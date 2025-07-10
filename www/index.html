@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATC Screen Prototype</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#0a0a0a',
+                        panel: '#1a1a1a',
+                        text: '#e0e0e0',
+                        highlight: '#4CAF50',
+                        warning: '#FFC107',
+                        danger: '#F44336',
+                        border: '#333',
+                        hover: '#2a2a2a',
+                    },
+                    minWidth: {
+                        '72': '18rem',
+                        '96': '24rem',
+                        '104': '26rem',
+                        '120': '30rem',
+                    },
+                    width: {
+                        '104': '26rem',
+                        '120': '30rem',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="aircraft-labels.css">
+    <link rel="preload" href="/sounds/airbus_retard.mp3" as="audio">
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+            
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- WebSocket Client -->
+    <script src="websocket-client.js"></script>
+    
+    <!-- Audio Client -->
+    <script src="audio-client.js"></script>
+
+    <!-- Map Manager -->
+    <script src="map-manager.js"></script>
+    
+    <!-- Aircraft Animation Engine -->
+    <script src="aircraft-animation.js"></script>
+</head>
+<body class="bg-background text-text m-0 p-0 font-mono overflow-hidden h-screen flex flex-col" x-data>
+    <div id="app-container" class="flex flex-col h-screen">
+        <!-- Header Removed-->
+
+        
+        <!-- Main Content with Sidebar Layout -->
+        <div class="flex flex-1 overflow-hidden">
+            <!-- Left Content Area (Settings, Map) -->
+            <div class="flex flex-col flex-1 relative">
+                <!-- Main Content -->
+                <main class="flex flex-1 overflow-hidden relative">
+                    <!-- Settings Panel -->
+                    <aside id="settings-panel" 
+                          :class="{ '-translate-x-full': $store.atc.settingsCollapsed }"
+                          class="w-80 min-w-80 bg-panel border-r border-border absolute left-0 top-0 bottom-0 transition-transform duration-300 z-50">
+                        <button class="absolute -right-4 top-2.5 w-8 h-8 bg-panel border border-border rounded-full text-text cursor-pointer flex items-center justify-center z-50 transition-transform duration-300"
+                                :class="{ 'rotate-180': $store.atc.settingsCollapsed }"
+                                @click="$store.atc.settingsCollapsed = !$store.atc.settingsCollapsed">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        
+                        <div class="p-4 h-full overflow-y-auto overflow-x-hidden bg-panel">
+                            <!-- Display Settings -->
+                            <section class="mb-5">
+                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Display</h3>
+                                <div class="grid gap-2.5">
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Aircraft Labels</span>
+                                        <label class="switch">
+                                            <input type="checkbox" x-model="$store.atc.settings.showLabels" @change="$store.atc.toggleLabels()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Aircraft Tracks</span>
+                                        <label class="switch">
+                                            <input type="checkbox" x-model="$store.atc.settings.showPaths" @change="$store.atc.togglePaths()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- New Trail Length Slider -->
+                                    <div class="flex items-center justify-between gap-2.5 pt-1.5">
+                                        <span class="text-sm">Track Length (min)</span>
+                                        <div class="flex items-center flex-1 min-w-0">
+                                            <input type="range" 
+                                                   x-model.number="$store.atc.settings.trailLength" 
+                                                   min="1" 
+                                                   max="10" 
+                                                   step="1"
+                                                   @input="$store.atc.applyFilters()" 
+                                                   class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
+                                            <span class="w-9 text-right text-sm" x-text="$store.atc.settings.trailLength"></span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Distance Rings</span>
+                                        <label class="switch">
+                                            <input type="checkbox" x-model="$store.atc.settings.showRings" @change="$store.atc.toggleRings()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Aircraft Animation Settings -->
+                                    <div class="border-t border-border pt-2.5 mt-2.5">
+                                        <div class="flex items-center justify-between gap-2.5 mb-2">
+                                            <span class="text-sm">Smooth Animation</span>
+                                            <label class="switch">
+                                                <input type="checkbox" x-model="$store.atc.settings.aircraftAnimation.enabled" @change="$store.atc.toggleAnimation()">
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                        
+                                        <!-- Animation FPS Slider -->
+                                        <div class="flex items-center justify-between gap-2.5 pt-1.5" x-show="$store.atc.settings.aircraftAnimation.enabled">
+                                            <span class="text-sm">Animation Quality (FPS)</span>
+                                            <div class="flex items-center flex-1 min-w-0">
+                                                <input type="range"
+                                                       x-model.number="$store.atc.settings.aircraftAnimation.interpolationFps"
+                                                       min="5"
+                                                       max="30"
+                                                       step="5"
+                                                       @input="$store.atc.saveSettings()"
+                                                       class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
+                                                <span class="w-9 text-right text-sm" x-text="$store.atc.settings.aircraftAnimation.interpolationFps"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Performance Options -->
+                                        <div class="flex items-center justify-between gap-2.5 pt-1.5" x-show="$store.atc.settings.aircraftAnimation.enabled">
+                                            <span class="text-sm text-xs">Adaptive Performance</span>
+                                            <label class="switch">
+                                                <input type="checkbox" x-model="$store.atc.settings.aircraftAnimation.adaptivePerformance" @change="$store.atc.saveSettings()">
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                            
+                            
+                            <!-- General Settings -->
+                            <section class="mb-5">
+                                 <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">General Settings</h3>
+                                 <div class="grid gap-2.5">
+                                           
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Tracks Limit</span>
+                                        <div class="flex items-center flex-1 min-w-0">
+                                            <input type="range"
+                                                   x-model.number="$store.atc.settings.tracksLimit"
+                                                   min="100"
+                                                   max="3600"
+                                                   step="100"
+                                                   @input="$store.atc.saveSettings()"
+                                                   class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
+                                            <span class="w-12 text-right text-sm" x-text="$store.atc.settings.tracksLimit"></span>
+                                        </div>
+                                    </div>
+                                    </div>
+                            </section>
+                            
+                            <!-- Station Override Settings -->
+                            <section class="mb-5">
+                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Station Override</h3>
+                                <div class="grid gap-2.5">
+                                    <!-- Current Position Display -->
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Current Position</span>
+                                        <div class="text-xs text-text/70 font-mono">
+                                            <span x-text="($store.atc.stationOverride.active ? $store.atc.stationOverride.latitude : $store.atc.stationLatitude)?.toFixed(4) || 'Loading...'"></span>,
+                                            <span x-text="($store.atc.stationOverride.active ? $store.atc.stationOverride.longitude : $store.atc.stationLongitude)?.toFixed(4) || 'Loading...'"></span>
+                                            <span x-show="$store.atc.stationOverride.active" class="text-orange-400 ml-1">(Override)</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- GPS Coordinate Inputs -->
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label class="text-xs text-text/70 block mb-1">Latitude</label>
+                                            <input type="number"
+                                                   x-model="$store.atc.stationOverride.latitude"
+                                                   step="0.000001"
+                                                   placeholder="43.6777"
+                                                   class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-text/70 block mb-1">Longitude</label>
+                                            <input type="number"
+                                                   x-model="$store.atc.stationOverride.longitude"
+                                                   step="0.000001"
+                                                   placeholder="-79.6248"
+                                                   class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Action Buttons -->
+                                    <div class="flex gap-1">
+                                        <button @click="$store.atc.setStationFromMap()"
+                                                title="Click map to set coordinates"
+                                                :class="$store.atc.stationOverride.mapClickMode ? 'bg-orange-600/70 text-white' : 'bg-slate-700/50 hover:bg-slate-600/70 text-slate-300 hover:text-white'"
+                                                class="flex items-center justify-center w-8 h-8 rounded transition-all border border-slate-600/50 hover:border-slate-500">
+                                            <i class="fas fa-crosshairs text-xs"></i>
+                                        </button>
+                                        <button @click="$store.atc.useGeolocation()"
+                                                title="Use device location"
+                                                class="flex items-center justify-center w-8 h-8 bg-blue-700/50 hover:bg-blue-600/70 text-blue-300 hover:text-white rounded transition-all border border-blue-600/50 hover:border-blue-500">
+                                            <i class="fas fa-location-arrow text-xs"></i>
+                                        </button>
+                                        <button @click="$store.atc.applyStationOverride()"
+                                                class="flex-1 px-3 py-1.5 bg-emerald-700/50 hover:bg-emerald-600/70 text-emerald-300 hover:text-white rounded transition-all border border-emerald-600/50 hover:border-emerald-500 font-medium text-xs">
+                                            Apply
+                                        </button>
+                                        <button x-show="$store.atc.stationOverride.active"
+                                                @click="$store.atc.clearStationOverride()"
+                                                title="Clear override"
+                                                class="flex items-center justify-center w-8 h-8 bg-red-700/50 hover:bg-red-600/70 text-red-300 hover:text-white rounded transition-all border border-red-600/50 hover:border-red-500">
+                                            <i class="fas fa-times text-xs"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Auto-Update Toggle -->
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Auto-update from GPS</span>
+                                        <label class="switch">
+                                            <input type="checkbox"
+                                                   x-model="$store.atc.stationOverride.autoUpdate"
+                                                   @change="$store.atc.toggleGeolocationAutoUpdate()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Update Interval -->
+                                    <div x-show="$store.atc.stationOverride.autoUpdate" class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Update interval</span>
+                                        <select x-model="$store.atc.stationOverride.updateInterval"
+                                                @change="$store.atc.updateGeolocationInterval()"
+                                                class="px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                                            <option value="30">30s</option>
+                                            <option value="60">1m</option>
+                                            <option value="120">2m</option>
+                                            <option value="300">5m</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Status Messages -->
+                                    <div x-show="$store.atc.stationOverride.mapClickMode"
+                                         class="text-xs text-orange-400 bg-orange-900/20 border border-orange-700/50 rounded px-2 py-1.5">
+                                        <i class="fas fa-crosshairs mr-1"></i>
+                                        Click on the map to set station location
+                                    </div>
+                                    
+                                    <div x-show="$store.atc.stationOverride.autoUpdate && $store.atc.stationOverride.geolocationStatus"
+                                         class="text-xs text-blue-400 bg-blue-900/20 border border-blue-700/50 rounded px-2 py-1.5">
+                                        <i class="fas fa-satellite-dish mr-1"></i>
+                                        <span x-text="$store.atc.stationOverride.geolocationStatus"></span>
+                                    </div>
+                                </div>
+                            </section>
+                            
+                            <!-- Last Seen Filter Section -->
+                            <section class="mb-5">
+                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Aircraft Retention</h3>
+                                <div class="grid gap-2.5">
+                                    <!-- Last Seen Filter Slider -->
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Last Seen (min)</span>
+                                        <div class="flex items-center flex-1 min-w-0">
+                                            <input type="range"
+                                                   x-model.number="$store.atc.settings.lastSeenMinutes"
+                                                   min="1"
+                                                   max="60"
+                                                   step="1"
+                                                   @input.debounce.500ms="$store.atc.requestNewAircraftData()"
+                                                   class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
+                                            <span class="w-9 text-right text-sm" x-text="$store.atc.settings.lastSeenMinutes"></span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Exclude Other Airports Grounded Toggle -->
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Hide Remote Ground Traffic</span>
+                                        <label class="switch">
+                                            <input type="checkbox" x-model="$store.atc.settings.excludeOtherAirportsGrounded" @change="$store.atc.requestNewAircraftData()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </section>
+                            
+                            <!-- Debug Settings -->
+                            <section class="mb-5">
+                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Debug Settings</h3>
+                                <div class="grid gap-2.5">
+                                    <!-- WebSocket Updates Pause/Play Button -->
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">WebSocket Updates</span>
+                                        <button @click="$store.atc.toggleWebSocketUpdates()"
+                                                :class="{
+                                                    'bg-green-500/20 border-green-500/50 text-green-400': !$store.atc.wsUpdatesPaused,
+                                                    'bg-red-500/20 border-red-500/50 text-red-400': $store.atc.wsUpdatesPaused
+                                                }"
+                                                class="px-3 py-1.5 rounded border text-xs font-medium transition-all duration-200 hover:bg-opacity-80 flex items-center gap-1.5">
+                                            <i :class="$store.atc.wsUpdatesPaused ? 'fas fa-play' : 'fas fa-pause'"></i>
+                                            <span x-text="$store.atc.wsUpdatesPaused ? 'Resume' : 'Pause'"></span>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Removed Map Updates and Data Only Mode debug toggles -->
+                                </div>
+                            </section>
+                            
+                            <!-- Simulated Aircraft Settings -->
+                            <section class="mb-5">
+                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Simulated Aircraft</h3>
+                                <div class="grid gap-2.5">
+                                    <button @click="$store.atc.showCreateSimulatedAircraft = true"
+                                            class="px-3 py-1.5 bg-blue-700/50 hover:bg-blue-600/70 text-blue-300 hover:text-white rounded transition-all border border-blue-600/50 hover:border-blue-500 font-medium text-xs">
+                                        <i class="fas fa-plus mr-1"></i>
+                                        Add Simulated Aircraft
+                                    </button>
+                                    
+                                    <!-- Simulated Aircraft List -->
+                                    <div class="mt-4">
+                                        <h4 class="text-sm font-medium text-text mb-2 flex items-center gap-2">
+                                            <i class="fas fa-gamepad text-blue-400"></i>
+                                            Active Simulated Aircraft
+                                        </h4>
+                                        <div x-data="{ simulatedAircraft: [] }"
+                                             x-init="
+                                                 // Load simulated aircraft on init
+                                                 fetch('/api/v1/simulation/aircraft')
+                                                     .then(response => response.json())
+                                                     .then(data => simulatedAircraft = data || [])
+                                                     .catch(error => console.error('Failed to load simulated aircraft:', error));
+                                                 
+                                                 // Refresh every 5 seconds
+                                                 setInterval(() => {
+                                                     fetch('/api/v1/simulation/aircraft')
+                                                         .then(response => response.json())
+                                                         .then(data => simulatedAircraft = data || [])
+                                                         .catch(error => console.error('Failed to refresh simulated aircraft:', error));
+                                                 }, 5000);
+                                             ">
+                                            <template x-if="simulatedAircraft.length === 0">
+                                                <div class="text-xs text-text/60 italic p-2 bg-background/30 rounded border border-border/30">
+                                                    No simulated aircraft active
+                                                </div>
+                                            </template>
+                                            
+                                            <template x-if="simulatedAircraft.length > 0">
+                                                <div class="space-y-2">
+                                                    <template x-for="aircraft in simulatedAircraft" :key="aircraft.hex">
+                                                        <div class="flex items-center justify-between p-2 bg-blue-900/10 border border-blue-700/30 rounded">
+                                                            <div class="flex-1">
+                                                                <div class="text-sm font-medium text-blue-300" x-text="aircraft.flight || aircraft.hex"></div>
+                                                                <div class="text-xs text-blue-400/70">
+                                                                    <span x-text="Math.round(aircraft.target_heading) + '° • ' + Math.round(aircraft.target_speed) + 'kt • ' + (aircraft.target_vertical_rate >= 0 ? '+' : '') + Math.round(aircraft.target_vertical_rate) + 'fpm'"></span>
+                                                                </div>
+                                                            </div>
+                                                            <button @click="
+                                                                if (confirm('Remove simulated aircraft ' + (aircraft.flight || aircraft.hex) + '?')) {
+                                                                    fetch('/api/v1/simulation/aircraft/' + aircraft.hex, { method: 'DELETE' })
+                                                                        .then(response => {
+                                                                            if (response.ok) {
+                                                                                simulatedAircraft = simulatedAircraft.filter(a => a.hex !== aircraft.hex);
+                                                                            } else {
+                                                                                alert('Failed to remove aircraft');
+                                                                            }
+                                                                        })
+                                                                        .catch(error => {
+                                                                            console.error('Error removing aircraft:', error);
+                                                                            alert('Error removing aircraft');
+                                                                        });
+                                                                }
+                                                            "
+                                                                    class="ml-2 px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 hover:text-red-300 rounded text-xs transition-colors">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </aside>
+                    
+                    <!-- Map Container -->
+                    <div class="flex-1 relative z-10">
+                        <!-- Aircraft Movement Alerts Bar -->
+                        <!-- Static Alerts Bar -->
+                        <div id="alerts-bar" class="absolute top-4 left-1/2 transform -translate-x-1/2 w-1/2 z-[10000]">
+                            <div class="bg-black/60 backdrop-blur-sm border-2 border-highlight/40 rounded-lg shadow-[0_5px_15px_rgba(0,0,0,0.5)] px-3 py-2 w-full min-h-[40px] flex items-center">
+                                <div class="text-text/80 text-xs font-medium mr-2">Alerts:</div>
+                                <div id="alerts-container" class="flex flex-wrap gap-1.5 items-center flex-1">
+                                    <!-- Static "None" text that's always visible when no alerts -->
+                                    <div class="text-text/50 text-xs" id="no-alerts-text">None</div>
+                                    
+                                    <!-- Dynamic alerts will be added here by JavaScript -->
+                                </div>
+                                <!-- Clear all alerts button -->
+                                <button @click="$store.atc.clearAllAircraftAlerts()"
+                                        x-show="$store.atc.aircraftAlerts.length > 0"
+                                        class="ml-2 text-text/40 hover:text-text/80 transition-colors duration-200 cursor-pointer flex items-center justify-center w-4 h-4"
+                                        title="Clear all alerts">
+                                    <i class="fas fa-times text-xs"></i>
+                                </button>
+                                
+                            </div>
+                        </div>
+                        
+                        <div id="map" class="h-full w-full bg-black"></div>
+                    </div>
+
+                    <!-- Connection Lost Overlay - Only show after initialization and when connection is lost -->
+                    <div class="fixed inset-0 bg-black/50 flex justify-center items-center z-[9000] transition-all duration-500"
+                         :class="{ 'opacity-100 visible': !$store.atc.connected && $store.atc.initialDataLoaded, 'opacity-0 invisible pointer-events-none': $store.atc.connected || !$store.atc.initialDataLoaded }">
+                        <div class="text-center text-danger text-4xl font-bold uppercase tracking-wider animate-pulse bg-black/50 p-8 rounded-lg shadow-2xl">
+                            <i class="fas fa-wifi-slash text-6xl mb-4 block"></i>
+                            Connection Lost
+                        </div>
+                    </div>
+                    
+                    <!-- Welcome Splash Screen -->
+                    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-[10000] transition-all duration-500"
+                         :class="{ 'opacity-100 visible splash-screen-enter': $store.atc.showSplashScreen, 'opacity-0 invisible pointer-events-none splash-screen-exit': !$store.atc.showSplashScreen }">
+                        <div class="bg-panel border-2 border-highlight/30 rounded-lg shadow-2xl max-w-2xl w-full mx-4 overflow-hidden splash-content">
+                            <!-- Header -->
+                            <div class="bg-black/50 p-4 border-b border-highlight/20">
+                                <div class="flex items-center justify-between">
+                                    <h2 class="text-2xl font-bold text-highlight">
+                                        <i class="fas fa-plane-arrival mr-2"></i>Co-ATC
+                                    </h2>
+                                    <div class="text-sm text-text/70">
+                                        <i class="fas fa-clock mr-1"></i>
+                                        <span x-text="$store.atc.zuluTime"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Content -->
+                            <div class="p-6">
+                                <!-- Welcome Message -->
+                                <div class="mb-6">
+                                    <h3 class="text-xl text-text mb-2">Welcome to Co-ATC</h3>
+                                    <p class="text-text/80">Real-time aircraft tracking and monitoring for modern air traffic control operations.</p>
+                                </div>
+                                
+                                <!-- Station Data -->
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                    <!-- Station Info -->
+                                    <div class="bg-black/30 rounded-lg p-4 border border-border">
+                                        <h4 class="text-highlight text-sm border-b border-border pb-1 mb-3">
+                                            <i class="fas fa-broadcast-tower mr-1"></i>Station Information
+                                        </h4>
+                                        <div class="space-y-2">
+                                            <div class="flex justify-between">
+                                                <span class="text-text/70">Airport Code:</span>
+                                                <span class="font-mono font-bold" x-text="$store.atc.stationAirportCode || 'N/A'"></span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-text/70">Coordinates:</span>
+                                                <span class="font-mono" x-text="$store.atc.stationLatitude && $store.atc.stationLongitude ?
+                                                    $store.atc.stationLatitude.toFixed(4) + ', ' + $store.atc.stationLongitude.toFixed(4) : 'N/A'"></span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-text/70">Elevation:</span>
+                                                <span class="font-mono" x-text="$store.atc.stationElevationFeet ? $store.atc.stationElevationFeet + ' ft' : 'N/A'"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Aircraft Data -->
+                                    <div class="bg-black/30 rounded-lg p-4 border border-border">
+                                        <h4 class="text-highlight text-sm border-b border-border pb-1 mb-3">
+                                            <i class="fas fa-plane mr-1"></i>Aircraft Status
+                                        </h4>
+                                        <div class="space-y-2">
+                                            <div class="flex justify-between">
+                                                <span class="text-text/70">In Air:</span>
+                                                <span class="font-mono font-bold text-highlight" x-text="$store.atc.counts.air_total || '0'"></span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-text/70">On Ground:</span>
+                                                <span class="font-mono font-bold text-gray-400" x-text="$store.atc.counts.ground_total || '0'"></span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-text/70">Total Aircraft:</span>
+                                                <span class="font-mono font-bold" x-text="($store.atc.counts.air_total || 0) + ($store.atc.counts.ground_total || 0)"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- METAR Data -->
+                                <div x-show="$store.atc.getLatestMetar()" class="bg-black/30 rounded-lg p-4 border border-border mb-6">
+                                    <h4 class="text-highlight text-sm border-b border-border pb-1 mb-3">
+                                        <i class="fas fa-cloud mr-1"></i>Latest METAR
+                                    </h4>
+                                                                        <div class="font-mono text-xs bg-black/50 p-3 rounded overflow-x-auto whitespace-nowrap">                                        <span x-text="$store.atc.metar && $store.atc.metar.trend && $store.atc.metar.trend.length > 0 ? $store.atc.metar.trend[0].metar : 'No METAR data available'"></span>                                    </div>                                </div>                            </div>                                                        <!-- Connection Status -->                            <div class="bg-black/30 p-3 border-t border-border/50 flex justify-center">                                <div class="flex items-center gap-2 text-sm">                                    <template x-if="$store.atc.connected === true">                                        <div class="flex items-center text-highlight">                                            <i class="fas fa-check-circle mr-2"></i>                                            Connected to Data Stream                                        </div>                                    </template>                                    <template x-if="$store.atc.connected === null">                                        <div class="flex items-center text-yellow-400">                                            <i class="fas fa-spinner fa-spin mr-2"></i>                                            Connecting to Data Stream...                                        </div>                                    </template>                                    <template x-if="$store.atc.connected === false">                                        <div class="flex items-center text-red-400">                                            <i class="fas fa-exclamation-triangle mr-2"></i>                                            Connection Lost - Reconnecting...                                        </div>                                    </template>                                </div>                            </div>                                                        <!-- Footer with Start Button -->                            <div class="bg-black/50 p-4 border-t border-highlight/20 flex justify-center">                                <button @click="$store.atc.closeSplashScreen()"                                        :disabled="$store.atc.connected !== true"                                        :class="{                                            'bg-highlight hover:bg-highlight/80 text-white cursor-pointer': $store.atc.connected === true,                                            'bg-gray-600 text-gray-400 cursor-not-allowed': $store.atc.connected !== true                                        }"                                        class="font-bold py-2 px-6 rounded-full transition-all duration-200 flex items-center">                                    <template x-if="$store.atc.connected === true">                                        <div class="flex items-center">                                            <i class="fas fa-play mr-2"></i>                                            Start Monitoring                                        </div>                                    </template>                                    <template x-if="$store.atc.connected !== true">                                        <div class="flex items-center">                                            <i class="fas fa-spinner fa-spin mr-2"></i>                                            <span x-text="$store.atc.connected === null ? 'Waiting for Connection...' : 'Reconnecting...'"></span>                                        </div>                                    </template>                                </button>                            </div>
+                        </div>
+                    </div>
+                </main>
+                
+                <!-- End of main content -->
+                </main>
+            </div>
+            <!-- End of left content area -->
+            
+            <!-- Right Sidebar -->
+            <aside class="w-120 min-w-120 bg-panel border-l border-border flex flex-col overflow-hidden z-50">
+                <!-- Aircraft List - Only shown when no aircraft is selected -->
+                <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col p-4 bg-panel">
+                    <div class="mb-2.5">
+                        <div class="flex justify-between items-center mb-1.5 relative pb-1">
+                            <h3 class="text-highlight text-base m-0">Tracked Targets</h3>
+                            <!-- Subtle green underline -->
+                            <div class="absolute bottom-0 left-0 right-0 h-px bg-highlight/30"></div>
+                        </div>
+                    </div>
+
+                    <!-- Search and Altitude Filter Row -->
+                    <div class="flex mb-2.5 gap-2">
+                        <!-- Search Box (50%) -->
+                        <div class="relative flex-1">
+                            <input type="text"
+                                   class="w-full p-1.5 pr-8 bg-background border border-border text-text rounded text-sm transition-all duration-200 focus:border-highlight/50 focus:shadow-[0_0_5px_rgba(76,175,80,0.1)] focus:outline-none"
+                                   placeholder="Search callsign, type, category..."
+                                   x-model="$store.atc.searchTerm"
+                                   @input.debounce.300ms="$store.atc.applyFilters()"
+                                   @keydown.tab.prevent="$store.atc.cycleToNextAircraft()"
+                                   @keydown.shift.tab.prevent="$store.atc.cycleToPreviousAircraft()">
+                            <button x-show="$store.atc.searchTerm.length > 0"
+                                    @click="$store.atc.searchTerm = ''; $store.atc.applyFilters()"
+                                    class="absolute right-2 top-1/2 transform -translate-y-1/2 text-text/50 hover:text-highlight transition-colors duration-200 cursor-pointer">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Altitude Filter (50%) -->
+                        <div class="flex-1 flex gap-1">
+                            <input type="number"
+                                   x-model.number="$store.atc.settings.minAltitude"
+                                   @input.debounce.300ms="$store.atc.applyFilters()"
+                                   placeholder="0"
+                                   min="0"
+                                   max="60000"
+                                   class="flex-1 p-1.5 bg-background border border-border text-text rounded text-sm transition-all duration-200 focus:border-highlight/50 focus:shadow-[0_0_5px_rgba(76,175,80,0.1)] focus:outline-none">
+                            <input type="number"
+                                   x-model.number="$store.atc.settings.maxAltitude"
+                                   @input.debounce.300ms="$store.atc.applyFilters()"
+                                   placeholder="60000"
+                                   min="0"
+                                   max="60000"
+                                   class="flex-1 p-1.5 bg-background border border-border text-text rounded text-sm transition-all duration-200 focus:border-highlight/50 focus:shadow-[0_0_5px_rgba(76,175,80,0.1)] focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Status Filter Buttons -->
+                    <div class="flex mb-2.5 gap-1.5">
+                        <!-- Air and Ground buttons side by side with equal width -->
+                        <div class="flex gap-1.5 flex-1">
+                            <button @click="$store.atc.toggleAirAircraft()"
+                                    :class="{
+                                        'bg-highlight/20 border-highlight/50 text-highlight': $store.atc.settings.showAirAircraft,
+                                        'bg-panel hover:bg-hover border-border text-text/70': !$store.atc.settings.showAirAircraft
+                                    }"
+                                    class="flex-1 px-2 py-1.5 border rounded text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
+                                <span class="w-2 h-2 rounded-full bg-highlight flex-shrink-0"></span>
+                                <span class="whitespace-nowrap"><strong>A</strong>ir (<span x-text="$store.atc.counts.air_active"></span>/<span x-text="$store.atc.counts.air_total"></span>)</span>
+                            </button>
+                            <button @click="$store.atc.toggleGroundAircraft()"
+                                    :class="{
+                                        'bg-gray-400/20 border-gray-400/50 text-gray-400': $store.atc.settings.showGroundAircraft,
+                                        'bg-panel hover:bg-hover border-border text-text/70': !$store.atc.settings.showGroundAircraft
+                                    }"
+                                    class="flex-1 px-2 py-1.5 border rounded text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
+                                <span class="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0"></span>
+                                <span class="whitespace-nowrap"><strong>G</strong>round (<span x-text="$store.atc.counts.ground_active"></span>/<span x-text="$store.atc.counts.ground_total"></span>)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Flight Phase Filter Buttons -->
+                    <div class="mb-2.5">
+                        <div class="grid grid-cols-8 gap-1.5">
+                            <button @click="$store.atc.togglePhaseFilter('NEW')"
+                                    :class="{
+                                        'bg-gray-500/20 border-gray-500/50 text-gray-400': $store.atc.settings.phaseFilters?.NEW !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.NEW === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">1</span>
+                                <span class="whitespace-nowrap">NEW</span>
+                            </button>
+                            <button @click="$store.atc.togglePhaseFilter('TAX')"
+                                    :class="{
+                                        'bg-purple-500/20 border-purple-500/50 text-purple-400': $store.atc.settings.phaseFilters?.TAX !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.TAX === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">2</span>
+                                <span class="whitespace-nowrap">TAX</span>
+                            </button>
+                            <button @click="$store.atc.togglePhaseFilter('T/O')"
+                                    :class="{
+                                        'bg-orange-500/20 border-orange-500/50 text-orange-400': $store.atc.settings.phaseFilters?.['T/O'] !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.['T/O'] === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">3</span>
+                                <span class="whitespace-nowrap">T/O</span>
+                            </button>
+                            <button @click="$store.atc.togglePhaseFilter('DEP')"
+                                    :class="{
+                                        'bg-green-500/20 border-green-500/50 text-green-400': $store.atc.settings.phaseFilters?.DEP !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.DEP === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">4</span>
+                                <span class="whitespace-nowrap">DEP</span>
+                            </button>
+                            <button @click="$store.atc.togglePhaseFilter('CRZ')"
+                                    :class="{
+                                        'bg-blue-500/20 border-blue-500/50 text-blue-400': $store.atc.settings.phaseFilters?.CRZ !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.CRZ === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">5</span>
+                                <span class="whitespace-nowrap">CRZ</span>
+                            </button>
+                            <button @click="$store.atc.togglePhaseFilter('ARR')"
+                                    :class="{
+                                        'bg-red-500/20 border-red-500/50 text-red-400': $store.atc.settings.phaseFilters?.ARR !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.ARR === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">6</span>
+                                <span class="whitespace-nowrap">ARR</span>
+                            </button>
+                            <button @click="$store.atc.togglePhaseFilter('APP')"
+                                    :class="{
+                                        'bg-yellow-500/20 border-yellow-500/50 text-yellow-400': $store.atc.settings.phaseFilters?.APP !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.APP === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">7</span>
+                                <span class="whitespace-nowrap">APP</span>
+                            </button>
+                            <button @click="$store.atc.togglePhaseFilter('T/D')"
+                                    :class="{
+                                        'bg-teal-500/20 border-teal-500/50 text-teal-400': $store.atc.settings.phaseFilters?.['T/D'] !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.['T/D'] === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">8</span>
+                                <span class="whitespace-nowrap">T/D</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Aircraft Table - Wrapped in scrollable container -->
+                    <div class="overflow-y-auto overflow-x-auto flex-1 min-h-0 pr-0">
+                        <table class="w-full table-fixed mt-2.5 text-xs">
+                        <thead>
+                            <tr>
+                                <th @click="$store.atc.toggleSort('phase')"
+                                    class="p-1.5 text-center text-highlight font-normal uppercase tracking-wider text-[10px] w-[70px] cursor-pointer hover:bg-hover/30 group transition-colors">
+                                    <div class="flex items-center justify-center gap-1">
+                                        Phase
+                                        <i class="fas transition-opacity"
+                                           :class="{
+                                               'fa-sort-up': $store.atc.sortColumn === 'phase' && $store.atc.sortDirection === 'asc',
+                                               'fa-sort-down': $store.atc.sortColumn === 'phase' && $store.atc.sortDirection === 'desc',
+                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'phase'
+                                           }"></i>
+                                    </div>
+                                </th>
+                                <th @click="$store.atc.toggleSort('callsign')"
+                                    class="p-1.5 text-left text-highlight font-normal uppercase tracking-wider text-[10px] w-[80px] cursor-pointer hover:bg-hover/30 group transition-colors">
+                                    <div class="flex items-center gap-1">
+                                        Callsign
+                                        <i class="fas transition-opacity"
+                                           :class="{
+                                               'fa-sort-up': $store.atc.sortColumn === 'callsign' && $store.atc.sortDirection === 'asc',
+                                               'fa-sort-down': $store.atc.sortColumn === 'callsign' && $store.atc.sortDirection === 'desc',
+                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'callsign'
+                                           }"></i>
+                                    </div>
+                                </th>
+                                <th @click="$store.atc.toggleSort('altitude')"
+                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[65px] cursor-pointer hover:bg-hover/30 group transition-colors">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <i class="fas fa-layer-group w-3"></i> Alt
+                                        <i class="fas transition-opacity"
+                                           :class="{
+                                               'fa-sort-up': $store.atc.sortColumn === 'altitude' && $store.atc.sortDirection === 'asc',
+                                               'fa-sort-down': $store.atc.sortColumn === 'altitude' && $store.atc.sortDirection === 'desc',
+                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'altitude'
+                                           }"></i>
+                                    </div>
+                                </th>
+                                <th @click="$store.atc.toggleSort('heading')"
+                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[55px] cursor-pointer hover:bg-hover/30 group transition-colors">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <i class="fas fa-compass w-3"></i> Hdg
+                                        <i class="fas transition-opacity"
+                                           :class="{
+                                               'fa-sort-up': $store.atc.sortColumn === 'heading' && $store.atc.sortDirection === 'asc',
+                                               'fa-sort-down': $store.atc.sortColumn === 'heading' && $store.atc.sortDirection === 'desc',
+                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'heading'
+                                           }"></i>
+                                    </div>
+                                </th>
+                                <th @click="$store.atc.toggleSort('speed')"
+                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[55px] cursor-pointer hover:bg-hover/30 group transition-colors">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <i class="fas fa-tachometer-alt w-3"></i> TAS
+                                        <i class="fas transition-opacity"
+                                           :class="{
+                                               'fa-sort-up': $store.atc.sortColumn === 'speed' && $store.atc.sortDirection === 'asc',
+                                               'fa-sort-down': $store.atc.sortColumn === 'speed' && $store.atc.sortDirection === 'desc',
+                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'speed'
+                                           }"></i>
+                                    </div>
+                                </th>
+                                <th @click="$store.atc.toggleSort('gs')"
+                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[55px] cursor-pointer hover:bg-hover/30 group transition-colors">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <i class="fas fa-wind w-3"></i> GS
+                                        <i class="fas transition-opacity"
+                                           :class="{
+                                               'fa-sort-up': $store.atc.sortColumn === 'gs' && $store.atc.sortDirection === 'asc',
+                                               'fa-sort-down': $store.atc.sortColumn === 'gs' && $store.atc.sortDirection === 'desc',
+                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'gs'
+                                           }"></i>
+                                    </div>
+                                </th>
+                                <th @click="$store.atc.toggleSort('distance')"
+                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[55px] cursor-pointer hover:bg-hover/30 group transition-colors">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <i class="fas fa-route w-3"></i> NM
+                                        <i class="fas transition-opacity"
+                                           :class="{
+                                               'fa-sort-up': $store.atc.sortColumn === 'distance' && $store.atc.sortDirection === 'asc',
+                                               'fa-sort-down': $store.atc.sortColumn === 'distance' && $store.atc.sortDirection === 'desc',
+                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'distance'
+                                           }"></i>
+                                    </div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(aircraft, index) in $store.atc.filteredAircraft" :key="aircraft.hex">
+                                <tr @click="$store.atc.selectedAircraft = aircraft; if ($store.atc.mapManager) { $store.atc.mapManager.updateVisualState(aircraft.hex, true); $store.atc.mapManager.centerOnAircraft(aircraft); }"
+                                    @mouseover="$store.atc.hoveredAircraft = aircraft; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
+                                    @mouseout="$store.atc.hoveredAircraft = null; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
+                                    class="group cursor-pointer aircraft-row"
+                                    :class="{ 'signal-lost': aircraft.status === 'signal_lost' }"
+                                    :data-aircraft-hex="aircraft.hex">
+                                    <!-- Flight strip container -->
+                                    <td colspan="7">
+                                        <!-- Signal Lost Divider (conditional) -->
+                                        <div x-show="$store.atc.shouldShowSignalLostDivider(aircraft, index)" class="flex items-center justify-center py-2 mb-1">
+                                            <div class="flex-1 h-px bg-gray-600"></div>
+                                            <span class="px-3 text-xs text-gray-400 font-medium uppercase tracking-wide">Signal Lost</span>
+                                            <div class="flex-1 h-px bg-gray-600"></div>
+                                        </div>
+                                        
+                                        <div class="flex items-stretch rounded-lg overflow-hidden border transition-all duration-0 bg-black/30 mt-1"
+                                             :class="{
+                                                'border-gray-400/50 bg-gray-500/20': $store.atc.hoveredAircraft?.hex === aircraft.hex || $store.atc.selectedAircraft?.hex === aircraft.hex,
+                                                'border-border hover:border-gray-400/30 hover:bg-gray-500/10': !($store.atc.hoveredAircraft?.hex === aircraft.hex || $store.atc.selectedAircraft?.hex === aircraft.hex) && !($store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex)),
+                                                'border-green-400/35': $store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex) && !($store.atc.hoveredAircraft?.hex === aircraft.hex || $store.atc.selectedAircraft?.hex === aircraft.hex)
+                                             }">
+                                            <!-- Phase cell -->
+                                            <div class="p-1.5 text-center w-[70px] flex items-center justify-center">
+                                                <span x-show="aircraft.phase && aircraft.phase.current && aircraft.phase.current.length > 0"
+                                                      x-text="$store.atc.getCurrentPhase(aircraft)"
+                                                      class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center"
+                                                      :class="{
+                                                          'bg-blue-500/20 text-blue-400 border border-blue-500/30': $store.atc.getCurrentPhase(aircraft) === 'CRZ',
+                                                          'bg-green-500/20 text-green-400 border border-green-500/30': $store.atc.getCurrentPhase(aircraft) === 'DEP',
+                                                          'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': $store.atc.getCurrentPhase(aircraft) === 'APP',
+                                                          'bg-red-500/20 text-red-400 border border-red-500/30': $store.atc.getCurrentPhase(aircraft) === 'ARR',
+                                                          'bg-purple-500/20 text-purple-400 border border-purple-500/30': $store.atc.getCurrentPhase(aircraft) === 'TAX',
+                                                          'bg-orange-500/20 text-orange-400 border border-orange-500/30': $store.atc.getCurrentPhase(aircraft) === 'T/O',
+                                                          'bg-teal-500/20 text-teal-400 border border-teal-500/30': $store.atc.getCurrentPhase(aircraft) === 'T/D',
+                                                          'bg-gray-500/20 text-gray-400 border border-gray-500/30': $store.atc.getCurrentPhase(aircraft) === 'NEW'
+                                                      }"></span>
+                                                <span x-show="!aircraft.phase || !aircraft.phase.current || aircraft.phase.current.length === 0"
+                                                      x-text="'NEW'"
+                                                      class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-gray-500/20 text-gray-400 border border-gray-500/30"></span>
+                                            </div>
+                                            
+                                            <!-- Callsign cell -->
+                                            <div class="p-1.5 text-left w-[80px] transition-colors">
+                                                <div class="flex flex-col">
+                                                    <span x-html="$store.atc.highlightSearchMatch(aircraft.flight || aircraft.hex)"
+                                                          :title="aircraft.last_seen ? 'Last seen: ' + $store.atc.getSecondsSinceLastSeen(aircraft) + 's ago' : 'Unknown'"
+                                                          :class="{
+                                                              'text-red-400': aircraft.status === 'signal_lost',
+                                                              'text-highlight': !aircraft.on_ground && aircraft.status !== 'signal_lost',
+                                                              'text-white': aircraft.on_ground && aircraft.status !== 'signal_lost'
+                                                          }"
+                                                          class="text-sm"></span>
+                                                    <span class="text-[9px] text-gray-400 -mt-1"
+                                                          x-html="$store.atc.highlightSearchMatch((aircraft.adsb && aircraft.adsb.t ? aircraft.adsb.t : 'N/A'))">
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Altitude cell -->
+                                            <div class="p-1.5 text-right w-[65px]">
+                                                <div class="flex flex-col items-end">
+                                                    <div class="flex items-center justify-end">
+                                                        <span class="text-sm" x-text="(Math.round((aircraft.adsb ? aircraft.adsb.alt_baro : 0)/100)*100).toLocaleString()"></span>
+                                                        <i :class="[$store.atc.getAltitudeTrendIcon(aircraft), $store.atc.getAltitudeTrendClasses(aircraft), 'ml-1']"
+                                                           :title="aircraft.adsb && aircraft.adsb.baro_rate !== undefined ? Math.round(aircraft.adsb.baro_rate) + ' ft/min' : 'N/A'"></i>
+                                                    </div>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5">ft</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Divider -->
+                                            <div class="w-px bg-transparent my-1"></div>
+                                            
+                                            <!-- Heading cell -->
+                                            <div class="p-1.5 text-right w-[55px]">
+                                                <div class="flex flex-col items-end">
+                                                    <span class="text-sm" x-text="Math.round($store.atc.getHeadingWithType(aircraft).value) + '°'"></span>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType(aircraft).type)"></span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Divider -->
+                                            <div class="w-px bg-transparent my-1"></div>
+                                            
+                                            <!-- TAS cell -->
+                                            <div class="p-1.5 text-right w-[55px]">
+                                                <div class="flex flex-col items-end">
+                                                    <span class="text-sm" x-text="Math.round(aircraft.adsb ? aircraft.adsb.tas : 0)"></span>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5">tas</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Divider -->
+                                            <div class="w-px bg-transparent my-1"></div>
+                                            
+                                            <!-- GS cell -->
+                                            <div class="p-1.5 text-right w-[55px]">
+                                                <div class="flex flex-col items-end">
+                                                    <span class="text-sm" x-text="Math.round(aircraft.adsb ? aircraft.adsb.gs : 0)"></span>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5">gs</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Divider -->
+                                            <div class="w-px bg-transparent my-1"></div>
+                                            
+                                            <!-- Distance cell -->
+                                            <div class="p-1.5 text-right w-[55px] pr-3">
+                                                <div class="flex flex-col items-end">
+                                                    <span class="text-sm" x-text="aircraft.distance !== undefined && aircraft.distance !== null ? aircraft.distance : '-'"></span>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5" x-show="aircraft.distance !== undefined && aircraft.distance !== null">nm</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
+                
+                <!-- Aircraft Details - Takes full height when shown -->
+                <template x-if="$store.atc.selectedAircraft">
+                    <div class="flex-1 min-h-0 p-4 overflow-y-auto bg-panel">
+                        <!-- Flight Strip at the top -->
+                        <div class="mb-3">
+                            <!-- Flight Strip at the top -->
+                            <div class="flex items-stretch rounded-lg overflow-hidden border border-highlight/30 transition-all duration-200 bg-black/30 mb-2 shadow-[0_0_10px_rgba(76,175,80,0.05)]">
+                                <!-- Phase cell -->
+                                <div class="px-2.5 py-2 text-center w-[70px] flex items-center justify-center">
+                                    <span x-show="$store.atc.selectedAircraft.phase && $store.atc.selectedAircraft.phase.current && $store.atc.selectedAircraft.phase.current.length > 0"
+                                          x-text="$store.atc.getCurrentPhase($store.atc.selectedAircraft)"
+                                          class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center"
+                                          :class="{
+                                              'bg-blue-500/20 text-blue-400 border border-blue-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'CRZ',
+                                              'bg-green-500/20 text-green-400 border border-green-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'DEP',
+                                              'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'APP',
+                                              'bg-red-500/20 text-red-400 border border-red-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'ARR',
+                                              'bg-purple-500/20 text-purple-400 border border-purple-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'TAX',
+                                              'bg-orange-500/20 text-orange-400 border border-orange-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'T/O',
+                                              'bg-teal-500/20 text-teal-400 border border-teal-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'T/D',
+                                              'bg-gray-500/20 text-gray-400 border border-gray-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'NEW'
+                                          }"></span>
+                                    <span x-show="!$store.atc.selectedAircraft.phase || !$store.atc.selectedAircraft.phase.current || $store.atc.selectedAircraft.phase.current.length === 0"
+                                          x-text="'NEW'"
+                                          class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-gray-500/20 text-gray-400 border border-gray-500/30"></span>
+                                </div>
+                                
+                                <!-- Callsign cell -->
+                                <div class="px-2.5 py-2 text-left w-[80px] transition-colors">
+                                    <div class="flex flex-col">
+                                        <span x-html="$store.atc.highlightSearchMatch($store.atc.selectedAircraft.flight || $store.atc.selectedAircraft.hex)"
+                                              :class="{'text-highlight': !$store.atc.selectedAircraft.on_ground, 'text-white': $store.atc.selectedAircraft.on_ground}"
+                                              class="font-bold text-sm"></span>
+                                        <span class="text-[9px] text-gray-400 -mt-1"
+                                              x-html="$store.atc.highlightSearchMatch(($store.atc.selectedAircraft.adsb && $store.atc.selectedAircraft.adsb.t ? $store.atc.selectedAircraft.adsb.t : 'N/A'))">
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Altitude cell -->
+                                <div class="px-2.5 py-2 text-right w-[65px]">
+                                    <div class="flex flex-col items-end">
+                                        <div class="flex items-center justify-end">
+                                            <span class="text-sm" x-text="(Math.round(($store.atc.selectedAircraft.adsb ? $store.atc.selectedAircraft.adsb.alt_baro : 0)/100)*100).toLocaleString()"></span>
+                                            <i :class="[$store.atc.getAltitudeTrendIcon($store.atc.selectedAircraft), $store.atc.getAltitudeTrendClasses($store.atc.selectedAircraft), 'ml-1']"
+                                               :title="$store.atc.selectedAircraft.adsb && $store.atc.selectedAircraft.adsb.baro_rate !== undefined ? Math.round($store.atc.selectedAircraft.adsb.baro_rate) + ' ft/min' : 'N/A'"></i>
+                                        </div>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5">ft</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Divider -->
+                                <div class="w-px bg-transparent my-1.5"></div>
+                                
+                                <!-- Heading cell -->
+                                <div class="px-2.5 py-2 text-right w-[55px]">
+                                    <div class="flex flex-col items-end">
+                                        <span class="text-sm" x-text="Math.round($store.atc.getHeadingWithType($store.atc.selectedAircraft).value) + '°'"></span>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType($store.atc.selectedAircraft).type)"></span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Divider -->
+                                <div class="w-px bg-transparent my-1.5"></div>
+                                
+                                <!-- TAS cell -->
+                                <div class="px-2.5 py-2 text-right w-[55px]">
+                                    <div class="flex flex-col items-end">
+                                        <span class="text-sm" x-text="Math.round($store.atc.selectedAircraft.adsb ? $store.atc.selectedAircraft.adsb.tas : 0)"></span>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5">tas</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Divider -->
+                                <div class="w-px bg-transparent my-1.5"></div>
+                                
+                                <!-- GS cell -->
+                                <div class="px-2.5 py-2 text-right w-[55px]">
+                                    <div class="flex flex-col items-end">
+                                        <span class="text-sm" x-text="Math.round($store.atc.selectedAircraft.adsb ? $store.atc.selectedAircraft.adsb.gs : 0)"></span>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5">gs</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Divider -->
+                                <div class="w-px bg-transparent my-1.5"></div>
+                                
+                                <!-- Distance cell -->
+                                <div class="px-2.5 py-2 text-right w-[55px] pr-4">
+                                    <div class="flex flex-col items-end">
+                                        <span class="text-sm" x-text="$store.atc.selectedAircraft.distance !== undefined && $store.atc.selectedAircraft.distance !== null ? $store.atc.selectedAircraft.distance : '-'"></span>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5" x-show="$store.atc.selectedAircraft.distance !== undefined && $store.atc.selectedAircraft.distance !== null">nm</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Simulation Controls (only shown for simulated aircraft) -->
+                            <div x-show="$store.atc.selectedAircraft.is_simulated" class="mb-3 p-3 bg-blue-900/10 border border-blue-700/30 rounded-lg"
+                                 x-data="{
+                                     newHeading: $store.atc.selectedAircraft.simulation_controls?.target_heading || 0,
+                                     newSpeed: $store.atc.selectedAircraft.simulation_controls?.target_speed || 0,
+                                     newVerticalRate: $store.atc.selectedAircraft.simulation_controls?.target_vertical_rate || 0,
+                                     updating: false
+                                 }"
+                                 x-init="
+                                     newHeading = $store.atc.selectedAircraft.simulation_controls?.target_heading || 0;
+                                     newSpeed = $store.atc.selectedAircraft.simulation_controls?.target_speed || 0;
+                                     newVerticalRate = $store.atc.selectedAircraft.simulation_controls?.target_vertical_rate || 0;
+                                 ">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-blue-300 text-sm font-semibold flex items-center gap-2">
+                                        <i class="fas fa-gamepad"></i>
+                                        Simulation Controls
+                                    </h4>
+                                    <button @click="
+                                        updating = true;
+                                        $store.atc.updateSimulationControls($store.atc.selectedAircraft.hex, 'heading', newHeading)
+                                            .then(() => $store.atc.updateSimulationControls($store.atc.selectedAircraft.hex, 'speed', newSpeed))
+                                            .then(() => $store.atc.updateSimulationControls($store.atc.selectedAircraft.hex, 'vertical_rate', newVerticalRate))
+                                            .finally(() => updating = false);
+                                    "
+                                            :disabled="updating"
+                                            class="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white text-xs rounded transition-colors flex items-center gap-1">
+                                        <i class="fas fa-paper-plane" :class="{ 'animate-spin fa-spinner': updating }"></i>
+                                        <span x-text="updating ? 'Setting...' : 'Set'"></span>
+                                    </button>
+                                </div>
+                                
+                                <div class="grid grid-cols-3 gap-3 text-xs">
+                                    <!-- Heading Control -->
+                                    <div class="space-y-1">
+                                        <label class="text-blue-300 font-medium block">Heading</label>
+                                        <input type="range" min="0" max="359" step="1"
+                                               x-model="newHeading"
+                                               class="w-full h-1 bg-blue-800/50 rounded-lg appearance-none cursor-pointer slider-blue">
+                                        <div class="text-blue-200 font-mono text-center" x-text="Math.round(newHeading) + '°'"></div>
+                                    </div>
+                                    
+                                    <!-- Speed Control -->
+                                    <div class="space-y-1">
+                                        <label class="text-blue-300 font-medium block">Speed</label>
+                                        <input type="range" min="0" max="500" step="5"
+                                               x-model="newSpeed"
+                                               class="w-full h-1 bg-blue-800/50 rounded-lg appearance-none cursor-pointer slider-blue">
+                                        <div class="text-blue-200 font-mono text-center" x-text="Math.round(newSpeed) + ' kts'"></div>
+                                    </div>
+                                    
+                                    <!-- Vertical Rate Control -->
+                                    <div class="space-y-1">
+                                        <label class="text-blue-300 font-medium block">V/S</label>
+                                        <input type="range" min="-3000" max="3000" step="100"
+                                               x-model="newVerticalRate"
+                                               class="w-full h-1 bg-blue-800/50 rounded-lg appearance-none cursor-pointer slider-blue">
+                                        <div class="text-blue-200 font-mono text-center" x-text="(newVerticalRate >= 0 ? '+' : '') + Math.round(newVerticalRate)"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Current Values Display -->
+                                <div class="mt-2 pt-2 border-t border-blue-700/30">
+                                    <div class="text-blue-400/70 text-xs">
+                                        Current: <span class="font-mono">
+                                            <span x-text="Math.round($store.atc.selectedAircraft.simulation_controls?.target_heading || 0) + '°'"></span> •
+                                            <span x-text="Math.round($store.atc.selectedAircraft.simulation_controls?.target_speed || 0) + 'kt'"></span> •
+                                            <span x-text="($store.atc.selectedAircraft.simulation_controls?.target_vertical_rate >= 0 ? '+' : '') + Math.round($store.atc.selectedAircraft.simulation_controls?.target_vertical_rate || 0) + 'fpm'"></span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Navigation Buttons - 3-way toggle -->
+                            <div class="flex gap-1 mb-3">
+                                <!-- Details Button -->
+                                <button @click="$store.atc.aircraftDetailsShowHistoryView = false; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView(); $store.atc.stopPhaseHistoryRefresh()"
+                                        :class="{ 'bg-black/50 border-highlight text-highlight': !$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showProximityView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': $store.atc.aircraftDetailsShowHistoryView || $store.atc.showProximityView }"
+                                        class="flex-1 py-1.5 px-3 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5">
+                                    <i class="fas fa-info-circle text-xs"></i>
+                                    <span>DETAILS</span>
+                                </button>
+                                
+                                <!-- Tracks Button (History + Future) -->
+                                <button @click="$store.atc.aircraftDetailsShowHistoryView = true; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView()"
+                                        :class="{ 'bg-black/50 border-highlight text-highlight': $store.atc.aircraftDetailsShowHistoryView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': !$store.atc.aircraftDetailsShowHistoryView }"
+                                        class="flex-1 py-1.5 px-3 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5">
+                                    <i class="fas fa-route text-xs"></i>
+                                    <span>TRACKS</span>
+                                    <span x-show="$store.atc.aircraftDetailsHistoryCount > 0"
+                                          class="ml-1 bg-highlight/20 text-highlight text-[9px] px-1 py-0.5 rounded-full"
+                                          x-text="$store.atc.aircraftDetailsHistoryCount"></span>
+                                </button>
+                                
+                                <!-- Proximity Viewer Button -->
+                                <button @click="$store.atc.showProximityView = true; $store.atc.aircraftDetailsShowHistoryView = false; $store.atc.stopPhaseHistoryRefresh(); $store.atc.loadProximityData(); $store.atc.startProximityRefresh()"
+                                        :class="{ 'bg-black/50 border-amber-500 text-amber-400': $store.atc.showProximityView, 'bg-black/30 border-border/50 hover:border-amber-500/30 text-text/80 hover:text-amber-400/80': !$store.atc.showProximityView }"
+                                        class="flex-1 py-1.5 px-3 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5">
+                                    <i class="fas fa-broadcast-tower text-xs"></i>
+                                    <span>PROXIMITY</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Header removed entirely as it's redundant with flight strip -->
+                        
+                        <!-- History View -->
+                        <div x-show="$store.atc.aircraftDetailsShowHistoryView" class="mb-4">
+                            
+                            <!-- Mini-Map for Tracks -->
+                            <div class="mb-4 bg-black/30 border border-border rounded-lg overflow-hidden">
+                                <div class="h-64 relative aspect-video"
+                                     x-data="{
+                                        mapId: 'tracks-mini-map-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                                        initialized: false
+                                     }"
+                                     x-init="$el.id = mapId;"
+                                     x-effect="
+                                        $store.atc.aircraftDetailsShowHistoryView && !initialized ? (() => {
+                                            initialized = true;
+                                            if ($store.atc.mapManager && $store.atc.mapManager.cleanupTracksMiniMap) {
+                                                $store.atc.mapManager.cleanupTracksMiniMap();
+                                            }
+                                            setTimeout(() => {
+                                                const mapManager = $store.atc.mapManager;
+                                                if (mapManager && mapManager.initTracksMiniMap && document.getElementById(mapId)) {
+                                                    mapManager.initTracksMiniMap(mapId);
+                                                }
+                                            }, 500);
+                                        })() : null
+                                     ">
+                                    <div class="absolute top-2 left-2 bg-black/60 backdrop-blur-sm border border-border rounded px-2 py-1 text-xs z-[1000]">
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex items-center gap-1">
+                                                <div class="w-2 h-2 rounded-full"
+                                                     :class="$store.atc.selectedAircraft?.status === 'signal_lost' ? 'bg-danger' : 'bg-highlight'"></div>
+                                                <span class="text-text/80" x-text="$store.atc.selectedAircraft?.status === 'signal_lost' ? 'Past' : 'Current'"></span>
+                                            </div>
+                                            <div class="flex items-center gap-1">
+                                                <div class="w-2 h-0.5 bg-gray-400 opacity-60" style="border-top: 1px dashed #888888;"></div>
+                                                <span class="text-text/80">History</span>
+                                            </div>
+                                            <div class="flex items-center gap-1">
+                                                <div class="w-2 h-0.5 bg-warning" style="border-top: 1px dashed #FFC107;"></div>
+                                                <span class="text-text/80">Future</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="overflow-x-auto w-full">
+                                <table class="w-full table-fixed text-xs">
+                                    <thead>
+                                        <tr>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[28%]">Time</th>
+                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">Alt</th>
+                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">HDG</th>
+                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">TAS</th>
+                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">GS</th>
+                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[16%]"><i class="fas fa-route w-3"></i> NM</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-if="$store.atc.aircraftDetailsHistoryLoading">
+                                            <tr><td colspan="7" class="p-4 text-center"><div class="flex justify-center items-center"><div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-highlight"></div><span class="ml-2">Loading positions...</span></div></td></tr>
+                                        </template>
+                                        <template x-if="!$store.atc.aircraftDetailsHistoryLoading && $store.atc.aircraftDetailsHistoryData.length === 0 && $store.atc.aircraftDetailsFutureData.length === 0">
+                                            <tr><td colspan="7" class="p-4 text-center">No position data available</td></tr>
+                                        </template>
+                                        
+                                        <!-- Future positions (shown first) -->
+                                        <template x-if="$store.atc.aircraftDetailsFutureData.length > 0">
+                                            <tr>
+                                                <td colspan="7" class="p-1.5 text-left border-b border-gray-500/30 text-gray-400 font-semibold">
+                                                    Future Predictions
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <template x-for="(position, index) in $store.atc.aircraftDetailsFutureData" :key="'future-'+index">
+                                            <tr class="hover:bg-hover/50 transition-colors">
+                                                <td class="p-1.5 text-left border-b border-border text-gray-400">
+                                                    <span x-text="'+' + (index + 1) + ' min'"></span>
+                                                </td>
+                                                <td class="p-1.5 text-right border-b border-border text-gray-400">
+                                                    <div class="flex items-center justify-end">
+                                                        <span x-text="Math.round(position.altitude/100)*100"></span>
+                                                        <i class="fas fa-exclamation-triangle text-yellow-500 ml-1"
+                                                           x-show="position.altitude < 0"></i>
+                                                    </div>
+                                                </td>
+                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="Math.round(position.mag_heading) + '°'"></td>
+                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="Math.round(position.speed_true)"></td>
+                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="Math.round(position.speed_gs)"></td>
+                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="position.distance !== undefined && position.distance !== null ? position.distance : '-'"></td>
+                                            </tr>
+                                        </template>
+                                        
+                                        <!-- History positions -->
+                                        <template x-if="$store.atc.aircraftDetailsHistoryData.length > 0">
+                                            <tr>
+                                                <td colspan="7" class="p-1.5 text-left border-b border-border bg-panel/50 font-semibold">
+                                                    Historical Positions
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <template x-for="(position, index) in $store.atc.aircraftDetailsHistoryData" :key="'history-'+index">
+                                            <tr class="hover:bg-hover/50 transition-colors"
+                                                @mouseenter="$store.atc.highlightPositionOnMap(position)"
+                                                @mouseleave="$store.atc.clearPositionHighlight()"
+                                                :class="{
+                                                    'border-t-2 border-t-amber-500': $store.atc.hasSignificantTimeGap(position, index),
+                                                    'bg-highlight/20 border-highlight/50': position.id && $store.atc.highlightedAdsbId && position.id == $store.atc.highlightedAdsbId
+                                                }">
+                                                <td class="p-1.5 text-left border-b border-border whitespace-nowrap">
+                                                    <span x-text="$store.atc.formatDate(position.timestamp, true)"></span>
+                                                    <span class="text-text/70 text-[10px] ml-1" x-text="Math.floor((new Date() - new Date(position.timestamp)) / 1000) + 's'"></span>
+                                                </td>
+                                                <td class="p-1.5 text-right border-b border-border">
+                                                    <div class="flex items-center justify-end">
+                                                        <span x-text="Math.round(position.altitude/100)*100"></span>
+                                                        <i :class="[$store.atc.aircraftDetailsGetAltitudeTrend(position, index), $store.atc.aircraftDetailsGetAltitudeTrendClass(position, index), 'ml-1']"
+                                                           :title="position.altitude > 0 ? Math.round(position.altitude) + ' ft / ' + Math.round(position.altitude * 0.3048) + ' m' : Math.round(position.altitude) + ' ft'"></i>
+                                                    </div>
+                                                </td>
+                                                <td class="p-1.5 text-right border-b border-border" x-text="Math.round(position.mag_heading) + '°'"></td>
+                                                <td class="p-1.5 text-right border-b border-border" x-text="Math.round(position.speed_true)"></td>
+                                                <td class="p-1.5 text-right border-b border-border" x-text="Math.round(position.speed_gs)"></td>
+                                                <td class="p-1.5 text-right border-b border-border" x-text="position.distance !== undefined && position.distance !== null ? position.distance : '-'"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Regular Details View -->
+                        <div x-show="!$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showProximityView">
+                            <!-- Phase History Table at top of Details tab -->
+                            <div class="mb-4 overflow-x-auto w-full">
+                                <div class="mb-2 text-sm font-semibold text-highlight border-b border-border pb-1">
+                                    Flight Phase History
+                                </div>
+                                <table class="w-full table-fixed text-xs">
+                                    <thead>
+                                        <tr>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[45%]">Time</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[25%]">Phase</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[30%]">ADSB ID</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-if="$store.atc.phaseHistoryLoading">
+                                            <tr><td colspan="3" class="p-4 text-center"><div class="flex justify-center items-center"><div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-highlight"></div><span class="ml-2">Loading...</span></div></td></tr>
+                                        </template>
+                                        <template x-if="!$store.atc.phaseHistoryLoading && $store.atc.safePhaseHistoryData.length === 0">
+                                            <tr><td colspan="3" class="p-4 text-center">No phase history available</td></tr>
+                                        </template>
+                                        <template x-for="phase in $store.atc.safePhaseHistoryData" :key="phase.timestamp + (phase.is_current ? '-current' : '-history')">
+                                            <tr class="hover:bg-hover/50 transition-colors" :class="{ 'font-bold': phase.is_current }">
+                                                <td class="p-1.5 text-left border-b border-border">
+                                                    <span x-text="$store.atc.formatDate(phase.timestamp, true)"></span>
+                                                    <span class="text-text/70 text-[10px] ml-1" x-text="Math.floor(($store.atc.currentTimeForPhases - new Date(phase.timestamp)) / 1000) + 's'"></span>
+                                                </td>
+                                                <td class="p-1.5 text-left border-b border-border">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
+                                                              :class="{
+                                                                  'bg-blue-500/20 text-blue-400 border border-blue-500/30': phase.phase === 'CRZ',
+                                                                  'bg-green-500/20 text-green-400 border border-green-500/30': phase.phase === 'DEP',
+                                                                  'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': phase.phase === 'APP',
+                                                                  'bg-red-500/20 text-red-400 border border-red-500/30': phase.phase === 'ARR',
+                                                                  'bg-purple-500/20 text-purple-400 border border-purple-500/30': phase.phase === 'TAX',
+                                                                  'bg-orange-500/20 text-orange-400 border border-orange-500/30': phase.phase === 'T/O',
+                                                                  'bg-teal-500/20 text-teal-400 border border-teal-500/30': phase.phase === 'T/D',
+                                                                  'bg-gray-500/20 text-gray-400 border border-gray-500/30': phase.phase === 'NEW'
+                                                              }"
+                                                              x-text="phase.phase"></span>
+                                                    </div>
+                                                </td>
+                                                <td class="p-1.5 text-left border-b border-border text-xs font-mono">
+                                                    <span x-show="phase.adsb_id"
+                                                          @click="$store.atc.navigateToTracksWithHighlight(phase.adsb_id)"
+                                                          class="cursor-pointer text-highlight hover:text-highlight/80 underline transition-colors"
+                                                          x-text="phase.adsb_id"></span>
+                                                    <span x-show="!phase.adsb_id" class="text-text/50">N/A</span>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Issued Clearances Table -->
+                            <div class="mb-4 overflow-x-auto w-full">
+                                <div class="mb-2 text-sm font-semibold text-highlight border-b border-border pb-1">
+                                    Issued Clearances
+                                </div>
+                                <table class="w-full table-fixed text-xs">
+                                    <thead>
+                                        <tr>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[30%]">Time</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[20%]">Type</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[15%]">Runway</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[20%]">Status</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[15%]">Age</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-if="!$store.atc.selectedAircraft?.clearances || $store.atc.selectedAircraft.clearances.length === 0">
+                                            <tr><td colspan="5" class="p-4 text-center">No clearances issued</td></tr>
+                                        </template>
+                                        <template x-for="clearance in $store.atc.selectedAircraft?.clearances || []" :key="clearance.id">
+                                            <tr class="hover:bg-hover/50 transition-colors">
+                                                <td class="p-1.5 text-left border-b border-border">
+                                                    <span x-text="$store.atc.formatDate(clearance.timestamp, true)"></span>
+                                                </td>
+                                                <td class="p-1.5 text-left border-b border-border">
+                                                    <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
+                                                          :class="{
+                                                              'bg-green-500/20 text-green-400 border border-green-500/30': clearance.type === 'takeoff',
+                                                              'bg-blue-500/20 text-blue-400 border border-blue-500/30': clearance.type === 'landing',
+                                                              'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': clearance.type === 'approach'
+                                                          }"
+                                                          x-text="clearance.type"></span>
+                                                </td>
+                                                <td class="p-1.5 text-left border-b border-border font-mono">
+                                                    <span x-text="clearance.runway || 'N/A'"></span>
+                                                </td>
+                                                <td class="p-1.5 text-left border-b border-border">
+                                                    <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
+                                                          :class="{
+                                                              'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': clearance.status === 'issued',
+                                                              'bg-green-500/20 text-green-400 border border-green-500/30': clearance.status === 'complied',
+                                                              'bg-red-500/20 text-red-400 border border-red-500/30': clearance.status === 'deviation'
+                                                          }"
+                                                          x-text="clearance.status"></span>
+                                                </td>
+                                                <td class="p-1.5 text-left border-b border-border text-text/70">
+                                                    <span x-text="clearance.time_since_issued"></span>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div x-html="$store.atc.formatAircraftDetails()"></div>
+                        </div>
+
+                        <!-- Proximity View -->
+                        <div x-show="$store.atc.showProximityView" class="mb-4">
+                            
+                            <!-- Distance Slider -->
+                            <div class="mb-4 flex items-center">
+                                <label class="text-xs text-text/70 whitespace-nowrap mr-2">Distance (NM): <span x-text="$store.atc.proximityDistance"></span></label>
+                                <input type="range"
+                                       x-model.number="$store.atc.proximityDistance"
+                                       min="1"
+                                       max="10"
+                                       step="1"
+                                       @input="$store.atc.loadProximityData()"
+                                       class="flex-1 h-1 bg-background rounded">
+                            </div>
+                            
+                            <!-- Aircraft Table -->
+                            <div class="overflow-x-auto w-full">
+                                <table class="w-full table-fixed text-xs">
+                                    <thead>
+                                        <tr>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[25%]">Callsign</th>
+                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[25%]">Rel Alt</th>
+                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[25%]">Rel Bearing</th>
+                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[25%]">Rel Distance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-if="$store.atc.proximityLoading">
+                                            <tr><td colspan="5" class="p-4 text-center"><div class="flex justify-center items-center"><div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-highlight"></div><span class="ml-2">Loading...</span></div></td></tr>
+                                        </template>
+                                        <template x-if="!$store.atc.proximityLoading && $store.atc.proximityAircraft.length === 0">
+                                            <tr><td colspan="5" class="p-4 text-center">No aircraft found within the specified distance</td></tr>
+                                        </template>
+                                        <template x-for="aircraft in $store.atc.proximityAircraft" :key="aircraft.hex">
+                                            <tr @click="$store.atc.selectedAircraft = aircraft; $store.atc.showProximityView = false; $store.atc.clearProximityView()"
+                                                @mouseenter="$store.atc.highlightProximityAircraftOnHover(aircraft.hex)"
+                                                @mouseleave="$store.atc.unhighlightProximityAircraftOnHover()"
+                                                class="hover:bg-hover/50 transition-colors cursor-pointer">
+                                                <td class="p-1.5 text-left border-b border-border" x-text="aircraft.flight || aircraft.hex"></td>
+                                                <td class="p-1.5 text-right border-b border-border">
+                                                    <div class="flex items-center justify-end">
+                                                        <span x-text="aircraft.rel_altitude !== undefined && aircraft.rel_altitude !== null ? (aircraft.rel_altitude > 0 ? '+' + Math.round(aircraft.rel_altitude) : Math.round(aircraft.rel_altitude)) : '-'"></span>
+                                                        <i :class="[$store.atc.getAltitudeTrendIcon(aircraft), $store.atc.getAltitudeTrendClasses(aircraft), 'ml-1']"
+                                                           :title="aircraft.adsb && aircraft.adsb.baro_rate ? (aircraft.adsb.baro_rate > 0 ? '+' : '') + Math.round(aircraft.adsb.baro_rate) + ' ft/min' : ''"></i>
+                                                    </div>
+                                                </td>
+                                                <td class="p-1.5 text-right border-b border-border" x-text="aircraft.rel_bearing !== undefined && aircraft.rel_bearing !== null ? Math.round(aircraft.rel_bearing).toString().padStart(3, '0') + '°' : '-'"></td>
+                                                <td class="p-1.5 text-right border-b border-border" x-text="aircraft.rel_distance !== undefined && aircraft.rel_distance !== null ? aircraft.rel_distance : '-'"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+
+                        <!-- Navigation Buttons - Removed from bottom as they're now at the top -->
+                    </div>
+                </template>
+            </aside>
+        </div>
+        
+        <!-- Radio Bar - Now positioned as footer spanning full width -->
+        <template x-if="$store.atc">
+            <div id="radio-bar" class="h-20 bg-panel border-t border-border flex items-center z-[1001] relative overflow-visible shadow-[0_-5px_10px_rgba(0,0,0,0.3)]">
+                <!-- Left side - Frequencies (no scrollbar, always visible) -->
+                <div class="flex-shrink-0 h-full flex items-center pl-0 pr-2">
+                    <div class="flex space-x-2 items-center h-full py-3">
+                        <template x-for="freq in $store.atc.audioFrequencies" :key="freq.id">
+                            <div
+                                :class="{
+                                    'bg-highlight/10 border-highlight/50 text-highlight shadow-lg': $store.atc.isUnmuted(freq.id),
+                                    'bg-panel hover:bg-hover border-border text-text/80 hover:text-text': !$store.atc.isUnmuted(freq.id)
+                                }"
+                                class="relative flex items-center justify-between px-3 py-1.5 border rounded-lg transition-all duration-200 h-full min-w-[260px] cursor-pointer"
+                                style="position: relative;"
+                                :data-freq-id="freq.id">
+                                <div @click="$store.atc.toggleMute(freq)" class="flex flex-col justify-center overflow-hidden flex-grow mr-2">
+                                    <div class="font-semibold text-sm truncate" x-text="freq.name" :title="freq.name"></div>
+                                    <div class="text-[11px] opacity-80 mt-0.5" x-text="freq.frequency_mhz + ' MHz'"></div>
+                                </div>
+                                <div class="flex items-center space-x-2 my-2">
+                                    <div @click="$store.atc.toggleMute(freq)" class="audio-visualizer-container w-20 h-4 flex items-center transition-all duration-200 relative bg-black/70 rounded-md border border-highlight/50 overflow-hidden">
+                                        <div :id="`vis-bar-${freq.id}`"
+                                             class="audio-visualizer-bar h-full rounded-r-sm"
+                                             :style="{
+                                                 width: '0%',
+                                                 backgroundColor: $store.atc.isUnmuted(freq.id) ? '#4CAF50' : '#888888'
+                                             }"></div>
+                                        <span x-text="$store.atc.secondsSinceLastAudio[freq.id] || '--s'"
+                                              class="absolute top-0 right-1 text-xs text-neutral-400 p-0.5"
+                                              style="font-size: 0.6rem; line-height: 1; pointer-events: none;">
+                                        </span>
+                                    </div>
+                                    <button @click.stop="$store.atc.toggleTranscriptionViewer(freq.id)"
+                                            title="View Transcriptions"
+                                            x-show="freq.transcribe_audio !== false"
+                                            class="p-1 rounded-md w-7 h-7 flex items-center justify-center text-xs transition-colors focus:outline-none relative"
+                                            :class="$store.atc.transcriptionViewerVisible[freq.id] ? 'bg-highlight/80 hover:bg-highlight text-black' : 'bg-black/30 hover:bg-black/50 text-text/80 hover:text-text'">
+                                        <i class="fas fa-comments"></i>
+                                        <span x-text="$store.atc.getTranscriptionCount(freq.id)"
+                                              x-show="$store.atc.getTranscriptionCount(freq.id) > 0"
+                                              class="absolute -top-1 -right-1 bg-danger text-white text-[8px] font-bold w-3 h-3 rounded-full flex items-center justify-center"></span>
+                                    </button>
+                                </div>
+
+                                <!-- Transcription Viewer -->
+                                <div x-show="$store.atc.transcriptionViewerVisible[freq.id]"
+                                     :data-viewer-id="freq.id"
+                                     class="absolute bottom-full left-0 mb-2 w-full bg-panel border border-border rounded-lg shadow-2xl overflow-hidden flex flex-col"
+                                     style="height: 400px; z-index: 10000; position: fixed; width: 300px;">
+                                    <div class="flex justify-between items-center p-1.5 border-b border-border">
+                                        <div class="flex-grow flex items-center">
+                                            <div class="relative w-full">
+                                                <input type="text"
+                                                       placeholder="Search transcriptions..."
+                                                       class="w-full py-1 px-2 text-xs bg-background border border-border text-text rounded"
+                                                       x-model="$store.atc.transcriptionSearchTerm"
+                                                       @input.debounce.300ms="$store.atc.filterTranscriptions(freq.id)">
+                                                <i class="fas fa-search absolute right-2 top-1/2 transform -translate-y-1/2 text-text/50 text-xs"></i>
+                                            </div>
+                                        </div>
+                                        <button @click="$store.atc.transcriptionViewerVisible[freq.id] = false" class="text-text/70 hover:text-text ml-2">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="p-1.5 space-y-1 overflow-y-auto flex-grow custom-scrollbar">
+                                        <template x-if="!$store.atc.frequencyTranscriptions[freq.id] || $store.atc.frequencyTranscriptions[freq.id].length === 0">
+                                            <p class="text-xs text-text/50 italic p-2 text-center">No transcriptions yet for this frequency.</p>
+                                        </template>
+                                        <template x-if="$store.atc.transcriptionSearchTerm && $store.atc.frequencyTranscriptions[freq.id] && $store.atc.frequencyTranscriptions[freq.id].length === 0">
+                                            <p class="text-xs text-text/50 italic p-2 text-center">No results found for "<span x-text="$store.atc.transcriptionSearchTerm"></span>"</p>
+                                        </template>
+                                        <template x-for="transcription in $store.atc.frequencyTranscriptions[freq.id]" :key="transcription.id">
+                                            <div class="text-xs p-1 rounded bg-background/30 border-l-2 mb-1"
+                                                 :class="{
+                                                    'border-blue-400': transcription.speaker_type === 'ATC',
+                                                    'border-green-400': transcription.speaker_type === 'PILOT',
+                                                    'border-gray-400': !transcription.speaker_type
+                                                 }">
+                                                <div class="flex justify-between items-center text-text/60 text-[9px] mb-0.5">
+                                                    <span x-text="transcription.id + ' - ' + new Date(transcription.timestamp).toLocaleTimeString()"></span>
+                                                    <!-- ATC speaker -->
+                                                    <span x-show="transcription.speaker_type === 'ATC'"
+                                                           x-text="transcription.speaker_type"
+                                                           class="text-blue-400 font-semibold uppercase"></span>
+                                                           
+                                                    <!-- PILOT speaker with clickable callsign -->
+                                                    <span x-show="transcription.speaker_type === 'PILOT'"
+                                                          class="font-semibold uppercase">
+                                                        <span x-show="transcription.callsign"
+                                                              x-text="transcription.callsign"
+                                                              @click="$store.atc.selectAircraftByCallsign(transcription.callsign)"
+                                                              class="text-green-400 cursor-pointer hover:underline hover:text-green-300"></span>
+                                                        <span x-show="!transcription.callsign"
+                                                              x-text="'PILOT'"
+                                                              class="text-green-400"></span>
+                                                    </span>
+                                                    
+                                                    <!-- Other speaker types -->
+                                                    <span x-show="transcription.speaker_type && transcription.speaker_type !== 'ATC' && transcription.speaker_type !== 'PILOT'"
+                                                           x-text="transcription.speaker_type"
+                                                           class="text-gray-400 font-semibold uppercase"></span>
+                                                </div>
+                                                <!-- Show processed content if available, otherwise show original -->
+                                                <p class="text-text/90 leading-tight cursor-help"
+                                                   x-show="transcription.is_processed && transcription.content_processed"
+                                                   x-html="$store.atc.highlightSearchTerm(transcription.content_processed)"
+                                                   :title="'Original: ' + transcription.text"></p>
+                                                
+                                                <!-- Show original content if not processed -->
+                                                <p class="text-text/90 leading-tight"
+                                                   x-show="!transcription.is_processed || !transcription.content_processed"
+                                                   x-html="$store.atc.highlightSearchTerm(transcription.text)"></p>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <!-- Separator -->
+                        <div class="h-12 w-px bg-border/50 mx-2 flex-shrink-0"></div>
+                        
+                        <!-- AI Advisory Section -->
+                        <div id="ai-advisory-container"
+                             x-data="{ 
+                                 isConnected: false, 
+                                 transcriptViewerVisible: false, 
+                                 transcriptCount: 0,
+                                 searchTerm: '',
+                                 filteredTranscripts: [],
+                                 updateState() {
+                                     if (window.atcChat) {
+                                         this.isConnected = window.atcChat.isConnected;
+                                         this.transcriptViewerVisible = window.atcChat.transcriptViewerVisible;
+                                         this.transcriptCount = window.atcChat.getTranscriptCount();
+                                         this.searchTerm = window.atcChat.transcriptSearchTerm || '';
+                                         this.filteredTranscripts = window.atcChat.filteredTranscripts || [];
+                                     }
+                                 },
+                                 updateSearchTerm() {
+                                     if (window.atcChat) {
+                                         window.atcChat.transcriptSearchTerm = this.searchTerm;
+                                         window.atcChat.filterTranscripts();
+                                         this.filteredTranscripts = window.atcChat.filteredTranscripts || [];
+                                     }
+                                 }
+                             }"
+                             x-init="
+                                 updateState();
+                                 setInterval(() => updateState(), 500);
+                                 document.addEventListener('atc-chat-update', () => updateState());
+                             "
+                             :class="{
+                                 'bg-purple-500/15 border-purple-400/60 text-purple-200 shadow-lg shadow-purple-500/20': isConnected,
+                                 'bg-panel hover:bg-hover border-border hover:border-purple-500/30 text-text/80 hover:text-purple-200/80': !isConnected
+                             }"
+                             class="relative flex items-center justify-between px-3 py-1.5 border-2 rounded-lg transition-all duration-200 h-full min-w-[260px] cursor-pointer">
+                            <div class="flex flex-col justify-center overflow-hidden flex-grow mr-2" @click="window.atcChat && window.atcChat.toggleChat()">
+                                <div class="font-semibold text-sm truncate">AI Advisory</div>
+                                <div id="ai-advisory-status" class="text-[11px] opacity-80 mt-0.5 w-32 truncate">Disconnected</div>
+                            </div>
+                            <div class="flex items-center space-x-2 my-2">
+                                <!-- AI Audio Visualizer -->
+                                <div class="audio-visualizer-container w-20 h-4 flex items-center transition-all duration-200 relative bg-black/70 rounded-md border border-purple-500/50 overflow-hidden" @click="window.atcChat && window.atcChat.toggleChat()">
+                                    <div id="ai-vis-bar"
+                                         class="h-full rounded-r-sm transition-all duration-[50ms] ease-out"
+                                         style="width: 0%; background-color: #a855f7; box-shadow: 0 0 8px #a855f7;"></div>
+                                    <span id="ai-activity-indicator"
+                                          class="absolute top-0 right-1 text-xs text-neutral-400 p-0.5"
+                                          style="font-size: 0.6rem; line-height: 1; pointer-events: none;">--</span>
+                                </div>
+                                <!-- Chat Transcript Button -->
+                                <button @click.stop="window.atcChat && window.atcChat.toggleTranscriptViewer()"
+                                        title="View AI Conversation"
+                                        class="p-1 rounded-md w-7 h-7 flex items-center justify-center text-xs transition-colors focus:outline-none relative"
+                                        :class="transcriptViewerVisible ? 'bg-purple-500/80 hover:bg-purple-500 text-white' : 'bg-black/30 hover:bg-black/50 text-text/80 hover:text-text'">
+                                    <i class="fas fa-comments"></i>
+                                    <span x-text="transcriptCount"
+                                          x-show="transcriptCount > 0"
+                                          class="absolute -top-1 -right-1 bg-purple-500 text-white text-[8px] font-bold w-3 h-3 rounded-full flex items-center justify-center"></span>
+                                </button>
+                            </div>
+                            
+                            <!-- AI Transcript Viewer -->
+                            <div x-show="transcriptViewerVisible"
+                                 :data-viewer-id="'ai-advisory'"
+                                 class="absolute bottom-full left-0 mb-2 w-full bg-panel border border-border rounded-lg shadow-2xl overflow-hidden flex flex-col"
+                                 style="height: 400px; z-index: 10000; position: fixed; width: 300px;">
+                                <div class="flex justify-between items-center p-1.5 border-b border-border">
+                                    <div class="flex-grow flex items-center">
+                                        <div class="relative w-full">
+                                            <input type="text"
+                                                   placeholder="Search conversation..."
+                                                   class="w-full py-1 px-2 text-xs bg-background border border-border text-text rounded"
+                                                   x-model="searchTerm"
+                                                   @input.debounce.300ms="updateSearchTerm()">
+                                            <i class="fas fa-search absolute right-2 top-1/2 transform -translate-y-1/2 text-text/50 text-xs"></i>
+                                        </div>
+                                    </div>
+                                    <button @click="window.atcChat && (window.atcChat.transcriptViewerVisible = false); updateState()" class="text-text/70 hover:text-text ml-2">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="p-1.5 space-y-1 overflow-y-auto flex-grow custom-scrollbar">
+                                    <template x-if="filteredTranscripts.length === 0">
+                                        <p class="text-xs text-text/50 italic p-2 text-center">No conversation yet with AI Advisory.</p>
+                                    </template>
+                                    <template x-if="searchTerm && filteredTranscripts.length === 0">
+                                        <p class="text-xs text-text/50 italic p-2 text-center">No results found for "<span x-text="searchTerm"></span>"</p>
+                                    </template>
+                                    <template x-for="transcript in filteredTranscripts" :key="transcript.id">
+                                        <div class="text-xs p-1 rounded bg-background/30 border-l-2 mb-1"
+                                             :class="{
+                                                'border-purple-400': transcript.speaker === 'AI',
+                                                'border-green-400': transcript.speaker === 'PILOT',
+                                                'border-gray-400': !transcript.speaker
+                                             }">
+                                            <div class="flex justify-between items-center text-text/60 text-[9px] mb-0.5">
+                                                <span x-text="new Date(transcript.timestamp).toLocaleTimeString()"></span>
+                                                <span x-show="transcript.speaker === 'AI'"
+                                                       x-text="'AI-ATC'"
+                                                       class="text-purple-400 font-semibold uppercase"></span>
+                                                <span x-show="transcript.speaker === 'PILOT'"
+                                                      x-text="'PILOT'"
+                                                      class="text-green-400 font-semibold uppercase"></span>
+                                            </div>
+                                            <p class="text-text/90 leading-tight"
+                                               x-html="window.atcChat ? window.atcChat.highlightSearchTerm(transcript.text) : transcript.text"></p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Middle section - Dynamic Weather Information (occupies remaining space) -->
+                <div class="flex-1 h-full flex items-center justify-center px-4">
+                    <div class="font-mono text-xs flex items-center justify-center">
+                        <div class="flex space-x-4">
+                        <!-- METAR Display -->
+                        <template x-if="$store.atc.getLatestMetar()">
+                            <div class="relative">
+                                <div @click="$store.atc.toggleMetarDetails()" data-metar-button
+                                     class="flex items-center cursor-pointer hover:bg-hover px-2 py-0.5 rounded transition-colors">
+                                    <i class="fas fa-cloud-sun mr-1 text-highlight"></i>
+                                    <span>METAR</span>
+                                </div>
+                        
+                                <!-- METAR Details Popup -->
+                                <div x-show="$store.atc.metarDetailsVisible"
+                                     @click.outside="$store.atc.metarDetailsVisible = false" data-metar-popup
+                                     class="absolute bottom-full left-1/2 mb-2 w-96 bg-panel border border-border rounded-lg shadow-2xl overflow-hidden z-[2000]" style="position: fixed; transform: translateX(-50%);">
+                                    <div class="flex justify-between items-center p-2 border-b border-border">
+                                        <h5 class="text-xs font-semibold text-highlight">METAR</h5>
+                                        <button @click="$store.atc.metarDetailsVisible = false" class="text-text/70 hover:text-text">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="p-3 max-h-96 overflow-y-auto">
+                                        <template x-if="$store.atc.metar && $store.atc.metar.trend">
+                                            <div class="space-y-3">
+                                                <template x-for="(item, index) in $store.atc.metar.trend" :key="index">
+                                                    <p class="text-xs bg-background/30 p-2 rounded break-words" x-text="item.metar"></p>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                
+                <!-- TAF Display -->
+                <template x-if="$store.atc.stationFetchTAF && $store.atc.taf">
+                    <div class="relative">
+                        <div @click="$store.atc.toggleTAFDetails()" data-taf-button
+                             class="flex items-center cursor-pointer hover:bg-hover px-2 py-0.5 rounded transition-colors">
+                            <i class="fas fa-cloud mr-1 text-blue-400"></i>
+                            <span>TAF</span>
+                        </div>
+                        
+                        <!-- TAF Details Popup -->
+                        <div x-show="$store.atc.tafDetailsVisible"
+                             @click.outside="$store.atc.tafDetailsVisible = false" data-taf-popup
+                             class="absolute bottom-full left-1/2 mb-2 w-96 bg-panel border border-border rounded-lg shadow-2xl overflow-hidden z-[2000]" style="position: fixed; transform: translateX(-50%);">
+                            <div class="flex justify-between items-center p-2 border-b border-border">
+                                <h5 class="text-xs font-semibold text-highlight">TAF</h5>
+                                <button @click="$store.atc.tafDetailsVisible = false" class="text-text/70 hover:text-text">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="p-3 max-h-96 overflow-y-auto">
+                                <template x-if="$store.atc.taf">
+                                    <div>
+                                        <p class="text-xs bg-background/30 p-2 rounded break-words" x-text="$store.atc.taf.taf"></p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                
+                <!-- NOTAM Display -->
+                <template x-if="$store.atc.stationFetchNOTAMs && $store.atc.notams && $store.atc.notams.length > 0">
+                    <div class="relative">
+                        <div @click="$store.atc.toggleNOTAMDetails()" data-notam-button
+                             class="flex items-center cursor-pointer hover:bg-hover px-2 py-0.5 rounded transition-colors">
+                            <i class="fas fa-exclamation-triangle mr-1 text-warning"></i>
+                            <span>NOTAM</span>
+                        </div>
+                        
+                        <!-- NOTAM Details Popup -->
+                        <div x-show="$store.atc.notamDetailsVisible"
+                             @click.outside="$store.atc.notamDetailsVisible = false" data-notam-popup
+                             class="absolute bottom-full left-1/2 mb-2 w-96 bg-panel border border-border rounded-lg shadow-2xl overflow-hidden z-[2000]" style="position: fixed; transform: translateX(-50%);">
+                            <div class="flex justify-between items-center p-2 border-b border-border">
+                                <h5 class="text-xs font-semibold text-highlight">NOTAM</h5>
+                                <button @click="$store.atc.notamDetailsVisible = false" class="text-text/70 hover:text-text">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="p-3 max-h-96 overflow-y-auto">
+                                <template x-if="$store.atc.notams && $store.atc.notams.length > 0">
+                                    <div class="space-y-3">
+                                        <template x-for="(notam, index) in $store.atc.notams" :key="index">
+                                            <p class="text-xs bg-background/30 p-2 rounded break-words" x-text="notam.raw || notam.message"></p>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right side - Stacked Clocks -->
+                <div class="flex-shrink-0 h-full flex items-center pr-4 pl-2">
+                    <div class="font-mono text-xs flex flex-col items-end justify-center space-y-1">
+                        <!-- Local Time - clickable with conditional underline -->
+                        <span @click="$store.atc.showLocalDates = true"
+                              class="cursor-pointer transition-all duration-200 pb-0.5 relative"
+                              :class="$store.atc.showLocalDates ? 'text-highlight' : 'text-text hover:text-text/80'">
+                            <span x-text="$store.atc.currentTime"></span>
+                            <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-highlight transform transition-transform duration-200"
+                                  :class="$store.atc.showLocalDates ? 'scale-x-100' : 'scale-x-0'"></span>
+                        </span>
+                        
+                        <!-- UTC Time - clickable with conditional underline -->
+                        <span @click="$store.atc.showLocalDates = false"
+                              class="cursor-pointer transition-all duration-200 pb-0.5 relative"
+                              :class="!$store.atc.showLocalDates ? 'text-highlight' : 'text-text hover:text-text/80'">
+                            <span x-text="$store.atc.zuluTime"></span>
+                            <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-highlight transform transition-transform duration-200"
+                                  :class="!$store.atc.showLocalDates ? 'scale-x-100' : 'scale-x-0'"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+    
+    <!-- Create Simulated Aircraft Modal -->
+    <div x-show="$store.atc.showCreateSimulatedAircraft"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+         @click.self="$store.atc.showCreateSimulatedAircraft = false"
+         :class="$store.atc.simulationModal.mapClickMode ? 'pointer-events-none' : ''">
+        
+        <div class="bg-panel border border-border rounded-lg p-6 w-96 max-w-full mx-4"
+             :class="$store.atc.simulationModal.mapClickMode ? 'pointer-events-auto' : ''">
+            <h3 class="text-lg font-semibold text-highlight mb-4">Create Simulated Aircraft</h3>
+            
+            <!-- Position -->
+            <div class="mb-4">
+                <label class="block text-sm text-text mb-2">Position</label>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                        <label class="text-xs text-text/70 block mb-1">Latitude</label>
+                        <input type="number"
+                               x-model="$store.atc.simulationModal.lat"
+                               step="0.000001"
+                               placeholder="43.6777"
+                               class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                    </div>
+                    <div>
+                        <label class="text-xs text-text/70 block mb-1">Longitude</label>
+                        <input type="number"
+                               x-model="$store.atc.simulationModal.lon"
+                               step="0.000001"
+                               placeholder="-79.6248"
+                               class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button @click="$store.atc.generateRandomPosition()"
+                            class="flex-1 px-3 py-1.5 bg-green-700/50 hover:bg-green-600/70 text-green-300 hover:text-white rounded transition-all border border-green-600/50 hover:border-green-500 text-xs">
+                        <i class="fas fa-dice mr-1"></i>
+                        Random Position
+                    </button>
+                    <button @click="$store.atc.setSimulationPositionFromMap()"
+                            :class="$store.atc.simulationModal.mapClickMode ? 'bg-orange-600/70 text-white' : 'bg-slate-700/50 hover:bg-slate-600/70 text-slate-300 hover:text-white'"
+                            class="flex-1 px-3 py-1.5 rounded transition-all border border-slate-600/50 hover:border-slate-500 text-xs">
+                        <i class="fas fa-crosshairs mr-1"></i>
+                        <span x-text="$store.atc.simulationModal.mapClickMode ? 'Click Map' : 'From Map'"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Flight Parameters -->
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs text-text/70 mb-1">Altitude (ft)</label>
+                    <input type="number"
+                           x-model.number="$store.atc.simulationModal.altitude"
+                           min="0" max="60000" step="100"
+                           class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                </div>
+                <div>
+                    <label class="block text-xs text-text/70 mb-1">Heading (°)</label>
+                    <input type="number"
+                           x-model.number="$store.atc.simulationModal.heading"
+                           min="0" max="359" step="1"
+                           class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                </div>
+                <div>
+                    <label class="block text-xs text-text/70 mb-1">Speed (kt)</label>
+                    <input type="number"
+                           x-model.number="$store.atc.simulationModal.speed"
+                           min="0" max="500" step="5"
+                           class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                </div>
+                <div>
+                    <label class="block text-xs text-text/70 mb-1">Vertical Rate (fpm)</label>
+                    <input type="number"
+                           x-model.number="$store.atc.simulationModal.verticalRate"
+                           min="-3000" max="3000" step="100"
+                           class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex gap-2">
+                <button @click="$store.atc.showCreateSimulatedAircraft = false; $store.atc.simulationModal.mapClickMode = false"
+                        class="flex-1 px-3 py-2 bg-gray-700/50 hover:bg-gray-600/70 text-gray-300 hover:text-white rounded transition-all border border-gray-600/50 hover:border-gray-500 text-xs">
+                    Cancel
+                </button>
+                <button @click="$store.atc.createSimulatedAircraft($store.atc.simulationModal.lat, $store.atc.simulationModal.lon, $store.atc.simulationModal.altitude, $store.atc.simulationModal.heading, $store.atc.simulationModal.speed, $store.atc.simulationModal.verticalRate)"
+                        :disabled="!$store.atc.simulationModal.lat || !$store.atc.simulationModal.lon"
+                        class="flex-1 px-3 py-2 bg-blue-700/50 hover:bg-blue-600/70 text-blue-300 hover:text-white rounded transition-all border border-blue-600/50 hover:border-blue-500 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                    Create Aircraft
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="app.js"></script>
+<script src="atc-chat.js"></script>
+</body>
+</html>

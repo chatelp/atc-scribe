@@ -1,0 +1,79 @@
+/* Aircraft Label Styles */
+.aircraft-label {
+    background-color: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--text-color);
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.aircraft-label-inactive {
+    opacity: 0.6;
+    border: 1px dashed var(--text-color);
+}
+
+.aircraft-callsign {
+    font-weight: bold;
+    color: var(--highlight-color);
+}
+
+.aircraft-altitude {
+    display: inline-block;
+    min-width: 45px;
+}
+
+.aircraft-climbing {
+    color: var(--highlight-color);
+}
+
+.aircraft-descending {
+    color: var(--danger-color);
+}
+
+.aircraft-level {
+    color: var(--text-color);
+}
+
+.inactive-flag {
+    color: var(--warning-color);
+}
+
+.inactive-status {
+    margin-top: 5px;
+    font-style: italic;
+}
+
+/* Future trajectory styles */
+.future-trail {
+    stroke-dasharray: 3, 7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.future-point-marker {
+    opacity: 0.4;
+}
+
+.future-point-marker-last {
+    opacity: 0.6;
+}
+
+.future-altitude-label {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 2px 4px;
+    border-radius: 2px;
+    white-space: nowrap;
+}
+
+.future-tooltip {
+    background-color: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    backdrop-filter: blur(4px);
+}

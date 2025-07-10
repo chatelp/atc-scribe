@@ -1,0 +1,405 @@
+#######################################################
+# ATC Monitoring System Configuration
+#######################################################
+
+#######################################################
+# HTTP Server Configuration
+#######################################################
+[server]
+# Primary HTTP port for the web interface and API
+port = 8000
+
+# Host address to bind to (127.0.0.1 = localhost only, 0.0.0.0 = all interfaces)
+host = "127.0.0.1"
+
+# Cross-Origin Resource Sharing (CORS) allowed origins
+# Use ["*"] to allow all origins, or specify domains like ["http://localhost:3000"]
+cors_allowed_origins = ["*"]
+
+# HTTP request timeouts in seconds
+read_timeout_seconds = 0        # Maximum time to read client request
+write_timeout_seconds = 0        # Maximum time to write response (0 = no timeout, recommended for streaming)
+idle_timeout_seconds = 3600      # Maximum time to wait for the next request when keep-alives are enabled
+
+# Additional ports to listen on (useful for multiple interfaces or port forwarding scenarios)
+additional_ports = [8001, 8002, 8003, 8004]
+
+# Directory to serve static files from (HTML, CSS, JS, images, etc.)
+# Files will be served dynamically - changes on disk are reflected immediately
+static_files_dir = "www"
+
+#######################################################
+# Aircraft Tracking (ADS-B) Configuration
+#######################################################
+[adsb]
+# Data source type:
+# - "local": Use a local ADS-B receiver (e.g., dump1090)
+# - "external": Use an external API service (e.g., ADS-B Exchange)
+source_type = "local"
+
+# Local source configuration (used when source_type = "local")
+# URL to the aircraft.json file from your local ADS-B receiver (tar1090)
+local_source_url = "http://192.168.1.166/tar1090/data/aircraft.json"
+
+# External source configuration (used when source_type = "external")
+# URL template with format placeholders for latitude, longitude, and distance
+external_source_url = "https://adsbexchange-com1.p.rapidapi.com/v2/lat/%f/lon/%f/dist/%.0f/"
+
+# API authentication for external source
+api_host = "adsbexchange-com1.p.rapidapi.com"
+api_key = ""  # Replace with your actual API key
+
+# Search radius in nautical miles around the station coordinates
+search_radius_nm = 50
+
+# Common configuration for both source types
+fetch_interval_seconds = 2      # How often to fetch new aircraft data
+signal_lost_timeout_seconds = 60 # How long to wait before considering a signal lost
+airline_db_path = "assets/airlines.json"  # Path to airline database for aircraft operator lookups
+
+# Enable WebSocket aircraft streaming (hybrid mode)
+websocket_aircraft_updates = false
+
+#######################################################
+# Logging Configuration
+#######################################################
+[logging]
+# Log level determines the verbosity of application logs
+# Options: "debug", "info", "warn", "error"
+level = "info"
+
+# Log format determines how logs are structured
+# Options: "json" (machine-readable), "console" (human-readable)
+format = "console"
+
+#######################################################
+# Storage Configuration
+#######################################################
+[storage]
+# Storage backend type (currently only SQLite is supported)
+type = "sqlite"
+
+# Base path for the SQLite database file
+# The actual filename will be generated as co-atc-YYYY-MM-DD.db
+sqlite_base_path = "data"
+
+# Maximum number of positions to return in the /aircraft API response (for all aircraft - excludes /aircraft/:id/history)
+max_positions_in_api = 50
+
+#######################################################
+# Station Location Configuration
+#######################################################
+[station]
+# Geographic coordinates of your monitoring station (decimal degrees)
+# Example: Toronto Pearson International Airport (CYYZ)
+latitude = 43.6777
+longitude = -79.6248
+
+# Elevation of your station above sea level (in feet)
+elevation_feet = 569
+
+# ICAO code of the airport (e.g., "CYYZ" for Toronto Pearson)
+airport_code = "CYYZ"
+
+# Path to runway database JSON file
+runways_db_path = "assets/runways.json"
+
+# Length of runway extensions in nautical miles (default: 10.0)
+runway_extension_length_nm = 10.0
+
+# Range in nautical miles to consider aircraft as being at this airport (default: 5.0)
+airport_range_nm = 5.0
+
+#######################################################
+# Radio Frequencies Configuration
+# - You can use HTTP streams (like LiveATC) or local SRT streams (https://github.com/rtl-airband/RTLSDR-Airband/pull/523).
+# - LiveATC says not to steal these streams, so keep that in mind.
+#######################################################
+[frequencies]
+# Audio buffer size in kilobytes for frequency monitoring
+buffer_size_kb = 8
+
+# Timeout for audio streams in seconds (0 = no timeout, recommended for continuous streaming)
+stream_timeout_secs = 0
+
+# How long to wait before reconnecting after a stream failure (in seconds)
+reconnect_interval_secs = 5
+
+# FFmpeg timeout configuration for audio stream connections
+# Set to 0 to disable timeout (not recommended for unreliable streams)
+ffmpeg_timeout_secs = 0                 # Connection timeout in seconds (0 = no timeout, default)
+ffmpeg_reconnect_delay_secs = 2         # Reconnection delay in seconds (default: 2)
+
+# Monitored frequencies configuration
+# Each [[frequencies.sources]] block defines one monitored frequency
+
+
+# Toronto Pearson Ground Control
+#[[frequencies.sources]]
+#id = "cyyz_grd"                  # Unique identifier
+#airport = "CYYZ"                 # Toronto Pearson
+#name = "CYYZ Ground"             # Ground Control
+#frequency_mhz = 119.100          # 119.1 MHz
+#url = "https://s1-bos.liveatc.net/cyyz5"
+#order = 2                        # Second in display order
+#transcribe_audio = false         # Not transcribing this frequency
+
+# Toronto Pearson Tower
+[[frequencies.sources]]
+id = "cyyz_twr"                  # Unique identifier
+airport = "CYYZ"                 # Toronto Pearson
+name = "CYYZ Tower"              # Tower Control
+frequency_mhz = 118.700          # 118.7 MHz
+url = "https://s1-bos.liveatc.net/cyyz7"
+order = 3                        # Third in display order
+transcribe_audio = true          # Transcribe this frequency
+
+# Toronto Pearson Arrivals
+[[frequencies.sources]]
+id = "cyyz_arr"                  # Unique identifier
+airport = "CYYZ"                 # Toronto Pearson
+name = "CYYZ Arrivals"           # Arrivals Control
+frequency_mhz = 124.475          # 124.475 MHz
+url = "https://s1-fmt2.liveatc.net/cyyz6"
+order = 4                        # Fourth in display order
+transcribe_audio = false          # Transcribe this frequency
+
+# Toronto Pearson Departures
+[[frequencies.sources]]
+id = "cyyz_dep"                  # Unique identifier
+airport = "CYYZ"                 # Toronto Pearson
+name = "CYYZ Departures"         # Departures Control
+frequency_mhz = 127.575          # 127.575 MHz
+url = "https://s1-bos.liveatc.net/cyyz8"
+order = 5                        # Fifth in display order
+transcribe_audio = false         # Not transcribing this frequency
+
+# Local VHF Stream (RTLSDR-Airband + SRT server)
+[[frequencies.sources]]
+id = "cyyz_lcl"                  
+airport = "CYYZ"                
+name = "Local"         
+frequency_mhz = 133.7         
+url = "srt://192.168.1.166:42069"
+order = 6                      
+transcribe_audio = true     
+
+#######################################################
+# Audio Transcription Configuration
+# - This will eat up your API credits, so please be careful.
+#######################################################
+[transcription]
+# OpenAI API settings
+openai_api_key = ""              # Replace with your actual API key
+model = "gpt-4o-transcribe"      # OpenAI model to use for transcription
+language = "en"                  # Primary language for transcription (e.g., "en" for English)
+
+# Audio processing settings
+noise_reduction = "near_field"   # Noise reduction mode: "near_field", "far_field", or "none"
+chunk_ms = 500                   # Size of audio chunks for processing in milliseconds
+buffer_size_kb = 32              # Audio buffer size in kilobytes
+
+# FFmpeg conversion settings (required for audio format conversion)
+ffmpeg_path = "ffmpeg"           # Path to FFmpeg executable
+ffmpeg_sample_rate = 24000       # Audio sample rate in Hz (24000 Hz required by OpenAI)
+ffmpeg_channels = 1              # Number of audio channels (1 = mono, required by OpenAI)
+ffmpeg_format = "s16le"          # Audio format (signed 16-bit little-endian PCM, raw format)
+
+# Connection management settings
+reconnect_interval_sec = 5       # Seconds to wait before reconnecting after failure
+max_retries = 3                  # Maximum number of connection retry attempts
+
+# Voice activity detection (VAD) settings
+turn_detection_type = "server_vad" # Method for detecting speech turns
+prefix_padding_ms = 1000          # Milliseconds of audio to include before detected speech
+silence_duration_ms = 500        # Milliseconds of silence to consider end of speech
+vad_threshold = 0.3              # Threshold for voice activity detection (0.0-1.0)
+
+# API retry settings for handling transient errors
+retry_max_attempts = 5           # Maximum number of API call retry attempts
+retry_initial_backoff_ms = 500   # Initial backoff time in milliseconds
+retry_max_backoff_ms = 10000     # Maximum backoff time in milliseconds
+
+# HTTP timeout for OpenAI API requests in seconds
+timeout_seconds = 60
+
+# Path to the transcription prompt file
+prompt_path = "assets/transcription_prompt.txt"
+
+#######################################################
+# Post-Processing Configuration
+#######################################################
+[post_processing]
+# Enable or disable post-processing
+enabled = true
+
+# OpenAI model to use for post-processing
+model = "gpt-4o"
+
+# How often to run the post-processing (in seconds)
+interval_seconds = 10
+
+# Maximum number of transcriptions to process in each batch
+batch_size = 20
+
+# Number of previous processed transcriptions to include for context
+context_transcriptions = 3
+
+# HTTP timeout for OpenAI API requests in seconds
+timeout_seconds = 120
+
+# Path to the system prompt file
+system_prompt_path = "assets/post_processing_prompt.txt"
+
+#######################################################
+# Flight Phase Detection Configuration
+#######################################################
+[flight_phases]
+# Enable enhanced flight phase detection
+enabled = true
+
+# Altitude thresholds (in feet)
+cruise_altitude_ft = 18000       # Minimum altitude for cruise phase
+departure_altitude_ft = 1000     # Minimum altitude for departure phase
+
+# Speed thresholds (in knots)
+taxiing_min_speed_kts = 1        # Minimum ground speed for taxiing
+taxiing_max_speed_kts = 50       # Maximum ground speed for taxiing
+
+# Approach detection parameters
+approach_centerline_tolerance_nm = 0.5        # Distance from runway centerline
+approach_max_distance_nm = 10                 # Maximum distance from runway threshold
+approach_heading_tolerance_deg = 30           # Heading alignment tolerance
+
+# Timeout configurations - grouped together for clarity
+# These control different aspects of phase transition timing:
+
+# 1. Long-term inactive aircraft cleanup (default: 3600 seconds = 1 hour)
+# Aircraft that haven't had ANY phase change for this duration revert to NEW
+# This is the ultimate cleanup for parked/inactive aircraft
+phase_change_timeout_seconds = 3600
+
+# 2. Ground phase transition prevention (default: 60 seconds, but 1800 = 30 min recommended)
+# Prevents TAX→NEW and T/D→NEW transitions when aircraft briefly stops
+# Helps maintain phase stability during normal ground operations
+phase_transition_timeout_seconds = 1800
+
+# 3. Critical phase preservation (default: 60 seconds)
+# Keeps T/O and T/D phases visible for at least this duration
+# Ensures pilots/controllers can see these important events
+phase_preservation_seconds = 30
+
+# 4. Phase flapping prevention (default: 600 seconds = 10 minutes)
+# Prevents rapid transitions between DEP↔APP, ARR↔DEP, and T/O↔T/D
+# Much shorter than phase_change_timeout as these are active aircraft
+phase_flapping_prevention_seconds = 600
+
+# 5. Recent takeoff detefction window (default: 30 minutes)
+# How long after takeoff an aircraft is considered "recently departed"
+# Used for DEP phase eligibility
+recent_takeoff_timeout_minutes = 30
+
+# Other phase detection parameters
+airport_range_nm = 5                          # Distance considered "close to airport"
+climbing_vertical_rate_fpm = 500              # Minimum vertical rate for climbing
+takeoff_altitude_threshold_ft = 2000          # Altitude threshold for takeoff detection
+emergency_squawk_codes = ["7500", "7600", "7700"]  # Emergency squawk codes
+approach_vertical_rate_threshold_fpm = 100    # Maximum vertical rate for approach
+
+# Ground detection thresholds
+flying_min_tas_kts = 50                       # Minimum true airspeed to be considered flying
+flying_min_alt_ft = 300                       # Minimum altitude to be considered flying
+helicopter_alt_multiplier = 2.0               # Multiplier for helicopter detection
+high_speed_threshold_kts = 200                # Speed above which aircraft is always considered flying
+high_altitude_override_ft = 5000              # Altitude above which aircraft is always considered flying (handles bad speed data)
+
+# Enhanced sensor validation thresholds
+impossible_alt_drop_threshold_ft = 10000      # Altitude above which drops to zero are always considered sensor errors (cruise altitude)
+impossible_speed_drop_threshold_kts = 100     # Speed above which drops to zero at altitude are considered sensor errors
+impossible_speed_drop_min_alt_ft = 5000       # Minimum altitude for impossible speed drop detection
+
+# Signal lost landing detection
+signal_lost_landing_enabled = true            # Enable automatic landing detection for signal lost aircraft
+signal_lost_landing_max_alt_ft = 1000         # Max altitude for signal lost landing detection
+
+#######################################################
+# Weather Data Configuration
+#  - Windy asks: "Do not steal this API. Download your own METARs for free from https://www.aviationweather.gov/dataserver"
+#  - So, please don't use this.
+#######################################################
+[wx]
+# Weather data refresh interval in minutes
+refresh_interval_minutes = 10
+
+# API endpoints and settings
+api_base_url = "https://node.windy.com/airports"
+request_timeout_seconds = 10
+max_retries = 2
+
+# Enable/disable specific weather data types
+fetch_metar = true
+fetch_taf = true
+fetch_notams = true
+
+# Cache settings
+cache_expiry_minutes = 60  # How long to keep cached data if refresh fails
+
+#######################################################
+# ATC Chat Configuration
+#######################################################
+[atc_chat]
+# Enable/disable ATC Chat feature
+enabled = true
+
+# OpenAI API settings for realtime chat
+openai_api_key = ""              # Replace with your actual API key
+realtime_model = "gpt-4o-realtime-preview-2025-06-03"
+voice = "ash"  # Voice options: 'alloy', 'ash',
+
+# Audio settings
+input_audio_format = "pcm16"
+output_audio_format = "pcm16"
+sample_rate = 24000
+channels = 1
+
+# Session settings
+max_response_tokens = 4096
+temperature = 0.6
+speed = 1.5
+# Turn detection type: "server_vad", "semantic_vad", or "none" (to disable turn detection)
+turn_detection_type = "none"
+vad_threshold = 0.3
+silence_duration_ms = 200
+
+# Context settings
+max_context_aircraft = 200
+transcription_history_seconds = 60
+
+# System prompt configuration
+system_prompt_path = "assets/atc_chat_prompt.txt"
+
+# Automatic system prompt refresh interval in seconds (0 = disabled)
+# This will automatically send session updates with latest airspace data
+# Set to 0 to disable timer-based updates - context will be updated on PTT press instead. Do not enable unless you like burning through your API credits.
+refresh_system_prompt = 0
+
+#######################################################
+# Templating System Configuration
+#######################################################
+[templating]
+# Enable/disable templating system
+enabled = true
+
+# Template cache settings
+template_cache_size = 10
+reload_templates = true  # Development mode - reload templates from disk
+
+# ATC Chat template settings
+[templating.atc_chat]
+template_path = "assets/atc_chat_prompt.txt"
+max_aircraft = 200
+
+# Post-processing template settings
+[templating.post_processing]
+template_path = "assets/post_processing_prompt.txt"
+context_transcriptions = 5

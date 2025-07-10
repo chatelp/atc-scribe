@@ -1,0 +1,617 @@
+/* Use tailwindcss for all styling - only use custom styles for things that tailwind doesn't support */
+
+/* Aircraft table row animations */
+.aircraft-row {
+    transition: opacity 0.3s ease, transform 0.3s ease, border-color 0s ease, background-color 0s ease;
+}
+
+.aircraft-row.aircraft-entering {
+    opacity: 0;
+    transform: translateX(-20px);
+}
+
+.aircraft-row.aircraft-leaving {
+    opacity: 0;
+    transform: translateX(20px);
+}
+
+/* Signal lost aircraft styling */
+.aircraft-row.signal-lost {
+    opacity: 0.6 !important;
+}
+
+/* Map label hover effect triggered from table */
+.aircraft-label-table-hover {
+    background-color: rgba(76, 175, 80, 0.1) !important;
+    border-color: rgba(76, 175, 80, 0.3) !important;
+}
+
+/* Flight card hover effect triggered from map */
+.flight-card-map-hover {
+    background-color: rgba(76, 175, 80, 0.1) !important;
+    border-color: rgba(76, 175, 80, 0.3) !important;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.2) !important;
+}
+
+/* Leaflet map customization */
+.leaflet-container {
+    @apply bg-black z-[1];
+}
+
+.leaflet-control-attribution {
+    @apply bg-black/70 text-[9px] text-gray-500;
+}
+
+.leaflet-control-zoom a {
+    @apply bg-panel text-text border-border;
+}
+
+/* Aircraft marker styles */
+.aircraft-marker {
+    @apply drop-shadow-md transition-all duration-200;
+}
+
+.aircraft-marker svg {
+    @apply transition-transform duration-200;
+}
+
+.aircraft-marker svg path {
+    @apply transition-all duration-200;
+}
+
+/* Removed hover states - colors are now fixed and don't change on mouseover */
+
+.label-hover + .aircraft-marker svg path {
+    @apply stroke-highlight fill-highlight/90;
+}
+
+.aircraft-label {
+    @apply bg-black/80 border border-text p-1.5 rounded text-[11px] whitespace-nowrap min-w-[140px] flex flex-col gap-1 transition-all duration-200;
+}
+
+.aircraft-label-inactive {
+    /* @apply opacity-60 border-dashed; */
+    opacity: 0.6;
+    @apply border-dashed;
+}
+
+.aircraft-label-signal-lost {
+    /* @apply opacity-40 border-dashed; */
+    opacity: 0.4;
+    @apply border-dashed;
+}
+
+/* Trend indicators */
+.trend-climbing { @apply text-highlight; }
+.trend-descending { @apply text-danger; }
+.trend-level { @apply text-text; }
+
+/* Toggle switch - no direct Tailwind equivalent */
+.switch {
+    @apply relative inline-block w-9 h-5;
+}
+
+.switch input {
+    @apply opacity-0 w-0 h-0 absolute;
+}
+
+.slider {
+    @apply absolute cursor-pointer inset-0 bg-neutral-700 transition-all duration-300 rounded-full before:content-[''] before:absolute before:h-4 before:w-4 before:left-0.5 before:bottom-0.5 before:bg-white before:transition-all before:duration-300 before:rounded-full;
+}
+
+input:checked + .slider {
+    @apply bg-highlight;
+}
+
+input:checked + .slider:before {
+    @apply translate-x-4;
+}
+
+/* --- BEGINNING OF DUAL SLIDER CSS UPDATES --- */
+
+/* Tracks: Make them transparent AND non-interactive */
+input[type=range].dual-range-min::-webkit-slider-runnable-track,
+input[type=range].dual-range-max::-webkit-slider-runnable-track {
+    background: transparent;
+    border: none;
+    pointer-events: none;
+}
+
+input[type=range].dual-range-min::-moz-range-track,
+input[type=range].dual-range-max::-moz-range-track {
+    background: transparent;
+    border: none;
+    pointer-events: none;
+}
+
+/* Thumbs: Ensure they are interactive */
+input[type=range].dual-range-min::-webkit-slider-thumb {
+    position: relative;
+    z-index: 2; 
+    pointer-events: auto !important;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 14px;
+    width: 14px;
+    background-color: var(--highlight-color, #4CAF50);
+    border-radius: 50%;
+    border: 1px solid #333;
+    margin-top: -6px; 
+}
+
+input[type=range].dual-range-max::-webkit-slider-thumb {
+    position: relative;
+    z-index: 1;
+    pointer-events: auto !important;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 14px;
+    width: 14px;
+    background-color: var(--highlight-color, #4CAF50);
+    border-radius: 50%;
+    border: 1px solid #333;
+    margin-top: -6px;
+}
+
+/* Firefox Thumbs */
+input[type=range].dual-range-min::-moz-range-thumb {
+    position: relative;
+    z-index: 2;
+    pointer-events: auto !important; 
+    height: 12px;
+    width: 12px;
+    background-color: var(--highlight-color, #4CAF50);
+    border-radius: 50%;
+    border: 1px solid #333;
+}
+
+input[type=range].dual-range-max::-moz-range-thumb {
+    position: relative;
+    z-index: 1;
+    pointer-events: auto !important;
+    height: 12px;
+    width: 12px;
+    background-color: var(--highlight-color, #4CAF50);
+    border-radius: 50%;
+    border: 1px solid #333;
+}
+
+/* General input[type=range] styling (ensure these don't conflict) */
+input[type=range].dual-range-min,
+input[type=range].dual-range-max {
+    /* Remove pointer-events from here if previously added, CSS handles tracks/thumbs */
+    -webkit-appearance: none; 
+    appearance: none;
+    width: 100%; 
+    background: transparent; 
+    cursor: pointer;
+}
+
+input[type=range].dual-range-min:focus,
+input[type=range].dual-range-max:focus {
+    outline: none; 
+}
+
+/* Ensure Tailwind colors are available as CSS variables if not already */
+:root {
+    --highlight-color: #4CAF50; /* Or your Tailwind highlight color */
+}
+
+/* --- END OF DUAL SLIDER CSS UPDATES --- */
+
+/* Audio Visualizer Styles */
+.audio-visualizer-container {
+    /* Container for the horizontal bar visualizer */
+    @apply p-0.5 backdrop-blur-[1px]; /* Add padding inside container with slight blur */
+}
+
+.audio-visualizer-bar {
+    @apply bg-highlight transition-all duration-[50ms] ease-out;
+    /* Removed min-width to allow 0% width */
+    box-shadow: 0 0 8px theme('colors.highlight');
+    background-color: #4CAF50; /* Explicit color value */
+    opacity: 1 !important; /* Force opacity */
+    border-radius: 0 2px 2px 0;
+}
+
+/* AI Advisory Audio Visualizer */
+#ai-vis-bar {
+    @apply transition-all duration-[50ms] ease-out;
+    background-color: #a855f7 !important; /* Purple color for AI */
+    box-shadow: 0 0 8px #a855f7 !important;
+    opacity: 1 !important;
+    border-radius: 0 2px 2px 0;
+}
+
+/* Custom Scrollbar Styles */
+/* For Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(76, 175, 80, 0.3);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(76, 175, 80, 0.5);
+}
+
+/* For Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(76, 175, 80, 0.3) rgba(0, 0, 0, 0.2);
+}
+
+/* Specific scrollbar styling for the history view */
+.overflow-y-auto, .overflow-x-auto {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(76, 175, 80, 0.3) rgba(0, 0, 0, 0.2);
+}
+
+/* Custom scrollbar for transcription viewer */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(76, 175, 80, 0.3) rgba(0, 0, 0, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(76, 175, 80, 0.3);
+    border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(76, 175, 80, 0.5);
+}
+
+/* History trail and point marker styles */
+.history-trail {
+    @apply transition-all duration-200;
+}
+
+.history-point-marker {
+    @apply cursor-pointer transition-all duration-200;
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
+}
+
+.history-point-marker:hover {
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.3));
+    transform: scale(1.5);
+}
+
+.history-point-marker-last {
+    @apply cursor-pointer transition-all duration-200;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
+}
+
+.history-point-marker-last:hover {
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.6));
+    transform: scale(1.5);
+}
+
+/* Custom tooltip styles for history points */
+.history-tooltip {
+    @apply p-0 m-0 border-0;
+}
+
+.history-tooltip .leaflet-tooltip-content {
+    @apply p-0 m-0;
+}
+
+.leaflet-tooltip.history-tooltip {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.history-tooltip-content {
+    @apply bg-black/80 backdrop-blur-sm p-1.5 rounded shadow-md border border-gray-700/50 text-xs;
+    min-width: 80px;
+}
+
+.history-time {
+    @apply font-mono text-white/90 font-semibold;
+}
+
+/* Altitude labels next to points */
+.altitude-label-container {
+    background: transparent !important;
+    border: none !important;
+    z-index: 1 !important;
+}
+
+.altitude-label {
+    @apply font-mono text-[10px] text-white/80 bg-black/40 backdrop-blur-[1px] px-1 py-0.5 rounded-sm whitespace-nowrap;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+    transform: translateY(-50%);
+}
+
+/* Proximity Viewer Styles */
+.proximity-highlight {
+    border-color: rgba(235, 140, 0, 0.6) !important; /* Less saturated orange border */
+    opacity: 1 !important; /* Full opacity */
+    box-shadow: 0 0 10px rgba(235, 140, 0, 0.2) !important;
+    z-index: 1500 !important; /* Ensure highlighted labels are on top */
+    animation: subtle-pulse 2s infinite !important; /* Subtle pulsing animation */
+}
+
+/* Ensure all aircraft labels appear on top of history markers */
+.leaflet-marker-pane {
+    z-index: 650 !important;
+}
+
+.leaflet-tooltip-pane {
+    z-index: 400 !important; /* Keep tooltips below markers */
+}
+
+.leaflet-shadow-pane {
+    z-index: 350 !important; /* Keep history markers below */
+}
+
+/* Custom style for history tooltips to ensure they stay below aircraft labels */
+.history-tooltip {
+    z-index: 400 !important;
+    opacity: 0.9 !important;
+    background-color: rgba(0, 0, 0, 0.7) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+    pointer-events: none !important; /* Make tooltips non-interactive */
+}
+
+/* Hover state for proximity highlight - no animation, brighter color */
+.proximity-highlight-hover {
+    border-color: rgba(255, 152, 0, 0.9) !important; /* Brighter orange for hover */
+    box-shadow: 0 0 12px rgba(255, 152, 0, 0.4) !important;
+    animation: none !important; /* Stop the animation on hover */
+}
+
+/* Circle style - same for both states, no animation */
+.proximity-circle-normal, .proximity-circle-alert {
+    opacity: 0.3;
+    transition: opacity 0.5s ease;
+}
+
+/* Subtle pulsing animation for proximity highlights */
+@keyframes subtle-pulse {
+    0% {
+        border-color: rgba(235, 140, 0, 0.6);
+    }
+    50% {
+        border-color: rgba(235, 140, 0, 0.3);
+    }
+    100% {
+        border-color: rgba(235, 140, 0, 0.6);
+    }
+}
+
+/* Radio Bar Enhancements */
+#radio-bar {
+    backdrop-filter: blur(2px);
+}
+
+/* Frequency Box Enhancements */
+#radio-bar .rounded-lg {
+    transition: all 0.25s ease-in-out;
+}
+
+#radio-bar .rounded-lg:hover {
+    /* Removed hover animation */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Button Enhancements */
+#radio-bar button {
+    transition: all 0.2s ease;
+}
+
+#radio-bar button:hover {
+    transform: scale(1.1);
+}
+
+#radio-bar button:active {
+    transform: scale(0.95);
+}
+
+/* Splash Screen Styles */
+.splash-screen-enter {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.splash-screen-exit {
+    animation: fadeOut 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Splash screen content animation */
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.splash-content {
+    animation: slideUp 0.6s ease-out;
+}
+
+/* Runway styling */
+.runway-line {
+    stroke-linecap: square;
+}
+
+.runway-extension-line {
+    stroke-dasharray: 5, 5;
+}
+
+.runway-label-container {
+    background: transparent !important;
+    border: none !important;
+    z-index: 1 !important;
+}
+
+.runway-label {
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+/* Runway distance marker styling */
+.runway-distance-marker {
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.7));
+}
+
+.runway-distance-label-container {
+    background: transparent !important;
+    border: none !important;
+    z-index: 1 !important;
+}
+
+.runway-distance-label {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 9px;
+    font-weight: normal;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.4);
+    padding: 1px 3px;
+    border-radius: 2px;
+    white-space: nowrap;
+    text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Proximity circle animation */
+@keyframes proximityPulse {
+    0%, 100% {
+        stroke-opacity: 0.8;
+        stroke-width: 2;
+    }
+    50% {
+        stroke-opacity: 0.4;
+        stroke-width: 3;
+    }
+}
+
+.proximity-circle-animated {
+    animation: proximityPulse 2s ease-in-out infinite;
+}
+
+/* Takeoff/Landing Effects */
+.takeoff-landing-pulse {
+    pointer-events: none;
+}
+
+/* Aircraft marker highlight during takeoff/landing */
+.takeoff-landing-highlight {
+    filter: drop-shadow(0 0 10px currentColor) brightness(1.5);
+    animation: takeoffLandingGlow 2s ease-out;
+}
+
+/* Aircraft label highlight during takeoff/landing */
+.takeoff-landing-label-highlight {
+    animation: takeoffLandingLabelPulse 2s ease-out;
+}
+
+@keyframes takeoffLandingGlow {
+    0% {
+        filter: drop-shadow(0 0 20px currentColor) brightness(2);
+        transform: scale(1.2);
+    }
+    50% {
+        filter: drop-shadow(0 0 15px currentColor) brightness(1.7);
+        transform: scale(1.1);
+    }
+    100% {
+        filter: drop-shadow(0 0 10px currentColor) brightness(1.5);
+        transform: scale(1);
+    }
+}
+
+@keyframes takeoffLandingLabelPulse {
+    0% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.9;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+/* Custom Slider Styles for Simulation Controls */
+.slider-blue::-webkit-slider-thumb {
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    border: 2px solid #1e40af;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.slider-blue::-webkit-slider-thumb:hover {
+    background: #2563eb;
+    transform: scale(1.1);
+}
+
+.slider-blue::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    border: 2px solid #1e40af;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.slider-blue::-moz-range-thumb:hover {
+    background: #2563eb;
+    transform: scale(1.1);
+}
+
+.slider-blue::-webkit-slider-track {
+    background: rgba(30, 64, 175, 0.3);
+    border-radius: 4px;
+    height: 8px;
+}
+
+.slider-blue::-moz-range-track {
+    background: rgba(30, 64, 175, 0.3);
+    border-radius: 4px;
+    height: 8px;
+}
