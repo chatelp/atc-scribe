@@ -91,7 +91,22 @@ ffmpeg -version
 
 ## Installation and Setup
 
-### 1. Clone and Build
+### Option 1: Download Pre-compiled Binaries
+
+The quickest way to get Co-ATC running is to download pre-compiled binaries from the releases page.
+
+1. **Download the latest release** from [GitHub Releases](https://github.com/yegors/co-atc/releases)
+2. **Clone the repository** (required for assets and www folders):
+   ```bash
+   git clone https://github.com/yegors/co-atc.git
+   cd co-atc
+   ```
+3. **Extract the binary** to the project root directory
+4. **Proceed to Configuration** section below
+
+### Option 2: Build from Source
+
+If you prefer to build from source or need to modify the code:
 
 #### Windows
 ```powershell
