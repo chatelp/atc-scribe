@@ -1,0 +1,64 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Docker files
+docker/
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+docs/
+*.md
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+
+# Build artifacts
+bin/
+build/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Development files
+*.test
+*.prof
+*.out
+coverage.txt
+coverage.html
+
+# Data files (these should be mounted as volumes)
+data/
+logs/
+*.db
+*.sqlite
+*.sqlite3
+
+# Configuration files (mounted as volumes)
+config.toml
+
+# Dependency files (will be handled by Go modules)
+vendor/
+
+# Test files
+*_test.go
+testdata/
+
+# License
+LICENSE 
