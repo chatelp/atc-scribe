@@ -144,6 +144,7 @@ cd co-atc
 go mod download
 
 # Build the application using the build script (for Linux AMD64)
+chmod +x ./build_linux.sh
 ./build_linux.sh
 ```
 
