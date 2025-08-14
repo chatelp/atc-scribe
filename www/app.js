@@ -1,12 +1,12 @@
-// Base API URL
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+// Base API URL - dynamically use the current port
+const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/api/v1`;
 
 // Configuration
 const CONFIG = {
     // defaultCenter: [43.6777, -79.6248], // Will be fetched from API
     defaultZoom: 10,
     dataUrl: `${API_BASE_URL}/aircraft`,
-    wsUrl: `ws://${window.location.hostname}:8000/api/v1/ws`, // WebSocket URL
+    wsUrl: `ws://${window.location.hostname}:${window.location.port}/api/v1/ws`, // WebSocket URL
     useRealData: true,
     useSampleData: true,
     rangeRings: [5, 10, 25, 50, 100],
