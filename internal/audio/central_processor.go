@@ -19,8 +19,17 @@ var (
 	Error  = logger.Error
 )
 
-// CentralAudioProcessor manages a single ffmpeg process for a frequency
-// that can be shared between browser streaming and transcription
+// sourceType indicates which audio source backend is being used
+type sourceType int
+
+const (
+	sourceTypeFFmpeg sourceType = iota // ffmpeg subprocess for HTTP streams
+	sourceTypeSRT                      // native SRT for srt:// URLs
+)
+
+// CentralAudioProcessor manages audio processing for a frequency
+// that can be shared between browser streaming and transcription.
+// It automatically uses native SRT for srt:// URLs, or ffmpeg for HTTP streams.
 type CentralAudioProcessor struct {
 	id                       string
 	audioURL                 string
@@ -31,6 +40,8 @@ type CentralAudioProcessor struct {
 	ffmpegReconnectDelaySecs int // FFmpeg reconnect delay in seconds
 	ffmpegCmd                *exec.Cmd
 	ffmpegStdout             io.ReadCloser
+	srtReader                *SRTReader // Native SRT reader (used instead of ffmpeg for srt://)
+	sourceType               sourceType // Which backend is being used
 	multiReader              *MultiReader
 	ctx                      context.Context
 	cancel                   context.CancelFunc
@@ -57,7 +68,8 @@ type CentralProcessorConfig struct {
 	FFmpegReconnectDelaySecs int // FFmpeg reconnect delay in seconds
 }
 
-// NewCentralAudioProcessor creates a new central audio processor
+// NewCentralAudioProcessor creates a new central audio processor.
+// For srt:// URLs, it uses native Go SRT library instead of ffmpeg.
 func NewCentralAudioProcessor(
 	ctx context.Context,
 	id string,
@@ -70,6 +82,12 @@ func NewCentralAudioProcessor(
 	// Create multi-reader for sharing the stream
 	multiReader := NewMultiReader(procCtx, logger.Named("multi-reader"))
 
+	// Determine source type based on URL
+	srcType := sourceTypeFFmpeg
+	if strings.HasPrefix(audioURL, "srt://") {
+		srcType = sourceTypeSRT
+	}
+
 	return &CentralAudioProcessor{
 		id:                       id,
 		audioURL:                 audioURL,
@@ -78,6 +96,7 @@ func NewCentralAudioProcessor(
 		channels:                 config.Channels,
 		ffmpegTimeoutSecs:        config.FFmpegTimeoutSecs,
 		ffmpegReconnectDelaySecs: config.FFmpegReconnectDelaySecs,
+		sourceType:               srcType,
 		multiReader:              multiReader,
 		ctx:                      procCtx,
 		cancel:                   procCancel,
@@ -102,18 +121,48 @@ func (p *CentralAudioProcessor) Start() error {
 	p.logger.Info("Starting central audio processor",
 		String("url", p.audioURL),
 		Int("sample_rate", p.sampleRate),
-		Int("channels", p.channels))
+		Int("channels", p.channels),
+		String("source_type", p.sourceTypeString()))
 
-	// Start the ffmpeg process
-	if err := p.startFFmpeg(); err != nil {
-		return fmt.Errorf("failed to start ffmpeg: %w", err)
+	// Start appropriate source based on URL type
+	var err error
+	if p.sourceType == sourceTypeSRT {
+		err = p.startSRT()
+		if err != nil {
+			// Fall back to ffmpeg if native SRT fails
+			// This can happen with some SRT servers that have incompatible handshake settings
+			p.logger.Warn("Native SRT connection failed, falling back to ffmpeg",
+				Error(err))
+			p.sourceType = sourceTypeFFmpeg
+			err = p.startFFmpeg()
+			if err != nil {
+				return fmt.Errorf("failed to start ffmpeg (fallback): %w", err)
+			}
+		}
+	} else {
+		err = p.startFFmpeg()
+		if err != nil {
+			return fmt.Errorf("failed to start ffmpeg: %w", err)
+		}
 	}
 
-	// Start monitoring the ffmpeg process
+	// Start monitoring
 	p.startMonitoring()
 
 	p.isRunning = true
 	return nil
+}
+
+// sourceTypeString returns a human-readable string for the source type
+func (p *CentralAudioProcessor) sourceTypeString() string {
+	switch p.sourceType {
+	case sourceTypeSRT:
+		return "native-srt"
+	case sourceTypeFFmpeg:
+		return "ffmpeg"
+	default:
+		return "unknown"
+	}
 }
 
 // Stop stops the audio processor
@@ -125,7 +174,8 @@ func (p *CentralAudioProcessor) Stop() error {
 		return nil
 	}
 
-	p.logger.Info("Stopping central audio processor")
+	p.logger.Info("Stopping central audio processor",
+		String("source_type", p.sourceTypeString()))
 
 	// Stop monitoring
 	if p.monitorTicker != nil {
@@ -136,14 +186,131 @@ func (p *CentralAudioProcessor) Stop() error {
 	// Cancel context to stop all operations
 	p.cancel()
 
-	// Stop ffmpeg
-	p.stopFFmpeg()
+	// Stop the appropriate source
+	if p.sourceType == sourceTypeSRT {
+		p.stopSRT()
+	} else {
+		p.stopFFmpeg()
+	}
 
 	// Close multi-reader
 	p.multiReader.Close()
 
 	p.isRunning = false
 	return nil
+}
+
+// startSRT starts the native SRT reader
+func (p *CentralAudioProcessor) startSRT() error {
+	p.logger.Debug("Starting native SRT reader",
+		String("url", p.audioURL))
+
+	// Create SRT reader
+	p.srtReader = NewSRTReader(p.ctx, p.audioURL, SRTReaderConfig{
+		ReconnectDelay: p.reconnectDelay,
+	}, p.logger)
+
+	// Connect to SRT stream
+	if err := p.srtReader.Connect(); err != nil {
+		return fmt.Errorf("failed to connect to SRT stream: %w", err)
+	}
+
+	// Start copying data from SRT to multi-reader
+	go p.processSRTOutput()
+
+	return nil
+}
+
+// stopSRT stops the native SRT reader
+func (p *CentralAudioProcessor) stopSRT() {
+	if p.srtReader != nil {
+		p.logger.Info("Stopping SRT reader")
+		_ = p.srtReader.Close()
+		p.srtReader = nil
+	}
+
+	if p.reconnectTimer != nil {
+		p.reconnectTimer.Stop()
+		p.reconnectTimer = nil
+	}
+}
+
+// processSRTOutput reads from SRT and writes to multi-reader
+func (p *CentralAudioProcessor) processSRTOutput() {
+	p.logger.Info("Starting to process SRT output")
+
+	buffer := make([]byte, 4096)
+	bytesProcessed := 0
+	lastLogTime := time.Now()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			p.logger.Info("Context canceled, stopping SRT output processing",
+				Int("total_bytes_processed", bytesProcessed))
+			return
+		default:
+			n, err := p.srtReader.Read(buffer)
+			if err != nil {
+				if err == io.EOF {
+					p.logger.Warn("SRT stream ended unexpectedly",
+						Int("total_bytes_processed", bytesProcessed),
+						String("duration_since_start", time.Since(lastLogTime).String()))
+				} else {
+					p.logger.Error("Error reading from SRT", Error(err),
+						Int("total_bytes_processed", bytesProcessed),
+						String("duration_since_start", time.Since(lastLogTime).String()))
+					p.lastError = err
+				}
+
+				// Attempt to restart SRT after a delay
+				p.mu.Lock()
+				if p.isRunning && p.reconnectTimer == nil {
+					p.logger.Warn("Scheduling SRT restart due to read error",
+						String("error_type", fmt.Sprintf("%T", err)),
+						String("error_message", err.Error()))
+					p.reconnectTimer = time.AfterFunc(p.reconnectDelay, func() {
+						p.mu.Lock()
+						defer p.mu.Unlock()
+
+						p.reconnectTimer = nil
+						if p.isRunning {
+							p.logger.Info("Executing scheduled SRT restart")
+							p.stopSRT()
+							if err := p.startSRT(); err != nil {
+								p.logger.Error("Failed to restart SRT", Error(err))
+							} else {
+								p.logger.Info("SRT restarted successfully")
+							}
+						}
+					})
+				}
+				p.mu.Unlock()
+				return
+			}
+
+			if n > 0 {
+				bytesProcessed += n
+				p.lastActivity = time.Now()
+
+				// Log progress every 30 seconds
+				if time.Since(lastLogTime) > 30*time.Second {
+					p.logger.Debug("SRT processing progress",
+						Int("bytes_processed", bytesProcessed),
+						Int("bytes_this_read", n),
+						String("duration", time.Since(lastLogTime).String()))
+					lastLogTime = time.Now()
+				}
+
+				// Write to multi-reader
+				if _, err := p.multiReader.Write(buffer[:n]); err != nil {
+					p.logger.Error("Error writing to multi-reader", Error(err),
+						Int("bytes_processed_before_error", bytesProcessed))
+					return
+				}
+			}
+		}
+	}
 }
 
 // startFFmpeg starts the ffmpeg process
@@ -322,7 +489,7 @@ func (p *CentralAudioProcessor) processFFmpegOutput() {
 	}
 }
 
-// startMonitoring starts monitoring the ffmpeg process
+// startMonitoring starts monitoring the audio source (ffmpeg or SRT)
 func (p *CentralAudioProcessor) startMonitoring() {
 	p.monitorTicker = time.NewTicker(5 * time.Second)
 
@@ -333,16 +500,30 @@ func (p *CentralAudioProcessor) startMonitoring() {
 				return
 			case <-p.monitorTicker.C:
 				p.mu.Lock()
-				if p.isRunning && p.ffmpegCmd != nil && p.ffmpegCmd.ProcessState != nil {
-					// Process has exited
-					p.logger.Warn("FFmpeg process has exited unexpectedly")
+				if p.sourceType == sourceTypeSRT {
+					// Monitor SRT connection
+					if p.isRunning && p.srtReader != nil && !p.srtReader.IsConnected() {
+						p.logger.Warn("SRT connection lost")
 
-					// Only restart if we're still running
-					if p.isRunning && p.reconnectTimer == nil {
-						p.logger.Info("Restarting ffmpeg after unexpected exit")
-						p.stopFFmpeg()
-						if err := p.startFFmpeg(); err != nil {
-							p.logger.Error("Failed to restart ffmpeg", Error(err))
+						if p.isRunning && p.reconnectTimer == nil {
+							p.logger.Info("Restarting SRT after connection loss")
+							p.stopSRT()
+							if err := p.startSRT(); err != nil {
+								p.logger.Error("Failed to restart SRT", Error(err))
+							}
+						}
+					}
+				} else {
+					// Monitor ffmpeg process
+					if p.isRunning && p.ffmpegCmd != nil && p.ffmpegCmd.ProcessState != nil {
+						p.logger.Warn("FFmpeg process has exited unexpectedly")
+
+						if p.isRunning && p.reconnectTimer == nil {
+							p.logger.Info("Restarting ffmpeg after unexpected exit")
+							p.stopFFmpeg()
+							if err := p.startFFmpeg(); err != nil {
+								p.logger.Error("Failed to restart ffmpeg", Error(err))
+							}
 						}
 					}
 				}
@@ -358,7 +539,20 @@ func (p *CentralAudioProcessor) CreateReader(id string) (io.ReadCloser, error) {
 	defer p.mu.Unlock()
 
 	if !p.isRunning {
-		if err := p.startFFmpeg(); err != nil {
+		var err error
+		if p.sourceType == sourceTypeSRT {
+			err = p.startSRT()
+			if err != nil {
+				// Fall back to ffmpeg if native SRT fails
+				p.logger.Warn("Native SRT connection failed, falling back to ffmpeg",
+					Error(err))
+				p.sourceType = sourceTypeFFmpeg
+				err = p.startFFmpeg()
+			}
+		} else {
+			err = p.startFFmpeg()
+		}
+		if err != nil {
 			return nil, fmt.Errorf("failed to start processor: %w", err)
 		}
 		p.isRunning = true
