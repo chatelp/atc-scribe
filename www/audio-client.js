@@ -40,7 +40,11 @@ class AudioClient {
         if (this.userSetVolumes === undefined) this.userSetVolumes = {};
         this.userSetVolumes[frequency.id] = this.userSetVolumes[frequency.id] || 1.0;
 
-        let streamUrl = frequency.stream_url;
+        // Build the stream URL using the current hostname and the port from the API
+        const streamPort = frequency.stream_port || window.location.port;
+        const streamPath = frequency.stream_url;
+        let streamUrl = `${window.location.protocol}//${window.location.hostname}:${streamPort}${streamPath}`;
+
         if (streamUrl.includes('CLIENT_ID')) {
             streamUrl = streamUrl.replace('CLIENT_ID', this.store.clientID);
         } else {

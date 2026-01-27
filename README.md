@@ -155,7 +155,7 @@ Copy the example configuration and customize for your environment:
 #### Windows
 ```powershell
 # Copy example configuration
-copy configs\config.example.toml configs\config.toml
+copy configs\config.toml.example configs\config.toml
 
 # Edit configuration file
 notepad configs\config.toml
@@ -164,7 +164,7 @@ notepad configs\config.toml
 #### Mac/Linux
 ```bash
 # Copy example configuration
-cp configs/config.example.toml configs/config.toml
+cp configs/config.toml.example configs/config.toml
 
 # Edit configuration file
 nano configs/config.toml

@@ -568,16 +568,9 @@ func NewService(
 	)
 
 	// Prepare the list of all available server ports for round-robin stream URL generation
-	allPorts := []int{config.Server.Port} // Start with the primary port
+	allPorts := []int{config.Server.Port}
 	if len(config.Server.AdditionalPorts) > 0 {
 		allPorts = append(allPorts, config.Server.AdditionalPorts...)
-	}
-	if len(allPorts) == 0 { // Should not happen with validation, but as a fallback
-		logger.Warn("No server ports configured for streaming, defaulting to primary port or 8080")
-		allPorts = []int{config.Server.Port}
-		if config.Server.Port == 0 {
-			allPorts = []int{8080}
-		}
 	}
 
 	return &Service{
@@ -590,7 +583,7 @@ func NewService(
 		streamsMu:            sync.RWMutex{},
 		ctx:                  ctx,
 		cancel:               cancel,
-		streamPortIndex:      0, // Initialize for round-robin
+		streamPortIndex:      0,
 		allServerPorts:       allPorts,
 		transcriptionManager: transcriptionManager,
 	}
@@ -971,17 +964,19 @@ func (s *Service) GetAudioStream(ctx context.Context, id string, clientID string
 func (s *Service) GetAllFrequencies() []*Frequency { // frequencies.Frequency from models.go
 	// No RLock needed as s.frequenciesConfig is read-only after NewService
 	var result []*Frequency
-	for _, fc := range s.frequenciesConfig { // Changed id to _ as it was unused
+	for _, fc := range s.frequenciesConfig {
+		streamURL, streamPort := s.buildStreamInfo(fc.ID)
 		result = append(result, &Frequency{
 			ID:              fc.ID,
 			Airport:         fc.Airport,
 			Name:            fc.Name,
 			FrequencyMHz:    fc.FrequencyMHz,
 			URL:             fc.URL,
-			StreamURL:       s.buildStreamURL(fc.ID),
-			Status:          "available",        // All configured frequencies are considered available for connection
-			Order:           fc.Order,           // Include order in the response
-			TranscribeAudio: fc.TranscribeAudio, // Include transcribe_audio flag from config
+			StreamURL:       streamURL,
+			StreamPort:      streamPort,
+			Status:          "available",
+			Order:           fc.Order,
+			TranscribeAudio: fc.TranscribeAudio,
 		})
 	}
 
@@ -998,6 +993,7 @@ func (s *Service) GetFrequencyByID(id string) (*Frequency, bool) {
 	if !ok {
 		return nil, false
 	}
+	streamURL, streamPort := s.buildStreamInfo(fc.ID)
 	return &Frequency{
 		ID:              fc.ID,
 		Airport:         fc.Airport,
@@ -1005,33 +1001,22 @@ func (s *Service) GetFrequencyByID(id string) (*Frequency, bool) {
 		Order:           fc.Order,
 		FrequencyMHz:    fc.FrequencyMHz,
 		URL:             fc.URL,
-		StreamURL:       s.buildStreamURL(fc.ID),
+		StreamURL:       streamURL,
+		StreamPort:      streamPort,
 		Status:          "available",
-		TranscribeAudio: fc.TranscribeAudio, // Include transcribe_audio flag from config
+		TranscribeAudio: fc.TranscribeAudio,
 	}, true
 }
 
-func (s *Service) buildStreamURL(frequencyID string) string {
-	host := s.config.Server.Host
-	if host == "0.0.0.0" || host == "" { // Default to localhost if host is 0.0.0.0 or empty
-		host = "localhost"
-	}
-
-	// Round-robin port selection
-	// s.streamsMu.Lock() // Lock if race conditions on streamPortIndex are a concern with many GetStreamURL calls
-	// For now, assuming GetStreamURL is called in a way that frequent contention is unlikely.
-	// If this becomes an issue, this index needs protection.
-	if len(s.allServerPorts) == 0 {
-		// Fallback, though NewService should prevent this
-		s.logger.Error("No server ports available for buildStreamURL, defaulting to config.Server.Port")
-		return fmt.Sprintf("http://%s:%d/api/v1/stream/%s", host, s.config.Server.Port, frequencyID)
-	}
-
+// buildStreamInfo returns the stream URL path and the port to use for this stream.
+// The port is selected via round-robin from all available server ports.
+func (s *Service) buildStreamInfo(frequencyID string) (string, int) {
+	// Get the next port via round-robin
 	port := s.allServerPorts[s.streamPortIndex]
 	s.streamPortIndex = (s.streamPortIndex + 1) % len(s.allServerPorts)
-	// s.streamsMu.Unlock()
 
-	return fmt.Sprintf("http://%s:%d/api/v1/stream/%s", host, port, frequencyID)
+	// Return relative URL path so the browser uses the correct hostname
+	return fmt.Sprintf("/api/v1/stream/%s", frequencyID), port
 }
 
 // AddFrequency and RemoveFrequency could be implemented to modify s.frequenciesConfig

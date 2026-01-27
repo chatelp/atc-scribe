@@ -17,7 +17,8 @@ type Frequency struct {
 	LastError       string    `json:"last_error,omitempty"`
 	Bitrate         int       `json:"bitrate,omitempty"`
 	Format          string    `json:"format,omitempty"`
-	StreamURL       string    `json:"stream_url"` // Relative URL to stream from our server
+	StreamURL       string    `json:"stream_url"`  // Relative URL path to stream from our server
+	StreamPort      int       `json:"stream_port"` // Port to use for streaming (for load distribution)
 	LastActive      time.Time `json:"last_active,omitempty"`
 	Order           int       `json:"order"`            // Order for display/sorting
 	TranscribeAudio bool      `json:"transcribe_audio"` // Whether to transcribe audio for this frequency

@@ -353,7 +353,7 @@ enabled = true
 
 # OpenAI API settings for realtime chat
 openai_api_key = ""              # Replace with your actual API key
-realtime_model = "gpt-4o-realtime-preview-2025-06-03"
+realtime_model = "gpt-realtime-2025-08-28"
 voice = "ash"  # Voice options: 'alloy', 'ash',
 
 # Audio settings
