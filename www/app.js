@@ -614,8 +614,10 @@ document.addEventListener('alpine:init', () => {
                             </div>
                             <span class="text-text/70 text-[10px]">${lastSeenText}</span>
                         </div>
-                        <div class="text-[10px] text-text/80 -mt-0.5">${airlineTypeDisplay}</div>
-                        <div class="text-[10px]">${speedLabel} ${speedValue}</div>
+                        <div class="grid grid-cols-2 gap-1 text-[10px]">
+                            <div class="${altitudeColorClass}">ALT ${altitudeDisplay} <span class="${altitudeTrendIconClass}"></span></div>
+                            <div>${speedLabel} ${speedValue}</div>
+                        </div>
                     </div>
                 `;
             }
@@ -630,7 +632,6 @@ document.addEventListener('alpine:init', () => {
                         </div>
                         <span class="text-text/70 text-[10px]">${lastSeenText}</span>
                     </div>
-                    <div class="text-[10px] text-text/80 -mt-0.5">${airlineTypeDisplay}</div>
                     <div class="grid grid-cols-2 gap-1 text-[10px]">
                         <div class="${altitudeColorClass}">ALT ${altitudeDisplay} <span class="${altitudeTrendIconClass}"></span></div>
                         <div>${speedLabel} ${speedValue}</div>
