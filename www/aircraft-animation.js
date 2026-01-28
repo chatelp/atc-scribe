@@ -175,7 +175,61 @@ class AircraftAnimationEngine {
             state.aircraft = aircraft;
         }
     }
-    
+
+    // Update aircraft with delta (only changed fields) - more efficient than full update
+    updateAircraftDelta(hex, delta) {
+        if (!this.config.enabled || !hex || !delta) {
+            return;
+        }
+
+        // Handle status change to signal_lost
+        if (delta.status === 'signal_lost') {
+            this.aircraftStates.delete(hex);
+            return;
+        }
+
+        const state = this.aircraftStates.get(hex);
+        if (!state) {
+            // No existing state - need full aircraft data first
+            return;
+        }
+
+        // Check if position changed
+        const hasPositionChange = delta.lat !== undefined || delta.lon !== undefined;
+
+        if (hasPositionChange) {
+            // Build position object from delta and existing state
+            const currentAircraft = state.aircraft;
+            const currentAdsb = currentAircraft?.adsb || {};
+
+            const position = {
+                lat: delta.lat !== undefined ? delta.lat : currentAdsb.lat,
+                lon: delta.lon !== undefined ? delta.lon : currentAdsb.lon,
+                alt: delta.alt_baro !== undefined ? delta.alt_baro : (currentAdsb.alt_baro || 0),
+                groundSpeed: delta.gs !== undefined ? delta.gs : (currentAdsb.gs || 0),
+                track: delta.track !== undefined ? delta.track : (currentAdsb.track || 0),
+                verticalRate: delta.baro_rate !== undefined ? delta.baro_rate : (currentAdsb.baro_rate || 0),
+                trackRate: currentAdsb.track_rate || 0
+            };
+
+            state.addPosition(position, Date.now());
+        }
+
+        // Update the aircraft reference with delta values
+        if (state.aircraft) {
+            if (!state.aircraft.adsb) state.aircraft.adsb = {};
+
+            if (delta.lat !== undefined) state.aircraft.adsb.lat = delta.lat;
+            if (delta.lon !== undefined) state.aircraft.adsb.lon = delta.lon;
+            if (delta.alt_baro !== undefined) state.aircraft.adsb.alt_baro = delta.alt_baro;
+            if (delta.track !== undefined) state.aircraft.adsb.track = delta.track;
+            if (delta.gs !== undefined) state.aircraft.adsb.gs = delta.gs;
+            if (delta.baro_rate !== undefined) state.aircraft.adsb.baro_rate = delta.baro_rate;
+            if (delta.status !== undefined) state.aircraft.status = delta.status;
+            if (delta.on_ground !== undefined) state.aircraft.on_ground = delta.on_ground;
+        }
+    }
+
     // Remove aircraft from animation
     removeAircraft(hex) {
         this.aircraftStates.delete(hex);

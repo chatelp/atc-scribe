@@ -28,6 +28,8 @@ func (h *WebSocketHandler) HandleMessage(client *websocket.Client, messageType s
 		return h.handleBulkRequest(client, data)
 	case websocket.MessageTypeFilterUpdate:
 		return h.handleFilterUpdate(client, data)
+	case websocket.MessageTypeSimulationControlUpdate:
+		return h.handleSimulationControlUpdate(client, data)
 	default:
 		h.logger.Debug("Unhandled message type", logger.String("type", messageType))
 		return nil
@@ -66,91 +68,43 @@ func (h *WebSocketHandler) handleBulkRequest(client *websocket.Client, data map[
 }
 
 // handleFilterUpdate processes filter update messages from clients
+// Note: Server-side filtering has been removed. All filtering is done client-side.
+// This handler is kept for backward compatibility but does nothing.
 func (h *WebSocketHandler) handleFilterUpdate(client *websocket.Client, data map[string]interface{}) error {
-	h.logger.Debug("Handling filter update request")
+	h.logger.Debug("Filter update received (filtering is client-side only)")
+	return nil
+}
 
-	// Parse filter data
-	var filters websocket.ClientFilters
+// handleSimulationControlUpdate processes simulation control update messages
+func (h *WebSocketHandler) handleSimulationControlUpdate(client *websocket.Client, data map[string]interface{}) error {
+	h.logger.Debug("Handling simulation control update")
 
-	if showAir, ok := data["show_air"].(bool); ok {
-		filters.ShowAir = showAir
+	// Parse required fields
+	hex, ok := data["hex"].(string)
+	if !ok || hex == "" {
+		h.logger.Warn("Missing or invalid hex in simulation control update")
+		return nil
 	}
 
-	if showGround, ok := data["show_ground"].(bool); ok {
-		filters.ShowGround = showGround
-	}
+	heading, _ := data["heading"].(float64)
+	speed, _ := data["speed"].(float64)
+	verticalRate, _ := data["vertical_rate"].(float64)
 
-	if phases, ok := data["phases"].(map[string]interface{}); ok {
-		filters.Phases = make(map[string]bool)
-		for phase, enabled := range phases {
-			if enabledBool, ok := enabled.(bool); ok {
-				filters.Phases[phase] = enabledBool
-			}
-		}
-	}
-
-	// Parse selected aircraft hex
-	if selectedHex, ok := data["selected_aircraft_hex"].(string); ok {
-		filters.SelectedAircraftHex = selectedHex
-	}
-
-	// Update client filters
-	client.UpdateFilters(&filters)
-
-	h.logger.Info("Updated client filters",
-		logger.Bool("show_air", filters.ShowAir),
-		logger.Bool("show_ground", filters.ShowGround),
-		logger.Int("phase_count", len(filters.Phases)))
-
-	// Convert filters to service format and get filtered aircraft
-	serviceFilters := make(map[string]interface{})
-	serviceFilters["show_air"] = filters.ShowAir
-	serviceFilters["show_ground"] = filters.ShowGround
-
-	// Convert phases map to array of enabled phases
-	if len(filters.Phases) > 0 {
-		enabledPhases := make([]string, 0)
-		for phase, enabled := range filters.Phases {
-			if enabled {
-				enabledPhases = append(enabledPhases, phase)
-			}
-		}
-		serviceFilters["phases"] = enabledPhases
-	}
-
-	// Parse additional filters from the request (same as handleBulkRequest)
-	if val, ok := data["min_altitude"].(float64); ok {
-		serviceFilters["min_altitude"] = val
-	}
-	if val, ok := data["max_altitude"].(float64); ok {
-		serviceFilters["max_altitude"] = val
-	}
-	if val, ok := data["last_seen_minutes"].(float64); ok {
-		serviceFilters["last_seen_minutes"] = val
-	}
-	if val, ok := data["exclude_other_airports_grounded"].(bool); ok {
-		serviceFilters["exclude_other_airports_grounded"] = val
-	}
-
-	// Get filtered aircraft data
-	response, err := h.service.HandleBulkRequest(serviceFilters)
-	if err != nil {
-		h.logger.Error("Failed to get filtered aircraft data", logger.Error(err))
+	// Update simulation controls via the service
+	if err := h.service.UpdateSimulationControls(hex, heading, speed, verticalRate); err != nil {
+		h.logger.Error("Failed to update simulation controls",
+			logger.String("hex", hex),
+			logger.Error(err))
 		return err
 	}
 
-	// Send filtered aircraft data back to client
-	message := &websocket.Message{
-		Type: "aircraft_bulk_response",
-		Data: map[string]interface{}{
-			"aircraft": response.Aircraft,
-			"count":    response.Count,
-			"counts":   response.Counts,
-		},
-	}
+	h.logger.Info("Updated simulation controls via WebSocket",
+		logger.String("hex", hex),
+		logger.Float64("heading", heading),
+		logger.Float64("speed", speed),
+		logger.Float64("vertical_rate", verticalRate))
 
-	// Send to specific client (not broadcast)
-	return h.sendToClient(client, message)
+	return nil
 }
 
 // sendToClient sends a message to a specific client

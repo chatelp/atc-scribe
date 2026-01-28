@@ -53,12 +53,9 @@ api_key = ""  # Replace with your actual API key
 search_radius_nm = 50
 
 # Common configuration for both source types
-fetch_interval_seconds = 2      # How often to fetch new aircraft data
+fetch_interval_seconds = 1      # How often to fetch new aircraft data
 signal_lost_timeout_seconds = 60 # How long to wait before considering a signal lost
 airline_db_path = "assets/airlines.json"  # Path to airline database for aircraft operator lookups
-
-# Enable WebSocket aircraft streaming (hybrid mode)
-websocket_aircraft_updates = false
 
 #######################################################
 # Logging Configuration

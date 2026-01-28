@@ -54,10 +54,9 @@ type ADSBConfig struct {
 	SearchRadiusNM    int    `toml:"search_radius_nm"`    // Search radius in nautical miles for external API queries
 
 	// Common settings for both source types
-	FetchIntervalSecs        int    `toml:"fetch_interval_seconds"`      // How often to fetch new aircraft data (in seconds)
-	SignalLostTimeoutSecs    int    `toml:"signal_lost_timeout_seconds"` // Time after which aircraft is marked as signal_lost (in seconds, default: 60)
-	AirlineDBPath            string `toml:"airline_db_path"`             // Path to airline database JSON file for aircraft operator lookups
-	WebSocketAircraftUpdates bool   `toml:"websocket_aircraft_updates"`  // Enable WebSocket aircraft streaming (hybrid mode)
+	FetchIntervalSecs     int    `toml:"fetch_interval_seconds"`      // How often to fetch new aircraft data (in seconds)
+	SignalLostTimeoutSecs int    `toml:"signal_lost_timeout_seconds"` // Time after which aircraft is marked as signal_lost (in seconds, default: 60)
+	AirlineDBPath         string `toml:"airline_db_path"`             // Path to airline database JSON file for aircraft operator lookups
 }
 
 // LoggingConfig contains application logging configuration

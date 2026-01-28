@@ -365,41 +365,53 @@ document.addEventListener('alpine:init', () => {
         
         // Perform heavy filtering computation asynchronously
         _performFiltering() {
-            // Create lightweight hash of current filter state (avoid expensive JSON.stringify)
-            const filterHash = `${this.searchTerm}|${this.settings.showGroundAircraft}|${this.settings.showAirAircraft}|${this.settings.minAltitude}|${this.settings.maxAltitude}|${Object.keys(this.aircraft).length}|${this.selectedAircraft?.hex}|${this.sortColumn}|${this.sortDirection}`;
-            
+            // Create lightweight hash of current filter state (include ALL filter settings)
+            const phaseFilterHash = this.settings.phaseFilters ? Object.entries(this.settings.phaseFilters).map(([k, v]) => `${k}:${v}`).join(',') : '';
+            const filterHash = `${this.searchTerm}|${this.settings.showGroundAircraft}|${this.settings.showAirAircraft}|${this.settings.minAltitude}|${this.settings.maxAltitude}|${this.settings.lastSeenMinutes}|${phaseFilterHash}|${Object.keys(this.aircraft).length}|${this.selectedAircraft?.hex}|${this.sortColumn}|${this.sortDirection}`;
+
             // Return cached result if nothing changed (but always filter if no cache exists)
             if (this._lastFilterHash === filterHash && this._filteredAircraftCache) {
                 return;
             }
-            
+
             console.log('[PERFORMANCE] Recalculating filtered aircraft list');
             const searchLower = this.searchTerm.toLowerCase();
+            const now = new Date();
+            const lastSeenCutoff = new Date(now.getTime() - (this.settings.lastSeenMinutes * 60 * 1000));
+
             const filtered = Object.values(this.aircraft).filter(aircraft => {
+                // Filter by last seen time - hide aircraft not seen recently
+                if (aircraft.last_seen) {
+                    const lastSeenDate = new Date(aircraft.last_seen);
+                    if (lastSeenDate < lastSeenCutoff) {
+                        return false;
+                    }
+                }
+
                 // Filter by search term - now includes callsign, type, and category
                 if (searchLower) {
                     const callsign = (aircraft.flight || aircraft.hex).toLowerCase();
                     const type = (aircraft.adsb?.type || '').toLowerCase();
                     const category = (aircraft.adsb?.category || '').toLowerCase();
-                    
+
                     const matchesSearch = callsign.includes(searchLower) ||
                                         type.includes(searchLower) ||
                                         category.includes(searchLower);
-                    
+
                     if (!matchesSearch) return false;
                 }
 
                 // Filter by air/ground settings - both can be enabled/disabled independently
                 const showThisAircraft = (aircraft.on_ground && this.settings.showGroundAircraft) ||
                                         (!aircraft.on_ground && this.settings.showAirAircraft);
-                
+
                 if (!showThisAircraft) {
                     return false;
                 }
 
                 // Filter by flight phase
                 const currentPhase = this.getCurrentPhase(aircraft);
-                
+
                 if (this.settings.phaseFilters && this.settings.phaseFilters[currentPhase] === false) {
                     return false;
                 }
@@ -409,7 +421,7 @@ document.addEventListener('alpine:init', () => {
                 if (!aircraft.on_ground && (!aircraft.adsb || aircraft.adsb.alt_baro < this.settings.minAltitude || aircraft.adsb.alt_baro > this.settings.maxAltitude)) {
                     return false;
                 }
-                
+
                 return true;
             });
 
@@ -850,9 +862,6 @@ document.addEventListener('alpine:init', () => {
             if (this.mapManager) {
                 this.mapManager.applyFiltersAndRefreshView();
             }
-
-            // Send filter update to server immediately (this will return filtered aircraft data)
-            this.sendFilterUpdate();
         },
 
         // Toggle Ground aircraft visibility
@@ -868,9 +877,6 @@ document.addEventListener('alpine:init', () => {
             if (this.mapManager) {
                 this.mapManager.applyFiltersAndRefreshView();
             }
-
-            // Send filter update to server immediately (this will return filtered aircraft data)
-            this.sendFilterUpdate();
         },
 
         // Toggle flight phase filter
@@ -882,14 +888,11 @@ document.addEventListener('alpine:init', () => {
             this.saveSettings();
             this.applyFilters();
             this.refreshAlertsDisplay(); // Refresh alerts based on new filter
-            
+
             // Update map visibility including tracks
             if (this.mapManager) {
                 this.mapManager.applyFiltersAndRefreshView();
             }
-            
-            // Send filter update to server immediately
-            this.sendFilterUpdate();
         },
 
         // Simulation methods
@@ -929,51 +932,40 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        async updateSimulationControls(hex, controlType, value) {
-            try {
-                // Find the aircraft to get current controls
-                const aircraft = this.aircraft.find(a => a.hex === hex);
-                if (!aircraft || !aircraft.simulation_controls) {
-                    console.error('Aircraft not found or not simulated:', hex);
-                    return;
-                }
+        // Set all simulation controls at once via WebSocket
+        setSimulationControls(hex, heading, speed, verticalRate) {
+            // Find the aircraft (this.aircraft is an object, not array)
+            const aircraft = this.aircraft[hex];
+            if (!aircraft) {
+                console.error('Aircraft not found:', hex);
+                return;
+            }
 
-                // Update the local value immediately for responsive UI
-                switch (controlType) {
-                    case 'heading':
-                        aircraft.simulation_controls.target_heading = parseFloat(value);
-                        break;
-                    case 'speed':
-                        aircraft.simulation_controls.target_speed = parseFloat(value);
-                        break;
-                    case 'vertical_rate':
-                        aircraft.simulation_controls.target_vertical_rate = parseFloat(value);
-                        break;
-                }
+            // Initialize simulation_controls if needed
+            if (!aircraft.simulation_controls) {
+                aircraft.simulation_controls = {};
+            }
 
-                // Send update to server
-                const response = await this.fetchWithTimeout(`${API_BASE_URL}/simulation/aircraft/${hex}/controls`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        heading: aircraft.simulation_controls.target_heading,
-                        speed: aircraft.simulation_controls.target_speed,
-                        vertical_rate: aircraft.simulation_controls.target_vertical_rate
-                    })
-                });
+            // Update local values immediately for responsive UI
+            aircraft.simulation_controls.target_heading = parseFloat(heading);
+            aircraft.simulation_controls.target_speed = parseFloat(speed);
+            aircraft.simulation_controls.target_vertical_rate = parseFloat(verticalRate);
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`Failed to update simulation controls: ${errorText}`);
-                    throw new Error(`Failed to update simulation controls: ${errorText}`);
-                }
-                
-                console.log(`Updated simulation controls: ${controlType}=${value} for aircraft ${hex}`);
-            } catch (error) {
-                console.error('Error updating simulation controls:', error);
-                throw error;
+            // Send update via WebSocket
+            if (wsClient && wsClient.connection && wsClient.connection.readyState === WebSocket.OPEN) {
+                const message = {
+                    type: 'simulation_control_update',
+                    data: {
+                        hex: hex,
+                        heading: parseFloat(heading),
+                        speed: parseFloat(speed),
+                        vertical_rate: parseFloat(verticalRate)
+                    }
+                };
+                wsClient.connection.send(JSON.stringify(message));
+                console.log(`Updated simulation controls via WebSocket for ${hex}: hdg=${heading} spd=${speed} vs=${verticalRate}`);
+            } else {
+                console.error('WebSocket not connected, cannot update simulation controls');
             }
         },
 
@@ -2314,195 +2306,12 @@ document.addEventListener('alpine:init', () => {
             audioClient.updateSecondsSinceLastAudio(this.secondsSinceLastAudio); // Pass the store's object to be updated
         },
 
-// CRITICAL: Choose between WebSocket streaming and HTTP polling based on server config
+// Initialize WebSocket for all aircraft data and alerts
 async initAircraftDataSource() {
-    try {
-        console.log('[AIRCRAFT DATA] Checking server configuration for data source...');
-        
-        // Fetch server config to determine if WebSocket streaming is enabled
-        const response = await fetch('/api/v1/config');
-        if (!response.ok) {
-            throw new Error(`Config request failed: ${response.status}`);
-        }
-        
-        const config = await response.json();
-        const streamingEnabled = config.adsb?.websocket_aircraft_updates;
-        
-        // ALWAYS establish WebSocket connection for alerts (phase changes, transcriptions, etc.)
-        console.log('[WEBSOCKET] Establishing WebSocket connection for alerts...');
-        this.initWebSocket();
-        
-        if (streamingEnabled) {
-            console.log('[AIRCRAFT DATA] WebSocket streaming ENABLED - aircraft updates via WebSocket');
-            // Aircraft data will come via WebSocket (handled in initWebSocket)
-        } else {
-            console.log('[AIRCRAFT DATA] WebSocket streaming DISABLED - aircraft updates via HTTP polling');
-            // Disable aircraft streaming in WebSocket but keep alerts
-            this.disableAircraftStreamingInWebSocket();
-            // Use HTTP polling for aircraft data
-            this.initHTTPPolling();
-        }
-        
-    } catch (error) {
-        console.error('[AIRCRAFT DATA] Failed to check server config, defaulting to HTTP polling:', error);
-        this.initWebSocket(); // Still need WebSocket for alerts
-        this.disableAircraftStreamingInWebSocket();
-        this.initHTTPPolling();
-    }
+    console.log('[AIRCRAFT DATA] Initializing WebSocket for aircraft updates and alerts...');
+    this.initWebSocket();
 },
 
-// Disable aircraft streaming in WebSocket but keep other alerts
-disableAircraftStreamingInWebSocket() {
-    console.log('[WEBSOCKET] Disabling aircraft streaming handlers - keeping alerts only');
-    this.aircraftStreamingDisabled = true;
-},
-
-        // HTTP Polling fallback (the fast method that worked before WebSocket)
-        initHTTPPolling() {
-            console.log('[HTTP POLLING] Starting HTTP aircraft data polling...');
-            
-            // Load initial aircraft data
-            this.fetchAircraftData();
-            
-            // Set up polling interval (use server's fetch interval)
-            if (this.aircraftPollingInterval) {
-                clearInterval(this.aircraftPollingInterval);
-            }
-            
-            this.aircraftPollingInterval = setInterval(() => {
-                this.fetchAircraftData();
-            }, 2000); // Poll every 2 seconds for responsive updates
-        },
-
-        // Fetch aircraft data via HTTP API (restored from pre-WebSocket implementation)
-        async fetchAircraftData() {
-            try {
-                // Build URL with current filter parameters
-                const params = new URLSearchParams();
-                
-                // Add altitude filters
-                params.append('min_altitude', this.settings.minAltitude.toString());
-                params.append('max_altitude', this.settings.maxAltitude.toString());
-                
-                // Add last seen filter
-                if (this.settings.lastSeenMinutes > 0) {
-                    params.append('last_seen_minutes', this.settings.lastSeenMinutes.toString());
-                }
-                
-                // Add ground traffic filter
-                if (this.settings.excludeOtherAirportsGrounded) {
-                    params.append('exclude_other_airports_grounded', 'true');
-                }
-                
-                // Add search term if provided
-                if (this.searchTerm && this.searchTerm.trim()) {
-                    params.append('callsign', this.searchTerm.trim());
-                }
-                
-                const url = `/api/v1/aircraft?${params.toString()}`;
-                console.log(`[HTTP POLLING] Fetching: ${url}`);
-                
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                // CRITICAL FIX: Update aircraft individually to prevent table flashing
-                const newAircraftMap = {};
-                const currentHexes = new Set();
-                let hasChanges = false;
-                
-                if (data.aircraft) {
-                    for (const aircraft of data.aircraft) {
-                        this.calculateAircraftDistance(aircraft);
-                        
-                        // Update animation engine with aircraft data (HTTP polling)
-                        if (this.animationEngine) {
-                            this.animationEngine.updateAircraft(aircraft);
-                        }
-                        
-                        newAircraftMap[aircraft.hex] = aircraft;
-                        currentHexes.add(aircraft.hex);
-                    }
-                }
-                
-                // Remove aircraft that are no longer present
-                const existingHexes = Object.keys(this.aircraft);
-                for (const hex of existingHexes) {
-                    if (!currentHexes.has(hex)) {
-                        delete this.aircraft[hex];
-                        hasChanges = true;
-                        console.log(`[HTTP POLLING] Removed aircraft: ${hex}`);
-                        
-                        // Remove from animation engine (HTTP polling)
-                        if (this.animationEngine) {
-                            this.animationEngine.removeAircraft(hex);
-                        }
-                        
-                        // Update selected aircraft if it was removed
-                        if (this.selectedAircraft && this.selectedAircraft.hex === hex) {
-                            this.selectedAircraft = null;
-                        }
-                    }
-                }
-                
-                // Add new aircraft and update existing ones
-                for (const [hex, aircraft] of Object.entries(newAircraftMap)) {
-                    const isNewAircraft = !this.aircraft[hex];
-                    if (isNewAircraft) {
-                        //console.log(`[HTTP POLLING] Added aircraft: ${hex}`);
-                        hasChanges = true;
-                    }
-                    
-                    // Always update the aircraft data (this updates existing aircraft without rebuilding table)
-                    this.aircraft[hex] = aircraft;
-                    
-                    // Update selected aircraft details if this is the selected one
-                    if (this.selectedAircraft && this.selectedAircraft.hex === hex) {
-                        this.selectedAircraft = aircraft;
-                    }
-                }
-                
-                // Update counts
-                this.counts = data.counts || {
-                    ground_active: 0,
-                    ground_total: 0,
-                    air_active: 0,
-                    air_total: 0
-                };
-                
-                // Update connection status
-                this.connected = true;
-                this.lastUpdate = new Date();
-                this.lastUpdateSeconds = 0;
-                
-                // Update map
-                if (this.mapManager) {
-                    const currentHexes = new Set(Object.keys(this.aircraft));
-                    this.mapManager.removeStaleMarkers(currentHexes);
-                    
-                    for (const aircraft of Object.values(this.aircraft)) {
-                        this.mapManager._ensureLeafletObjects(aircraft);
-                    }
-                    
-                    this.mapManager.applyFiltersAndRefreshView();
-                }
-                
-                // CRITICAL FIX: Only invalidate cache if aircraft were added/removed, not on every update
-                if (hasChanges) {
-                    this._lastFilterHash = null;
-                    console.log(`[HTTP POLLING] Cache invalidated due to aircraft changes`);
-                }
-                
-                console.log(`[HTTP POLLING] Updated ${Object.keys(this.aircraft).length} aircraft`);
-                
-            } catch (error) {
-                console.error('[HTTP POLLING] Failed to fetch aircraft data:', error);
-                this.connected = false;
-            }
-        },
         // Initialize WebSocket connection
                 initWebSocket() {            if (!wsClient) {                console.error("wsClient not available during initWebSocket. This shouldn't happen.");                return;            }            // Reset reconnection attempts when manually initializing            if (wsClient.resetReconnectAttempts) {                wsClient.resetReconnectAttempts();            }            // Clear any existing listeners from previous initializations, if any            wsClient.listeners.transcription = [];            wsClient.listeners.transcription_update = [];            wsClient.listeners.phase_change = [];            wsClient.listeners.aircraft_event = [];            wsClient.listeners.open = [];            wsClient.listeners.close = [];            wsClient.listeners.error = [];
 
@@ -2917,43 +2726,23 @@ disableAircraftStreamingInWebSocket() {
             }
         },
         
-        // NEW: Request initial aircraft data via WebSocket
+        // Request initial aircraft data via WebSocket
         requestInitialAircraftData() {
-            // CRITICAL: Don't request bulk data if aircraft streaming is disabled
-            if (this.aircraftStreamingDisabled) {
-                console.log('[AIRCRAFT STREAMING DISABLED] Skipping bulk aircraft request');
-                return;
+            console.log('Requesting initial aircraft data');
+            // Request bulk data for initial load
+            // Only send last_seen_minutes to server to avoid loading stale aircraft
+            // All other filtering is done client-side
+            if (wsClient) {
+                wsClient.requestBulkAircraftData({
+                    last_seen_minutes: this.settings.lastSeenMinutes
+                });
             }
-            
-            console.log('Sending initial filter update to get aircraft data');
-            // Send filter update which will return filtered aircraft data
-            this.sendFilterUpdate();
         },
 
-        // NEW: Build current filter object from settings
-        buildCurrentFilters() {
-            return {
-                min_altitude: this.settings.minAltitude,
-                max_altitude: this.settings.maxAltitude,
-                last_seen_minutes: this.settings.lastSeenMinutes,
-                exclude_other_airports_grounded: this.settings.excludeOtherAirportsGrounded,
-                show_air: this.settings.showAirAircraft,
-                show_ground: this.settings.showGroundAircraft,
-                phases: this.settings.phaseFilters || {},
-                selected_aircraft_hex: this.selectedAircraft?.hex || null
-            };
-        },
-
-        // NEW: Handle bulk aircraft data response
+        // Handle bulk aircraft data response (initial load on WebSocket connect)
         handleBulkAircraftData(data) {
             console.log(`Received bulk aircraft data: ${data.count} aircraft`);
-            
-            // CRITICAL: Skip bulk aircraft updates if streaming is disabled (using HTTP polling instead)
-            if (this.aircraftStreamingDisabled) {
-                console.log(`[AIRCRAFT STREAMING DISABLED] Skipping bulk aircraft data`);
-                return;
-            }
-            
+
             // Clear current aircraft data
             this.aircraft = {};
             
@@ -3015,50 +2804,40 @@ disableAircraftStreamingInWebSocket() {
         // Filtering throttling state to prevent main thread blocking
         _filteringScheduled: false,
         _lastFilterTime: null,
-        
-        // HTTP polling state
-        aircraftPollingInterval: null,
-        aircraftStreamingDisabled: false,
-
         // ASYNC Performance-optimized aircraft handlers to prevent main thread blocking
         handleAircraftAdded(data) {
             if (this.wsUpdatesPaused) {
                 console.log(`[PAUSED] Skipping aircraft added: ${data.aircraft?.flight || data.hex}`);
                 return;
             }
-            
-            // CRITICAL: Skip aircraft updates if streaming is disabled (using HTTP polling instead)
-            if (this.aircraftStreamingDisabled) {
-                console.log(`[AIRCRAFT STREAMING DISABLED] Skipping aircraft added: ${data.aircraft?.flight || data.hex}`);
-                return;
-            }
-            
-            // CRITICAL FIX: Process asynchronously to prevent main thread blocking
+
+            // Process asynchronously to prevent main thread blocking
             setTimeout(() => {
                 if (data.aircraft) {
                     console.log(`Adding new aircraft: ${data.aircraft.flight || data.hex}`);
-                    
+
+                    // Update last update timestamp
+                    this.lastUpdate = new Date();
+                    this.lastUpdateSeconds = 0;
+
                     // Apply distance calculation
                     this.calculateAircraftDistance(data.aircraft);
-                    
+
+                    // ALWAYS add to aircraft store - filtering is done at display level
+                    this.aircraft[data.aircraft.hex] = data.aircraft;
+
                     // Update animation engine with new aircraft data
                     if (this.animationEngine) {
                         this.animationEngine.updateAircraft(data.aircraft);
                     }
-                    
-                    // Check if aircraft passes current filters
-                    if (this.aircraftPassesFilters(data.aircraft)) {
-                        // Add to aircraft map
-                        this.aircraft[data.aircraft.hex] = data.aircraft;
-                        
-                        // Queue for throttled map update
-                        this.queueMapUpdate(data.aircraft.hex);
-                        
-                        // Queue cache invalidation
-                        this.queueCacheInvalidation();
-                    }
+
+                    // Queue for throttled map update (map will handle visibility based on filters)
+                    this.queueMapUpdate(data.aircraft.hex);
+
+                    // Queue cache invalidation
+                    this.queueCacheInvalidation();
                 }
-            }, 0); // Yield to allow other operations
+            }, 0);
         },
 
         handleAircraftUpdate(data) {
@@ -3066,58 +2845,94 @@ disableAircraftStreamingInWebSocket() {
                 console.log(`[PAUSED] Skipping aircraft update: ${data.hex}`);
                 return;
             }
-            
-            // CRITICAL: Skip aircraft updates if streaming is disabled (using HTTP polling instead)
-            if (this.aircraftStreamingDisabled) {
-                console.log(`[AIRCRAFT STREAMING DISABLED] Skipping aircraft update: ${data.hex}`);
-                return;
-            }
-            
-            // CRITICAL FIX: Process asynchronously to prevent main thread blocking
+
+            // Process asynchronously to prevent main thread blocking
             setTimeout(() => {
-                if (data.aircraft) {
-                    //console.log(`Updating aircraft: ${data.hex}`);
-                    
-                    // Replace entire aircraft object (no incremental changes)
-                    // This aligns with HTTP API payload structure for consistency
+                const hex = data.hex;
+                let existing = this.aircraft[hex];
+
+                // Update last update timestamp
+                this.lastUpdate = new Date();
+                this.lastUpdateSeconds = 0;
+
+                // Handle delta update (new efficient format)
+                if (data.delta) {
+                    // If aircraft doesn't exist in store yet, create a minimal entry
+                    // (this can happen if aircraft was added while filtered out in older code)
+                    if (!existing) {
+                        existing = { hex: hex };
+                        this.aircraft[hex] = existing;
+                    }
+
+                    this.applyDelta(existing, data.delta);
+                    this.calculateAircraftDistance(existing);
+
+                    // Update animation engine with delta
+                    if (this.animationEngine) {
+                        this.animationEngine.updateAircraftDelta(hex, data.delta);
+                    }
+
+                    // Queue map update - map will handle visibility based on filters
+                    this.queueMapUpdate(hex);
+
+                    // Update selected aircraft panel if this is the selected one
+                    if (this.selectedAircraft && this.selectedAircraft.hex === hex) {
+                        this.setupAircraftDetailsPanel();
+                    }
+
+                    this.queueCacheInvalidation();
+                }
+                // Fallback: full aircraft object (backward compatibility)
+                else if (data.aircraft) {
+                    // ALWAYS store aircraft data - filtering is done at display level
                     this.aircraft[data.aircraft.hex] = data.aircraft;
-                    
-                    // Apply distance calculation (same as HTTP polling)
                     this.calculateAircraftDistance(data.aircraft);
-                    
-                    // Update animation engine with new aircraft data
+
                     if (this.animationEngine) {
                         this.animationEngine.updateAircraft(data.aircraft);
                     }
-                    
-                    // Check if aircraft passes filters and update map
-                    if (this.aircraftPassesFilters(data.aircraft)) {
-                        // Queue for throttled map update
-                        this.queueMapUpdate(data.hex);
-                    } else {
-                        // Remove from display if it no longer passes filters
-                        delete this.aircraft[data.hex];
-                        if (this.mapManager) {
-                            this.mapManager.removeAircraft(data.hex);
-                        }
-                        // Remove from animation engine
-                        if (this.animationEngine) {
-                            this.animationEngine.removeAircraft(data.hex);
-                        }
-                    }
-                    
-                    // CRITICAL FIX: Update aircraft details panel if this is the selected aircraft
+
+                    // Queue map update - map will handle visibility based on filters
+                    this.queueMapUpdate(hex);
+
                     if (this.selectedAircraft && this.selectedAircraft.hex === data.aircraft.hex) {
-                        // Update the selectedAircraft reference to the new data
                         this.selectedAircraft = data.aircraft;
-                        // Refresh the aircraft details panel with the updated data
                         this.setupAircraftDetailsPanel();
                     }
-                    
-                    // Queue cache invalidation
+
                     this.queueCacheInvalidation();
                 }
-            }, 0); // Yield to allow other operations
+            }, 0);
+        },
+
+        // Apply delta updates to an existing aircraft object
+        applyDelta(aircraft, delta) {
+            // Initialize adsb object if needed
+            if (!aircraft.adsb) aircraft.adsb = {};
+
+            // Apply ADSB position/flight data
+            if (delta.lat !== undefined) aircraft.adsb.lat = delta.lat;
+            if (delta.lon !== undefined) aircraft.adsb.lon = delta.lon;
+            if (delta.alt_baro !== undefined) aircraft.adsb.alt_baro = delta.alt_baro;
+            if (delta.track !== undefined) aircraft.adsb.track = delta.track;
+            if (delta.gs !== undefined) aircraft.adsb.gs = delta.gs;
+            if (delta.tas !== undefined) aircraft.adsb.tas = delta.tas;
+            if (delta.baro_rate !== undefined) aircraft.adsb.baro_rate = delta.baro_rate;
+            if (delta.mag_heading !== undefined) aircraft.adsb.mag_heading = delta.mag_heading;
+            if (delta.true_heading !== undefined) aircraft.adsb.true_heading = delta.true_heading;
+
+            // Apply full adsb object if provided
+            if (delta.adsb !== undefined) aircraft.adsb = delta.adsb;
+
+            // Apply top-level aircraft properties
+            if (delta.flight !== undefined) aircraft.flight = delta.flight;
+            if (delta.status !== undefined) aircraft.status = delta.status;
+            if (delta.on_ground !== undefined) aircraft.on_ground = delta.on_ground;
+            if (delta.phase !== undefined) aircraft.phase = delta.phase;
+            if (delta.distance !== undefined) aircraft.distance = delta.distance;
+
+            // Update last_seen to current time since we just received an update
+            aircraft.last_seen = new Date().toISOString();
         },
 
         handleAircraftRemoved(data) {
@@ -3125,39 +2940,33 @@ disableAircraftStreamingInWebSocket() {
                 console.log(`[PAUSED] Skipping aircraft removed: ${data.hex}`);
                 return;
             }
-            
-            // CRITICAL: Skip aircraft updates if streaming is disabled (using HTTP polling instead)
-            if (this.aircraftStreamingDisabled) {
-                console.log(`[AIRCRAFT STREAMING DISABLED] Skipping aircraft removed: ${data.hex}`);
-                return;
-            }
-            
-            // CRITICAL FIX: Process asynchronously to prevent main thread blocking
+
+            // Process asynchronously to prevent main thread blocking
             setTimeout(() => {
                 console.log(`Removing aircraft: ${data.hex}`);
-                
+
                 if (this.aircraft[data.hex]) {
                     delete this.aircraft[data.hex];
-                    
-                    // Remove from map immediately (removal is fast)
+
+                    // Remove from map
                     if (this.mapManager) {
                         this.mapManager.removeAircraft(data.hex);
                     }
-                    
+
                     // Remove from animation engine
                     if (this.animationEngine) {
                         this.animationEngine.removeAircraft(data.hex);
                     }
-                    
+
                     // Deselect if this was the selected aircraft
                     if (this.selectedAircraft && this.selectedAircraft.hex === data.hex) {
                         this.selectedAircraft = null;
                     }
-                    
+
                     // Queue cache invalidation
                     this.queueCacheInvalidation();
                 }
-            }, 0); // Yield to allow other operations
+            }, 0);
         },
 
         // Removed applyAircraftChanges method - no longer needed since we receive full aircraft objects
@@ -3227,39 +3036,12 @@ disableAircraftStreamingInWebSocket() {
             }
         },
 
-        // Method to request new aircraft data when settings change
+        // Request new aircraft data when settings change
+        // Note: Server-side filtering has been removed. All filtering is done client-side.
+        // Settings are just saved locally; server broadcasts all updates.
         requestNewAircraftData() {
-            console.log('Requesting new aircraft data due to setting change');
+            console.log('Settings changed, saving locally');
             this.saveSettings();
-            
-            // CRITICAL: Use different approach based on streaming mode
-            if (this.aircraftStreamingDisabled) {
-                console.log('[AIRCRAFT STREAMING DISABLED] Refreshing via HTTP polling');
-                // Immediately fetch new data via HTTP with updated filters
-                this.fetchAircraftData();
-            } else {
-                console.log('[AIRCRAFT STREAMING ENABLED] Sending filter update');
-                // Send filter update which will return filtered aircraft data
-                this.sendFilterUpdate();
-            }
-        },
-
-        // Send filter update to server for real-time filtering
-        sendFilterUpdate() {
-            // Only send if WebSocket streaming is enabled
-            if (this.aircraftStreamingDisabled) {
-                console.log('[AIRCRAFT STREAMING DISABLED] Skipping filter update');
-                return;
-            }
-
-            if (wsClient && wsClient.connection && wsClient.connection.readyState === WebSocket.OPEN) {
-                // Send all current filters to server
-                const filters = this.buildCurrentFilters();
-                wsClient.updateFilters(filters);
-                console.log('[FILTER UPDATE] Sent to server:', filters);
-            } else {
-                console.warn('[FILTER UPDATE] WebSocket not connected, cannot send filter update');
-            }
         },
 
         calculateAircraftDistance(aircraft) {
@@ -3344,13 +3126,10 @@ disableAircraftStreamingInWebSocket() {
             
             if (foundAircraft) {
                 console.log(`Found aircraft with callsign ${callsign}:`, foundAircraft);
-                
+
                 // Set as selected aircraft
                 this.selectedAircraft = foundAircraft;
-                
-                // Notify server about selected aircraft change for real-time updates
-                this.sendFilterUpdate();
-                
+
                 // Update aircraft details panel
                 this.setupAircraftDetailsPanel();
                 

@@ -358,52 +358,26 @@
                                             <i class="fas fa-gamepad text-blue-400"></i>
                                             Active Simulated Aircraft
                                         </h4>
-                                        <div x-data="{ simulatedAircraft: [] }"
-                                             x-init="
-                                                 // Load simulated aircraft on init
-                                                 fetch('/api/v1/simulation/aircraft')
-                                                     .then(response => response.json())
-                                                     .then(data => simulatedAircraft = data || [])
-                                                     .catch(error => console.error('Failed to load simulated aircraft:', error));
-                                                 
-                                                 // Refresh every 5 seconds
-                                                 setInterval(() => {
-                                                     fetch('/api/v1/simulation/aircraft')
-                                                         .then(response => response.json())
-                                                         .then(data => simulatedAircraft = data || [])
-                                                         .catch(error => console.error('Failed to refresh simulated aircraft:', error));
-                                                 }, 5000);
-                                             ">
-                                            <template x-if="simulatedAircraft.length === 0">
+                                        <div>
+                                            <template x-if="Object.values($store.atc.aircraft).filter(a => a.is_simulated).length === 0">
                                                 <div class="text-xs text-text/60 italic p-2 bg-background/30 rounded border border-border/30">
                                                     No simulated aircraft active
                                                 </div>
                                             </template>
-                                            
-                                            <template x-if="simulatedAircraft.length > 0">
+
+                                            <template x-if="Object.values($store.atc.aircraft).filter(a => a.is_simulated).length > 0">
                                                 <div class="space-y-2">
-                                                    <template x-for="aircraft in simulatedAircraft" :key="aircraft.hex">
+                                                    <template x-for="aircraft in Object.values($store.atc.aircraft).filter(a => a.is_simulated)" :key="aircraft.hex">
                                                         <div class="flex items-center justify-between p-2 bg-blue-900/10 border border-blue-700/30 rounded">
                                                             <div class="flex-1">
                                                                 <div class="text-sm font-medium text-blue-300" x-text="aircraft.flight || aircraft.hex"></div>
-                                                                <div class="text-xs text-blue-400/70">
-                                                                    <span x-text="Math.round(aircraft.target_heading) + '° • ' + Math.round(aircraft.target_speed) + 'kt • ' + (aircraft.target_vertical_rate >= 0 ? '+' : '') + Math.round(aircraft.target_vertical_rate) + 'fpm'"></span>
+                                                                <div class="text-xs text-blue-400/70" x-show="aircraft.simulation_controls">
+                                                                    <span x-text="Math.round(aircraft.simulation_controls?.target_heading || 0) + '° • ' + Math.round(aircraft.simulation_controls?.target_speed || 0) + 'kt • ' + ((aircraft.simulation_controls?.target_vertical_rate || 0) >= 0 ? '+' : '') + Math.round(aircraft.simulation_controls?.target_vertical_rate || 0) + 'fpm'"></span>
                                                                 </div>
                                                             </div>
                                                             <button @click="
                                                                 if (confirm('Remove simulated aircraft ' + (aircraft.flight || aircraft.hex) + '?')) {
-                                                                    fetch('/api/v1/simulation/aircraft/' + aircraft.hex, { method: 'DELETE' })
-                                                                        .then(response => {
-                                                                            if (response.ok) {
-                                                                                simulatedAircraft = simulatedAircraft.filter(a => a.hex !== aircraft.hex);
-                                                                            } else {
-                                                                                alert('Failed to remove aircraft');
-                                                                            }
-                                                                        })
-                                                                        .catch(error => {
-                                                                            console.error('Error removing aircraft:', error);
-                                                                            alert('Error removing aircraft');
-                                                                        });
+                                                                    $store.atc.removeSimulatedAircraft(aircraft.hex);
                                                                 }
                                                             "
                                                                     class="ml-2 px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 hover:text-red-300 rounded text-xs transition-colors">
@@ -560,7 +534,7 @@
                         <div class="relative flex-1">
                             <input type="text"
                                    class="w-full p-1.5 pr-8 bg-background border border-border text-text rounded text-sm transition-all duration-200 focus:border-highlight/50 focus:shadow-[0_0_5px_rgba(76,175,80,0.1)] focus:outline-none"
-                                   placeholder="Search callsign, type, category..."
+                                   placeholder="Search callsign, category"
                                    x-model="$store.atc.searchTerm"
                                    @input.debounce.300ms="$store.atc.applyFilters()"
                                    @keydown.tab.prevent="$store.atc.cycleToNextAircraft()"
@@ -839,9 +813,20 @@
                                                               'text-white': aircraft.on_ground && aircraft.status !== 'signal_lost'
                                                           }"
                                                           class="text-sm"></span>
-                                                    <span class="text-[9px] text-gray-400 -mt-1"
-                                                          x-html="$store.atc.highlightSearchMatch((aircraft.adsb && aircraft.adsb.t ? aircraft.adsb.t : 'N/A'))">
-                                                    </span>
+                                                    <div class="flex items-center gap-1 -mt-1">
+                                                        <span class="text-[9px] text-gray-500" x-text="aircraft.adsb?.category || ''"></span>
+                                                        <span x-show="aircraft.adsb?.squawk"
+                                                              class="text-[8px] font-mono"
+                                                              :class="{
+                                                                  'text-red-400': aircraft.adsb?.squawk === '7700',
+                                                                  'text-orange-400': aircraft.adsb?.squawk === '7600',
+                                                                  'text-purple-400': aircraft.adsb?.squawk === '7500',
+                                                                  'text-gray-400': !['7500', '7600', '7700'].includes(aircraft.adsb?.squawk)
+                                                              }"
+                                                              :title="aircraft.adsb?.squawk === '7700' ? 'EMERGENCY' : aircraft.adsb?.squawk === '7600' ? 'RADIO FAILURE' : aircraft.adsb?.squawk === '7500' ? 'HIJACK' : 'Squawk'"
+                                                              x-text="aircraft.adsb?.squawk">
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             
@@ -943,9 +928,20 @@
                                         <span x-html="$store.atc.highlightSearchMatch($store.atc.selectedAircraft.flight || $store.atc.selectedAircraft.hex)"
                                               :class="{'text-highlight': !$store.atc.selectedAircraft.on_ground, 'text-white': $store.atc.selectedAircraft.on_ground}"
                                               class="font-bold text-sm"></span>
-                                        <span class="text-[9px] text-gray-400 -mt-1"
-                                              x-html="$store.atc.highlightSearchMatch(($store.atc.selectedAircraft.adsb && $store.atc.selectedAircraft.adsb.t ? $store.atc.selectedAircraft.adsb.t : 'N/A'))">
-                                        </span>
+                                        <div class="flex items-center gap-1 -mt-1">
+                                            <span class="text-[9px] text-gray-500" x-text="$store.atc.selectedAircraft.adsb?.category || ''"></span>
+                                            <span x-show="$store.atc.selectedAircraft.adsb?.squawk"
+                                                  class="text-[8px] font-mono"
+                                                  :class="{
+                                                      'text-red-400': $store.atc.selectedAircraft.adsb?.squawk === '7700',
+                                                      'text-orange-400': $store.atc.selectedAircraft.adsb?.squawk === '7600',
+                                                      'text-purple-400': $store.atc.selectedAircraft.adsb?.squawk === '7500',
+                                                      'text-gray-400': !['7500', '7600', '7700'].includes($store.atc.selectedAircraft.adsb?.squawk)
+                                                  }"
+                                                  :title="$store.atc.selectedAircraft.adsb?.squawk === '7700' ? 'EMERGENCY' : $store.atc.selectedAircraft.adsb?.squawk === '7600' ? 'RADIO FAILURE' : $store.atc.selectedAircraft.adsb?.squawk === '7500' ? 'HIJACK' : 'Squawk'"
+                                                  x-text="$store.atc.selectedAircraft.adsb?.squawk">
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -1024,17 +1020,10 @@
                                         <i class="fas fa-gamepad"></i>
                                         Simulation Controls
                                     </h4>
-                                    <button @click="
-                                        updating = true;
-                                        $store.atc.updateSimulationControls($store.atc.selectedAircraft.hex, 'heading', newHeading)
-                                            .then(() => $store.atc.updateSimulationControls($store.atc.selectedAircraft.hex, 'speed', newSpeed))
-                                            .then(() => $store.atc.updateSimulationControls($store.atc.selectedAircraft.hex, 'vertical_rate', newVerticalRate))
-                                            .finally(() => updating = false);
-                                    "
-                                            :disabled="updating"
-                                            class="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white text-xs rounded transition-colors flex items-center gap-1">
-                                        <i class="fas fa-paper-plane" :class="{ 'animate-spin fa-spinner': updating }"></i>
-                                        <span x-text="updating ? 'Setting...' : 'Set'"></span>
+                                    <button @click="$store.atc.setSimulationControls($store.atc.selectedAircraft.hex, newHeading, newSpeed, newVerticalRate)"
+                                            class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded transition-colors flex items-center gap-1">
+                                        <i class="fas fa-paper-plane"></i>
+                                        <span>Set</span>
                                     </button>
                                 </div>
                                 

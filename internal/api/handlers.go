@@ -484,8 +484,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	// Create a sanitized config with only public values
 	publicConfig := map[string]interface{}{
 		"adsb": map[string]interface{}{
-			"fetch_interval_seconds":     h.config.ADSB.FetchIntervalSecs,
-			"websocket_aircraft_updates": h.config.ADSB.WebSocketAircraftUpdates,
+			"fetch_interval_seconds": h.config.ADSB.FetchIntervalSecs,
 		},
 		"storage": map[string]interface{}{
 			"sqlite_base_path":     h.config.Storage.SQLiteBasePath,

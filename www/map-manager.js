@@ -496,7 +496,6 @@ class MapManager {
             marker.on('click', (e) => {
                 this.L.DomEvent.stopPropagation(e);
                 Alpine.store('atc').selectedAircraft = aircraft;
-                Alpine.store('atc').sendFilterUpdate();
                 this.updateVisualState(aircraft.hex, true);
             });
             label.on('mouseover', () => {
@@ -510,7 +509,6 @@ class MapManager {
             label.on('click', (e) => {
                 this.L.DomEvent.stopPropagation(e);
                 Alpine.store('atc').selectedAircraft = aircraft;
-                Alpine.store('atc').sendFilterUpdate();
                 this.updateVisualState(aircraft.hex, true);
             });
             
@@ -1041,13 +1039,17 @@ class MapManager {
 
     updateMapMarkerAndLabelVisibility() {
         const searchLower = this.store.searchTerm.toLowerCase();
-        
+
         // Get current map bounds for viewport culling
         const mapBounds = this.map ? this.map.getBounds() : null;
         const currentZoom = this.map ? this.map.getZoom() : 10;
-        
+
         // Enable viewport culling when zoomed in (zoom level > 11)
         const useViewportCulling = currentZoom > 11 && mapBounds;
+
+        // Calculate last seen cutoff time
+        const now = new Date();
+        const lastSeenCutoff = new Date(now.getTime() - (this.store.settings.lastSeenMinutes * 60 * 1000));
 
         Object.keys(this.store.aircraft).forEach(hex => {
             const aircraft = this.store.aircraft[hex];
@@ -1055,41 +1057,48 @@ class MapManager {
 
             if (!markerInfo) return;
 
+            // Filter by last seen time
+            let isVisibleByLastSeen = true;
+            if (aircraft.last_seen) {
+                const lastSeenDate = new Date(aircraft.last_seen);
+                isVisibleByLastSeen = lastSeenDate >= lastSeenCutoff;
+            }
+
             const callsign = (aircraft.flight || aircraft.hex).toLowerCase();
             const type = (aircraft.adsb?.type || '').toLowerCase();
             const category = (aircraft.adsb?.category || '').toLowerCase();
-            
+
             const matchesSearch = searchLower === '' ||
                                 callsign.includes(searchLower) ||
                                 type.includes(searchLower) ||
                                 category.includes(searchLower);
-            
+
             // Filter by air/ground state - both can be enabled/disabled independently
             const isVisibleByGroundState = (aircraft.on_ground && this.store.settings.showGroundAircraft) ||
                                           (!aircraft.on_ground && this.store.settings.showAirAircraft);
-            
+
             // Only apply altitude filter to aircraft in the air
             const isVisibleByAltitude = aircraft.on_ground ||
                 (aircraft.adsb && aircraft.adsb.alt_baro >= this.store.settings.minAltitude &&
                 aircraft.adsb.alt_baro <= this.store.settings.maxAltitude);
-            
+
             // Filter by flight phase - matching the table logic in app.js
             const currentPhase = this.getCurrentPhase(aircraft);
-            
+
             const isVisibleByPhase = !(this.store.settings.phaseFilters && this.store.settings.phaseFilters[currentPhase] === false);
-            
+
             // Check if this aircraft is currently selected
             const isSelectedAircraft = this.store.selectedAircraft && this.store.selectedAircraft.hex === aircraft.hex;
-            
+
             // Check if aircraft is in viewport (when viewport culling is enabled)
             let isInViewport = true;
             if (useViewportCulling && aircraft.adsb && aircraft.adsb.lat && aircraft.adsb.lon) {
                 const position = L.latLng(aircraft.adsb.lat, aircraft.adsb.lon);
                 isInViewport = mapBounds.contains(position);
             }
-            
-            // Aircraft should be visible if it matches filters AND is in viewport OR if it's selected
-            const shouldBeVisibleOnMap = ((matchesSearch && isVisibleByGroundState && isVisibleByAltitude && isVisibleByPhase && isInViewport) || isSelectedAircraft);
+
+            // Aircraft should be visible if it matches ALL filters AND is in viewport OR if it's selected
+            const shouldBeVisibleOnMap = ((matchesSearch && isVisibleByGroundState && isVisibleByAltitude && isVisibleByPhase && isVisibleByLastSeen && isInViewport) || isSelectedAircraft);
 
             const markerIsOnMap = this.layers.aircraft.hasLayer(markerInfo.aircraft);
             const labelIsOnMap = markerInfo.label && this.layers.aircraft.hasLayer(markerInfo.label);

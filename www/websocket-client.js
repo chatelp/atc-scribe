@@ -200,20 +200,8 @@ class WebSocketClient {
         }
     }
 
-    // Method to send filter updates to server
-    updateFilters(filters) {
-        if (this.connection && this.connection.readyState === WebSocket.OPEN) {
-            const message = {
-                type: 'filter_update',
-                data: filters
-            };
-            
-            console.log('Sending filter update:', filters);
-            this.connection.send(JSON.stringify(message));
-        } else {
-            console.warn('WebSocket not connected, cannot send filter update');
-        }
-    }
+    // Note: updateFilters method removed - server-side filtering is no longer used.
+    // All filtering is done client-side.
 
     // Notify all listeners of an event
     _notifyListeners(type, data) {

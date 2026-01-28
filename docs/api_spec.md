@@ -233,8 +233,7 @@ Returns the public configuration settings.
 ```json
 {
   "adsb": {
-    "fetch_interval_seconds": 1,
-    "websocket_aircraft_updates": true
+    "fetch_interval_seconds": 1
   },
   "storage": {
     "sqlite_base_path": "data/",

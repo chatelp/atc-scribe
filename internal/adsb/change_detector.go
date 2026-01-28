@@ -22,10 +22,10 @@ func NewChangeDetector(logger *logger.Logger) *ChangeDetector {
 
 // AircraftChange represents a change in aircraft data
 type AircraftChange struct {
-	Type     string // "added", "updated", "removed"
-	Aircraft *Aircraft
-	Hex      string
-	// Removed Changes field - we now always send full aircraft data
+	Type     string                 // "added", "updated", "removed"
+	Aircraft *Aircraft              // Full object for "added", nil for others
+	Hex      string                 // Aircraft hex code
+	Delta    map[string]interface{} // Changed fields only (for "updated")
 }
 
 // DetectChanges compares current aircraft data with previous and returns changes
@@ -41,16 +41,17 @@ func (cd *ChangeDetector) DetectChanges(currentAircraft []*Aircraft) []AircraftC
 	// Detect new and updated aircraft
 	for hex, current := range currentMap {
 		if previous, exists := cd.previousAircraft[hex]; exists {
-			// Check for ANY updates (no thresholds)
-			if cd.hasAnyChanges(previous, current) {
+			// Compute delta - only returns non-empty if there are actual changes
+			delta := cd.computeDelta(previous, current)
+			if len(delta) > 0 {
 				changes = append(changes, AircraftChange{
-					Type:     "updated",
-					Aircraft: current,
-					Hex:      hex,
+					Type:  "updated",
+					Hex:   hex,
+					Delta: delta,
 				})
 			}
 		} else {
-			// New aircraft
+			// New aircraft - send full object
 			changes = append(changes, AircraftChange{
 				Type:     "added",
 				Aircraft: current,
@@ -74,83 +75,89 @@ func (cd *ChangeDetector) DetectChanges(currentAircraft []*Aircraft) []AircraftC
 	return changes
 }
 
-// hasAnyChanges compares two aircraft and returns true if ANY field changed (no thresholds)
-func (cd *ChangeDetector) hasAnyChanges(previous, current *Aircraft) bool {
-	// Compare ADSB data - detect ANY change, no matter how small
+// computeDelta returns only the fields that changed between previous and current aircraft
+func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]interface{} {
+	delta := make(map[string]interface{})
+
+	// Compare ADSB data
 	if previous.ADSB != nil && current.ADSB != nil {
-		// Position: ANY change in coordinates
-		if previous.ADSB.Lat != current.ADSB.Lat || previous.ADSB.Lon != current.ADSB.Lon {
-			return true
+		// Position
+		if previous.ADSB.Lat != current.ADSB.Lat {
+			delta["lat"] = current.ADSB.Lat
+		}
+		if previous.ADSB.Lon != current.ADSB.Lon {
+			delta["lon"] = current.ADSB.Lon
 		}
 
-		// Altitude: ANY change
+		// Altitude
 		if previous.ADSB.AltBaro != current.ADSB.AltBaro {
-			return true
+			delta["alt_baro"] = current.ADSB.AltBaro
 		}
 
-		// Track: ANY change
+		// Track
 		if previous.ADSB.Track != current.ADSB.Track {
-			return true
+			delta["track"] = current.ADSB.Track
 		}
 
-		// Ground Speed: ANY change
+		// Ground Speed
 		if previous.ADSB.GS != current.ADSB.GS {
-			return true
+			delta["gs"] = current.ADSB.GS
 		}
 
-		// True Airspeed: ANY change
+		// True Airspeed
 		if previous.ADSB.TAS != current.ADSB.TAS {
-			return true
+			delta["tas"] = current.ADSB.TAS
 		}
 
-		// Barometric Rate: ANY change
+		// Barometric Rate
 		if previous.ADSB.BaroRate != current.ADSB.BaroRate {
-			return true
+			delta["baro_rate"] = current.ADSB.BaroRate
 		}
 
-		// Magnetic Heading: ANY change
+		// Magnetic Heading
 		if previous.ADSB.MagHeading != current.ADSB.MagHeading {
-			return true
+			delta["mag_heading"] = current.ADSB.MagHeading
 		}
 
-		// True Heading: ANY change
+		// True Heading
 		if previous.ADSB.TrueHeading != current.ADSB.TrueHeading {
-			return true
+			delta["true_heading"] = current.ADSB.TrueHeading
 		}
 	} else if (previous.ADSB == nil) != (current.ADSB == nil) {
-		// ADSB data appeared or disappeared
-		return true
+		// ADSB data appeared or disappeared - send full ADSB object
+		if current.ADSB != nil {
+			delta["adsb"] = current.ADSB
+		} else {
+			delta["adsb"] = nil
+		}
 	}
 
 	// Compare basic aircraft properties
 	if previous.Flight != current.Flight {
-		return true
+		delta["flight"] = current.Flight
 	}
 
 	if previous.Status != current.Status {
-		return true
+		delta["status"] = current.Status
 	}
 
 	if previous.OnGround != current.OnGround {
-		return true
+		delta["on_ground"] = current.OnGround
 	}
 
 	// Compare phase data
 	if !reflect.DeepEqual(previous.Phase, current.Phase) {
-		return true
+		delta["phase"] = current.Phase
 	}
 
-	// Compare distance - ANY change
+	// Compare distance
 	if (previous.Distance == nil) != (current.Distance == nil) ||
 		(previous.Distance != nil && current.Distance != nil && *previous.Distance != *current.Distance) {
-		return true
+		delta["distance"] = current.Distance
 	}
 
-	// Compare last_seen - this will trigger updates on every poll cycle for real-time behavior
-	if !previous.LastSeen.Equal(current.LastSeen) {
-		return true
-	}
+	// NOTE: LastSeen is intentionally NOT compared - it changes every cycle
+	// and would cause unnecessary updates
 
-	// No changes detected
-	return false
+	return delta
 }

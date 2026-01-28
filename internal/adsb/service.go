@@ -56,6 +56,7 @@ user notifications.
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -117,8 +118,9 @@ type SimulationService interface {
 	UpdatePositions()
 	GenerateADSBData() []ADSBTarget
 	IsSimulated(hex string) bool
-	GetAllAircraft() interface{}                // Returns simulation aircraft data
-	GetAircraft(hex string) (interface{}, bool) // Returns specific simulated aircraft
+	GetAllAircraft() interface{}                                       // Returns simulation aircraft data
+	GetAircraft(hex string) (interface{}, bool)                        // Returns specific simulated aircraft
+	UpdateControls(hex string, heading, speed, verticalRate float64) error // Update simulation controls
 }
 
 // Service is the main service for ADS-B data processing
@@ -195,19 +197,11 @@ func NewService(
 		simulationService:  simulationService,
 	}
 
-	// CRITICAL FIX: Only enable WebSocket streaming if configured
-	if adsbCfg.WebSocketAircraftUpdates {
-		logger.Info("Aircraft streaming ENABLED - initializing WebSocket change detection")
-		service.changeDetector = NewChangeDetector(logger)
-		service.broadcastChan = make(chan []AircraftChange, 100)
-		// Start broadcast worker
-		service.startBroadcastWorker()
-	} else {
-		logger.Info("Aircraft streaming DISABLED - using HTTP polling only")
-		// No change detection or broadcasting
-		service.changeDetector = nil
-		service.broadcastChan = nil
-	}
+	// Always enable WebSocket streaming for aircraft updates
+	logger.Info("Initializing WebSocket change detection for aircraft streaming")
+	service.changeDetector = NewChangeDetector(logger)
+	service.broadcastChan = make(chan []AircraftChange, 100)
+	service.startBroadcastWorker()
 
 	// Set the config for the prediction function
 	predictionConfig := &Config{
@@ -266,12 +260,15 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 		"hex":  change.Hex,
 	}
 
+	// For "added", send full aircraft object
+	// For "updated", send only the delta (changed fields)
+	// For "removed", just send hex
 	if change.Aircraft != nil {
 		data["aircraft"] = change.Aircraft
 	}
-
-	// Removed "changes" field - we now always send full aircraft data
-	// This aligns WebSocket payloads with HTTP API responses
+	if change.Delta != nil {
+		data["delta"] = change.Delta
+	}
 
 	message := &websocket.Message{
 		Type: messageType,
@@ -638,6 +635,14 @@ func (s *Service) updateSimulationFields(aircraft []*Aircraft) {
 			}
 		}
 	}
+}
+
+// UpdateSimulationControls updates the control parameters for a simulated aircraft
+func (s *Service) UpdateSimulationControls(hex string, heading, speed, verticalRate float64) error {
+	if s.simulationService == nil {
+		return fmt.Errorf("simulation service not available")
+	}
+	return s.simulationService.UpdateControls(hex, heading, speed, verticalRate)
 }
 
 // GetAllAircraft returns all aircraft

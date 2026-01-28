@@ -12,12 +12,13 @@ import (
 
 // New message types for aircraft streaming
 const (
-	MessageTypeAircraftAdded        = "aircraft_added"
-	MessageTypeAircraftUpdate       = "aircraft_update"
-	MessageTypeAircraftRemoved      = "aircraft_removed"
-	MessageTypeAircraftBulkRequest  = "aircraft_bulk_request"  // Client requests bulk data
-	MessageTypeAircraftBulkResponse = "aircraft_bulk_response" // Server sends bulk data
-	MessageTypeFilterUpdate         = "filter_update"          // Client sends filter preferences
+	MessageTypeAircraftAdded           = "aircraft_added"
+	MessageTypeAircraftUpdate          = "aircraft_update"
+	MessageTypeAircraftRemoved         = "aircraft_removed"
+	MessageTypeAircraftBulkRequest     = "aircraft_bulk_request"     // Client requests bulk data
+	MessageTypeAircraftBulkResponse    = "aircraft_bulk_response"    // Server sends bulk data
+	MessageTypeFilterUpdate            = "filter_update"             // Client sends filter preferences
+	MessageTypeSimulationControlUpdate = "simulation_control_update" // Client updates simulation controls
 )
 
 // Message represents a WebSocket message
@@ -36,14 +37,6 @@ type MessageHandler interface {
 	HandleMessage(client *Client, messageType string, data map[string]interface{}) error
 }
 
-// ClientFilters represents the active filters for a WebSocket client
-type ClientFilters struct {
-	ShowAir             bool            `json:"show_air"`
-	ShowGround          bool            `json:"show_ground"`
-	Phases              map[string]bool `json:"phases"`                // phase -> enabled
-	SelectedAircraftHex string          `json:"selected_aircraft_hex"` // hex of currently selected aircraft
-}
-
 // Client represents a WebSocket client
 type Client struct {
 	conn      *websocket.Conn
@@ -52,7 +45,6 @@ type Client struct {
 	mu        sync.Mutex
 	closed    bool
 	closeChan chan struct{}
-	filters   *ClientFilters // Active filters for this client
 }
 
 // Server represents a WebSocket server
@@ -131,12 +123,7 @@ func (s *Server) Run() {
 				}
 				client.mu.Unlock()
 
-				// Filter aircraft updates based on client preferences
-				shouldSend := s.shouldSendToClient(client, message)
-				if !shouldSend {
-					continue
-				}
-
+				// Send to all clients - filtering is done client-side
 				select {
 				case client.send <- message:
 					// Message sent successfully
@@ -364,169 +351,6 @@ func (c *Client) SendMessage(message *Message) bool {
 		// Channel is full, drop message
 		return false
 	}
-}
-
-// UpdateFilters updates the client's active filters
-func (c *Client) UpdateFilters(filters *ClientFilters) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.filters = filters
-}
-
-// GetFilters returns a copy of the client's current filters
-func (c *Client) GetFilters() *ClientFilters {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.filters == nil {
-		return nil
-	}
-	// Return a copy to avoid race conditions
-	filtersCopy := &ClientFilters{
-		ShowAir:    c.filters.ShowAir,
-		ShowGround: c.filters.ShowGround,
-		Phases:     make(map[string]bool),
-	}
-	for phase, enabled := range c.filters.Phases {
-		filtersCopy.Phases[phase] = enabled
-	}
-	return filtersCopy
-}
-
-// MatchesFilters checks if an aircraft matches the client's active filters
-func (c *Client) MatchesFilters(aircraft map[string]interface{}) bool {
-	filters := c.GetFilters()
-	if filters == nil {
-		// No filters set, show everything
-		return true
-	}
-
-	// Get aircraft hex for debugging
-	hex, _ := aircraft["hex"].(string)
-
-	// Always allow updates for the selected aircraft, regardless of filters
-	if filters.SelectedAircraftHex != "" && hex == filters.SelectedAircraftHex {
-		c.server.logger.Info("Aircraft is selected, allowing update regardless of filters", String("hex", hex))
-		return true
-	}
-
-	// Check Air/Ground scope - CRITICAL: if both are false, filter out everything
-	onGround, _ := aircraft["on_ground"].(bool)
-
-	if !filters.ShowAir && !filters.ShowGround {
-		// Both air and ground are disabled, filter out everything
-		c.server.logger.Info("Aircraft filtered out - both Air and Ground disabled", String("hex", hex))
-		return false
-	}
-
-	if onGround && !filters.ShowGround {
-		// Debug log
-		c.server.logger.Info("Aircraft is grounded but ShowGround=false, filtering out", String("hex", hex))
-		return false
-	}
-	if !onGround && !filters.ShowAir {
-		// Debug log
-		c.server.logger.Info("Aircraft is airborne but ShowAir=false, filtering out", String("hex", hex))
-		return false
-	}
-
-	// Check phase filter - only if we have phase restrictions
-	if len(filters.Phases) > 0 {
-		// Check if ALL phases are disabled
-		allPhasesDisabled := true
-		for _, enabled := range filters.Phases {
-			if enabled {
-				allPhasesDisabled = false
-				break
-			}
-		}
-
-		if allPhasesDisabled {
-			// All phases are disabled, filter out everything
-			c.server.logger.Info("Aircraft filtered out - all phases disabled", String("hex", hex))
-			return false
-		}
-
-		// Get current phase from aircraft
-		var currentPhase string
-		if phaseData, ok := aircraft["phase_data"].(map[string]interface{}); ok {
-			if current, ok := phaseData["current"].(map[string]interface{}); ok {
-				if phase, ok := current["phase"].(string); ok {
-					currentPhase = phase
-				}
-			}
-		}
-
-		// If we have a phase, check if it's enabled
-		if currentPhase != "" {
-			if enabled, exists := filters.Phases[currentPhase]; exists && !enabled {
-				c.server.logger.Info("Aircraft phase is disabled, filtering out", String("hex", hex), String("phase", currentPhase))
-				return false
-			}
-		}
-	}
-
-	c.server.logger.Info("Aircraft PASSED filters", String("hex", hex))
-	return true
-}
-
-// shouldSendToClient determines if a message should be sent to a specific client based on their filters
-func (s *Server) shouldSendToClient(client *Client, message *Message) bool {
-	//s.logger.Info("shouldSendToClient called", String("message_type", message.Type))
-
-	// Always send non-aircraft messages (alerts, transcriptions, etc.)
-	if message.Type != MessageTypeAircraftAdded &&
-		message.Type != MessageTypeAircraftUpdate &&
-		message.Type != MessageTypeAircraftRemoved {
-		//s.logger.Info("Non-aircraft message, sending", String("message_type", message.Type))
-		return true
-	}
-
-	// Debug: Log what's actually in the message data
-	s.logger.Debug("Message data keys", String("keys", fmt.Sprintf("%v", getMapKeys(message.Data))))
-
-	// For aircraft messages, check if the aircraft matches client filters
-	if aircraftData, exists := message.Data["aircraft"]; exists {
-		// Convert aircraft data to map[string]interface{} for filtering
-		var data map[string]interface{}
-
-		// Try direct type assertion first
-		if directMap, ok := aircraftData.(map[string]interface{}); ok {
-			data = directMap
-		} else {
-			// Convert struct to map using JSON marshaling/unmarshaling
-			if jsonBytes, err := json.Marshal(aircraftData); err == nil {
-				if err := json.Unmarshal(jsonBytes, &data); err == nil {
-					s.logger.Info("Converted aircraft struct to map for filtering")
-				} else {
-					s.logger.Error("Failed to unmarshal aircraft data", Error(err))
-					return true // Send if we can't filter
-				}
-			} else {
-				s.logger.Error("Failed to marshal aircraft data", Error(err))
-				return true // Send if we can't filter
-			}
-		}
-
-		if data != nil {
-			result := client.MatchesFilters(data)
-			hex, _ := data["hex"].(string)
-			s.logger.Info("Aircraft message filter result", String("hex", hex), String("result", fmt.Sprintf("%t", result)))
-			return result
-		}
-	}
-
-	// If no aircraft data, send the message (e.g., aircraft_removed might not have full data)
-	s.logger.Info("No aircraft data in message, sending")
-	return true
-}
-
-// Helper function to get map keys for debugging
-func getMapKeys(m map[string]interface{}) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }
 
 // Import logger functions
