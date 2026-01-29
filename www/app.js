@@ -712,13 +712,22 @@ document.addEventListener('alpine:init', () => {
                 landingSeconds = `${secondsAgo}s`;
             }
 
+            // Get BSDB data if available - use it to enrich basic info
+            const bsdbData = aircraft.bsdb || {};
+
+            // Prefer BSDB data over ADSB data for type and registration
+            const aircraftType = bsdbData.type || adsbData.t || 'N/A';
+            const aircraftReg = bsdbData.registration || adsbData.r || 'N/A';
+            const aircraftOperator = bsdbData.registered_owners || 'N/A';
+
             const fields = [
                 ['Basic Info', [
                     ['Callsign', aircraft.flight?.trim() || 'N/A'],
                     ['Airline', aircraft.airline || 'N/A'],
+                    ['Operator', aircraftOperator],
                     ['Hex', aircraft.hex],
-                    ['Type', adsbData.t || 'N/A'],
-                    ['Registration', adsbData.r || 'N/A'],
+                    ['Type', aircraftType],
+                    ['Registration', aircraftReg],
                     ['Category', adsbData.category || 'N/A'],
                     ['Squawk', adsbData.squawk || 'N/A'],
                     ['First Seen', firstSeenText, firstSeenSeconds],

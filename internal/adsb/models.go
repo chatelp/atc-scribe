@@ -99,6 +99,16 @@ type PhaseData struct {
 	History []PhaseChange `json:"history"` // All phase changes in descending order by timestamp
 }
 
+// BSDBData represents aircraft data from BaseStation.sqb database
+type BSDBData struct {
+	Registration     string `json:"registration,omitempty"`
+	ICAOTypeCode     string `json:"icao_type_code,omitempty"`
+	OperatorFlagCode string `json:"operator_flag_code,omitempty"`
+	Manufacturer     string `json:"manufacturer,omitempty"`
+	Type             string `json:"type,omitempty"`
+	RegisteredOwners string `json:"registered_owners,omitempty"`
+}
+
 // Aircraft represents a processed aircraft with essential fields and status
 type Aircraft struct {
 	Hex                string              `json:"hex"`
@@ -115,6 +125,7 @@ type Aircraft struct {
 	RelativeBearing    *float64            `json:"rel_bearing,omitempty"`  // Relative bearing from reference aircraft (0 to 360)
 	RelativeAlt        *float64            `json:"rel_altitude,omitempty"` // Relative altitude from reference aircraft (feet)
 	ADSB               *ADSBTarget         `json:"adsb,omitempty"`
+	BSDB               *BSDBData           `json:"bsdb,omitempty"`                // BaseStation.sqb enrichment data
 	History            []PositionMinimal   `json:"history,omitempty"`             // Minimal historical positions for map trails
 	Future             []Position          `json:"future,omitempty"`              // Predicted future positions (placeholder for now)
 	Phase              *PhaseData          `json:"phase,omitempty"`               // Phase information with current and history

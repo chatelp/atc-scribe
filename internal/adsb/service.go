@@ -73,6 +73,22 @@ type WebSocketServer interface {
 	Broadcast(message *websocket.Message)
 }
 
+// BSDBService defines the interface for BaseStation.sqb lookup service
+type BSDBService interface {
+	Lookup(hex string) *BSDBInfo
+	LookupBatch(hexCodes []string) map[string]*BSDBInfo
+}
+
+// BSDBInfo represents aircraft info from BaseStation.sqb (interface type for dependency injection)
+type BSDBInfo struct {
+	Registration     string
+	ICAOTypeCode     string
+	OperatorFlagCode string
+	Manufacturer     string
+	Type             string
+	RegisteredOwners string
+}
+
 // Airline represents an airline from the airlines.json file
 type Airline struct {
 	ID       string `json:"id"`
@@ -150,6 +166,7 @@ type Service struct {
 	changeDetector     *ChangeDetector           // Tracks aircraft changes
 	broadcastChan      chan []AircraftChange     // Channel for broadcasting changes
 	simulationService  SimulationService         // Simulation service for simulated aircraft
+	bsdbService        BSDBService               // BaseStation.sqb lookup service
 }
 
 // AircraftBulkResponse represents server response with bulk aircraft data
@@ -637,6 +654,31 @@ func (s *Service) updateSimulationFields(aircraft []*Aircraft) {
 	}
 }
 
+// SetBSDBService sets the BaseStation.sqb lookup service
+func (s *Service) SetBSDBService(bsdbService BSDBService) {
+	s.bsdbService = bsdbService
+}
+
+// enrichWithBSDB enriches aircraft data with BaseStation.sqb information
+func (s *Service) enrichWithBSDB(aircraft []*Aircraft) {
+	if s.bsdbService == nil {
+		return
+	}
+
+	for _, a := range aircraft {
+		if info := s.bsdbService.Lookup(a.Hex); info != nil {
+			a.BSDB = &BSDBData{
+				Registration:     info.Registration,
+				ICAOTypeCode:     info.ICAOTypeCode,
+				OperatorFlagCode: info.OperatorFlagCode,
+				Manufacturer:     info.Manufacturer,
+				Type:             info.Type,
+				RegisteredOwners: info.RegisteredOwners,
+			}
+		}
+	}
+}
+
 // UpdateSimulationControls updates the control parameters for a simulated aircraft
 func (s *Service) UpdateSimulationControls(hex string, heading, speed, verticalRate float64) error {
 	if s.simulationService == nil {
@@ -649,6 +691,7 @@ func (s *Service) UpdateSimulationControls(hex string, heading, speed, verticalR
 func (s *Service) GetAllAircraft() []*Aircraft {
 	aircraft := s.storage.GetAll()
 	s.updateSimulationFields(aircraft)
+	s.enrichWithBSDB(aircraft)
 	return aircraft
 }
 
@@ -657,6 +700,7 @@ func (s *Service) GetAircraftByHex(hex string) (*Aircraft, bool) {
 	aircraft, found := s.storage.GetByHex(hex)
 	if found && aircraft != nil {
 		s.updateSimulationFields([]*Aircraft{aircraft})
+		s.enrichWithBSDB([]*Aircraft{aircraft})
 	}
 	return aircraft, found
 }
@@ -683,6 +727,7 @@ func (s *Service) GetFilteredAircraft(
 		tookOffAfter, tookOffBefore, landedAfter, landedBefore,
 	)
 	s.updateSimulationFields(aircraft)
+	s.enrichWithBSDB(aircraft)
 	return aircraft
 }
 
@@ -690,6 +735,7 @@ func (s *Service) GetFilteredAircraft(
 func (s *Service) GetFilteredAircraftSimple(minAltitude, maxAltitude float64, status ...string) []*Aircraft {
 	aircraft := s.storage.GetFiltered(minAltitude, maxAltitude, status, nil, nil, nil, nil)
 	s.updateSimulationFields(aircraft)
+	s.enrichWithBSDB(aircraft)
 	return aircraft
 }
 

@@ -325,10 +325,55 @@ class MapManager {
             const isMapClick = e.originalEvent.target.classList.contains('leaflet-container') ||
                               e.originalEvent.target.classList.contains('leaflet-tile') ||
                               e.originalEvent.target.classList.contains('leaflet-pane');
-            
+
             if (isMapClick && this.store.searchTerm) {
                 this.store.searchTerm = '';
                 this.store.applyFilters();
+            }
+        });
+
+        // Start periodic label refresh timer to keep lastSeen timestamps updating
+        this.startLabelRefreshTimer();
+    }
+
+    // Refresh all aircraft labels periodically (keeps lastSeen timer counting up)
+    startLabelRefreshTimer() {
+        // Clear any existing timer
+        if (this.labelRefreshTimer) {
+            clearInterval(this.labelRefreshTimer);
+        }
+
+        // Refresh labels every second
+        this.labelRefreshTimer = setInterval(() => {
+            this.refreshAllLabels();
+        }, 1000);
+    }
+
+    // Update all visible aircraft labels with current time data
+    refreshAllLabels() {
+        if (!this.store.settings.showLabels) return;
+
+        Object.keys(this.markers).forEach(hex => {
+            const markerInfo = this.markers[hex];
+            const aircraft = this.store.aircraft[hex];
+
+            if (!markerInfo || !markerInfo.label || !aircraft) return;
+
+            const callsign = (aircraft.flight || aircraft.hex).trim();
+            const altitude = aircraft.adsb ? aircraft.adsb.alt_baro : 0;
+            const verticalTrend = this.getVerticalTrend(aircraft);
+            const newLabelContent = this.store.createLabelContent(aircraft, callsign, altitude, verticalTrend);
+
+            // Always update if content changed (includes the lastSeen timestamp)
+            if (markerInfo.lastLabelContent !== newLabelContent) {
+                const labelContentIcon = this.L.divIcon({
+                    html: newLabelContent,
+                    className: this.getLabelClassName(aircraft),
+                    iconSize: [130, 40],
+                    iconAnchor: [-8, 2]
+                });
+                markerInfo.label.setIcon(labelContentIcon);
+                markerInfo.lastLabelContent = newLabelContent;
             }
         });
     }

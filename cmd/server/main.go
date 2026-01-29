@@ -15,6 +15,7 @@ import (
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/api"
 	"github.com/yegors/co-atc/internal/atcchat"
+	"github.com/yegors/co-atc/internal/bsdb"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/simulation"
@@ -24,6 +25,44 @@ import (
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
 )
+
+// bsdbAdapter wraps bsdb.Service to implement adsb.BSDBService interface
+type bsdbAdapter struct {
+	service *bsdb.Service
+}
+
+func (a *bsdbAdapter) Lookup(hex string) *adsb.BSDBInfo {
+	info := a.service.Lookup(hex)
+	if info == nil {
+		return nil
+	}
+	return &adsb.BSDBInfo{
+		Registration:     info.Registration,
+		ICAOTypeCode:     info.ICAOTypeCode,
+		OperatorFlagCode: info.OperatorFlagCode,
+		Manufacturer:     info.Manufacturer,
+		Type:             info.Type,
+		RegisteredOwners: info.RegisteredOwners,
+	}
+}
+
+func (a *bsdbAdapter) LookupBatch(hexCodes []string) map[string]*adsb.BSDBInfo {
+	result := make(map[string]*adsb.BSDBInfo)
+	batch := a.service.LookupBatch(hexCodes)
+	for hex, info := range batch {
+		if info != nil {
+			result[hex] = &adsb.BSDBInfo{
+				Registration:     info.Registration,
+				ICAOTypeCode:     info.ICAOTypeCode,
+				OperatorFlagCode: info.OperatorFlagCode,
+				Manufacturer:     info.Manufacturer,
+				Type:             info.Type,
+				RegisteredOwners: info.RegisteredOwners,
+			}
+		}
+	}
+	return result
+}
 
 func main() {
 	// Parse command line flags
@@ -133,6 +172,21 @@ func main() {
 		wsServer,
 		simulationService,
 	)
+
+	// Load BaseStation.sqb database for aircraft enrichment
+	bsdbPath := filepath.Join("assets", "BaseStation.sqb")
+	bsdbService, err := bsdb.NewService(bsdbPath, true) // preload for fast lookups
+	if err != nil {
+		log.Warn("Failed to load BaseStation.sqb database - aircraft enrichment disabled",
+			logger.Error(err),
+			logger.String("path", bsdbPath))
+	} else {
+		adsbService.SetBSDBService(&bsdbAdapter{service: bsdbService})
+		log.Info("BaseStation.sqb database loaded",
+			logger.String("path", bsdbPath),
+			logger.Int("aircraft_count", bsdbService.Count()))
+		defer bsdbService.Close()
+	}
 
 	// Create and set WebSocket message handler for ADSB
 	wsHandler := adsb.NewWebSocketHandler(adsbService, log)
