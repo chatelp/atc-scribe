@@ -1416,26 +1416,40 @@
                         <template x-for="freq in $store.atc.audioFrequencies" :key="freq.id">
                             <div
                                 :class="{
-                                    'bg-highlight/10 border-highlight/50 text-highlight shadow-lg': $store.atc.isUnmuted(freq.id),
-                                    'bg-panel hover:bg-hover border-border text-text/80 hover:text-text': !$store.atc.isUnmuted(freq.id)
+                                    'bg-highlight/10 border-highlight/50 text-highlight shadow-lg': $store.atc.isUnmuted(freq.id) && !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
+                                    'bg-panel hover:bg-hover border-border text-text/80 hover:text-text': !$store.atc.isUnmuted(freq.id) && !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
+                                    'border-red-400/30 bg-red-950/30 text-red-300/60 opacity-80 cursor-not-allowed': $store.atc.isFrequencyFailed(freq.id),
+                                    'border-amber-600/30 bg-amber-950/20 text-amber-200/50 opacity-80 cursor-not-allowed': $store.atc.isFrequencyConnecting(freq.id)
                                 }"
                                 class="relative flex items-center justify-between px-3 py-1.5 border rounded-lg transition-all duration-200 h-full min-w-[260px] cursor-pointer"
                                 style="position: relative;"
-                                :data-freq-id="freq.id">
-                                <div @click="$store.atc.toggleMute(freq)" class="flex flex-col justify-center overflow-hidden flex-grow mr-2">
+                                :data-freq-id="freq.id"
+                                :title="$store.atc.isFrequencyFailed(freq.id) ? 'Connection failed: ' + ($store.atc.getFrequencyError(freq.id) || 'Unknown error') : ($store.atc.isFrequencyConnecting(freq.id) ? 'Connecting...' : '')">
+                                <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)" class="flex flex-col justify-center overflow-hidden flex-grow mr-2">
                                     <div class="font-semibold text-sm truncate" x-text="freq.name" :title="freq.name"></div>
-                                    <div class="text-[11px] opacity-80 mt-0.5" x-text="freq.frequency_mhz + ' MHz'"></div>
+                                    <div class="text-[11px] opacity-80 mt-0.5">
+                                        <span x-text="freq.frequency_mhz + ' MHz'"></span>
+                                        <span x-show="$store.atc.isFrequencyFailed(freq.id)" class="ml-1 text-red-300/60">(Failed)</span>
+                                        <span x-show="$store.atc.isFrequencyConnecting(freq.id)" class="ml-1 text-amber-200/50">(Retry)</span>
+                                    </div>
                                 </div>
                                 <div class="flex items-center space-x-2 my-2">
-                                    <div @click="$store.atc.toggleMute(freq)" class="audio-visualizer-container w-20 h-4 flex items-center transition-all duration-200 relative bg-black/70 rounded-md border border-highlight/50 overflow-hidden">
+                                    <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)"
+                                         class="audio-visualizer-container w-20 h-4 flex items-center transition-all duration-200 relative bg-black/70 rounded-md border overflow-hidden"
+                                         :class="{
+                                             'border-highlight/50': !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
+                                             'border-red-400/30': $store.atc.isFrequencyFailed(freq.id),
+                                             'border-amber-600/30': $store.atc.isFrequencyConnecting(freq.id)
+                                         }">
                                         <div :id="`vis-bar-${freq.id}`"
                                              class="audio-visualizer-bar h-full rounded-r-sm"
                                              :style="{
                                                  width: '0%',
-                                                 backgroundColor: $store.atc.isUnmuted(freq.id) ? '#4CAF50' : '#888888'
+                                                 backgroundColor: $store.atc.isFrequencyFailed(freq.id) ? '#b45555' : ($store.atc.isUnmuted(freq.id) ? '#4CAF50' : '#888888')
                                              }"></div>
-                                        <span x-text="$store.atc.secondsSinceLastAudio[freq.id] || '--s'"
-                                              class="absolute top-0 right-1 text-xs text-neutral-400 p-0.5"
+                                        <span x-text="$store.atc.isFrequencyFailed(freq.id) ? '!' : ($store.atc.secondsSinceLastAudio[freq.id] || '--s')"
+                                              class="absolute top-0 right-1 text-xs p-0.5"
+                                              :class="$store.atc.isFrequencyFailed(freq.id) ? 'text-red-300/60 font-bold' : 'text-neutral-400'"
                                               style="font-size: 0.6rem; line-height: 1; pointer-events: none;">
                                         </span>
                                     </div>

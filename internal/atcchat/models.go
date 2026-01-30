@@ -84,7 +84,6 @@ type SessionConfig struct {
 	Channels          int     `json:"channels"`
 	MaxResponseTokens int     `json:"max_response_tokens"`
 	Temperature       float64 `json:"temperature"`
-	Speed             float64 `json:"speed"`
 	TurnDetectionType string  `json:"turn_detection_type"`
 	VADThreshold      float64 `json:"vad_threshold"`
 	SilenceDurationMs int     `json:"silence_duration_ms"`

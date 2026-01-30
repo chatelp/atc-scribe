@@ -470,6 +470,16 @@ type Service struct {
 	streamPortIndex      int   // For round-robin port selection
 	allServerPorts       []int // Combined list of primary and additional ports
 	transcriptionManager *transcription.TranscriptionManager
+	wsServer             *websocket.Server // WebSocket server for broadcasting status updates
+	connectionStatus     map[string]connectionStatusInfo // Track connection status per frequency
+	statusMu             sync.RWMutex                    // Mutex for connectionStatus map
+}
+
+// connectionStatusInfo stores the current connection status and error for a frequency
+type connectionStatusInfo struct {
+	Status    string
+	Error     string
+	UpdatedAt time.Time
 }
 
 // NewService creates a new frequencies service.
@@ -586,6 +596,8 @@ func NewService(
 		streamPortIndex:      0,
 		allServerPorts:       allPorts,
 		transcriptionManager: transcriptionManager,
+		wsServer:             wsServer,
+		connectionStatus:     make(map[string]connectionStatusInfo),
 	}
 }
 
@@ -613,14 +625,21 @@ func (s *Service) Start(ctx context.Context) error {
 			s.logger.Error("Failed to create stream processor",
 				String("id", id),
 				Error(err))
+			// Broadcast failure status
+			s.broadcastFrequencyStatus(id, audio.StatusFailed, err.Error())
 			continue
 		}
+
+		// Set status callback to broadcast status changes via WebSocket
+		processor.audioProcessor.SetStatusCallback(s.broadcastFrequencyStatus)
 
 		err = processor.Start()
 		if err != nil {
 			s.logger.Error("Failed to start stream processor",
 				String("id", id),
 				Error(err))
+			// Broadcast failure status
+			s.broadcastFrequencyStatus(id, audio.StatusFailed, err.Error())
 			continue
 		}
 
@@ -964,8 +983,26 @@ func (s *Service) GetAudioStream(ctx context.Context, id string, clientID string
 func (s *Service) GetAllFrequencies() []*Frequency { // frequencies.Frequency from models.go
 	// No RLock needed as s.frequenciesConfig is read-only after NewService
 	var result []*Frequency
+
+	// Get a snapshot of connection statuses
+	s.statusMu.RLock()
+	statusSnapshot := make(map[string]connectionStatusInfo)
+	for k, v := range s.connectionStatus {
+		statusSnapshot[k] = v
+	}
+	s.statusMu.RUnlock()
+
 	for _, fc := range s.frequenciesConfig {
 		streamURL, streamPort := s.buildStreamInfo(fc.ID)
+
+		// Get the connection status if available
+		status := "available"
+		lastError := ""
+		if statusInfo, exists := statusSnapshot[fc.ID]; exists {
+			status = statusInfo.Status
+			lastError = statusInfo.Error
+		}
+
 		result = append(result, &Frequency{
 			ID:              fc.ID,
 			Airport:         fc.Airport,
@@ -974,7 +1011,8 @@ func (s *Service) GetAllFrequencies() []*Frequency { // frequencies.Frequency fr
 			URL:             fc.URL,
 			StreamURL:       streamURL,
 			StreamPort:      streamPort,
-			Status:          "available",
+			Status:          status,
+			LastError:       lastError,
 			Order:           fc.Order,
 			TranscribeAudio: fc.TranscribeAudio,
 		})
@@ -994,6 +1032,17 @@ func (s *Service) GetFrequencyByID(id string) (*Frequency, bool) {
 		return nil, false
 	}
 	streamURL, streamPort := s.buildStreamInfo(fc.ID)
+
+	// Get the connection status if available
+	status := "available"
+	lastError := ""
+	s.statusMu.RLock()
+	if statusInfo, exists := s.connectionStatus[fc.ID]; exists {
+		status = statusInfo.Status
+		lastError = statusInfo.Error
+	}
+	s.statusMu.RUnlock()
+
 	return &Frequency{
 		ID:              fc.ID,
 		Airport:         fc.Airport,
@@ -1003,7 +1052,8 @@ func (s *Service) GetFrequencyByID(id string) (*Frequency, bool) {
 		URL:             fc.URL,
 		StreamURL:       streamURL,
 		StreamPort:      streamPort,
-		Status:          "available",
+		Status:          status,
+		LastError:       lastError,
 		TranscribeAudio: fc.TranscribeAudio,
 	}, true
 }
@@ -1017,6 +1067,40 @@ func (s *Service) buildStreamInfo(frequencyID string) (string, int) {
 
 	// Return relative URL path so the browser uses the correct hostname
 	return fmt.Sprintf("/api/v1/stream/%s", frequencyID), port
+}
+
+// broadcastFrequencyStatus sends a frequency status change to all connected WebSocket clients
+// and stores the status for later retrieval via API
+func (s *Service) broadcastFrequencyStatus(frequencyID string, status audio.ConnectionStatus, errorMsg string) {
+	// Always store the status, even if WebSocket server isn't available
+	s.statusMu.Lock()
+	s.connectionStatus[frequencyID] = connectionStatusInfo{
+		Status:    string(status),
+		Error:     errorMsg,
+		UpdatedAt: time.Now(),
+	}
+	s.statusMu.Unlock()
+
+	s.logger.Debug("Frequency status updated",
+		String("frequency_id", frequencyID),
+		String("status", string(status)),
+		String("error", errorMsg))
+
+	// Broadcast via WebSocket if available
+	if s.wsServer == nil {
+		return
+	}
+
+	message := &websocket.Message{
+		Type: websocket.MessageTypeFrequencyStatus,
+		Data: map[string]interface{}{
+			"frequency_id": frequencyID,
+			"status":       string(status),
+			"error":        errorMsg,
+		},
+	}
+
+	s.wsServer.Broadcast(message)
 }
 
 // AddFrequency and RemoveFrequency could be implemented to modify s.frequenciesConfig

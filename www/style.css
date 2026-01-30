@@ -336,6 +336,14 @@ input[type=range].dual-range-max:focus {
     background: transparent !important;
     border: none !important;
     z-index: 1 !important;
+    overflow: visible !important;
+}
+
+/* Prevent Leaflet panes from clipping labels */
+.leaflet-pane,
+.leaflet-marker-pane,
+.leaflet-overlay-pane {
+    overflow: visible !important;
 }
 
 .altitude-label {
@@ -614,4 +622,43 @@ input[type=range].dual-range-max:focus {
     background: rgba(30, 64, 175, 0.3);
     border-radius: 4px;
     height: 8px;
+}
+
+/* ==========================================
+   Aircraft Animation Performance Styles
+   ========================================== */
+
+/* GPU-accelerated transforms for smooth aircraft movement */
+.leaflet-marker-icon,
+.leaflet-marker-pane .aircraft-marker,
+.leaflet-marker-pane .aircraft-icon-container {
+    will-change: transform;
+    transform: translateZ(0); /* Force GPU acceleration */
+    backface-visibility: hidden; /* Prevents flicker during transforms */
+}
+
+/* Aircraft labels need visible overflow to prevent clipping */
+.leaflet-marker-icon {
+    overflow: visible !important;
+}
+
+/* Aircraft label children - ensure visible overflow */
+.leaflet-marker-icon > div {
+    overflow: visible !important;
+}
+
+/* Smooth transitions for interpolated movement */
+.aircraft-icon-container {
+    transition: transform 0.1s linear;
+}
+
+/* Disable transitions during rapid updates for better performance */
+.aircraft-marker.no-transition .aircraft-icon-container,
+.aircraft-marker.no-transition {
+    transition: none !important;
+}
+
+/* Canvas pane optimization */
+.leaflet-overlay-pane canvas {
+    image-rendering: optimizeSpeed;
 }

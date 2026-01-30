@@ -492,7 +492,6 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		},
 		"frequencies": map[string]interface{}{
 			"buffer_size_kb":          h.config.Frequencies.BufferSizeKB,
-			"stream_timeout_secs":     h.config.Frequencies.StreamTimeoutSecs,
 			"reconnect_interval_secs": h.config.Frequencies.ReconnectIntervalSecs,
 		},
 		"atc_chat": map[string]interface{}{

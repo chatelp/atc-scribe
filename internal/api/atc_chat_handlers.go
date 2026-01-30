@@ -437,7 +437,6 @@ func (h *ATCChatHandlers) sendSessionUpdate(conn *SafeWebSocketConn, session *at
 		"input_audio_format":         config.InputAudioFormat,
 		"output_audio_format":        config.OutputAudioFormat,
 		"temperature":                config.Temperature,
-		"speed":                      config.Speed,
 		"max_response_output_tokens": config.MaxResponseTokens,
 		"tool_choice":                "auto",
 		"tools":                      []interface{}{},
@@ -478,8 +477,7 @@ func (h *ATCChatHandlers) sendSessionUpdate(conn *SafeWebSocketConn, session *at
 		logger.Int("prompt_length", len(systemPrompt)),
 		logger.String("prompt_preview", systemPrompt[:min(200, len(systemPrompt))]),
 		logger.String("voice", config.Voice),
-		logger.Float64("temperature", config.Temperature),
-		logger.Float64("speed", config.Speed))
+		logger.Float64("temperature", config.Temperature))
 
 	// Log the full session update for debugging
 	h.logger.Debug("Full session.update payload",

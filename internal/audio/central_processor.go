@@ -27,6 +27,19 @@ const (
 	sourceTypeSRT                      // native SRT for srt:// URLs
 )
 
+// ConnectionStatus represents the current connection state of a frequency
+type ConnectionStatus string
+
+const (
+	StatusConnecting ConnectionStatus = "connecting"
+	StatusConnected  ConnectionStatus = "connected"
+	StatusFailed     ConnectionStatus = "failed"
+	StatusStopped    ConnectionStatus = "stopped"
+)
+
+// StatusChangeCallback is called when the connection status changes
+type StatusChangeCallback func(frequencyID string, status ConnectionStatus, errorMsg string)
+
 // CentralAudioProcessor manages audio processing for a frequency
 // that can be shared between browser streaming and transcription.
 // It automatically uses native SRT for srt:// URLs, or ffmpeg for HTTP streams.
@@ -55,6 +68,8 @@ type CentralAudioProcessor struct {
 	reconnectDelay           time.Duration
 	format                   string
 	contentType              string
+	statusCallback           StatusChangeCallback // Callback for status changes
+	currentStatus            ConnectionStatus     // Current connection status
 }
 
 // CentralProcessorConfig contains configuration for the central audio processor
@@ -109,6 +124,22 @@ func NewCentralAudioProcessor(
 	}, nil
 }
 
+// SetStatusCallback sets the callback function for status changes
+func (p *CentralAudioProcessor) SetStatusCallback(callback StatusChangeCallback) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.statusCallback = callback
+}
+
+// notifyStatusChange notifies listeners of a status change
+func (p *CentralAudioProcessor) notifyStatusChange(status ConnectionStatus, errorMsg string) {
+	p.currentStatus = status
+	if p.statusCallback != nil {
+		// Call callback in a goroutine to prevent blocking
+		go p.statusCallback(p.id, status, errorMsg)
+	}
+}
+
 // Start starts the audio processor
 func (p *CentralAudioProcessor) Start() error {
 	p.mu.Lock()
@@ -124,24 +155,21 @@ func (p *CentralAudioProcessor) Start() error {
 		Int("channels", p.channels),
 		String("source_type", p.sourceTypeString()))
 
+	// Notify connecting status
+	p.notifyStatusChange(StatusConnecting, "")
+
 	// Start appropriate source based on URL type
 	var err error
 	if p.sourceType == sourceTypeSRT {
 		err = p.startSRT()
 		if err != nil {
-			// Fall back to ffmpeg if native SRT fails
-			// This can happen with some SRT servers that have incompatible handshake settings
-			p.logger.Warn("Native SRT connection failed, falling back to ffmpeg",
-				Error(err))
-			p.sourceType = sourceTypeFFmpeg
-			err = p.startFFmpeg()
-			if err != nil {
-				return fmt.Errorf("failed to start ffmpeg (fallback): %w", err)
-			}
+			p.notifyStatusChange(StatusFailed, err.Error())
+			return fmt.Errorf("failed to start native SRT: %w", err)
 		}
 	} else {
 		err = p.startFFmpeg()
 		if err != nil {
+			p.notifyStatusChange(StatusFailed, err.Error())
 			return fmt.Errorf("failed to start ffmpeg: %w", err)
 		}
 	}
@@ -150,6 +178,8 @@ func (p *CentralAudioProcessor) Start() error {
 	p.startMonitoring()
 
 	p.isRunning = true
+	// Notify connected status
+	p.notifyStatusChange(StatusConnected, "")
 	return nil
 }
 
@@ -197,6 +227,8 @@ func (p *CentralAudioProcessor) Stop() error {
 	p.multiReader.Close()
 
 	p.isRunning = false
+	// Notify stopped status
+	p.notifyStatusChange(StatusStopped, "")
 	return nil
 }
 
@@ -269,6 +301,8 @@ func (p *CentralAudioProcessor) processSRTOutput() {
 					p.logger.Warn("Scheduling SRT restart due to read error",
 						String("error_type", fmt.Sprintf("%T", err)),
 						String("error_message", err.Error()))
+					// Notify failed status
+					p.notifyStatusChange(StatusFailed, err.Error())
 					p.reconnectTimer = time.AfterFunc(p.reconnectDelay, func() {
 						p.mu.Lock()
 						defer p.mu.Unlock()
@@ -276,11 +310,14 @@ func (p *CentralAudioProcessor) processSRTOutput() {
 						p.reconnectTimer = nil
 						if p.isRunning {
 							p.logger.Info("Executing scheduled SRT restart")
+							p.notifyStatusChange(StatusConnecting, "")
 							p.stopSRT()
 							if err := p.startSRT(); err != nil {
 								p.logger.Error("Failed to restart SRT", Error(err))
+								p.notifyStatusChange(StatusFailed, err.Error())
 							} else {
 								p.logger.Info("SRT restarted successfully")
+								p.notifyStatusChange(StatusConnected, "")
 							}
 						}
 					})
@@ -313,59 +350,39 @@ func (p *CentralAudioProcessor) processSRTOutput() {
 	}
 }
 
-// startFFmpeg starts the ffmpeg process
+// startFFmpeg starts the ffmpeg process for HTTP streams
 func (p *CentralAudioProcessor) startFFmpeg() error {
 	p.logger.Debug("Starting ffmpeg process",
 		String("path", p.ffmpegPath),
 		String("url", p.audioURL))
 
-	// Create FFmpeg command with different options based on stream type
-	var args []string
-
-	// Check if this is an SRT stream
-	if strings.HasPrefix(p.audioURL, "srt://") {
-		// SRT stream configuration - optimized for low latency
-		args = []string{
-			"-loglevel", "error", // Minimal logging
-			"-fflags", "nobuffer", // Disable input buffering
-			"-flags", "low_delay", // Enable low delay mode
-			"-i", p.audioURL, // Input SRT URL
-			"-f", p.format, // Output format (should be s16le for raw PCM)
-			"-acodec", "pcm_s16le", // Audio codec
-			"-ac", fmt.Sprintf("%d", p.channels), // Channels
-			"-ar", fmt.Sprintf("%d", p.sampleRate), // Sample rate
-			"-flush_packets", "1", // Flush packets immediately
-			"pipe:1", // Output to stdout
-		}
-	} else {
-		// HTTP stream configuration - optimized for low latency with reconnection
-		args = []string{
-			"-loglevel", "error", // Minimal logging
-			"-fflags", "nobuffer", // Disable input buffering
-			"-flags", "low_delay", // Enable low delay mode
-		}
-
-		// Add timeout if configured (convert seconds to microseconds)
-		if p.ffmpegTimeoutSecs > 0 {
-			timeoutMicros := p.ffmpegTimeoutSecs * 1000000
-			args = append(args, "-timeout", fmt.Sprintf("%d", timeoutMicros))
-		}
-
-		// Add reconnection settings
-		args = append(args,
-			"-reconnect", "1", // Enable reconnection
-			"-reconnect_at_eof", "1", // Reconnect at end of file
-			"-reconnect_streamed", "1", // Reconnect for streamed inputs
-			"-reconnect_delay_max", fmt.Sprintf("%d", p.ffmpegReconnectDelaySecs), // Configurable reconnect delay
-			"-i", p.audioURL, // Input URL
-			"-f", p.format, // Output format (should be s16le for raw PCM)
-			"-acodec", "pcm_s16le", // Audio codec
-			"-ac", fmt.Sprintf("%d", p.channels), // Channels
-			"-ar", fmt.Sprintf("%d", p.sampleRate), // Sample rate
-			"-flush_packets", "1", // Flush packets immediately
-			"pipe:1", // Output to stdout
-		)
+	// HTTP stream configuration - optimized for low latency with reconnection
+	args := []string{
+		"-loglevel", "error",  // Minimal logging
+		"-fflags", "nobuffer", // Disable input buffering
+		"-flags", "low_delay", // Enable low delay mode
 	}
+
+	// Add timeout if configured (convert seconds to microseconds)
+	if p.ffmpegTimeoutSecs > 0 {
+		timeoutMicros := p.ffmpegTimeoutSecs * 1000000
+		args = append(args, "-timeout", fmt.Sprintf("%d", timeoutMicros))
+	}
+
+	// Add reconnection settings
+	args = append(args,
+		"-reconnect", "1",           // Enable reconnection
+		"-reconnect_at_eof", "1",    // Reconnect at end of file
+		"-reconnect_streamed", "1",  // Reconnect for streamed inputs
+		"-reconnect_delay_max", fmt.Sprintf("%d", p.ffmpegReconnectDelaySecs), // Configurable reconnect delay
+		"-i", p.audioURL,            // Input URL
+		"-f", p.format,              // Output format (should be s16le for raw PCM)
+		"-acodec", "pcm_s16le",      // Audio codec
+		"-ac", fmt.Sprintf("%d", p.channels),    // Channels
+		"-ar", fmt.Sprintf("%d", p.sampleRate),  // Sample rate
+		"-flush_packets", "1",       // Flush packets immediately
+		"pipe:1",                    // Output to stdout
+	)
 
 	// Create ffmpeg command with enhanced arguments
 	p.ffmpegCmd = exec.CommandContext(p.ctx, p.ffmpegPath, args...)
@@ -444,6 +461,8 @@ func (p *CentralAudioProcessor) processFFmpegOutput() {
 					p.logger.Warn("Scheduling ffmpeg restart due to read error",
 						String("error_type", fmt.Sprintf("%T", err)),
 						String("error_message", err.Error()))
+					// Notify failed status
+					p.notifyStatusChange(StatusFailed, err.Error())
 					p.reconnectTimer = time.AfterFunc(p.reconnectDelay, func() {
 						p.mu.Lock()
 						defer p.mu.Unlock()
@@ -451,11 +470,14 @@ func (p *CentralAudioProcessor) processFFmpegOutput() {
 						p.reconnectTimer = nil
 						if p.isRunning {
 							p.logger.Info("Executing scheduled ffmpeg restart")
+							p.notifyStatusChange(StatusConnecting, "")
 							p.stopFFmpeg()
 							if err := p.startFFmpeg(); err != nil {
 								p.logger.Error("Failed to restart ffmpeg", Error(err))
+								p.notifyStatusChange(StatusFailed, err.Error())
 							} else {
 								p.logger.Info("FFmpeg restarted successfully")
+								p.notifyStatusChange(StatusConnected, "")
 							}
 						}
 					})
@@ -507,9 +529,13 @@ func (p *CentralAudioProcessor) startMonitoring() {
 
 						if p.isRunning && p.reconnectTimer == nil {
 							p.logger.Info("Restarting SRT after connection loss")
+							p.notifyStatusChange(StatusConnecting, "Reconnecting after connection loss")
 							p.stopSRT()
 							if err := p.startSRT(); err != nil {
 								p.logger.Error("Failed to restart SRT", Error(err))
+								p.notifyStatusChange(StatusFailed, err.Error())
+							} else {
+								p.notifyStatusChange(StatusConnected, "")
 							}
 						}
 					}
@@ -520,9 +546,13 @@ func (p *CentralAudioProcessor) startMonitoring() {
 
 						if p.isRunning && p.reconnectTimer == nil {
 							p.logger.Info("Restarting ffmpeg after unexpected exit")
+							p.notifyStatusChange(StatusConnecting, "Reconnecting after process exit")
 							p.stopFFmpeg()
 							if err := p.startFFmpeg(); err != nil {
 								p.logger.Error("Failed to restart ffmpeg", Error(err))
+								p.notifyStatusChange(StatusFailed, err.Error())
+							} else {
+								p.notifyStatusChange(StatusConnected, "")
 							}
 						}
 					}
@@ -542,13 +572,6 @@ func (p *CentralAudioProcessor) CreateReader(id string) (io.ReadCloser, error) {
 		var err error
 		if p.sourceType == sourceTypeSRT {
 			err = p.startSRT()
-			if err != nil {
-				// Fall back to ffmpeg if native SRT fails
-				p.logger.Warn("Native SRT connection failed, falling back to ffmpeg",
-					Error(err))
-				p.sourceType = sourceTypeFFmpeg
-				err = p.startFFmpeg()
-			}
 		} else {
 			err = p.startFFmpeg()
 		}

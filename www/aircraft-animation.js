@@ -1,40 +1,51 @@
 // Aircraft Smooth Animation Engine
 // Provides vector extrapolation and smooth interpolation for aircraft movement
+// Uses requestAnimationFrame for 60 FPS visual smoothness
 
 class AircraftAnimationEngine {
     constructor(mapManager, store) {
         this.mapManager = mapManager;
         this.store = store;
-        
+
         // Animation configuration
         this.config = {
             enabled: true,
-            interpolationFps: 10,                    // 100ms updates
+            interpolationFps: 30,                    // Visual update rate (30fps is smooth enough)
+            physicsUpdateRate: 10,                   // Physics/velocity calculations per second
             maxExtrapolationSeconds: 2.4,            // 20% beyond 2s update interval
             confidenceDecayRate: 0.5,                // Exponential decay factor
             minConfidenceThreshold: 0.3,             // Stop animating below this
             viewportCulling: true,                   // Only animate visible aircraft
             adaptivePerformance: true,               // Reduce quality under load
-            maxProcessingTimeMs: 50,                 // Max time per animation frame
+            maxProcessingTimeMs: 30,                 // 30ms frame budget for 30fps
             maxHistoryPoints: 5,                     // Position history per aircraft
             enableCurvedInterpolation: true,         // Use track rate for turning aircraft
             enableAltitudeInterpolation: true,       // Interpolate altitude changes
-            distanceQualityReduction: 50             // Reduce quality beyond this distance (NM)
+            distanceQualityReduction: 50,            // Reduce quality beyond this distance (NM)
+            cleanupIntervalMs: 30000,                // Cleanup stale states every 30s
+            useCssTransforms: false                  // Use Leaflet setLatLng (more reliable)
         };
-        
+
         // Animation state
-        this.animationTimer = null;
+        this.rafId = null;                           // requestAnimationFrame ID
         this.aircraftStates = new Map();             // hex -> AircraftState
         this.lastAnimationTime = 0;
+        this.lastPhysicsTime = 0;
+        this.lastCleanupTime = 0;
         this.frameTimeHistory = [];
         this.qualityLevel = 1.0;                     // 1.0 = full quality, 0.3 = minimum
         this.isRunning = false;
-        
+
+        // Pending marker updates for batching
+        this.pendingMarkerUpdates = new Map();
+        this.markerUpdateScheduled = false;
+
         // Performance monitoring
         this.performanceMonitor = new PerformanceMonitor();
-        
+
         // Bind methods
         this.animationFrame = this.animationFrame.bind(this);
+        this.rafLoop = this.rafLoop.bind(this);
     }
     
     // Initialize the animation engine
@@ -60,79 +71,243 @@ class AircraftAnimationEngine {
             console.warn('Aircraft Animation Engine: Already running');
             return;
         }
-        
-        console.log('Aircraft Animation Engine: Starting...');
+
+        console.log('Aircraft Animation Engine: Starting with requestAnimationFrame...');
         this.isRunning = true;
-        this.lastAnimationTime = Date.now();
-        
-        // Start animation timer
-        this.animationTimer = setInterval(this.animationFrame, 1000 / this.config.interpolationFps);
+        this.lastAnimationTime = performance.now();
+        this.lastPhysicsTime = performance.now();
+        this.lastCleanupTime = Date.now();
+
+        // Start RAF loop
+        this.rafLoop();
     }
-    
+
     // Stop the animation engine
     stop() {
         if (!this.isRunning) {
             return;
         }
-        
+
         console.log('Aircraft Animation Engine: Stopping...');
         this.isRunning = false;
-        
-        if (this.animationTimer) {
-            clearInterval(this.animationTimer);
-            this.animationTimer = null;
+
+        if (this.rafId) {
+            cancelAnimationFrame(this.rafId);
+            this.rafId = null;
         }
-        
+
+        // Reset CSS transforms on all markers before clearing states
+        this.resetAllMarkerTransforms();
+
         // Clear all aircraft states
         this.aircraftStates.clear();
+        this.pendingMarkerUpdates.clear();
+    }
+
+    // Reset CSS transforms on all markers
+    resetAllMarkerTransforms() {
+        if (!this.mapManager || !this.mapManager.markers) return;
+
+        Object.keys(this.mapManager.markers).forEach(hex => {
+            const markers = this.mapManager.markers[hex];
+            if (markers?.aircraft) {
+                const element = markers.aircraft.getElement();
+                if (element) {
+                    element.style.transform = '';
+                    element.style.transition = '';
+                }
+            }
+            if (markers?.label) {
+                const element = markers.label.getElement();
+                if (element) {
+                    element.style.transform = '';
+                    element.style.transition = '';
+                }
+            }
+        });
+    }
+
+    // Main RAF loop - throttled to configured FPS
+    rafLoop() {
+        if (!this.isRunning) return;
+
+        const now = performance.now();
+        const deltaTime = now - this.lastAnimationTime;
+        const targetFrameTime = 1000 / this.config.interpolationFps;
+
+        // Throttle to configured FPS to reduce CPU usage
+        if (deltaTime >= targetFrameTime) {
+            // Run animation frame logic
+            this.animationFrame(now, deltaTime);
+            this.lastAnimationTime = now;
+        }
+
+        // Schedule next frame
+        this.rafId = requestAnimationFrame(this.rafLoop);
     }
     
-    // Main animation frame processing
-    animationFrame() {
+    // Main animation frame processing (called by RAF loop)
+    animationFrame(now, deltaTime) {
         if (!this.isRunning || !this.config.enabled) {
             return;
         }
-        
+
         const startTime = performance.now();
         const currentTime = Date.now();
-        
+
         try {
+            // Periodic cleanup of stale states (every 30s)
+            if (currentTime - this.lastCleanupTime > this.config.cleanupIntervalMs) {
+                this.cleanupStaleStates();
+                this.lastCleanupTime = currentTime;
+            }
+
             // Get visible aircraft for viewport culling
-            const visibleAircraft = this.config.viewportCulling ? 
-                this.getVisibleAircraft() : 
+            const visibleAircraft = this.config.viewportCulling ?
+                this.getVisibleAircraft() :
                 Object.values(this.store.aircraft || {});
-            
-            // Update positions for all visible aircraft
+
+            // Update interpolated positions for all visible aircraft
             let updatedCount = 0;
             for (const aircraft of visibleAircraft) {
-                if (this.updateAircraftPosition(aircraft, currentTime)) {
+                if (this.updateAircraftPosition(aircraft, currentTime, deltaTime)) {
                     updatedCount++;
                 }
-                
+
                 // Check processing time limit
                 if (performance.now() - startTime > this.config.maxProcessingTimeMs) {
-                    console.warn('Aircraft Animation: Frame time limit exceeded, stopping early');
                     break;
                 }
             }
-            
-            this.lastAnimationTime = currentTime;
-            
+
+            // Process batched marker updates
+            this.processPendingMarkerUpdates();
+
             // Performance monitoring
             const processingTime = performance.now() - startTime;
             this.performanceMonitor.recordFrameTime(processingTime);
-            
+
             // Adaptive performance adjustment
             if (this.config.adaptivePerformance) {
                 this.qualityLevel = this.performanceMonitor.getQualityLevel();
             }
-            
-            if (updatedCount > 0) {
-                //console.log(`Animation frame: ${updatedCount} aircraft updated in ${processingTime.toFixed(1)}ms`);
-            }
-            
+
         } catch (error) {
             console.error('Aircraft Animation: Error in animation frame:', error);
+        }
+    }
+
+    // Cleanup animation states for aircraft no longer in the store
+    cleanupStaleStates() {
+        const storeHexes = new Set(Object.keys(this.store.aircraft || {}));
+        let removedCount = 0;
+
+        for (const hex of this.aircraftStates.keys()) {
+            if (!storeHexes.has(hex)) {
+                this.aircraftStates.delete(hex);
+                removedCount++;
+            }
+        }
+
+        if (removedCount > 0) {
+            console.log(`Aircraft Animation: Cleaned up ${removedCount} stale states`);
+        }
+    }
+
+    // Queue marker update for batch processing
+    queueMarkerUpdate(hex, position) {
+        this.pendingMarkerUpdates.set(hex, position);
+    }
+
+    // Process all pending marker updates in a batch
+    processPendingMarkerUpdates() {
+        if (this.pendingMarkerUpdates.size === 0) return;
+
+        const updates = Array.from(this.pendingMarkerUpdates.entries());
+        this.pendingMarkerUpdates.clear();
+
+        // Batch DOM updates
+        for (const [hex, position] of updates) {
+            this.applyMarkerTransform(hex, position);
+        }
+    }
+
+    // Apply CSS transform to marker for smooth interpolated movement
+    applyMarkerTransform(hex, position) {
+        if (!this.mapManager || !this.mapManager.markers || !this.mapManager.markers[hex]) {
+            return;
+        }
+
+        const markers = this.mapManager.markers[hex];
+        if (!markers.aircraft) return;
+
+        // Get the base Leaflet position (from last real data update)
+        const baseLatLng = markers.aircraft.getLatLng();
+        if (!baseLatLng) return;
+
+        // Convert positions to container pixels for transform calculation
+        const map = this.mapManager.map;
+        if (!map) return;
+
+        const basePoint = map.latLngToContainerPoint(baseLatLng);
+        const targetPoint = map.latLngToContainerPoint([position.lat, position.lon]);
+
+        // Calculate pixel offset
+        const dx = targetPoint.x - basePoint.x;
+        const dy = targetPoint.y - basePoint.y;
+
+        // Skip if movement is negligible
+        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+        // Apply CSS transform to aircraft marker
+        const aircraftElement = markers.aircraft.getElement();
+        if (aircraftElement) {
+            // Preserve existing rotation transform, add translation
+            const iconContainer = aircraftElement.querySelector('.aircraft-icon-container');
+            if (iconContainer) {
+                const currentRotation = iconContainer.style.transform.match(/rotate\([^)]+\)/)?.[0] || '';
+                iconContainer.style.transform = `translate(${dx}px, ${dy}px) ${currentRotation}`;
+            } else {
+                aircraftElement.style.transform = `translate(${dx}px, ${dy}px)`;
+            }
+        }
+
+        // Apply same transform to label
+        if (markers.label) {
+            const labelElement = markers.label.getElement();
+            if (labelElement) {
+                labelElement.style.transform = `translate(${dx}px, ${dy}px)`;
+            }
+        }
+    }
+
+    // Reset transform for a single marker (called when real data arrives)
+    resetMarkerTransform(hex) {
+        if (!this.mapManager || !this.mapManager.markers || !this.mapManager.markers[hex]) {
+            return;
+        }
+
+        const markers = this.mapManager.markers[hex];
+
+        if (markers.aircraft) {
+            const element = markers.aircraft.getElement();
+            if (element) {
+                const iconContainer = element.querySelector('.aircraft-icon-container');
+                if (iconContainer) {
+                    // Preserve rotation, remove translation
+                    const rotation = iconContainer.style.transform.match(/rotate\([^)]+\)/)?.[0] || '';
+                    iconContainer.style.transform = rotation;
+                } else {
+                    element.style.transform = '';
+                }
+            }
+        }
+
+        if (markers.label) {
+            const element = markers.label.getElement();
+            if (element) {
+                element.style.transform = '';
+            }
         }
     }
     
@@ -141,22 +316,23 @@ class AircraftAnimationEngine {
         if (!this.config.enabled || !aircraft || !aircraft.hex) {
             return;
         }
-        
+
         const hex = aircraft.hex;
-        
+
         // Remove signal_lost aircraft from animation tracking
         if (aircraft.status === 'signal_lost') {
             this.aircraftStates.delete(hex);
+            this.resetMarkerTransform(hex);
             return;
         }
-        
+
         let state = this.aircraftStates.get(hex);
-        
+
         if (!state) {
             state = new AircraftState(hex);
             this.aircraftStates.set(hex, state);
         }
-        
+
         // Add new position to history
         if (aircraft.adsb && aircraft.adsb.lat && aircraft.adsb.lon) {
             const position = {
@@ -168,11 +344,16 @@ class AircraftAnimationEngine {
                 verticalRate: aircraft.adsb.baro_rate || 0,
                 trackRate: aircraft.adsb.track_rate || 0
             };
-            
+
             state.addPosition(position, Date.now());
-            
+
             // Update aircraft reference
             state.aircraft = aircraft;
+
+            // Reset CSS transform since Leaflet will update the actual position
+            if (this.config.useCssTransforms) {
+                this.resetMarkerTransform(hex);
+            }
         }
     }
 
@@ -185,6 +366,7 @@ class AircraftAnimationEngine {
         // Handle status change to signal_lost
         if (delta.status === 'signal_lost') {
             this.aircraftStates.delete(hex);
+            this.resetMarkerTransform(hex);
             return;
         }
 
@@ -213,6 +395,11 @@ class AircraftAnimationEngine {
             };
 
             state.addPosition(position, Date.now());
+
+            // Reset CSS transform since Leaflet will update the actual position
+            if (this.config.useCssTransforms) {
+                this.resetMarkerTransform(hex);
+            }
         }
 
         // Update the aircraft reference with delta values
@@ -236,39 +423,44 @@ class AircraftAnimationEngine {
     }
     
     // Update single aircraft position with interpolation
-    updateAircraftPosition(aircraft, currentTime) {
+    updateAircraftPosition(aircraft, currentTime, deltaTime) {
         if (!aircraft || !aircraft.hex) {
             return false;
         }
-        
+
         // Don't animate signal_lost aircraft - keep them static
         if (aircraft.status === 'signal_lost') {
             return false;
         }
-        
+
         const state = this.aircraftStates.get(aircraft.hex);
         if (!state || !state.hasValidVelocity()) {
             return false;
         }
-        
+
         // Calculate elapsed time since last server update
         const elapsedTime = (currentTime - state.lastUpdateTime) / 1000; // seconds
-        
+
         // Don't extrapolate beyond configured limit
         if (elapsedTime > this.config.maxExtrapolationSeconds) {
             return false;
         }
-        
+
         // Calculate interpolated position
         const interpolatedPosition = this.interpolatePosition(state, elapsedTime);
-        
+
         if (!interpolatedPosition || interpolatedPosition.confidence < this.config.minConfidenceThreshold) {
             return false;
         }
-        
-        // Update map marker with interpolated position
-        this.updateMapMarker(aircraft.hex, interpolatedPosition);
-        
+
+        // Queue marker update for batch processing (uses CSS transforms)
+        if (this.config.useCssTransforms) {
+            this.queueMarkerUpdate(aircraft.hex, interpolatedPosition);
+        } else {
+            // Fallback: direct Leaflet update
+            this.updateMapMarker(aircraft.hex, interpolatedPosition);
+        }
+
         return true;
     }
     
@@ -424,13 +616,16 @@ class AircraftAnimationEngine {
     // Update configuration
     updateConfig(newConfig) {
         Object.assign(this.config, newConfig);
-        
-        // Restart if FPS changed
-        if (this.isRunning && newConfig.interpolationFps) {
-            this.stop();
-            this.start();
+
+        // Restart if enabled state changed
+        if (newConfig.enabled !== undefined) {
+            if (newConfig.enabled && !this.isRunning) {
+                this.start();
+            } else if (!newConfig.enabled && this.isRunning) {
+                this.stop();
+            }
         }
-        
+
         console.log('Aircraft Animation: Configuration updated:', this.config);
     }
 }

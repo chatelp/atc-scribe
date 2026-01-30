@@ -19,9 +19,8 @@ type Config struct {
 	Transcription  TranscriptionConfig  `toml:"transcription"`   // Audio transcription settings
 	PostProcessing PostProcessingConfig `toml:"post_processing"` // Post-processing settings for transcriptions
 	FlightPhases   FlightPhasesConfig   `toml:"flight_phases"`   // Flight phase detection settings
-	Weather        WeatherConfig        `toml:"wx"`              // Weather data fetching and caching settings
-	ATCChat        ATCChatConfig        `toml:"atc_chat"`        // ATC Chat voice assistant settings
-	Templating     TemplatingConfig     `toml:"templating"`      // Shared templating system settings
+	Weather WeatherConfig `toml:"wx"`       // Weather data fetching and caching settings
+	ATCChat ATCChatConfig `toml:"atc_chat"` // ATC Chat voice assistant settings
 }
 
 // ServerConfig contains HTTP server configuration settings
@@ -136,7 +135,6 @@ type PostProcessingConfig struct {
 type FrequenciesConfig struct {
 	Sources               []FrequencyConfig `toml:"sources"`                 // List of radio frequencies to monitor
 	BufferSizeKB          int               `toml:"buffer_size_kb"`          // Audio buffer size in kilobytes
-	StreamTimeoutSecs     int               `toml:"stream_timeout_secs"`     // Timeout for audio streams (0 = no timeout)
 	ReconnectIntervalSecs int               `toml:"reconnect_interval_secs"` // Seconds to wait before reconnecting after stream failure
 
 	// FFmpeg timeout configuration
@@ -433,11 +431,6 @@ func (c *Config) ValidateFrequencies() error {
 		return fmt.Errorf("invalid buffer size: %d KB", c.Frequencies.BufferSizeKB)
 	}
 
-	// Validate stream timeout
-	if c.Frequencies.StreamTimeoutSecs < 0 {
-		return fmt.Errorf("invalid stream timeout: %d", c.Frequencies.StreamTimeoutSecs)
-	}
-
 	// Validate reconnect interval
 	if c.Frequencies.ReconnectIntervalSecs <= 0 {
 		return fmt.Errorf("invalid reconnect interval: %d", c.Frequencies.ReconnectIntervalSecs)
@@ -690,7 +683,6 @@ type ATCChatConfig struct {
 	// Session settings
 	MaxResponseTokens int     `toml:"max_response_tokens"` // Maximum tokens in response
 	Temperature       float64 `toml:"temperature"`         // Response randomness (0.0-1.0)
-	Speed             float64 `toml:"speed"`               // Response speed (1.0-4.0)
 	TurnDetectionType string  `toml:"turn_detection_type"` // Turn detection method
 	VADThreshold      float64 `toml:"vad_threshold"`       // Voice activity detection threshold
 	SilenceDurationMs int     `toml:"silence_duration_ms"` // Silence duration for turn detection
@@ -704,30 +696,3 @@ type ATCChatConfig struct {
 	RefreshSystemPromptSecs int    `toml:"refresh_system_prompt"` // Automatic system prompt refresh interval in seconds (0 = disabled)
 }
 
-// TemplatingConfig contains shared templating system configuration
-type TemplatingConfig struct {
-	// Feature toggle
-	Enabled bool `toml:"enabled"` // Enable or disable templating system
-
-	// Template cache settings
-	TemplateCacheSize int  `toml:"template_cache_size"` // Maximum number of templates to cache
-	ReloadTemplates   bool `toml:"reload_templates"`    // Whether to reload templates from disk (development mode)
-
-	// ATC Chat template settings
-	ATCChat TemplatingATCChatConfig `toml:"atc_chat"`
-
-	// Post-processing template settings
-	PostProcessing TemplatingPostProcessingConfig `toml:"post_processing"`
-}
-
-// TemplatingATCChatConfig contains ATC chat specific templating settings
-type TemplatingATCChatConfig struct {
-	TemplatePath string `toml:"template_path"` // Path to ATC chat template file
-	MaxAircraft  int    `toml:"max_aircraft"`  // Maximum aircraft to include in template
-}
-
-// TemplatingPostProcessingConfig contains post-processing specific templating settings
-type TemplatingPostProcessingConfig struct {
-	TemplatePath          string `toml:"template_path"`          // Path to post-processing template file
-	ContextTranscriptions int    `toml:"context_transcriptions"` // Number of context transcriptions to include
-}

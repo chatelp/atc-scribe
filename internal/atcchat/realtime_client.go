@@ -106,9 +106,6 @@ func (rc *RealtimeClient) CreateSession(ctx context.Context, systemPrompt string
 		sessionReq.Temperature = 0.8
 	}
 
-	// Note: Speed parameter not yet supported in OpenAI realtime API
-	// Will be added when OpenAI supports it
-
 	// Add turn detection based on configuration
 	// If TurnDetectionType is empty or "none", omit turn_detection entirely (turn off)
 	// Otherwise, configure with the specified type

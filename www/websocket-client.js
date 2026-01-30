@@ -20,10 +20,17 @@ class WebSocketClient {
             status_update: [], // Add new listener type for status updates
             phase_change: [], // Add new listener type for phase changes
             clearance_issued: [], // Add new listener type for clearance events
+            frequency_status: [], // Frequency connection status changes
             open: [],
             close: [],
             error: []
         };
+
+        // Bound event handlers for proper cleanup
+        this._boundOpenHandler = null;
+        this._boundCloseHandler = null;
+        this._boundErrorHandler = null;
+        this._boundMessageHandler = null;
     }
 
     // Connect to the WebSocket server
@@ -34,9 +41,11 @@ class WebSocketClient {
             return;
         }
 
-        // Close existing connection if any
+        // Close existing connection and cleanup handlers
         if (this.connection) {
+            this._removeConnectionHandlers();
             this.connection.close();
+            this.connection = null;
         }
 
         this.isReconnecting = true;
@@ -44,70 +53,59 @@ class WebSocketClient {
         // Create new WebSocket connection
         this.connection = new WebSocket(this.url);
 
-        // Connection opened
-        this.connection.addEventListener('open', (event) => {
+        // Create bound handlers for proper cleanup later
+        this._boundOpenHandler = (event) => {
             console.log('WebSocket connection established');
             this.isReconnecting = false;
             this.reconnectAttempts = 0; // Reset retry counter
             this._notifyListeners('open', event);
-        });
+        };
 
-        // Connection closed
-        this.connection.addEventListener('close', (event) => {
+        this._boundCloseHandler = (event) => {
             console.log('WebSocket connection closed');
             this.isReconnecting = false;
             this._notifyListeners('close', event);
-            
+
             // Only attempt auto-reconnect if enabled and under max attempts
             if (this.autoReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
                 this.reconnectAttempts++;
                 console.log(`WebSocket: Attempting reconnect ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
-                
+
                 this.reconnectTimeout = setTimeout(() => {
                     this.connect();
                 }, this.reconnectDelay);
             } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                 console.error('WebSocket: Max reconnection attempts reached. Stopping auto-reconnect.');
             }
-        });
+        };
 
-        // Connection error
-        this.connection.addEventListener('error', (event) => {
+        this._boundErrorHandler = (event) => {
             console.error('WebSocket error:', event);
             this.isReconnecting = false;
             this._notifyListeners('error', event);
-        });
+        };
 
-        // Listen for messages - CRITICAL FIX: Process asynchronously to prevent main thread blocking
-        this.connection.addEventListener('message', (event) => {
+        this._boundMessageHandler = (event) => {
             // IMMEDIATELY yield control back to browser to prevent blocking HTTP requests
             setTimeout(() => {
                 try {
                     const message = JSON.parse(event.data);
-                    
+
                     // Handle aircraft streaming messages
                     if (message.type === 'aircraft_added') {
-                        console.log(`Aircraft ADDED: ${message.data.aircraft?.flight || message.data.hex}`);
                         this._notifyListeners('aircraft_added', message.data);
                     } else if (message.type === 'aircraft_update') {
-                        const changeKeys = Object.keys(message.data.changes || {}).join(', ');
-                        //console.log(`Aircraft UPDATED: ${message.data.hex} - ${changeKeys}`);
                         this._notifyListeners('aircraft_update', message.data);
                     } else if (message.type === 'aircraft_removed') {
-                        console.log(`Aircraft REMOVED: ${message.data.hex}`);
                         this._notifyListeners('aircraft_removed', message.data);
                     } else if (message.type === 'aircraft_bulk_response') {
-                        console.log(`BULK DATA: Received ${message.data.count} aircraft`);
                         this._notifyListeners('aircraft_bulk_response', message.data);
                     } else if (message.type === 'transcription') {
                         this._notifyListeners('transcription', message.data);
                     } else if (message.type === 'transcription_update') {
                         this._notifyListeners('transcription_update', message.data);
                     } else if (message.type === 'aircraft') {
-                        // Log aircraft movement messages to console
                         if (message.data && message.data.movement) {
-                            console.log(`Aircraft ${message.data.movement.toUpperCase()}: ${message.data.flight || message.data.hex}`, message.data);
-                            
                             // Call the Alpine.js store method to handle the aircraft message
                             if (window.Alpine && Alpine.store('atc')) {
                                 Alpine.store('atc').handleAircraftMessage(message.data);
@@ -115,43 +113,78 @@ class WebSocketClient {
                         }
                         this._notifyListeners('aircraft', message.data);
                     } else if (message.type === 'status_update') {
-                        // Log status update messages to console
-                        console.log(`Aircraft STATUS CHANGE: ${message.data.flight || message.data.hex} -> ${message.data.new_status.toUpperCase()}`, message.data);
-                        
                         // Call the Alpine.js store method to handle the status update
                         if (window.Alpine && Alpine.store('atc')) {
                             Alpine.store('atc').handleStatusUpdateMessage(message.data);
                         }
-                        
                         this._notifyListeners('status_update', message.data);
                     } else if (message.type === 'phase_change') {
-                        // Log phase change messages to console
-                        console.log(`Phase Change: ${message.data.flight || message.data.hex} ${message.data.transition}`, message.data);
-                        
                         this._notifyListeners('phase_change', message.data);
+                    } else if (message.type === 'frequency_status') {
+                        this._notifyListeners('frequency_status', message.data);
                     }
                 } catch (error) {
                     console.error('Error parsing WebSocket message:', error);
                 }
             }, 0); // Yield to browser event loop immediately
-        });
+        };
+
+        // Add event listeners
+        this.connection.addEventListener('open', this._boundOpenHandler);
+        this.connection.addEventListener('close', this._boundCloseHandler);
+        this.connection.addEventListener('error', this._boundErrorHandler);
+        this.connection.addEventListener('message', this._boundMessageHandler);
+    }
+
+    // Remove event handlers from connection (prevents memory leaks)
+    _removeConnectionHandlers() {
+        if (this.connection) {
+            if (this._boundOpenHandler) {
+                this.connection.removeEventListener('open', this._boundOpenHandler);
+            }
+            if (this._boundCloseHandler) {
+                this.connection.removeEventListener('close', this._boundCloseHandler);
+            }
+            if (this._boundErrorHandler) {
+                this.connection.removeEventListener('error', this._boundErrorHandler);
+            }
+            if (this._boundMessageHandler) {
+                this.connection.removeEventListener('message', this._boundMessageHandler);
+            }
+        }
+
+        // Clear references
+        this._boundOpenHandler = null;
+        this._boundCloseHandler = null;
+        this._boundErrorHandler = null;
+        this._boundMessageHandler = null;
     }
 
     // Close the WebSocket connection
     disconnect() {
         this.autoReconnect = false; // Disable auto-reconnect when manually disconnecting
-        
+
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
         }
 
+        // Remove event handlers before closing to prevent memory leaks
+        this._removeConnectionHandlers();
+
         if (this.connection) {
             this.connection.close();
             this.connection = null;
         }
-        
+
         this.isReconnecting = false;
+    }
+
+    // Clear all custom event listeners (for cleanup on page unload)
+    clearAllListeners() {
+        Object.keys(this.listeners).forEach(type => {
+            this.listeners[type] = [];
+        });
     }
 
     // Enable auto-reconnect

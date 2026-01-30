@@ -116,9 +116,6 @@ airport_range_nm = 5.0
 # Audio buffer size in kilobytes for frequency monitoring
 buffer_size_kb = 8
 
-# Timeout for audio streams in seconds (0 = no timeout, recommended for continuous streaming)
-stream_timeout_secs = 0
-
 # How long to wait before reconnecting after a stream failure (in seconds)
 reconnect_interval_secs = 5
 
@@ -362,7 +359,6 @@ channels = 1
 # Session settings
 max_response_tokens = 4096
 temperature = 0.6
-speed = 1.5
 # Turn detection type: "server_vad", "semantic_vad", or "none" (to disable turn detection)
 turn_detection_type = "none"
 vad_threshold = 0.3
@@ -380,23 +376,3 @@ system_prompt_path = "assets/atc_chat_prompt.txt"
 # Set to 0 to disable timer-based updates - context will be updated on PTT press instead. Do not enable unless you like burning through your API credits.
 refresh_system_prompt = 0
 
-#######################################################
-# Templating System Configuration
-#######################################################
-[templating]
-# Enable/disable templating system
-enabled = true
-
-# Template cache settings
-template_cache_size = 10
-reload_templates = true  # Development mode - reload templates from disk
-
-# ATC Chat template settings
-[templating.atc_chat]
-template_path = "assets/atc_chat_prompt.txt"
-max_aircraft = 200
-
-# Post-processing template settings
-[templating.post_processing]
-template_path = "assets/post_processing_prompt.txt"
-context_transcriptions = 5

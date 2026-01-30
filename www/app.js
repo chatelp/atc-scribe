@@ -181,6 +181,7 @@ document.addEventListener('alpine:init', () => {
         frequencyTranscriptions: {}, // Stores transcriptions per frequency_id
         transcriptionViewerVisible: {}, // Stores visibility state for each frequency's viewer
         isReconnecting: false, // Flag to prevent duplicate reconnection attempts
+        frequencyConnectionStatus: {}, // Tracks connection status per frequency (connecting, connected, failed)
 
         // Settings
         settings: {
@@ -374,7 +375,6 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            console.log('[PERFORMANCE] Recalculating filtered aircraft list');
             const searchLower = this.searchTerm.toLowerCase();
             const now = new Date();
             const lastSeenCutoff = new Date(now.getTime() - (this.settings.lastSeenMinutes * 60 * 1000));
@@ -624,7 +624,7 @@ document.addEventListener('alpine:init', () => {
                                 ${phaseBadge}
                                 <span class="font-bold ${callsignColorClass} text-xs group-hover:text-white/90 ${phaseBadge ? 'ml-1.5' : ''}">${callsign}</span>
                             </div>
-                            <span class="text-text/70 text-[10px]">${lastSeenText}</span>
+                            <span class="text-text/70 text-[10px]" data-lastseen>${lastSeenText}</span>
                         </div>
                         <div class="grid grid-cols-2 gap-1 text-[10px]">
                             <div class="${altitudeColorClass}">ALT ${altitudeDisplay} <span class="${altitudeTrendIconClass}"></span></div>
@@ -642,7 +642,7 @@ document.addEventListener('alpine:init', () => {
                             ${phaseBadge}
                             <span class="font-bold ${callsignColorClass} text-xs ${phaseBadge ? 'ml-1.5' : ''}">${callsign}</span>
                         </div>
-                        <span class="text-text/70 text-[10px]">${lastSeenText}</span>
+                        <span class="text-text/70 text-[10px]" data-lastseen>${lastSeenText}</span>
                     </div>
                     <div class="grid grid-cols-2 gap-1 text-[10px]">
                         <div class="${altitudeColorClass}">ALT ${altitudeDisplay} <span class="${altitudeTrendIconClass}"></span></div>
@@ -1217,8 +1217,15 @@ document.addEventListener('alpine:init', () => {
             if (!this.selectedAircraft) { // No aircraft selected, fully close and reset
                 this.aircraftDetailsShowHistoryView = false;
                 this.aircraftDetailsHistoryData = [];
+                this.aircraftDetailsFutureData = [];
                 this.aircraftDetailsHistoryCount = 0;
                 this.aircraftDetailsStopHistoryRefresh();
+
+                // Clear map trails for the previously selected aircraft
+                if (this.mapManager && this.aircraftDetailsCurrentAircraftHexForPanel) {
+                    this.mapManager.clearAircraftTrails(this.aircraftDetailsCurrentAircraftHexForPanel);
+                }
+
                 this.aircraftDetailsCurrentAircraftHexForPanel = null;
                 this.showProximityView = false;
                 this.stopProximityRefresh();
@@ -1243,14 +1250,9 @@ document.addEventListener('alpine:init', () => {
                 this.phaseHistoryData = [];
                 this.stopPhaseHistoryRefresh();
                 
-                // CRITICAL FIX: Clear map trails for the previous aircraft immediately to prevent visual glitch
+                // Clear map trails for the previous aircraft immediately (O(1) operation)
                 if (this.mapManager && this.aircraftDetailsCurrentAircraftHexForPanel) {
-                    // Remove trails for the previously selected aircraft
-                    this.mapManager.layers.trails.eachLayer(layer => {
-                        if (layer.options.aircraftHex === this.aircraftDetailsCurrentAircraftHexForPanel) {
-                            this.mapManager.layers.trails.removeLayer(layer);
-                        }
-                    });
+                    this.mapManager.clearAircraftTrails(this.aircraftDetailsCurrentAircraftHexForPanel);
                 }
                 
                 // Clear stale track data from the aircraft object to prevent showing previous aircraft's tracks
@@ -1319,25 +1321,21 @@ document.addEventListener('alpine:init', () => {
 
         async aircraftDetailsLoadTracks(isRefresh = false) {
             if (!this.selectedAircraft) return;
-            
+
             const hex = this.selectedAircraft.hex;
-            const requestId = `${hex}-${Date.now()}`; // Unique request ID for debugging
-            
-            console.log(`[TRACKS] Starting tracks request for ${hex} (${requestId}), isRefresh: ${isRefresh}`);
-            
+
             // Initialize tracks pending requests if needed
             if (!this.pendingRequests.tracks) {
                 this.pendingRequests.tracks = new Map();
             }
-            
+
             // Check if there's already a pending tracks request for this aircraft
             if (this.pendingRequests.tracks.get(hex)) {
-                console.log(`[TRACKS] Request already in progress for ${hex}, skipping ${requestId}`);
                 return;
             }
 
-            // Set pending flag with timestamp for debugging
-            this.pendingRequests.tracks.set(hex, { requestId, startTime: Date.now() });
+            // Set pending flag
+            this.pendingRequests.tracks.set(hex, true);
             
             if (!isRefresh) {
                 this.aircraftDetailsHistoryLoading = true;
@@ -1347,34 +1345,24 @@ document.addEventListener('alpine:init', () => {
                 // Add limit parameter to control track length
                 const limit = this.settings.tracksLimit || 1000;
                 const url = `${API_BASE_URL}/aircraft/${hex}/tracks?limit=${limit}`;
-                
-                console.log(`[TRACKS] Fetching: ${url} (${requestId})`);
-                const startTime = Date.now();
-                
+
                 const response = await this.fetchWithTimeout(url);
-                const fetchTime = Date.now() - startTime;
-                
-                console.log(`[TRACKS] Fetch completed in ${fetchTime}ms for ${hex} (${requestId})`);
-                
+
                 if (!response.ok) {
-                    console.error(`[TRACKS] Error fetching tracks: ${response.status} for ${hex} (${requestId})`);
-                    this.aircraftDetailsHistoryData = []; // Clear data on error
-                    this.aircraftDetailsFutureData = []; // Clear data on error
+                    this.aircraftDetailsHistoryData = [];
+                    this.aircraftDetailsFutureData = [];
                     this.aircraftDetailsHistoryCount = 0;
                     this.aircraftDetailsHistoryLoading = false;
                     return;
                 }
-                
+
                 const data = await response.json();
-                const totalTime = Date.now() - startTime;
-                
-                console.log(`[TRACKS] Data parsed in ${totalTime}ms, history: ${data.history?.length || 0}, future: ${data.future?.length || 0} (${requestId})`);
-                
+
                 // Split combined tracks response into history and future
                 this.aircraftDetailsHistoryData = data.history || [];
                 this.aircraftDetailsFutureData = data.future || [];
                 this.aircraftDetailsHistoryCount = this.aircraftDetailsHistoryData.length;
-                
+
                 // Update tracks mini-map and main map trails
                 if (this.mapManager && this.mapManager.updateTracksMiniMap) {
                     this.mapManager.updateTracksMiniMap();
@@ -1382,26 +1370,13 @@ document.addEventListener('alpine:init', () => {
                 if (this.mapManager && this.mapManager.updateFlightPaths) {
                     this.mapManager.updateFlightPaths();
                 }
-                
-                console.log(`[TRACKS] Successfully completed tracks request for ${hex} (${requestId})`);
             } catch (error) {
-                const elapsedTime = Date.now() - this.pendingRequests.tracks.get(hex)?.startTime;
-                if (error.message.includes('timeout')) {
-                    console.warn(`[TRACKS] Request timed out after ${elapsedTime}ms for ${hex} (${requestId})`);
-                } else {
-                    console.error(`[TRACKS] Error after ${elapsedTime}ms for ${hex} (${requestId}):`, error);
-                }
-                this.aircraftDetailsHistoryData = []; // Clear data on error
-                this.aircraftDetailsFutureData = []; // Clear data on error
+                this.aircraftDetailsHistoryData = [];
+                this.aircraftDetailsFutureData = [];
                 this.aircraftDetailsHistoryCount = 0;
             } finally {
                 this.aircraftDetailsHistoryLoading = false;
-                // Always clear the pending flag
-                if (this.pendingRequests.tracks.delete(hex)) {
-                    //console.log(`[TRACKS] Cleared pending flag for ${hex} (${requestId})`);
-                } else {
-                    console.warn(`[TRACKS] Failed to clear pending flag for ${hex} (${requestId})`);
-                }
+                this.pendingRequests.tracks.delete(hex);
             }
         },
         
@@ -1666,58 +1641,40 @@ document.addEventListener('alpine:init', () => {
 
         // Load phase history data for the selected aircraft
         async loadPhaseHistoryData() {
-            if (!this.phaseHistoryAircraftHex) {
-                console.log('No aircraft hex for phase history');
-                return;
-            }
-            
+            if (!this.phaseHistoryAircraftHex) return;
+
             const hex = this.phaseHistoryAircraftHex;
-            
+
             // Check if there's already a pending phase history request for this aircraft
-            if (this.pendingRequests.phaseHistory.get(hex)) {
-                console.log(`Phase history request already in progress for ${hex}, skipping...`);
-                return;
-            }
+            if (this.pendingRequests.phaseHistory.get(hex)) return;
 
             this.pendingRequests.phaseHistory.set(hex, true);
             this.phaseHistoryLoading = true;
-            console.log('Loading phase history for aircraft:', hex);
-            
+
             try {
                 // Use the existing aircraft phase data if available
                 const aircraft = this.aircraft[hex];
-                console.log('Aircraft data:', aircraft);
-                console.log('Aircraft phase data:', aircraft?.phase);
-                
+
                 if (aircraft && aircraft.phase) {
                     // Use only the history array since it already includes the current phase
                     if (aircraft.phase.history && aircraft.phase.history.length > 0) {
-                        console.log('Loading history phases:', aircraft.phase.history.length);
-                        
                         // Mark the first (most recent) phase as current
                         const historyWithCurrent = aircraft.phase.history.map((phase, index) => ({
                             ...phase,
-                            is_current: index === 0, // First item is the current phase
-                            id: phase.id !== undefined ? phase.id : `phase-${index}` // Use real ID if available, fallback only if undefined
+                            is_current: index === 0,
+                            id: phase.id !== undefined ? phase.id : `phase-${index}`
                         }));
-                        
-                        console.log('Final phase history data:', historyWithCurrent);
                         this.phaseHistoryData = historyWithCurrent;
                     } else {
-                        console.log('No history phases found');
                         this.phaseHistoryData = [];
                     }
                 } else {
-                    console.log('No aircraft or phase data found');
-                    // Fallback: could fetch from API if needed
                     this.phaseHistoryData = [];
                 }
             } catch (error) {
-                console.error('Error loading phase history:', error);
                 this.phaseHistoryData = [];
             } finally {
                 this.phaseHistoryLoading = false;
-                // Always clear the pending flag
                 this.pendingRequests.phaseHistory.delete(hex);
             }
         },
@@ -1929,11 +1886,57 @@ document.addEventListener('alpine:init', () => {
                 
                 audioClient.initAudioContext();
 
+                // Setup cleanup handler for page unload (prevents memory leaks)
+                window.addEventListener('beforeunload', () => {
+                    this.cleanup();
+                });
+
             } catch (error) {
                 console.error("Error during application initialization:", error);
             }
         },
 
+        // Centralized cleanup to prevent memory leaks during long sessions
+        cleanup() {
+            console.log('App cleanup: Clearing all intervals and resources...');
+
+            // Clear all interval IDs
+            const intervalIds = [
+                'timeUpdateIntervalId',
+                'lastAudioUpdateIntervalId',
+                'stationRefreshInterval',
+                'weatherRefreshInterval',
+                'aircraftDetailsHistoryRefreshInterval',
+                'proximityRefreshInterval',
+                'phaseHistoryRefreshInterval'
+            ];
+
+            intervalIds.forEach(id => {
+                if (this[id]) {
+                    clearInterval(this[id]);
+                    this[id] = null;
+                }
+            });
+
+            // Stop animation engine
+            if (window.animationEngine) {
+                window.animationEngine.stop();
+            }
+
+            // Disconnect WebSocket and clear listeners
+            if (window.wsClient) {
+                window.wsClient.clearAllListeners();
+                window.wsClient.disconnect();
+            }
+
+            // Stop map label refresh timer
+            if (this.mapManager && this.mapManager.labelRefreshTimer) {
+                clearInterval(this.mapManager.labelRefreshTimer);
+                this.mapManager.labelRefreshTimer = null;
+            }
+
+            console.log('App cleanup: Complete');
+        },
 
         processAircraftData(data) {
             // Store the current proximity highlighted aircraft before processing new data
@@ -2359,6 +2362,11 @@ async initAircraftDataSource() {
             // Add bulk data response handler
             wsClient.addEventListener('aircraft_bulk_response', (data) => {
                 this.handleBulkAircraftData(data);
+            });
+
+            // Add frequency status change handler
+            wsClient.addEventListener('frequency_status', (data) => {
+                this.handleFrequencyStatusChange(data);
             });
 
             // Aircraft events are now handled as phase changes (T/O and T/D)
@@ -3814,17 +3822,30 @@ async initAircraftDataSource() {
                 const response = await fetch(this.audioApiUrl);
                 if (!response.ok) {
                     console.error(`HTTP error fetching frequencies! Status: ${response.status}`);
-                    this.audioFrequencies = []; 
+                    this.audioFrequencies = [];
                     return;
                 }
                 const data = await response.json();
                 if (data && data.frequencies) {
                     this.audioFrequencies = data.frequencies;
+
+                    // Populate connection status from API response
+                    data.frequencies.forEach(freq => {
+                        if (freq.status && freq.status !== 'available') {
+                            this.frequencyConnectionStatus[freq.id] = {
+                                status: freq.status,
+                                error: freq.last_error || null,
+                                lastUpdate: Date.now()
+                            };
+                            console.log(`Frequency ${freq.id} initial status: ${freq.status}`, freq.last_error || '');
+                        }
+                    });
+
                     // DO NOT connect to all frequencies immediately here.
                     // Let the user click "Start Radios"
-                    // this.connectToAllFrequencies(); 
+                    // this.connectToAllFrequencies();
                     // Instead, just prepare them (create elements, setup viz graph)
-                    this.prepareAllFrequencies(); 
+                    this.prepareAllFrequencies();
                 } else {
                     this.audioFrequencies = [];
                 }
@@ -3867,7 +3888,55 @@ async initAircraftDataSource() {
             if (!audioClient) { console.warn("audioClient not ready in cleanupFrequency"); return; }
             audioClient.cleanupFrequency(frequencyId);
         },
-        
+
+        // Handle frequency connection status changes from WebSocket
+        handleFrequencyStatusChange(data) {
+            if (!data || !data.frequency_id) {
+                console.warn('Invalid frequency status data:', data);
+                return;
+            }
+
+            const { frequency_id, status, error } = data;
+            console.log(`Frequency ${frequency_id} status changed to: ${status}`, error ? `(${error})` : '');
+
+            // Update the status tracking object
+            this.frequencyConnectionStatus[frequency_id] = {
+                status: status,
+                error: error || null,
+                lastUpdate: Date.now()
+            };
+        },
+
+        // Check if a frequency is in a failed state
+        isFrequencyFailed(frequencyId) {
+            const statusInfo = this.frequencyConnectionStatus[frequencyId];
+            return statusInfo && statusInfo.status === 'failed';
+        },
+
+        // Check if a frequency is connecting
+        isFrequencyConnecting(frequencyId) {
+            const statusInfo = this.frequencyConnectionStatus[frequencyId];
+            return statusInfo && statusInfo.status === 'connecting';
+        },
+
+        // Check if a frequency is connected
+        isFrequencyConnected(frequencyId) {
+            const statusInfo = this.frequencyConnectionStatus[frequencyId];
+            return statusInfo && statusInfo.status === 'connected';
+        },
+
+        // Get the connection status for a frequency
+        getFrequencyStatus(frequencyId) {
+            const statusInfo = this.frequencyConnectionStatus[frequencyId];
+            return statusInfo ? statusInfo.status : 'unknown';
+        },
+
+        // Get error message for a frequency
+        getFrequencyError(frequencyId) {
+            const statusInfo = this.frequencyConnectionStatus[frequencyId];
+            return statusInfo ? statusInfo.error : null;
+        },
+
         // Play welcome sound
         playWelcomeSound() {
             if (this.splashScreenAudioPlayed) return;
@@ -3911,10 +3980,12 @@ async initAircraftDataSource() {
                 
                 // ESC key to close aircraft details
                 if (e.key === 'Escape' && this.selectedAircraft) {
+                    const previousHex = this.selectedAircraft.hex;
                     this.selectedAircraft = null;
                     this.aircraftDetailsShowHistoryView = false;
                     this.showProximityView = false;
                     this.aircraftDetailsHistoryData = [];
+                    this.aircraftDetailsFutureData = [];
                     this.aircraftDetailsHistoryCount = 0;
                     this.phaseHistoryData = [];
                     this.phaseHistoryAircraftHex = null;
@@ -3922,6 +3993,11 @@ async initAircraftDataSource() {
                     this.stopProximityRefresh();
                     this.stopPhaseHistoryRefresh();
                     this.clearProximityView();
+
+                    // Clear map trails for the deselected aircraft
+                    if (this.mapManager && previousHex) {
+                        this.mapManager.clearAircraftTrails(previousHex);
+                    }
                 }
                 
                 // TAB key for aircraft navigation (only when not in input fields)
@@ -4086,22 +4162,29 @@ async initAircraftDataSource() {
     // Now initialize the store's own logic
     Alpine.store('atc').init();
 
-    // Watch for aircraft selection changes to clear pending requests
+    // Watch for aircraft selection changes to clear pending requests and trails
     Alpine.effect(() => {
-        const selectedAircraft = Alpine.store('atc').selectedAircraft;
-        const previousSelectedHex = Alpine.store('atc')._previousSelectedHex;
-        
-        // If aircraft selection changed, clear pending requests for the previous aircraft
+        const store = Alpine.store('atc');
+        const selectedAircraft = store.selectedAircraft;
+        const previousSelectedHex = store._previousSelectedHex;
+
+        // If aircraft selection changed
         if (previousSelectedHex && previousSelectedHex !== selectedAircraft?.hex) {
-            Alpine.store('atc').clearPendingRequestsForAircraft(previousSelectedHex);
+            // Clear pending requests for the previous aircraft
+            store.clearPendingRequestsForAircraft(previousSelectedHex);
+
+            // Clear trails for the previous aircraft when deselecting
+            if (store.mapManager) {
+                store.mapManager.clearAircraftTrails(previousSelectedHex);
+            }
         }
-        
+
         // Store current selection for next comparison
-        Alpine.store('atc')._previousSelectedHex = selectedAircraft?.hex;
-        
+        store._previousSelectedHex = selectedAircraft?.hex;
+
         // Refresh map visibility when selected aircraft changes to show/hide aircraft based on filters
-        if (Alpine.store('atc').mapManager) {
-            Alpine.store('atc').mapManager.applyFiltersAndRefreshView();
+        if (store.mapManager) {
+            store.mapManager.applyFiltersAndRefreshView();
         }
     });
 });

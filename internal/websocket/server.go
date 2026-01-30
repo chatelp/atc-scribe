@@ -19,6 +19,7 @@ const (
 	MessageTypeAircraftBulkResponse    = "aircraft_bulk_response"    // Server sends bulk data
 	MessageTypeFilterUpdate            = "filter_update"             // Client sends filter preferences
 	MessageTypeSimulationControlUpdate = "simulation_control_update" // Client updates simulation controls
+	MessageTypeFrequencyStatus         = "frequency_status"          // Frequency connection status changes
 )
 
 // Message represents a WebSocket message

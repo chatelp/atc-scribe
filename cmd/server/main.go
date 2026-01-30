@@ -85,7 +85,7 @@ func main() {
 	// Create logger
 	log, err := logger.New(logger.Config{
 		Level:  cfg.Logging.Level,
-		Format: "console", // Always use console format for better readability
+		Format: cfg.Logging.Format,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating logger: %v\n", err)
