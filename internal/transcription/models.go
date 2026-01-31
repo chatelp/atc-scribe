@@ -35,4 +35,5 @@ type Config struct {
 	PromptPath            string
 	Prompt                string // Loaded from PromptPath
 	TimeoutSeconds        int    // HTTP timeout for OpenAI API requests
+	LogDir                string // Optional directory for transcription log files
 }

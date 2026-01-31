@@ -147,7 +147,8 @@ The setup includes persistent volumes for:
 - **`co-atc-logs`** - Application logs
 
 **File mounts:**
-- **`../assets`** - Contains AI prompts, airlines, airports, and runways data
+- **`../assets`** - Static data files (airlines, airports, runways)
+- **`../prompts`** - AI system prompts
 - **`../www`** - Web interface files (HTML, CSS, JS)
 - **`./config.toml`** - Your configuration file
 
@@ -300,13 +301,13 @@ curl -I http://localhost:8000
 4. Look for ADS-B errors in logs: `docker-compose logs co-atc | grep adsb`
 
 ### Common Issue: Missing assets/prompts errors
-1. Ensure assets directory exists: `ls -la ../assets/`
+1. Ensure directories exist: `ls -la ../assets/ ../prompts/`
 2. Check required files exist:
    ```bash
    ls -la ../assets/*.json
-   ls -la ../assets/*.txt
+   ls -la ../prompts/*.txt
    ```
-3. Verify volume mount: `docker exec co-atc ls -la assets/`
+3. Verify volume mounts: `docker exec co-atc ls -la assets/ prompts/`
 
 ### Common Issue: Audio/frequency issues
 1. Verify FFmpeg is working: `docker exec co-atc ffmpeg -version`

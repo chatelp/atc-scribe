@@ -529,6 +529,7 @@ func NewService(
 		RetryMaxBackoffMs:     config.Transcription.RetryMaxBackoffMs,
 		PromptPath:            config.Transcription.PromptPath,
 		TimeoutSeconds:        config.Transcription.TimeoutSeconds,
+		LogDir:                config.Transcription.LogDir,
 	}
 
 	// Load the prompt from file

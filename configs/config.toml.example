@@ -218,7 +218,14 @@ retry_max_backoff_ms = 10000     # Maximum backoff time in milliseconds
 timeout_seconds = 60
 
 # Path to the transcription prompt file
-prompt_path = "assets/transcription_prompt.txt"
+prompt_path = "prompts/transcription_prompt.txt"
+
+# Optional directory for transcription log files (append-only logs)
+# If set, transcriptions will be written to log files organized by date and frequency:
+#   - raw/{date}_{frequency_id}.log       - Raw transcriptions from Whisper
+#   - processed/{date}_{frequency_id}.log - Post-processed transcriptions (if enabled)
+# Leave empty to disable file logging
+log_dir = "data/transcriptions"
 
 #######################################################
 # Post-Processing Configuration
@@ -243,7 +250,7 @@ context_transcriptions = 3
 timeout_seconds = 120
 
 # Path to the system prompt file
-system_prompt_path = "assets/post_processing_prompt.txt"
+system_prompt_path = "prompts/post_processing_prompt.txt"
 
 #######################################################
 # Flight Phase Detection Configuration
@@ -369,7 +376,7 @@ max_context_aircraft = 200
 transcription_history_seconds = 60
 
 # System prompt configuration
-system_prompt_path = "assets/atc_chat_prompt.txt"
+system_prompt_path = "prompts/atc_chat_prompt.txt"
 
 # Automatic system prompt refresh interval in seconds (0 = disabled)
 # This will automatically send session updates with latest airspace data

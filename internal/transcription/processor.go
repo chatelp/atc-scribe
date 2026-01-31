@@ -43,6 +43,7 @@ type Processor struct {
 	transcriptionConfig Config
 	sessionStartTime    time.Time
 	sessionRefreshMu    sync.Mutex
+	fileLogger          *FileLogger
 }
 
 // NewProcessor creates a new transcription processor with a provided reader
@@ -54,6 +55,7 @@ func NewProcessor(
 	wsServer *websocket.Server,
 	storage *sqlite.TranscriptionStorage,
 	logger *logger.Logger,
+	fileLogger *FileLogger,
 ) (ProcessorInterface, error) {
 	// Check if OpenAI API key is provided - fail fast if missing
 	if config.OpenAIAPIKey == "" {
@@ -77,6 +79,7 @@ func NewProcessor(
 		logger:              logger.Named("custom-xscribe").With(String("frequency_id", frequencyID)),
 		audioChunker:        audio.NewAudioChunker(config.FFmpegSampleRate, config.FFmpegChannels, config.ChunkMs),
 		transcriptionConfig: config,
+		fileLogger:          fileLogger,
 	}
 
 	return processor, nil
@@ -106,6 +109,13 @@ func (p *Processor) Start() error {
 		return fmt.Errorf("failed to connect to WebSocket: %w", err)
 	}
 	p.logger.Info("Connected to OpenAI WebSocket")
+
+	// Log service start to file
+	if p.fileLogger != nil {
+		if err := p.fileLogger.LogServiceStarted(p.frequencyID); err != nil {
+			p.logger.Error("Failed to write service started to log file", Error(err))
+		}
+	}
 
 	// Start processing in goroutines
 	go p.processAudio()
@@ -522,6 +532,13 @@ func (p *Processor) processTranscriptionEvent(event *TranscriptionEvent) error {
 		}
 
 		p.logger.Debug("Stored transcription in database", Int64("id", id))
+
+		// Write to file logger if enabled
+		if p.fileLogger != nil {
+			if err := p.fileLogger.LogRaw(p.frequencyID, event.Timestamp, event.Text); err != nil {
+				p.logger.Error("Failed to write raw transcription to log file", Error(err))
+			}
+		}
 
 		// Update the record with the ID
 		record.ID = id

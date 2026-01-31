@@ -90,6 +90,9 @@ type TranscriptionConfig struct {
 	Language     string `toml:"language"`       // Primary language for transcription (e.g., "en" for English)
 	PromptPath   string `toml:"prompt_path"`    // Path to the system prompt file for transcription
 
+	// File logging settings
+	LogDir string `toml:"log_dir"` // Optional directory for transcription log files (append-only logs by date and frequency)
+
 	// Audio processing settings
 	NoiseReduction string `toml:"noise_reduction"` // Noise reduction mode: "near_field", "far_field", or "none"
 	ChunkMs        int    `toml:"chunk_ms"`        // Size of audio chunks for processing in milliseconds

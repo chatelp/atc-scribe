@@ -27,6 +27,7 @@ type TranscriptionManager struct {
 	postProcessingConfig PostProcessingConfig
 	templateRenderer     TemplateRenderer
 	frequencyNames       map[string]string // Map of frequency IDs to names
+	fileLogger           *FileLogger       // Optional file logger for transcriptions
 }
 
 // NewTranscriptionManager creates a new transcription manager
@@ -48,6 +49,20 @@ func NewTranscriptionManager(
 		frequencyNames[freq.ID] = freq.Name
 	}
 
+	// Create file logger if log_dir is configured
+	var fileLogger *FileLogger
+	if transcriptionConfig.LogDir != "" {
+		var err error
+		fileLogger, err = NewFileLogger(transcriptionConfig.LogDir, logger)
+		if err != nil {
+			logger.Error("Failed to create transcription file logger",
+				String("log_dir", transcriptionConfig.LogDir),
+				Error(err))
+			// Continue without file logging
+			fileLogger = nil
+		}
+	}
+
 	return &TranscriptionManager{
 		processors:           make(map[string]ProcessorInterface),
 		wsServer:             wsServer,
@@ -60,6 +75,7 @@ func NewTranscriptionManager(
 		postProcessingConfig: postProcessingConfig,
 		templateRenderer:     templateRenderer,
 		frequencyNames:       frequencyNames,
+		fileLogger:           fileLogger,
 	}
 }
 
@@ -144,6 +160,7 @@ func (m *TranscriptionManager) StartTranscription(
 		m.wsServer,
 		m.transcriptionStorage,
 		m.logger,
+		m.fileLogger,
 	)
 	if err != nil {
 		return err
@@ -224,6 +241,7 @@ func (m *TranscriptionManager) StartTranscriptionWithExternalAudio(
 		m.wsServer,
 		m.transcriptionStorage,
 		m.logger,
+		m.fileLogger,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create external processor: %w", err)
@@ -286,6 +304,13 @@ func (m *TranscriptionManager) StopAllTranscriptions() {
 
 	// Stop post-processor
 	m.StopPostProcessing()
+
+	// Close file logger
+	if m.fileLogger != nil {
+		if err := m.fileLogger.Close(); err != nil {
+			m.logger.Error("Failed to close file logger", Error(err))
+		}
+	}
 }
 
 // StartPostProcessing starts the post-processing of transcriptions
@@ -317,6 +342,7 @@ func (m *TranscriptionManager) StartPostProcessing(ctx context.Context) error {
 		m.postProcessingConfig,
 		m.logger,
 		m.frequencyNames,
+		m.fileLogger,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create post-processor: %w", err)

@@ -21,9 +21,12 @@ services:
       # Configuration (mount your customized config.toml here)
       - ./config.toml:/app/configs/config.toml:ro
       
-      # Assets (REQUIRED - contains prompts, airlines, airports, runways data)
+      # Assets (REQUIRED - contains airlines, airports, runways data)
       - ../assets:/app/assets:ro
-      
+
+      # Prompts (REQUIRED - AI system prompts)
+      - ../prompts:/app/prompts:ro
+
       # Web files (optional override for development)
       - ../www:/app/www:ro
     

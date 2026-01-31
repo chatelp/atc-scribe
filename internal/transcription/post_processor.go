@@ -53,6 +53,7 @@ type PostProcessor struct {
 	batchSize            int
 	wg                   sync.WaitGroup
 	frequencyNames       map[string]string // Map of frequency IDs to names
+	fileLogger           *FileLogger       // Optional file logger for transcriptions
 }
 
 // NewPostProcessor creates a new post-processor
@@ -67,6 +68,7 @@ func NewPostProcessor(
 	config PostProcessingConfig,
 	logger *logger.Logger,
 	frequencyNames map[string]string,
+	fileLogger *FileLogger,
 ) (*PostProcessor, error) {
 	// Create context with cancellation
 	procCtx, procCancel := context.WithCancel(ctx)
@@ -86,6 +88,7 @@ func NewPostProcessor(
 		processingInterval:   time.Duration(config.IntervalSeconds) * time.Second,
 		batchSize:            config.BatchSize,
 		frequencyNames:       frequencyNames,
+		fileLogger:           fileLogger,
 	}
 
 	return processor, nil
@@ -422,6 +425,13 @@ func (p *PostProcessor) logProcessedTranscription(record *sqlite.TranscriptionRe
 		logger.String("speaker_type", record.SpeakerType),
 		logger.String("callsign", record.Callsign),
 		logger.Time("timestamp", record.CreatedAt))
+
+	// Write to file logger if enabled
+	if p.fileLogger != nil {
+		if err := p.fileLogger.LogProcessed(record.FrequencyID, record.CreatedAt, record.SpeakerType, record.Callsign, record.ContentProcessed); err != nil {
+			p.logger.Error("Failed to write processed transcription to log file", logger.Error(err))
+		}
+	}
 
 	// Create WebSocket message to update the original message
 	message := &websocket.Message{

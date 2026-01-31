@@ -57,7 +57,8 @@ internal/
   weather/                  # METAR/TAF/NOTAM
   websocket/                # Real-time broadcasting
 www/                        # Frontend (Alpine.js SPA)
-assets/                     # Static data, AI prompts
+assets/                     # Static data (airlines, airports, runways)
+prompts/                    # AI system prompts
 configs/config.toml         # Configuration file
 data/                       # SQLite databases (auto-created)
 docs/                       # Documentation
@@ -105,7 +106,7 @@ docs/                       # Documentation
 - `docs/api_spec.md` - API endpoint documentation
 - `docs/technical_docs.md` - Architecture details
 - `.roorules` - Project conventions
-- `assets/*.txt` - AI system prompts
+- `prompts/*.txt` - AI system prompts
 
 ## Testing
 

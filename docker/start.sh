@@ -30,14 +30,23 @@ echo "📁 Working in: $DOCKER_DIR"
 # Check if assets directory exists
 if [ ! -d "../assets" ]; then
     echo "❌ Assets directory not found at ../assets"
-    echo "   This directory contains essential AI prompts and data files."
+    echo "   This directory contains static data files (airlines, airports, runways)."
     echo "   Please ensure you're running this from the docker/ directory"
     echo "   and that the assets/ directory exists in the project root."
     exit 1
 fi
 
-# Check if required asset files exist
-REQUIRED_FILES=("../assets/airlines.json" "../assets/airports.json" "../assets/runways.json" "../assets/atc_chat_prompt.txt")
+# Check if prompts directory exists
+if [ ! -d "../prompts" ]; then
+    echo "❌ Prompts directory not found at ../prompts"
+    echo "   This directory contains AI system prompts."
+    echo "   Please ensure you're running this from the docker/ directory"
+    echo "   and that the prompts/ directory exists in the project root."
+    exit 1
+fi
+
+# Check if required files exist
+REQUIRED_FILES=("../assets/airlines.json" "../assets/airports.json" "../assets/runways.json" "../prompts/atc_chat_prompt.txt")
 for file in "${REQUIRED_FILES[@]}"; do
     if [ ! -f "$file" ]; then
         echo "❌ Required file missing: $file"
@@ -45,7 +54,7 @@ for file in "${REQUIRED_FILES[@]}"; do
     fi
 done
 
-echo "✅ Assets directory and required files found"
+echo "✅ Assets and prompts directories found"
 
 # Check if config file exists
 if [ ! -f "config.toml" ]; then

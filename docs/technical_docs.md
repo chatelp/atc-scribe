@@ -89,14 +89,14 @@ co-atc/
 │   │   └── service.go        # Weather service implementation
 │   └── websocket/            # WebSocket server
 │       └── server.go         # WebSocket server implementation
-├── assets/                   # Static assets and prompts
+├── assets/                   # Static data files
 │   ├── airlines.json         # Airline database
 │   ├── airports.json         # Airport database
-│   ├── runways.json          # Runway database
-│   ├── atc_chat_prompt.txt   # ATC chat AI prompt
+│   └── runways.json          # Runway database
+├── prompts/                  # AI system prompts
+│   ├── atc_chat_prompt.txt   # ATC chat voice assistant prompt
 │   ├── post_processing_prompt.txt # Post-processing prompt
-│   ├── transcription_prompt.txt # Transcription prompt
-│   └── voice_assistant_prompt.txt # Voice assistant prompt
+│   └── transcription_prompt.txt # Transcription prompt
 ├── configs/                  # Configuration files
 │   └── config.toml           # Main configuration file
 └── www/                      # Frontend web application

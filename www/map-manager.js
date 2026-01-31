@@ -281,6 +281,33 @@ class MapManager {
         delete this.trailLayersByHex[hex];
         // Invalidate version cache so trails will be redrawn if aircraft is selected again
         delete this.trailVersions[hex];
+        // Also clear the trail data itself
+        delete this.trails[hex];
+    }
+
+    // Clean up orphaned trail data for aircraft no longer in the store
+    cleanupOrphanedTrails() {
+        const storeAircraftHexes = new Set(Object.keys(this.store.aircraft || {}));
+
+        // Clean up trails for aircraft no longer in the store
+        Object.keys(this.trails).forEach(hex => {
+            if (!storeAircraftHexes.has(hex)) {
+                // Aircraft is no longer in the store - clean up completely
+                this._removeTrailLayersByHex(hex);
+                delete this.trailLayersByHex[hex];
+                delete this.trailVersions[hex];
+                delete this.trails[hex];
+            }
+        });
+
+        // Also check trailLayersByHex for orphaned entries
+        Object.keys(this.trailLayersByHex).forEach(hex => {
+            if (!storeAircraftHexes.has(hex)) {
+                this._removeTrailLayersByHex(hex);
+                delete this.trailLayersByHex[hex];
+                delete this.trailVersions[hex];
+            }
+        });
     }
 
     // Create a new marker (pooling disabled - was causing glitches)
@@ -754,12 +781,19 @@ class MapManager {
         // Don't clear all layers - only update changed trails
         if (!this.store.settings.showPaths) {
             this.layers.trails.clearLayers();
+            // Also clean up trail data when paths are disabled
+            this.trails = {};
+            this.trailVersions = {};
+            this.trailLayersByHex = {};
             return;
         }
 
+        // Clean up orphaned trails first (trails for aircraft no longer in the store)
+        this.cleanupOrphanedTrails();
+
         // Track which trails need updates
         const updatedTrails = new Set();
-        
+
         Object.keys(this.store.aircraft).forEach(hex => {
             const aircraftData = this.store.aircraft[hex];
             if (!aircraftData) return;
@@ -784,9 +818,12 @@ class MapManager {
             // Determine if trail should be visible
             const shouldShowTrail = (isVisibleByGroundState && isVisibleByAltitude && isVisibleByPhase) || isSelectedAircraft;
             
-            // If aircraft doesn't match filters and isn't selected, remove its trail
+            // If aircraft doesn't match filters and isn't selected, remove its trail and data
             if (!shouldShowTrail) {
                 this._removeTrailLayersByHex(hex);
+                delete this.trailLayersByHex[hex];
+                delete this.trailVersions[hex];
+                delete this.trails[hex];
                 return;
             }
 

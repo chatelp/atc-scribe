@@ -39,8 +39,9 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/co-atc .
 
-# Copy assets and web files
+# Copy assets, prompts, and web files
 COPY --from=builder /app/assets ./assets
+COPY --from=builder /app/prompts ./prompts
 COPY --from=builder /app/www ./www
 COPY --from=builder /app/configs ./configs
 
