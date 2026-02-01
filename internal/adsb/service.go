@@ -104,6 +104,8 @@ type Airline struct {
 // Storage defines the interface for aircraft data storage
 type Storage interface {
 	GetAll() []*Aircraft
+	GetAllWithLastSeenFilter(lastSeenMinutes int) []*Aircraft
+	GetAllMinimal(lastSeenMinutes int) []*Aircraft // Minimal mode: skips phase history and date queries
 	GetByHex(hex string) (*Aircraft, bool)
 	GetFiltered(
 		minAltitude, maxAltitude float64,
@@ -690,6 +692,24 @@ func (s *Service) UpdateSimulationControls(hex string, heading, speed, verticalR
 // GetAllAircraft returns all aircraft
 func (s *Service) GetAllAircraft() []*Aircraft {
 	aircraft := s.storage.GetAll()
+	s.updateSimulationFields(aircraft)
+	s.enrichWithBSDB(aircraft)
+	return aircraft
+}
+
+// GetAllAircraftWithLastSeenFilter returns aircraft seen within the last N minutes
+// This uses database-level filtering for better performance on large databases
+func (s *Service) GetAllAircraftWithLastSeenFilter(lastSeenMinutes int) []*Aircraft {
+	aircraft := s.storage.GetAllWithLastSeenFilter(lastSeenMinutes)
+	s.updateSimulationFields(aircraft)
+	s.enrichWithBSDB(aircraft)
+	return aircraft
+}
+
+// GetAllAircraftMinimal returns aircraft with minimal data (optimized for simple API)
+// Skips phase history and takeoff/landing time queries for better performance
+func (s *Service) GetAllAircraftMinimal(lastSeenMinutes int) []*Aircraft {
+	aircraft := s.storage.GetAllMinimal(lastSeenMinutes)
 	s.updateSimulationFields(aircraft)
 	s.enrichWithBSDB(aircraft)
 	return aircraft

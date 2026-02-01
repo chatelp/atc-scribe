@@ -819,27 +819,18 @@ class MapManager {
             const aircraftData = this.store.aircraft[hex];
             if (!aircraftData) return;
 
-            // Filter by air/ground state - both can be enabled/disabled independently
-            const isVisibleByGroundState = (aircraftData.on_ground && this.store.settings.showGroundAircraft) ||
-                                          (!aircraftData.on_ground && this.store.settings.showAirAircraft);
-            
-            // Only apply altitude filter to aircraft in the air
-            const isVisibleByAltitude = aircraftData.on_ground ||
-                (aircraftData.adsb && aircraftData.adsb.alt_baro >= this.store.settings.minAltitude &&
-                aircraftData.adsb.alt_baro <= this.store.settings.maxAltitude);
-            
-            // Filter by flight phase - matching the table logic in app.js
-            const currentPhase = this.getCurrentPhase(aircraftData);
-            
-            const isVisibleByPhase = !(this.store.settings.phaseFilters && this.store.settings.phaseFilters[currentPhase] === false);
-            
             // Check if this aircraft is currently selected
             const isSelectedAircraft = this.store.selectedAircraft && this.store.selectedAircraft.hex === hex;
-            
-            // Determine if trail should be visible
-            const shouldShowTrail = (isVisibleByGroundState && isVisibleByAltitude && isVisibleByPhase) || isSelectedAircraft;
-            
-            // If aircraft doesn't match filters and isn't selected, remove its trail and data
+
+            // Trail visibility follows marker visibility - if marker isn't on map, trail shouldn't show
+            // This ensures trails respect ALL filters (search, ground state, altitude, phase, last seen)
+            const markerInfo = this.markers[hex];
+            const markerIsOnMap = markerInfo && this.layers.aircraft.hasLayer(markerInfo.aircraft);
+
+            // Show trail if marker is visible OR if aircraft is selected (selected always shows)
+            const shouldShowTrail = markerIsOnMap || isSelectedAircraft;
+
+            // If aircraft marker isn't visible and isn't selected, remove its trail
             if (!shouldShowTrail) {
                 this._removeTrailLayersByHex(hex);
                 delete this.trailLayersByHex[hex];

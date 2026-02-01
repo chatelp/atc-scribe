@@ -154,8 +154,7 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 		delta["distance"] = current.Distance
 	}
 
-	// NOTE: LastSeen is intentionally NOT compared - it changes every cycle
-	// and would cause unnecessary updates
+	// last_seen is set client-side to current time when receiving any update
 
 	return delta
 }

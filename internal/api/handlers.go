@@ -68,6 +68,9 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 	// Get aircraft data
 	dataFetchStart := time.Now()
 	var aircraft []*adsb.Aircraft
+	// Track whether we used database-level last_seen filtering
+	usedDBLastSeenFilter := false
+
 	if minAltitude > 0 || maxAltitude < 60000 || len(status) > 0 ||
 		tookOffAfter != nil || tookOffBefore != nil ||
 		landedAfter != nil || landedBefore != nil {
@@ -77,6 +80,14 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 			status,
 			tookOffAfter, tookOffBefore, landedAfter, landedBefore,
 		)
+	} else if simple {
+		// Use minimal mode for simple API - skips phase history and date queries
+		aircraft = h.adsbService.GetAllAircraftMinimal(lastSeenMinutes)
+		usedDBLastSeenFilter = lastSeenMinutes > 0
+	} else if lastSeenMinutes > 0 {
+		// Use database-level filtering for last_seen - much faster on large databases
+		aircraft = h.adsbService.GetAllAircraftWithLastSeenFilter(lastSeenMinutes)
+		usedDBLastSeenFilter = true
 	} else {
 		aircraft = h.adsbService.GetAllAircraft()
 	}
@@ -84,7 +95,8 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 	dataFetchDuration := time.Since(dataFetchStart)
 	h.logger.Debug("Aircraft data fetch completed",
 		logger.Duration("duration", dataFetchDuration),
-		logger.Int("aircraft_count", len(aircraft)))
+		logger.Int("aircraft_count", len(aircraft)),
+		logger.Bool("used_db_last_seen_filter", usedDBLastSeenFilter))
 
 	// Filter by callsign if provided
 	if callsign != "" {
@@ -97,8 +109,8 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		aircraft = filtered
 	}
 
-	// Filter by last seen time if provided
-	if lastSeenMinutes > 0 {
+	// Filter by last seen time if provided (only needed if not already filtered at DB level)
+	if lastSeenMinutes > 0 && !usedDBLastSeenFilter {
 		now := time.Now().UTC() // Use UTC for cutoff time
 		cutoffTime := now.Add(-time.Duration(lastSeenMinutes) * time.Minute)
 
@@ -344,10 +356,10 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 			if a.ADSB != nil {
 				sa.Lat = a.ADSB.Lat
 				sa.Lon = a.ADSB.Lon
-				sa.AltBaro = a.ADSB.AltBaro.Float64()
+				sa.AltBaro = math.Round(a.ADSB.AltBaro.Float64()/100) * 100
 				sa.GroundSpeed = a.ADSB.GS
 				sa.Track = a.ADSB.Track
-				sa.VerticalRate = a.ADSB.BaroRate
+				sa.VerticalRate = math.Round(a.ADSB.BaroRate/100) * 100
 				sa.Squawk = a.ADSB.Squawk
 				sa.Category = a.ADSB.Category
 				// Use ADSB type if BSDB type not available

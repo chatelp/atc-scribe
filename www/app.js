@@ -2967,7 +2967,7 @@ async initAircraftDataSource() {
             if (delta.phase !== undefined && aircraft.phase !== delta.phase) aircraft.phase = delta.phase;
             if (delta.distance !== undefined && aircraft.distance !== delta.distance) aircraft.distance = delta.distance;
 
-            // Update last_seen to current time since we just received an update
+            // last_seen = now (we just received an update)
             aircraft.last_seen = new Date().toISOString();
         },
 

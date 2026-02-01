@@ -247,7 +247,7 @@ func initDatabase(db *sql.DB, log *logger.Logger) error {
 
 // GetAll returns all aircraft
 func (s *AircraftStorage) GetAll() []*adsb.Aircraft {
-	aircraft, err := s.getAllAircraft()
+	aircraft, err := s.getAllAircraftInternal(0, false)
 	if err != nil {
 		s.logger.Error("Failed to get all aircraft", logger.Error(err))
 		return []*adsb.Aircraft{}
@@ -256,17 +256,58 @@ func (s *AircraftStorage) GetAll() []*adsb.Aircraft {
 	return aircraft
 }
 
-// getAllAircraft retrieves all aircraft from the database
-func (s *AircraftStorage) getAllAircraft() ([]*adsb.Aircraft, error) {
-	start := time.Now()
-	s.logger.Debug("Starting getAllAircraft query")
+// GetAllWithLastSeenFilter returns aircraft seen within the last N minutes
+// This filters at the database level for much better performance on large databases
+func (s *AircraftStorage) GetAllWithLastSeenFilter(lastSeenMinutes int) []*adsb.Aircraft {
+	aircraft, err := s.getAllAircraftInternal(lastSeenMinutes, false)
+	if err != nil {
+		s.logger.Error("Failed to get aircraft with last seen filter", logger.Error(err))
+		return []*adsb.Aircraft{}
+	}
 
-	// Query all aircraft
-	rows, err := s.db.Query(`
-		SELECT hex, flight, airline, status, last_seen,
-		on_ground, created_at
-		FROM aircraft
-	`)
+	return aircraft
+}
+
+// GetAllMinimal returns aircraft with minimal data (skips phase history and date queries)
+// This is optimized for the simple=1 API endpoint
+func (s *AircraftStorage) GetAllMinimal(lastSeenMinutes int) []*adsb.Aircraft {
+	aircraft, err := s.getAllAircraftInternal(lastSeenMinutes, true)
+	if err != nil {
+		s.logger.Error("Failed to get aircraft minimal", logger.Error(err))
+		return []*adsb.Aircraft{}
+	}
+
+	return aircraft
+}
+
+// getAllAircraftInternal retrieves aircraft from the database with optional filtering
+// If lastSeenMinutes > 0, only returns aircraft seen within that time window
+// If minimal is true, skips phase history and takeoff/landing time queries (faster for simple API)
+func (s *AircraftStorage) getAllAircraftInternal(lastSeenMinutes int, minimal bool) ([]*adsb.Aircraft, error) {
+	start := time.Now()
+	s.logger.Debug("Starting getAllAircraftInternal query", logger.Int("lastSeenMinutes", lastSeenMinutes))
+
+	// Build query with optional last_seen filter
+	var rows *sql.Rows
+	var err error
+
+	if lastSeenMinutes > 0 {
+		// Use parameterized cutoff time - this uses idx_aircraft_last_seen index
+		cutoffTime := time.Now().UTC().Add(-time.Duration(lastSeenMinutes) * time.Minute)
+		rows, err = s.db.Query(`
+			SELECT hex, flight, airline, status, last_seen,
+			on_ground, created_at
+			FROM aircraft
+			WHERE last_seen >= ?
+		`, cutoffTime.Format(time.RFC3339))
+	} else {
+		// Query all aircraft (original behavior)
+		rows, err = s.db.Query(`
+			SELECT hex, flight, airline, status, last_seen,
+			on_ground, created_at
+			FROM aircraft
+		`)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query aircraft: %w", err)
 	}
@@ -348,17 +389,23 @@ func (s *AircraftStorage) getAllAircraft() ([]*adsb.Aircraft, error) {
 
 	// Get current phases for all aircraft in a single batch query
 	phaseStart := time.Now()
-	s.logger.Debug("Starting phase data population", logger.Int("aircraft_count", len(aircraftMap)))
+	s.logger.Debug("Starting phase data population", logger.Int("aircraft_count", len(aircraftMap)), logger.Bool("minimal", minimal))
 
 	currentPhases, err := s.GetCurrentPhasesBatch(hexCodes)
 	if err != nil {
 		s.logger.Error("Failed to get current phases batch", logger.Error(err))
 	} else {
-		// Get recent phase history for all aircraft in batch (last 5 changes per aircraft)
-		recentHistory, err := s.getRecentPhaseHistoryBatch(hexCodes, 5)
-		if err != nil {
-			s.logger.Error("Failed to get recent phase history batch", logger.Error(err))
-			recentHistory = make(map[string][]adsb.PhaseChange) // Empty fallback
+		// In minimal mode, skip phase history query (only need current phase)
+		var recentHistory map[string][]adsb.PhaseChange
+		if !minimal {
+			// Get recent phase history for all aircraft in batch (last 5 changes per aircraft)
+			recentHistory, err = s.getRecentPhaseHistoryBatch(hexCodes, 5)
+			if err != nil {
+				s.logger.Error("Failed to get recent phase history batch", logger.Error(err))
+				recentHistory = make(map[string][]adsb.PhaseChange) // Empty fallback
+			}
+		} else {
+			recentHistory = make(map[string][]adsb.PhaseChange)
 		}
 
 		// Assign current phases and recent history to aircraft
@@ -376,34 +423,36 @@ func (s *AircraftStorage) getAllAircraft() ([]*adsb.Aircraft, error) {
 	phaseDuration := time.Since(phaseStart)
 	s.logger.Debug("Phase data population completed", logger.Duration("duration", phaseDuration))
 
-	// PERFORMANCE: Batch query for takeoff and landing times instead of N individual queries
-	dateStart := time.Now()
-	s.logger.Debug("Starting date_landed/date_tookoff population (batch)", logger.Int("aircraft_count", len(aircraftMap)))
+	// PERFORMANCE: Batch query for takeoff and landing times (skip in minimal mode)
+	if !minimal {
+		dateStart := time.Now()
+		s.logger.Debug("Starting date_landed/date_tookoff population (batch)", logger.Int("aircraft_count", len(aircraftMap)))
 
-	takeoffTimes, err := s.GetLatestTakeoffTimesBatch(hexCodes)
-	if err != nil {
-		s.logger.Error("Failed to get takeoff times batch", logger.Error(err))
-	} else {
-		for hex, aircraft := range aircraftMap {
-			if takeoffTime, exists := takeoffTimes[hex]; exists {
-				aircraft.DateTookoff = takeoffTime
+		takeoffTimes, err := s.GetLatestTakeoffTimesBatch(hexCodes)
+		if err != nil {
+			s.logger.Error("Failed to get takeoff times batch", logger.Error(err))
+		} else {
+			for hex, aircraft := range aircraftMap {
+				if takeoffTime, exists := takeoffTimes[hex]; exists {
+					aircraft.DateTookoff = takeoffTime
+				}
 			}
 		}
-	}
 
-	landingTimes, err := s.GetLatestLandingTimesBatch(hexCodes)
-	if err != nil {
-		s.logger.Error("Failed to get landing times batch", logger.Error(err))
-	} else {
-		for hex, aircraft := range aircraftMap {
-			if landingTime, exists := landingTimes[hex]; exists {
-				aircraft.DateLanded = landingTime
+		landingTimes, err := s.GetLatestLandingTimesBatch(hexCodes)
+		if err != nil {
+			s.logger.Error("Failed to get landing times batch", logger.Error(err))
+		} else {
+			for hex, aircraft := range aircraftMap {
+				if landingTime, exists := landingTimes[hex]; exists {
+					aircraft.DateLanded = landingTime
+				}
 			}
 		}
-	}
 
-	dateDuration := time.Since(dateStart)
-	s.logger.Debug("Date population completed (batch)", logger.Duration("duration", dateDuration))
+		dateDuration := time.Since(dateStart)
+		s.logger.Debug("Date population completed (batch)", logger.Duration("duration", dateDuration))
+	}
 
 	// Convert map to slice
 	aircraft := make([]*adsb.Aircraft, 0, len(aircraftMap))
@@ -458,30 +507,34 @@ func (s *AircraftStorage) getLatestADSBDataBatch(hexCodes []string) (map[string]
 		return make(map[string]*adsb.ADSBTarget), nil
 	}
 
-	// Create placeholders for the IN clause
+	// Create placeholders for the IN clause (need two copies for the query)
 	placeholders := make([]string, len(hexCodes))
-	args := make([]interface{}, len(hexCodes))
+	args := make([]interface{}, len(hexCodes)*2) // Double args: once for subquery, once for main query
 	for i, hex := range hexCodes {
 		placeholders[i] = "?"
-		args[i] = hex
+		args[i] = hex                   // First set for subquery
+		args[i+len(hexCodes)] = hex     // Second set for outer WHERE
 	}
 
-	// Use correlated subquery - relies on idx_adsb_targets_hex_timestamp index
+	// Use GROUP BY + JOIN pattern - more efficient than correlated subquery on large tables
+	// 1. Subquery groups to find MAX(timestamp) per aircraft (small result set)
+	// 2. JOIN fetches the actual data rows using the index
 	query := fmt.Sprintf(`
 		SELECT
-			aircraft_hex,
-			raw_data,
-			source_type,
-			registration,
-			aircraft_type
-		FROM adsb_targets a1
-		WHERE aircraft_hex IN (%s)
-		AND timestamp = (
-			SELECT MAX(timestamp)
-			FROM adsb_targets a2
-			WHERE a2.aircraft_hex = a1.aircraft_hex
-		)
-	`, strings.Join(placeholders, ","))
+			a.aircraft_hex,
+			a.raw_data,
+			a.source_type,
+			a.registration,
+			a.aircraft_type
+		FROM adsb_targets a
+		INNER JOIN (
+			SELECT aircraft_hex, MAX(timestamp) as max_ts
+			FROM adsb_targets
+			WHERE aircraft_hex IN (%s)
+			GROUP BY aircraft_hex
+		) latest ON a.aircraft_hex = latest.aircraft_hex AND a.timestamp = latest.max_ts
+		WHERE a.aircraft_hex IN (%s)
+	`, strings.Join(placeholders, ","), strings.Join(placeholders, ","))
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -1614,25 +1667,27 @@ func (s *AircraftStorage) GetCurrentPhasesBatch(hexCodes []string) (map[string]*
 		return make(map[string]*adsb.PhaseChange), nil
 	}
 
-	// Create placeholders for the IN clause
+	// Create placeholders for the IN clause (need two copies for the query)
 	placeholders := make([]string, len(hexCodes))
-	args := make([]interface{}, len(hexCodes))
+	args := make([]interface{}, len(hexCodes)*2)
 	for i, hex := range hexCodes {
 		placeholders[i] = "?"
 		args[i] = hex
+		args[i+len(hexCodes)] = hex
 	}
 
+	// Use GROUP BY + JOIN pattern instead of ROW_NUMBER() for better performance
 	query := fmt.Sprintf(`
-		WITH latest_phases AS (
-			SELECT hex, id, phase, timestamp, adsb_id,
-				   ROW_NUMBER() OVER (PARTITION BY hex ORDER BY timestamp DESC) as rn
+		SELECT p.hex, p.id, p.phase, p.timestamp, p.adsb_id
+		FROM phase_changes p
+		INNER JOIN (
+			SELECT hex, MAX(timestamp) as max_ts
 			FROM phase_changes
 			WHERE hex IN (%s)
-		)
-		SELECT hex, id, phase, timestamp, adsb_id
-		FROM latest_phases
-		WHERE rn = 1
-	`, strings.Join(placeholders, ","))
+			GROUP BY hex
+		) latest ON p.hex = latest.hex AND p.timestamp = latest.max_ts
+		WHERE p.hex IN (%s)
+	`, strings.Join(placeholders, ","), strings.Join(placeholders, ","))
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -1676,25 +1731,27 @@ func (s *AircraftStorage) GetLatestADSBTargetIDsBatch(hexCodes []string) (map[st
 		return make(map[string]*int), nil
 	}
 
-	// Create placeholders for the IN clause
+	// Create placeholders for the IN clause (need two copies for the query)
 	placeholders := make([]string, len(hexCodes))
-	args := make([]interface{}, len(hexCodes))
+	args := make([]interface{}, len(hexCodes)*2)
 	for i, hex := range hexCodes {
 		placeholders[i] = "?"
 		args[i] = hex
+		args[i+len(hexCodes)] = hex
 	}
 
+	// Use GROUP BY + JOIN pattern instead of ROW_NUMBER() for better performance
 	query := fmt.Sprintf(`
-		WITH latest_targets AS (
-			SELECT aircraft_hex, id,
-				   ROW_NUMBER() OVER (PARTITION BY aircraft_hex ORDER BY timestamp DESC) as rn
+		SELECT a.aircraft_hex, a.id
+		FROM adsb_targets a
+		INNER JOIN (
+			SELECT aircraft_hex, MAX(timestamp) as max_ts
 			FROM adsb_targets
 			WHERE aircraft_hex IN (%s)
-		)
-		SELECT aircraft_hex, id
-		FROM latest_targets
-		WHERE rn = 1
-	`, strings.Join(placeholders, ","))
+			GROUP BY aircraft_hex
+		) latest ON a.aircraft_hex = latest.aircraft_hex AND a.timestamp = latest.max_ts
+		WHERE a.aircraft_hex IN (%s)
+	`, strings.Join(placeholders, ","), strings.Join(placeholders, ","))
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -1783,16 +1840,13 @@ func (s *AircraftStorage) GetLatestTakeoffTimesBatch(hexCodes []string) (map[str
 		args[i] = hex
 	}
 
+	// Use GROUP BY with MAX - simple and efficient for getting latest timestamp per hex
+	// Uses idx_phase_changes_hex_phase_timestamp index
 	query := fmt.Sprintf(`
-		WITH latest_takeoffs AS (
-			SELECT hex, timestamp,
-				   ROW_NUMBER() OVER (PARTITION BY hex ORDER BY timestamp DESC) as rn
-			FROM phase_changes
-			WHERE hex IN (%s) AND phase = 'T/O'
-		)
-		SELECT hex, timestamp
-		FROM latest_takeoffs
-		WHERE rn = 1
+		SELECT hex, MAX(timestamp) as timestamp
+		FROM phase_changes
+		WHERE hex IN (%s) AND phase = 'T/O'
+		GROUP BY hex
 	`, strings.Join(placeholders, ","))
 
 	rows, err := s.db.Query(query, args...)
@@ -1839,16 +1893,13 @@ func (s *AircraftStorage) GetLatestLandingTimesBatch(hexCodes []string) (map[str
 		args[i] = hex
 	}
 
+	// Use GROUP BY with MAX - simple and efficient for getting latest timestamp per hex
+	// Uses idx_phase_changes_hex_phase_timestamp index
 	query := fmt.Sprintf(`
-		WITH latest_landings AS (
-			SELECT hex, timestamp,
-				   ROW_NUMBER() OVER (PARTITION BY hex ORDER BY timestamp DESC) as rn
-			FROM phase_changes
-			WHERE hex IN (%s) AND phase = 'T/D'
-		)
-		SELECT hex, timestamp
-		FROM latest_landings
-		WHERE rn = 1
+		SELECT hex, MAX(timestamp) as timestamp
+		FROM phase_changes
+		WHERE hex IN (%s) AND phase = 'T/D'
+		GROUP BY hex
 	`, strings.Join(placeholders, ","))
 
 	rows, err := s.db.Query(query, args...)
