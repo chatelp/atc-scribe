@@ -64,9 +64,9 @@ type Server struct {
 func NewServer(logger *logger.Logger) *Server {
 	return &Server{
 		clients:    make(map[*Client]bool),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		broadcast:  make(chan *Message),
+		register:   make(chan *Client, 32),    // Buffered to prevent goroutine blocking
+		unregister: make(chan *Client, 32),    // Buffered to prevent goroutine blocking
+		broadcast:  make(chan *Message, 512),  // Buffered for high-throughput broadcasting
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,

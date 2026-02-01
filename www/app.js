@@ -326,10 +326,24 @@ document.addEventListener('alpine:init', () => {
         },
 
         // Helper function to safely get current phase
+        // PERFORMANCE: Cache the result on the aircraft object to avoid repeated nested property access
         getCurrentPhase(aircraft) {
-            return (aircraft && aircraft.phase && aircraft.phase.current && aircraft.phase.current.length > 0)
+            if (!aircraft) return 'NEW';
+
+            // Check if we have a cached phase and phase object hasn't changed
+            if (aircraft._cachedPhase !== undefined && aircraft._phaseVersion === aircraft.phase) {
+                return aircraft._cachedPhase;
+            }
+
+            // Calculate and cache the phase
+            const phase = (aircraft.phase && aircraft.phase.current && aircraft.phase.current.length > 0)
                 ? aircraft.phase.current[0].phase
                 : 'NEW';
+
+            aircraft._cachedPhase = phase;
+            aircraft._phaseVersion = aircraft.phase; // Track which phase object was used
+
+            return phase;
         },
 
         get filteredAircraft() {
@@ -2821,40 +2835,35 @@ async initAircraftDataSource() {
         // Filtering throttling state to prevent main thread blocking
         _filteringScheduled: false,
         _lastFilterTime: null,
-        // ASYNC Performance-optimized aircraft handlers to prevent main thread blocking
+        // Performance-optimized aircraft handlers (throttling handled by queueMapUpdate/queueCacheInvalidation)
         handleAircraftAdded(data) {
             if (this.wsUpdatesPaused) {
                 console.log(`[PAUSED] Skipping aircraft added: ${data.aircraft?.flight || data.hex}`);
                 return;
             }
 
-            // Process asynchronously to prevent main thread blocking
-            setTimeout(() => {
-                if (data.aircraft) {
-                    console.log(`Adding new aircraft: ${data.aircraft.flight || data.hex}`);
+            if (data.aircraft) {
+                // Update last update timestamp
+                this.lastUpdate = new Date();
+                this.lastUpdateSeconds = 0;
 
-                    // Update last update timestamp
-                    this.lastUpdate = new Date();
-                    this.lastUpdateSeconds = 0;
+                // Apply distance calculation
+                this.calculateAircraftDistance(data.aircraft);
 
-                    // Apply distance calculation
-                    this.calculateAircraftDistance(data.aircraft);
+                // ALWAYS add to aircraft store - filtering is done at display level
+                this.aircraft[data.aircraft.hex] = data.aircraft;
 
-                    // ALWAYS add to aircraft store - filtering is done at display level
-                    this.aircraft[data.aircraft.hex] = data.aircraft;
-
-                    // Update animation engine with new aircraft data
-                    if (this.animationEngine) {
-                        this.animationEngine.updateAircraft(data.aircraft);
-                    }
-
-                    // Queue for throttled map update (map will handle visibility based on filters)
-                    this.queueMapUpdate(data.aircraft.hex);
-
-                    // Queue cache invalidation
-                    this.queueCacheInvalidation();
+                // Update animation engine with new aircraft data
+                if (this.animationEngine) {
+                    this.animationEngine.updateAircraft(data.aircraft);
                 }
-            }, 0);
+
+                // Queue for throttled map update (map will handle visibility based on filters)
+                this.queueMapUpdate(data.aircraft.hex);
+
+                // Queue cache invalidation
+                this.queueCacheInvalidation();
+            }
         },
 
         handleAircraftUpdate(data) {
@@ -2863,90 +2872,100 @@ async initAircraftDataSource() {
                 return;
             }
 
-            // Process asynchronously to prevent main thread blocking
-            setTimeout(() => {
-                const hex = data.hex;
-                let existing = this.aircraft[hex];
+            const hex = data.hex;
+            let existing = this.aircraft[hex];
 
-                // Update last update timestamp
-                this.lastUpdate = new Date();
-                this.lastUpdateSeconds = 0;
+            // Update last update timestamp
+            this.lastUpdate = new Date();
+            this.lastUpdateSeconds = 0;
 
-                // Handle delta update (new efficient format)
-                if (data.delta) {
-                    // If aircraft doesn't exist in store yet, create a minimal entry
-                    // (this can happen if aircraft was added while filtered out in older code)
-                    if (!existing) {
-                        existing = { hex: hex };
-                        this.aircraft[hex] = existing;
-                    }
+            // Handle delta update (new efficient format)
+            if (data.delta) {
+                // If aircraft doesn't exist in store yet, create a minimal entry
+                // (this can happen if aircraft was added while filtered out in older code)
+                if (!existing) {
+                    existing = { hex: hex };
+                    this.aircraft[hex] = existing;
+                }
 
-                    this.applyDelta(existing, data.delta);
-                    this.calculateAircraftDistance(existing);
+                // Check if this update contains filter-relevant changes BEFORE applying
+                const hasFilterRelevantChanges =
+                    data.delta.status !== undefined ||
+                    data.delta.phase !== undefined ||
+                    data.delta.on_ground !== undefined ||
+                    data.delta.flight !== undefined;
 
-                    // Update animation engine with delta
-                    if (this.animationEngine) {
-                        this.animationEngine.updateAircraftDelta(hex, data.delta);
-                    }
+                this.applyDelta(existing, data.delta);
+                this.calculateAircraftDistance(existing);
 
-                    // Queue map update - map will handle visibility based on filters
-                    this.queueMapUpdate(hex);
+                // Update animation engine with delta
+                if (this.animationEngine) {
+                    this.animationEngine.updateAircraftDelta(hex, data.delta);
+                }
 
-                    // Update selected aircraft panel if this is the selected one
-                    if (this.selectedAircraft && this.selectedAircraft.hex === hex) {
-                        this.setupAircraftDetailsPanel();
-                    }
+                // Queue map update - map will handle visibility based on filters
+                this.queueMapUpdate(hex);
 
+                // Update selected aircraft panel if this is the selected one
+                if (this.selectedAircraft && this.selectedAircraft.hex === hex) {
+                    this.setupAircraftDetailsPanel();
+                }
+
+                // PERFORMANCE: Only invalidate cache if filter-relevant data changed
+                // Position/altitude/speed updates don't affect which aircraft are shown
+                if (hasFilterRelevantChanges) {
                     this.queueCacheInvalidation();
                 }
-                // Fallback: full aircraft object (backward compatibility)
-                else if (data.aircraft) {
-                    // ALWAYS store aircraft data - filtering is done at display level
-                    this.aircraft[data.aircraft.hex] = data.aircraft;
-                    this.calculateAircraftDistance(data.aircraft);
+            }
+            // Fallback: full aircraft object (backward compatibility)
+            else if (data.aircraft) {
+                // ALWAYS store aircraft data - filtering is done at display level
+                this.aircraft[data.aircraft.hex] = data.aircraft;
+                this.calculateAircraftDistance(data.aircraft);
 
-                    if (this.animationEngine) {
-                        this.animationEngine.updateAircraft(data.aircraft);
-                    }
-
-                    // Queue map update - map will handle visibility based on filters
-                    this.queueMapUpdate(hex);
-
-                    if (this.selectedAircraft && this.selectedAircraft.hex === data.aircraft.hex) {
-                        this.selectedAircraft = data.aircraft;
-                        this.setupAircraftDetailsPanel();
-                    }
-
-                    this.queueCacheInvalidation();
+                if (this.animationEngine) {
+                    this.animationEngine.updateAircraft(data.aircraft);
                 }
-            }, 0);
+
+                // Queue map update - map will handle visibility based on filters
+                this.queueMapUpdate(hex);
+
+                if (this.selectedAircraft && this.selectedAircraft.hex === data.aircraft.hex) {
+                    this.selectedAircraft = data.aircraft;
+                    this.setupAircraftDetailsPanel();
+                }
+
+                // Full object replacement always needs cache invalidation
+                this.queueCacheInvalidation();
+            }
         },
 
         // Apply delta updates to an existing aircraft object
+        // PERFORMANCE: Only set values that have actually changed to minimize Alpine reactivity triggers
         applyDelta(aircraft, delta) {
             // Initialize adsb object if needed
             if (!aircraft.adsb) aircraft.adsb = {};
 
-            // Apply ADSB position/flight data
-            if (delta.lat !== undefined) aircraft.adsb.lat = delta.lat;
-            if (delta.lon !== undefined) aircraft.adsb.lon = delta.lon;
-            if (delta.alt_baro !== undefined) aircraft.adsb.alt_baro = delta.alt_baro;
-            if (delta.track !== undefined) aircraft.adsb.track = delta.track;
-            if (delta.gs !== undefined) aircraft.adsb.gs = delta.gs;
-            if (delta.tas !== undefined) aircraft.adsb.tas = delta.tas;
-            if (delta.baro_rate !== undefined) aircraft.adsb.baro_rate = delta.baro_rate;
-            if (delta.mag_heading !== undefined) aircraft.adsb.mag_heading = delta.mag_heading;
-            if (delta.true_heading !== undefined) aircraft.adsb.true_heading = delta.true_heading;
+            // Apply ADSB position/flight data - only if value changed
+            if (delta.lat !== undefined && aircraft.adsb.lat !== delta.lat) aircraft.adsb.lat = delta.lat;
+            if (delta.lon !== undefined && aircraft.adsb.lon !== delta.lon) aircraft.adsb.lon = delta.lon;
+            if (delta.alt_baro !== undefined && aircraft.adsb.alt_baro !== delta.alt_baro) aircraft.adsb.alt_baro = delta.alt_baro;
+            if (delta.track !== undefined && aircraft.adsb.track !== delta.track) aircraft.adsb.track = delta.track;
+            if (delta.gs !== undefined && aircraft.adsb.gs !== delta.gs) aircraft.adsb.gs = delta.gs;
+            if (delta.tas !== undefined && aircraft.adsb.tas !== delta.tas) aircraft.adsb.tas = delta.tas;
+            if (delta.baro_rate !== undefined && aircraft.adsb.baro_rate !== delta.baro_rate) aircraft.adsb.baro_rate = delta.baro_rate;
+            if (delta.mag_heading !== undefined && aircraft.adsb.mag_heading !== delta.mag_heading) aircraft.adsb.mag_heading = delta.mag_heading;
+            if (delta.true_heading !== undefined && aircraft.adsb.true_heading !== delta.true_heading) aircraft.adsb.true_heading = delta.true_heading;
 
             // Apply full adsb object if provided
             if (delta.adsb !== undefined) aircraft.adsb = delta.adsb;
 
-            // Apply top-level aircraft properties
-            if (delta.flight !== undefined) aircraft.flight = delta.flight;
-            if (delta.status !== undefined) aircraft.status = delta.status;
-            if (delta.on_ground !== undefined) aircraft.on_ground = delta.on_ground;
-            if (delta.phase !== undefined) aircraft.phase = delta.phase;
-            if (delta.distance !== undefined) aircraft.distance = delta.distance;
+            // Apply top-level aircraft properties - only if value changed
+            if (delta.flight !== undefined && aircraft.flight !== delta.flight) aircraft.flight = delta.flight;
+            if (delta.status !== undefined && aircraft.status !== delta.status) aircraft.status = delta.status;
+            if (delta.on_ground !== undefined && aircraft.on_ground !== delta.on_ground) aircraft.on_ground = delta.on_ground;
+            if (delta.phase !== undefined && aircraft.phase !== delta.phase) aircraft.phase = delta.phase;
+            if (delta.distance !== undefined && aircraft.distance !== delta.distance) aircraft.distance = delta.distance;
 
             // Update last_seen to current time since we just received an update
             aircraft.last_seen = new Date().toISOString();
@@ -2958,32 +2977,27 @@ async initAircraftDataSource() {
                 return;
             }
 
-            // Process asynchronously to prevent main thread blocking
-            setTimeout(() => {
-                console.log(`Removing aircraft: ${data.hex}`);
+            if (this.aircraft[data.hex]) {
+                delete this.aircraft[data.hex];
 
-                if (this.aircraft[data.hex]) {
-                    delete this.aircraft[data.hex];
-
-                    // Remove from map
-                    if (this.mapManager) {
-                        this.mapManager.removeAircraft(data.hex);
-                    }
-
-                    // Remove from animation engine
-                    if (this.animationEngine) {
-                        this.animationEngine.removeAircraft(data.hex);
-                    }
-
-                    // Deselect if this was the selected aircraft
-                    if (this.selectedAircraft && this.selectedAircraft.hex === data.hex) {
-                        this.selectedAircraft = null;
-                    }
-
-                    // Queue cache invalidation
-                    this.queueCacheInvalidation();
+                // Remove from map
+                if (this.mapManager) {
+                    this.mapManager.removeAircraft(data.hex);
                 }
-            }, 0);
+
+                // Remove from animation engine
+                if (this.animationEngine) {
+                    this.animationEngine.removeAircraft(data.hex);
+                }
+
+                // Deselect if this was the selected aircraft
+                if (this.selectedAircraft && this.selectedAircraft.hex === data.hex) {
+                    this.selectedAircraft = null;
+                }
+
+                // Queue cache invalidation
+                this.queueCacheInvalidation();
+            }
         },
 
         // Removed applyAircraftChanges method - no longer needed since we receive full aircraft objects
@@ -2991,20 +3005,17 @@ async initAircraftDataSource() {
         // Queue map updates for throttling
         queueMapUpdate(hex) {
             if (this.wsUpdatesPaused) {
-                console.log(`[PAUSED] Skipping map update queue for: ${hex}`);
                 return;
             }
-            // Removed mapUpdatesDisabled and dataOnlyMode debug checks
-            
-            
+
             this.pendingMapUpdates.add(hex);
-            
-            // Throttling: 500ms
+
+            // Throttle: 100ms - fast enough for real-time feel, batches multiple updates
             if (!this.mapUpdateThrottleId) {
                 this.mapUpdateThrottleId = setTimeout(() => {
                     this.processPendingMapUpdates();
                     this.mapUpdateThrottleId = null;
-                }, 500);
+                }, 100);
             }
         },
 
@@ -3012,29 +3023,28 @@ async initAircraftDataSource() {
         // Process all pending map updates in a batch
         processPendingMapUpdates() {
             if (this.pendingMapUpdates.size === 0) return;
-            
-            console.log(`Processing ${this.pendingMapUpdates.size} pending map updates`);
-            
-            // PERFORMANCE OPTIMIZATION: Limit batch size to prevent DOM overload
-            const maxBatchSize = 10; // Process max 10 aircraft per batch
-            const aircraftToUpdate = Array.from(this.pendingMapUpdates).slice(0, maxBatchSize);
-            
+
+            // Process ALL pending updates in one batch - map updates are lightweight
+            const aircraftToUpdate = Array.from(this.pendingMapUpdates);
+            this.pendingMapUpdates.clear();
+
             // Update specific aircraft markers instead of full refresh
             aircraftToUpdate.forEach(hex => {
                 const aircraft = this.aircraft[hex];
                 if (aircraft && this.mapManager) {
                     this.mapManager.updateSingleAircraft(hex, aircraft);
                 }
-                this.pendingMapUpdates.delete(hex);
             });
-            
-            // If more updates remain, schedule another batch
-            if (this.pendingMapUpdates.size > 0) {
-                console.log(`${this.pendingMapUpdates.size} updates remaining, scheduling next batch...`);
-                this.mapUpdateThrottleId = setTimeout(() => {
-                    this.processPendingMapUpdates();
-                    this.mapUpdateThrottleId = null;
-                }, 500); // Shorter delay for remaining batches
+
+            // TRAILS FIX: Throttled call to update flight paths (draws trail polylines)
+            if (this.mapManager && this.settings.showPaths && !this._trailUpdatePending) {
+                this._trailUpdatePending = true;
+                setTimeout(() => {
+                    this._trailUpdatePending = false;
+                    if (this.mapManager) {
+                        this.mapManager.updateFlightPaths();
+                    }
+                }, 500); // Update trails every 500ms max
             }
         },
 
@@ -4126,10 +4136,21 @@ async initAircraftDataSource() {
         toggleWebSocketUpdates() {
             this.wsUpdatesPaused = !this.wsUpdatesPaused;
             console.log(`WebSocket updates ${this.wsUpdatesPaused ? 'PAUSED' : 'RESUMED'}`);
-            
+
             if (this.wsUpdatesPaused) {
                 // Clear any pending updates when pausing
                 this.cleanupThrottling();
+                // PERFORMANCE: Stop animation engine when updates are paused
+                if (this.animationEngine) {
+                    this.animationEngine.stop();
+                    console.log('Animation engine STOPPED');
+                }
+            } else {
+                // Resume animation engine when updates resume
+                if (this.animationEngine) {
+                    this.animationEngine.start();
+                    console.log('Animation engine STARTED');
+                }
             }
         },
 

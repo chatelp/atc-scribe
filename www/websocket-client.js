@@ -86,47 +86,45 @@ class WebSocketClient {
         };
 
         this._boundMessageHandler = (event) => {
-            // IMMEDIATELY yield control back to browser to prevent blocking HTTP requests
-            setTimeout(() => {
-                try {
-                    const message = JSON.parse(event.data);
+            // Process messages directly - no setTimeout to avoid event loop flooding
+            try {
+                const message = JSON.parse(event.data);
 
-                    // Handle aircraft streaming messages
-                    if (message.type === 'aircraft_added') {
-                        this._notifyListeners('aircraft_added', message.data);
-                    } else if (message.type === 'aircraft_update') {
-                        this._notifyListeners('aircraft_update', message.data);
-                    } else if (message.type === 'aircraft_removed') {
-                        this._notifyListeners('aircraft_removed', message.data);
-                    } else if (message.type === 'aircraft_bulk_response') {
-                        this._notifyListeners('aircraft_bulk_response', message.data);
-                    } else if (message.type === 'transcription') {
-                        this._notifyListeners('transcription', message.data);
-                    } else if (message.type === 'transcription_update') {
-                        this._notifyListeners('transcription_update', message.data);
-                    } else if (message.type === 'aircraft') {
-                        if (message.data && message.data.movement) {
-                            // Call the Alpine.js store method to handle the aircraft message
-                            if (window.Alpine && Alpine.store('atc')) {
-                                Alpine.store('atc').handleAircraftMessage(message.data);
-                            }
-                        }
-                        this._notifyListeners('aircraft', message.data);
-                    } else if (message.type === 'status_update') {
-                        // Call the Alpine.js store method to handle the status update
+                // Handle aircraft streaming messages
+                if (message.type === 'aircraft_added') {
+                    this._notifyListeners('aircraft_added', message.data);
+                } else if (message.type === 'aircraft_update') {
+                    this._notifyListeners('aircraft_update', message.data);
+                } else if (message.type === 'aircraft_removed') {
+                    this._notifyListeners('aircraft_removed', message.data);
+                } else if (message.type === 'aircraft_bulk_response') {
+                    this._notifyListeners('aircraft_bulk_response', message.data);
+                } else if (message.type === 'transcription') {
+                    this._notifyListeners('transcription', message.data);
+                } else if (message.type === 'transcription_update') {
+                    this._notifyListeners('transcription_update', message.data);
+                } else if (message.type === 'aircraft') {
+                    if (message.data && message.data.movement) {
+                        // Call the Alpine.js store method to handle the aircraft message
                         if (window.Alpine && Alpine.store('atc')) {
-                            Alpine.store('atc').handleStatusUpdateMessage(message.data);
+                            Alpine.store('atc').handleAircraftMessage(message.data);
                         }
-                        this._notifyListeners('status_update', message.data);
-                    } else if (message.type === 'phase_change') {
-                        this._notifyListeners('phase_change', message.data);
-                    } else if (message.type === 'frequency_status') {
-                        this._notifyListeners('frequency_status', message.data);
                     }
-                } catch (error) {
-                    console.error('Error parsing WebSocket message:', error);
+                    this._notifyListeners('aircraft', message.data);
+                } else if (message.type === 'status_update') {
+                    // Call the Alpine.js store method to handle the status update
+                    if (window.Alpine && Alpine.store('atc')) {
+                        Alpine.store('atc').handleStatusUpdateMessage(message.data);
+                    }
+                    this._notifyListeners('status_update', message.data);
+                } else if (message.type === 'phase_change') {
+                    this._notifyListeners('phase_change', message.data);
+                } else if (message.type === 'frequency_status') {
+                    this._notifyListeners('frequency_status', message.data);
                 }
-            }, 0); // Yield to browser event loop immediately
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
         };
 
         // Add event listeners

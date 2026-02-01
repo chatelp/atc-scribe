@@ -373,8 +373,14 @@ class MapManager {
         });
         
         // Add event listeners for viewport changes to update visible aircraft list
+        // PERFORMANCE: Throttle to prevent excessive updates during rapid pan/zoom
+        this._visibleListUpdateTimeout = null;
         this.map.on('moveend zoomend', () => {
-            this.updateVisibleAircraftList();
+            if (this._visibleListUpdateTimeout) return;
+            this._visibleListUpdateTimeout = setTimeout(() => {
+                this._visibleListUpdateTimeout = null;
+                this.updateVisibleAircraftList();
+            }, 250); // 250ms throttle
         });
 
         this.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -445,44 +451,50 @@ class MapManager {
         this.startLabelRefreshTimer();
     }
 
-    // Refresh all aircraft labels periodically (keeps lastSeen timer counting up)
+    // Refresh stale aircraft labels periodically (only for aircraft without recent updates)
     startLabelRefreshTimer() {
         // Clear any existing timer
         if (this.labelRefreshTimer) {
             clearInterval(this.labelRefreshTimer);
         }
 
-        // Refresh labels every second
+        // Refresh stale labels every 5 seconds (much less aggressive than every 1 second)
         this.labelRefreshTimer = setInterval(() => {
-            this.refreshAllLabels();
-        }, 1000);
+            this.refreshStaleLabels();
+        }, 5000);
     }
 
-    // Update all visible aircraft labels with current time data
-    refreshAllLabels() {
+    // Update only stale aircraft labels (those without recent WebSocket updates)
+    refreshStaleLabels() {
         if (!this.store.settings.showLabels) return;
+
+        const now = Date.now();
+        const staleThreshold = 5000; // Only update labels for aircraft not updated in 5+ seconds
 
         // Batch DOM updates in a single frame
         requestAnimationFrame(() => {
-            const now = new Date();
             const hexes = Object.keys(this.markers);
             for (let i = 0; i < hexes.length; i++) {
                 const hex = hexes[i];
                 const markerInfo = this.markers[hex];
                 const aircraft = this.store.aircraft[hex];
 
-                if (!markerInfo || !markerInfo.label || !aircraft) continue;
+                if (!markerInfo || !markerInfo.label || !aircraft || !aircraft.last_seen) continue;
 
                 // Skip if label is not on map (not visible)
                 if (!this.layers.aircraft.hasLayer(markerInfo.label)) continue;
 
-                // OPTIMIZATION: Only update lastSeen text directly in DOM
-                // Avoid expensive setIcon() which replaces entire DOM element
+                // Only update stale aircraft (not recently updated via WebSocket)
+                const lastSeenTime = new Date(aircraft.last_seen).getTime();
+                const timeSinceUpdate = now - lastSeenTime;
+                if (timeSinceUpdate < staleThreshold) continue;
+
+                // Update lastSeen text directly in DOM for stale aircraft
                 const labelElement = markerInfo.label.getElement();
-                if (labelElement && aircraft.last_seen) {
+                if (labelElement) {
                     const lastSeenSpan = labelElement.querySelector('[data-lastseen]');
                     if (lastSeenSpan) {
-                        const secondsAgo = Math.floor((now - new Date(aircraft.last_seen)) / 1000);
+                        const secondsAgo = Math.floor(timeSinceUpdate / 1000);
                         const newText = `${secondsAgo}s`;
                         if (lastSeenSpan.textContent !== newText) {
                             lastSeenSpan.textContent = newText;
@@ -686,14 +698,23 @@ class MapManager {
         } else {
             // UPDATE EXISTING MARKER WITH COMPREHENSIVE CHANGE DETECTION
             const existing = this.markers[aircraft.hex];
-            
+
             // Only update position if moved more than ~25 meters (0.0002 degrees ≈ 25m)
-            const positionChanged = Math.abs(existing.lastLat - position[0]) > 0.0002 || 
+            const positionChanged = Math.abs(existing.lastLat - position[0]) > 0.0002 ||
                                    Math.abs(existing.lastLon - position[1]) > 0.0002;
-            
-            if (positionChanged) {
+
+            // ANIMATION FIX: Skip direct position updates when animation engine can interpolate
+            // Only skip if animation engine has valid velocity for this aircraft
+            const animationEngine = this.store.animationEngine;
+            const animState = animationEngine?.aircraftStates?.get(aircraft.hex);
+            const canAnimate = animationEngine?.isRunning && animState?.hasValidVelocity?.();
+
+            if (positionChanged && !canAnimate) {
                 existing.aircraft.setLatLng(position);
-                existing.label.setLatLng(position); // Fixed: Remove offset causing overlapping labels
+                existing.label.setLatLng(position);
+            }
+            // Always track last position for change detection
+            if (positionChanged) {
                 existing.lastLat = position[0];
                 existing.lastLon = position[1];
             }
@@ -1284,32 +1305,28 @@ class MapManager {
     // Efficient single aircraft update for WebSocket performance
     updateSingleAircraft(hex, aircraft) {
         if (!aircraft) return;
-        
-        // Ensure leaflet objects exist
+
+        // _ensureLeafletObjects handles all updates: position, label content (with version checking), etc.
         this._ensureLeafletObjects(aircraft);
-        
-        // Update marker position and visual state
+
         const markerInfo = this.markers[hex];
         if (!markerInfo) return;
-        
-        // Update marker position if it exists
-        if (aircraft.adsb && aircraft.adsb.lat && aircraft.adsb.lon) {
-            const newPos = [aircraft.adsb.lat, aircraft.adsb.lon];
-            markerInfo.aircraft.setLatLng(newPos);
+
+        // Immediately update lastSeen text in DOM (without full label regeneration)
+        if (markerInfo.label && aircraft.last_seen) {
+            const labelElement = markerInfo.label.getElement();
+            if (labelElement) {
+                const lastSeenSpan = labelElement.querySelector('[data-lastseen]');
+                if (lastSeenSpan) {
+                    const secondsAgo = Math.floor((Date.now() - new Date(aircraft.last_seen).getTime()) / 1000);
+                    lastSeenSpan.textContent = `${secondsAgo}s`;
+                }
+            }
         }
-        
+
         // Update visual state (color, rotation, etc.)
         this.updateVisualState(hex);
-        
-        // Update label content with latest data
-        if (markerInfo.label && this.store.settings.showLabels) {
-            const callsign = aircraft.flight || aircraft.hex;
-            const altitude = aircraft.adsb ? aircraft.adsb.alt_baro : 0;
-            const verticalTrend = this.getVerticalTrend(aircraft);
-            const labelContent = this.store.createLabelContent(aircraft, callsign, altitude, verticalTrend);
-            markerInfo.label.setTooltipContent(labelContent);
-        }
-        
+
         // Check visibility for this specific aircraft
         this.updateSingleAircraftVisibility(hex, aircraft);
     }
@@ -1378,24 +1395,25 @@ class MapManager {
     }
     
     // Update list of aircraft visible on map for UI indicators
+    // PERFORMANCE: Only update store if the set actually changed to prevent Alpine re-renders
     updateVisibleAircraftList() {
         if (!this.map) return;
-        
+
         const mapBounds = this.map.getBounds();
         const currentZoom = this.map.getZoom();
         const useViewportCulling = currentZoom > 11 && mapBounds;
-        
+
         // Track which aircraft are currently visible on the map
         const visibleAircraftHexes = new Set();
-        
+
         Object.keys(this.store.aircraft).forEach(hex => {
             const aircraft = this.store.aircraft[hex];
             const markerInfo = this.markers[hex];
-            
+
             if (!markerInfo || !this.layers.aircraft.hasLayer(markerInfo.aircraft)) {
                 return; // Aircraft marker not on map
             }
-            
+
             // If viewport culling is enabled, check if aircraft is in bounds
             if (useViewportCulling && aircraft.adsb && aircraft.adsb.lat && aircraft.adsb.lon) {
                 const position = L.latLng(aircraft.adsb.lat, aircraft.adsb.lon);
@@ -1407,8 +1425,21 @@ class MapManager {
                 visibleAircraftHexes.add(hex);
             }
         });
-        
-        // Update store with visible aircraft list
+
+        // PERFORMANCE: Only update store if the set actually changed
+        // Compare sets to avoid unnecessary Alpine reactivity triggers on map pan/zoom
+        const currentSet = this.store.visibleAircraftOnMap;
+        if (currentSet && currentSet.size === visibleAircraftHexes.size) {
+            let setsEqual = true;
+            for (const hex of visibleAircraftHexes) {
+                if (!currentSet.has(hex)) {
+                    setsEqual = false;
+                    break;
+                }
+            }
+            if (setsEqual) return; // No change, skip update
+        }
+
         this.store.visibleAircraftOnMap = visibleAircraftHexes;
     }
 

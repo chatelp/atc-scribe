@@ -179,8 +179,8 @@ func (e *ExternalADSBTarget) Convert() ADSBTarget {
 	}
 
 	// Convert numeric fields
-	target.AltBaro = e.AltBaro.Float64()
-	target.AltGeom = e.AltGeom.Float64()
+	target.AltBaro = FlexibleFloat64(e.AltBaro.Float64())
+	target.AltGeom = FlexibleFloat64(e.AltGeom.Float64())
 	target.GS = e.GS.Float64()
 	target.IAS = e.IAS.Float64()
 	target.TAS = e.TAS.Float64()

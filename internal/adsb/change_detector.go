@@ -1,8 +1,6 @@
 package adsb
 
 import (
-	"reflect"
-
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
@@ -145,8 +143,8 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 		delta["on_ground"] = current.OnGround
 	}
 
-	// Compare phase data
-	if !reflect.DeepEqual(previous.Phase, current.Phase) {
+	// Compare phase data (optimized - no reflection)
+	if !phaseDataEqual(previous.Phase, current.Phase) {
 		delta["phase"] = current.Phase
 	}
 
@@ -160,4 +158,31 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 	// and would cause unnecessary updates
 
 	return delta
+}
+
+// phaseDataEqual compares two PhaseData structs without using reflection
+// Only compares the current phase since that's what matters for change detection
+func phaseDataEqual(a, b *PhaseData) bool {
+	// Both nil = equal
+	if a == nil && b == nil {
+		return true
+	}
+	// One nil, one not = not equal
+	if a == nil || b == nil {
+		return false
+	}
+	// Compare current phase arrays length
+	if len(a.Current) != len(b.Current) {
+		return false
+	}
+	// If both have current phase, compare the phase string and timestamp
+	if len(a.Current) > 0 && len(b.Current) > 0 {
+		if a.Current[0].Phase != b.Current[0].Phase {
+			return false
+		}
+		if !a.Current[0].Timestamp.Equal(b.Current[0].Timestamp) {
+			return false
+		}
+	}
+	return true
 }

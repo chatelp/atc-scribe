@@ -310,19 +310,25 @@ func (s *AircraftStorage) getAllAircraft() ([]*adsb.Aircraft, error) {
 		return []*adsb.Aircraft{}, nil
 	}
 
-	// For each aircraft, get the latest ADSB data (fast individual queries)
+	// Build hex codes list once for all batch operations
+	hexCodes := make([]string, 0, len(aircraftMap))
+	for hex := range aircraftMap {
+		hexCodes = append(hexCodes, hex)
+	}
+
+	// PERFORMANCE: Use batch query for ADSB data instead of N individual queries
 	adsbStart := time.Now()
-	s.logger.Debug("Starting ADSB data population", logger.Int("aircraft_count", len(aircraftMap)))
+	s.logger.Debug("Starting ADSB data population (batch)", logger.Int("aircraft_count", len(aircraftMap)))
 
-	for hex, aircraft := range aircraftMap {
-		// Get the latest ADSB data
-		adsbData, err := s.getLatestADSBData(hex)
-		if err == nil && adsbData != nil {
-			aircraft.ADSB = adsbData
+	adsbDataMap, err := s.getLatestADSBDataBatch(hexCodes)
+	if err != nil {
+		s.logger.Error("Failed to get ADSB data batch", logger.Error(err))
+	} else {
+		for hex, aircraft := range aircraftMap {
+			if adsbData, exists := adsbDataMap[hex]; exists {
+				aircraft.ADSB = adsbData
+			}
 		}
-
-		// History and future data are not populated in the main aircraft endpoint
-		// Use the combined /aircraft/{hex}/tracks endpoint instead
 	}
 
 	adsbDuration := time.Since(adsbStart)
@@ -331,11 +337,6 @@ func (s *AircraftStorage) getAllAircraft() ([]*adsb.Aircraft, error) {
 	// Get current phases for all aircraft in a single batch query
 	phaseStart := time.Now()
 	s.logger.Debug("Starting phase data population", logger.Int("aircraft_count", len(aircraftMap)))
-
-	hexCodes := make([]string, 0, len(aircraftMap))
-	for hex := range aircraftMap {
-		hexCodes = append(hexCodes, hex)
-	}
 
 	currentPhases, err := s.GetCurrentPhasesBatch(hexCodes)
 	if err != nil {
@@ -898,7 +899,7 @@ func (s *AircraftStorage) GetByHex(hex string) (*adsb.Aircraft, bool) {
 			a.Future = adsb.PredictFuturePositions(
 				a.ADSB.Lat,
 				a.ADSB.Lon,
-				a.ADSB.AltBaro,
+				a.ADSB.AltBaro.Float64(),
 				heading,    // true heading
 				magHeading, // magnetic heading
 				speed,

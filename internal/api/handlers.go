@@ -63,7 +63,7 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	minAltitude, maxAltitude, callsign, status, lastSeenMinutes,
 		tookOffAfter, tookOffBefore, landedAfter, landedBefore, distanceNM,
-		refLat, refLon, refHex, refFlight, excludeOtherAirportsGrounded := parseAircraftFilters(r)
+		refLat, refLon, refHex, refFlight, excludeOtherAirportsGrounded, simple := parseAircraftFilters(r)
 
 	// Get aircraft data
 	dataFetchStart := time.Now()
@@ -135,7 +135,7 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 				if refHeading == 0 {
 					refHeading = refAircraft.ADSB.Track // Use track if true heading is not available
 				}
-				refAltitude = refAircraft.ADSB.AltBaro
+				refAltitude = refAircraft.ADSB.AltBaro.Float64()
 			}
 			refType = "hex"
 		} else if refFlight != "" {
@@ -201,8 +201,8 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 						a.RelativeBearing = &bearing
 
 						// Calculate relative altitude
-						if refAltitude > 0 && a.ADSB.AltBaro > 0 {
-							relAlt := a.ADSB.AltBaro - refAltitude
+						if refAltitude > 0 && a.ADSB.AltBaro.Float64() > 0 {
+							relAlt := a.ADSB.AltBaro.Float64() - refAltitude
 							a.RelativeAlt = &relAlt
 						}
 					}
@@ -320,6 +320,63 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 
 		// Convert to API format
 		aircraft.Clearances = h.convertClearancesToAPIFormat(clearances)
+	}
+
+	// Return simplified response if simple=1
+	if simple {
+		simpleAircraft := make([]*adsb.AircraftSimple, 0, len(aircraft))
+		for _, a := range aircraft {
+			sa := &adsb.AircraftSimple{
+				Hex:      a.Hex,
+				Callsign: a.Flight,
+				Airline:  a.Airline,
+				Distance: a.Distance,
+				Status:   a.Status,
+			}
+			// Add BSDB data if available
+			if a.BSDB != nil {
+				sa.Registration = a.BSDB.Registration
+				sa.AircraftType = a.BSDB.ICAOTypeCode
+				sa.Manufacturer = a.BSDB.Manufacturer
+				sa.RegisteredOwners = a.BSDB.RegisteredOwners
+			}
+			// Add ADSB data if available
+			if a.ADSB != nil {
+				sa.Lat = a.ADSB.Lat
+				sa.Lon = a.ADSB.Lon
+				sa.AltBaro = a.ADSB.AltBaro.Float64()
+				sa.GroundSpeed = a.ADSB.GS
+				sa.Track = a.ADSB.Track
+				sa.VerticalRate = a.ADSB.BaroRate
+				sa.Squawk = a.ADSB.Squawk
+				sa.Category = a.ADSB.Category
+				// Use ADSB type if BSDB type not available
+				if sa.AircraftType == "" {
+					sa.AircraftType = a.ADSB.AircraftType
+				}
+				if sa.Registration == "" {
+					sa.Registration = a.ADSB.Registration
+				}
+			}
+			// Add current phase if available
+			if a.Phase != nil && len(a.Phase.Current) > 0 {
+				sa.Phase = a.Phase.Current[0].Phase
+			}
+			simpleAircraft = append(simpleAircraft, sa)
+		}
+
+		simpleResponse := adsb.AircraftSimpleResponse{
+			Timestamp: time.Now().UTC(),
+			Count:     len(simpleAircraft),
+			Aircraft:  simpleAircraft,
+		}
+		WriteJSON(w, http.StatusOK, simpleResponse)
+
+		totalDuration := time.Since(start)
+		h.logger.Debug("GetAllAircraft API call completed (simple mode)",
+			logger.Duration("total_duration", totalDuration),
+			logger.Int("final_aircraft_count", len(simpleAircraft)))
+		return
 	}
 
 	// Create response
@@ -1247,7 +1304,7 @@ func (h *Handler) StreamAudio(w http.ResponseWriter, r *http.Request) {
 }
 
 // parseAircraftFilters parses aircraft filter parameters from the request
-func parseAircraftFilters(r *http.Request) (float64, float64, string, []string, int, *time.Time, *time.Time, *time.Time, *time.Time, float64, float64, float64, string, string, bool) {
+func parseAircraftFilters(r *http.Request) (float64, float64, string, []string, int, *time.Time, *time.Time, *time.Time, *time.Time, float64, float64, float64, string, string, bool, bool) {
 	minAltitude := 0.0
 	maxAltitude := 60000.0
 	callsign := ""
@@ -1260,6 +1317,7 @@ func parseAircraftFilters(r *http.Request) (float64, float64, string, []string, 
 	refLat, refLon := 0.0, 0.0
 	refHex := ""
 	refFlight := ""
+	simple := false // Simple mode returns lightweight response
 
 	// Parse existing filters
 	if minStr := r.URL.Query().Get("min_altitude"); minStr != "" {
@@ -1353,9 +1411,18 @@ func parseAircraftFilters(r *http.Request) (float64, float64, string, []string, 
 		}
 	}
 
+	// Parse simple parameter for lightweight response
+	if simpleStr := r.URL.Query().Get("simple"); simpleStr != "" {
+		if s, err := strconv.ParseBool(simpleStr); err == nil {
+			simple = s
+		} else if simpleStr == "1" {
+			simple = true
+		}
+	}
+
 	return minAltitude, maxAltitude, callsign, status, lastSeenMinutes,
 		tookOffAfter, tookOffBefore, landedAfter, landedBefore, distanceNM,
-		refLat, refLon, refHex, refFlight, excludeOtherAirportsGrounded
+		refLat, refLon, refHex, refFlight, excludeOtherAirportsGrounded, simple
 }
 
 // getHexCoordinates gets coordinates from an aircraft hex code

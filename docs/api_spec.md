@@ -144,7 +144,7 @@ The `status` field for each aircraft indicates its current status:
 
 **Query Parameters:**
 - `min_altitude` (optional): Minimum altitude in feet
-- `max_altitude` (optional): Maximum altitude in feet  
+- `max_altitude` (optional): Maximum altitude in feet
 - `status` (optional): Comma-separated list of statuses to include (active, stale, signal_lost)
 - `callsign` (optional): Filter by callsign (partial match)
 - `last_seen_minutes` (optional): Only include aircraft seen within the last N minutes
@@ -157,6 +157,39 @@ The `status` field for each aircraft indicates its current status:
 - `ref_hex` (optional): Reference aircraft hex code for distance filtering
 - `ref_flight` (optional): Reference flight number for distance filtering
 - `exclude_other_airports_grounded` (optional): Exclude grounded aircraft outside the airport range (1 = true, 0 = false)
+- `simple` (optional): Return a lightweight response with essential fields only (1 = true, 0 = false)
+
+**Simple Response Format (when `simple=1`):**
+```json
+{
+  "timestamp": "2025-05-19T01:02:03.456Z",
+  "count": 2,
+  "aircraft": [
+    {
+      "hex": "a1b2c3",
+      "callsign": "SWA1234",
+      "registration": "N12345",
+      "aircraft_type": "B738",
+      "manufacturer": "Boeing",
+      "registered_owners": "Southwest Airlines Co",
+      "airline": "Southwest Airlines",
+      "category": "A3",
+      "lat": 43.7,
+      "lon": -79.5,
+      "alt_baro": 35000,
+      "gs": 450,
+      "track": 90,
+      "vertical_rate": -64,
+      "squawk": "3151",
+      "distance": 30.8,
+      "phase": "CRZ",
+      "status": "active"
+    }
+  ]
+}
+```
+
+The simple response excludes: history, future predictions, phase history, clearances, airline info, raw ADSB data, and detailed counts.
 
 ### GET /api/v1/aircraft/{hex}
 

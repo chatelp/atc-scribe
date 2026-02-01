@@ -217,7 +217,7 @@ func NewService(
 	// Always enable WebSocket streaming for aircraft updates
 	logger.Info("Initializing WebSocket change detection for aircraft streaming")
 	service.changeDetector = NewChangeDetector(logger)
-	service.broadcastChan = make(chan []AircraftChange, 100)
+	service.broadcastChan = make(chan []AircraftChange, 256) // Buffered to handle burst traffic
 	service.startBroadcastWorker()
 
 	// Set the config for the prediction function
@@ -381,7 +381,7 @@ func (s *Service) sendPhaseChangeAlertWithEvent(aircraft *Aircraft, fromPhase, t
 			}{
 				Lat: aircraft.ADSB.Lat,
 				Lon: aircraft.ADSB.Lon,
-				Alt: aircraft.ADSB.AltBaro,
+				Alt: aircraft.ADSB.AltBaro.Float64(),
 			},
 			RunwayInfo: runwayInfo,
 		}
@@ -398,7 +398,7 @@ func (s *Service) sendPhaseChangeAlertWithEvent(aircraft *Aircraft, fromPhase, t
 			logger.String("flight", aircraft.Flight),
 			logger.String("transition", fromPhase+" → "+toPhase),
 			logger.String("event_type", eventType),
-			logger.Float64("altitude", aircraft.ADSB.AltBaro),
+			logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
 			logger.Bool("on_ground", aircraft.OnGround),
 		)
 	}
@@ -495,12 +495,12 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 		if found && existingAircraft.ADSB != nil {
 			prevTAS = existingAircraft.ADSB.TAS
 			prevGS = existingAircraft.ADSB.GS
-			prevAlt = existingAircraft.ADSB.AltBaro
+			prevAlt = existingAircraft.ADSB.AltBaro.Float64()
 		}
 
 		// Validate and correct sensor data for potential errors
 		correctedTAS, correctedGS, correctedAlt := ValidateSensorData(
-			a.ADSB.TAS, a.ADSB.GS, a.ADSB.AltBaro,
+			a.ADSB.TAS, a.ADSB.GS, a.ADSB.AltBaro.Float64(),
 			prevTAS, prevGS, prevAlt,
 			a.ADSB.Lat, a.ADSB.Lon, s.stationLat, s.stationLon,
 			s.flightPhasesConfig.AirportRangeNM,
@@ -524,7 +524,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 			// Flying state detection moved to after phase determination
 
 			// Log sensor corrections if they occurred
-			if correctedTAS != a.ADSB.TAS || correctedGS != a.ADSB.GS || correctedAlt != a.ADSB.AltBaro {
+			if correctedTAS != a.ADSB.TAS || correctedGS != a.ADSB.GS || correctedAlt != a.ADSB.AltBaro.Float64() {
 				s.logger.Debug("Sensor data corrected for flying determination",
 					logger.String("hex", a.Hex),
 					logger.String("flight", a.Flight),
@@ -532,7 +532,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 					logger.Float64("corrected_tas", correctedTAS),
 					logger.Float64("original_gs", a.ADSB.GS),
 					logger.Float64("corrected_gs", correctedGS),
-					logger.Float64("original_alt", a.ADSB.AltBaro),
+					logger.Float64("original_alt", a.ADSB.AltBaro.Float64()),
 					logger.Float64("corrected_alt", correctedAlt),
 				)
 			}
@@ -1109,7 +1109,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft) []PhaseChan
 							logger.String("flight", a.Flight),
 							logger.Float64("time_since_takeoff", timeSinceTakeoff),
 							logger.Float64("threshold_seconds", flappingThreshold),
-							logger.Float64("altitude", a.ADSB.AltBaro),
+							logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
 						)
 						continue // Skip this transition
 					}
@@ -1123,7 +1123,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft) []PhaseChan
 					logger.String("flight", a.Flight),
 					logger.Bool("was_on_ground", existingAircraft.OnGround),
 					logger.Bool("now_on_ground", a.OnGround),
-					logger.Float64("altitude", a.ADSB.AltBaro),
+					logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
 					logger.Float64("ground_speed", a.ADSB.GS),
 				)
 
@@ -1140,7 +1140,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft) []PhaseChan
 							logger.String("flight", a.Flight),
 							logger.Float64("time_since_landing", timeSinceLanding),
 							logger.Float64("threshold_seconds", flappingThreshold),
-							logger.Float64("altitude", a.ADSB.AltBaro),
+							logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
 						)
 						continue // Skip this transition
 					}
@@ -1154,7 +1154,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft) []PhaseChan
 					logger.String("flight", a.Flight),
 					logger.Bool("was_on_ground", existingAircraft.OnGround),
 					logger.Bool("now_on_ground", a.OnGround),
-					logger.Float64("altitude", a.ADSB.AltBaro),
+					logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
 					logger.Float64("ground_speed", a.ADSB.GS),
 				)
 			}
@@ -1204,7 +1204,7 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 
 		// Only consider aircraft that were in APP phase or low altitude ARR
 		if currentPhase.Phase != "APP" &&
-			!(currentPhase.Phase == "ARR" && aircraft.ADSB.AltBaro < 2000) {
+			!(currentPhase.Phase == "ARR" && aircraft.ADSB.AltBaro.Float64() < 2000) {
 			continue
 		}
 
@@ -1216,7 +1216,7 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 
 		// If aircraft was close to airport and low altitude when signal lost
 		if distanceFromStation <= s.flightPhasesConfig.AirportRangeNM &&
-			aircraft.ADSB.AltBaro < s.flightPhasesConfig.SignalLostLandingMaxAltFt {
+			aircraft.ADSB.AltBaro.Float64() < s.flightPhasesConfig.SignalLostLandingMaxAltFt {
 
 			// Mark as landed
 			aircraft.OnGround = true
@@ -1236,7 +1236,7 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 			s.logger.Info("Signal lost aircraft marked as landed",
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
-				logger.Float64("last_altitude", aircraft.ADSB.AltBaro),
+				logger.Float64("last_altitude", aircraft.ADSB.AltBaro.Float64()),
 				logger.Float64("distance_from_airport", distanceFromStation),
 			)
 		}
@@ -1287,7 +1287,7 @@ func (s *Service) hasRecentTakeoff(aircraft *Aircraft) bool {
 		// - Below 2x departure altitude (e.g., 6000 ft if departure altitude is 3000 ft)
 		// These multipliers give us a larger catch zone for recent departures
 		if distanceFromStation <= float64(config.AirportRangeNM)*2 && // Within 2x airport range
-			aircraft.ADSB.AltBaro <= float64(config.DepartureAltitudeFt)*2 { // Within 2x departure altitude
+			aircraft.ADSB.AltBaro.Float64() <= float64(config.DepartureAltitudeFt)*2 { // Within 2x departure altitude
 			return true
 		}
 	}
@@ -1396,8 +1396,8 @@ func (s *Service) determineFlightPhase(aircraft *Aircraft) string {
 
 	// STEP 4: AIRBORNE PHASE DETERMINATION
 	// Aircraft is flying - determine which flight phase based on altitude, location, and behavior
-	altitude := adsb.AltBaro      // Barometric altitude in feet
-	verticalRate := adsb.BaroRate // Vertical speed in feet per minute
+	altitude := adsb.AltBaro.Float64() // Barometric altitude in feet
+	verticalRate := adsb.BaroRate      // Vertical speed in feet per minute
 
 	// STEP 4A: CRUISE PHASE - Highest Priority
 	// Aircraft at cruise altitude (typically 10,000+ ft) are in cruise phase
@@ -1722,7 +1722,7 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
 				logger.String("phase", change.Phase),
-				logger.Float64("altitude", aircraft.ADSB.AltBaro),
+				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
 				logger.Float64("ground_speed", aircraft.ADSB.GS),
 				logger.Float64("vertical_rate", aircraft.ADSB.BaroRate),
 				logger.Float64("distance_from_station", distanceFromStation),
@@ -1733,7 +1733,7 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
 				logger.String("transition", previousPhase+" → "+change.Phase),
-				logger.Float64("altitude", aircraft.ADSB.AltBaro),
+				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
 				logger.Float64("ground_speed", aircraft.ADSB.GS),
 				logger.Float64("vertical_rate", aircraft.ADSB.BaroRate),
 				logger.Float64("distance_from_station", distanceFromStation),
@@ -1750,7 +1750,7 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				"phase":      change.Phase,
 				"prev_phase": previousPhase,
 				"transition": previousPhase + " → " + change.Phase,
-				"altitude":   aircraft.ADSB.AltBaro,
+				"altitude":   aircraft.ADSB.AltBaro.Float64(),
 				"on_ground":  aircraft.OnGround,
 				"timestamp":  change.Timestamp.Format(time.RFC3339),
 			}
@@ -1768,7 +1768,7 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
 				logger.String("transition", previousPhase+" → T/O"),
-				logger.Float64("altitude", aircraft.ADSB.AltBaro),
+				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
 				logger.Bool("on_ground", aircraft.OnGround),
 			)
 
@@ -1778,7 +1778,7 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
 				logger.String("transition", previousPhase+" → T/D"),
-				logger.Float64("altitude", aircraft.ADSB.AltBaro),
+				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
 				logger.Bool("on_ground", aircraft.OnGround),
 			)
 
@@ -1807,7 +1807,7 @@ func (s *Service) sendImmediateGroundTransitionAlerts(phaseChanges []PhaseChange
 			s.logger.Info("Aircraft TOOK OFF (IMMEDIATE)",
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
-				logger.Float64("altitude", aircraft.ADSB.AltBaro),
+				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
 				logger.String("timestamp", change.Timestamp.Format(time.RFC3339)),
 			)
 
@@ -1820,7 +1820,7 @@ func (s *Service) sendImmediateGroundTransitionAlerts(phaseChanges []PhaseChange
 					"phase":      change.Phase,
 					"prev_phase": previousPhase,
 					"transition": previousPhase + " → " + change.Phase,
-					"altitude":   aircraft.ADSB.AltBaro,
+					"altitude":   aircraft.ADSB.AltBaro.Float64(),
 					"on_ground":  aircraft.OnGround,
 					"timestamp":  change.Timestamp.Format(time.RFC3339),
 				}
@@ -1837,7 +1837,7 @@ func (s *Service) sendImmediateGroundTransitionAlerts(phaseChanges []PhaseChange
 			s.logger.Info("Aircraft LANDED (IMMEDIATE)",
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
-				logger.Float64("altitude", aircraft.ADSB.AltBaro),
+				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
 				logger.String("timestamp", change.Timestamp.Format(time.RFC3339)),
 			)
 
@@ -1850,7 +1850,7 @@ func (s *Service) sendImmediateGroundTransitionAlerts(phaseChanges []PhaseChange
 					"phase":      change.Phase,
 					"prev_phase": previousPhase,
 					"transition": previousPhase + " → " + change.Phase,
-					"altitude":   aircraft.ADSB.AltBaro,
+					"altitude":   aircraft.ADSB.AltBaro.Float64(),
 					"on_ground":  aircraft.OnGround,
 					"timestamp":  change.Timestamp.Format(time.RFC3339),
 				}
@@ -1956,7 +1956,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 				if existing.Hex == raw.Hex && existing.ADSB != nil {
 					prevTAS = existing.ADSB.TAS
 					prevGS = existing.ADSB.GS
-					prevAlt = existing.ADSB.AltBaro
+					prevAlt = existing.ADSB.AltBaro.Float64()
 					break
 				}
 			}
@@ -1964,7 +1964,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 
 		// Validate and correct sensor data for potential errors
 		correctedTAS, correctedGS, correctedAlt := ValidateSensorData(
-			raw.TAS, raw.GS, raw.AltBaro,
+			raw.TAS, raw.GS, raw.AltBaro.Float64(),
 			prevTAS, prevGS, prevAlt,
 			raw.Lat, raw.Lon, s.stationLat, s.stationLon,
 			s.flightPhasesConfig.AirportRangeNM,
@@ -1975,7 +1975,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 		onGround := !IsFlying(correctedTAS, correctedGS, correctedAlt, &s.flightPhasesConfig)
 
 		// Log sensor corrections if they occurred
-		if correctedTAS != raw.TAS || correctedGS != raw.GS || correctedAlt != raw.AltBaro {
+		if correctedTAS != raw.TAS || correctedGS != raw.GS || correctedAlt != raw.AltBaro.Float64() {
 			s.logger.Debug("Sensor data corrected in ProcessRawData",
 				logger.String("hex", raw.Hex),
 				logger.String("flight", flightName),
@@ -1983,7 +1983,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 				logger.Float64("corrected_tas", correctedTAS),
 				logger.Float64("original_gs", raw.GS),
 				logger.Float64("corrected_gs", correctedGS),
-				logger.Float64("original_alt", raw.AltBaro),
+				logger.Float64("original_alt", raw.AltBaro.Float64()),
 				logger.Float64("corrected_alt", correctedAlt),
 			)
 		}
@@ -2032,7 +2032,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 			s.logger.Info("New aircraft detected",
 				logger.String("hex", a.Hex),
 				logger.String("flight", a.Flight),
-				logger.Float64("altitude", a.ADSB.AltBaro),
+				logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
 				logger.Bool("on_ground", a.OnGround),
 			)
 
@@ -2042,7 +2042,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 				data := map[string]interface{}{
 					"hex":        a.Hex,
 					"flight":     a.Flight,
-					"altitude":   a.ADSB.AltBaro,
+					"altitude":   a.ADSB.AltBaro.Float64(),
 					"on_ground":  a.OnGround,
 					"timestamp":  time.Now().UTC().Format(time.RFC3339),
 					"new_status": "new_aircraft",
@@ -2057,7 +2057,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 		}
 
 		// Calculate future positions if we have the necessary data
-		if raw.Lat != 0 && raw.Lon != 0 && raw.AltBaro != 0 {
+		if raw.Lat != 0 && raw.Lon != 0 && raw.AltBaro.Float64() != 0 {
 			// Get heading (use true_heading, track, or mag_heading, whichever is available)
 			heading := raw.TrueHeading
 			if heading == 0 {
@@ -2091,7 +2091,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 				futurePredictions := PredictFuturePositions(
 					raw.Lat,
 					raw.Lon,
-					raw.AltBaro,
+					raw.AltBaro.Float64(),
 					heading,    // true heading
 					magHeading, // magnetic heading
 					speed,

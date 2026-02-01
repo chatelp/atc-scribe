@@ -62,6 +62,8 @@ class AudioClient {
         });
         audioElement.addEventListener('pause', () => {
             console.log(`Audio paused for ${frequency.id}`);
+            // PERFORMANCE: Stop visualization when audio is paused to save CPU
+            this.cleanupVisualization(frequency.id);
         });
 
         this.audioElements[frequency.id] = {

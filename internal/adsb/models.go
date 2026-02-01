@@ -1,8 +1,40 @@
 package adsb
 
 import (
+	"encoding/json"
 	"time"
 )
+
+// FlexibleFloat64 is a float64 that can unmarshal from both numeric values
+// and strings like "ground" (which occurs in ADS-B data when aircraft is on ground)
+type FlexibleFloat64 float64
+
+// UnmarshalJSON implements json.Unmarshaler for FlexibleFloat64
+func (f *FlexibleFloat64) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as float64 first
+	var floatVal float64
+	if err := json.Unmarshal(data, &floatVal); err == nil {
+		*f = FlexibleFloat64(floatVal)
+		return nil
+	}
+
+	// If that fails, try as string (handles "ground" case)
+	var strVal string
+	if err := json.Unmarshal(data, &strVal); err == nil {
+		// "ground" or any other string means altitude is effectively 0
+		*f = 0
+		return nil
+	}
+
+	// If both fail, default to 0
+	*f = 0
+	return nil
+}
+
+// Float64 returns the value as a standard float64
+func (f FlexibleFloat64) Float64() float64 {
+	return float64(f)
+}
 
 // RawAircraftData represents the raw JSON data from the ADS-B source
 type RawAircraftData struct {
@@ -14,13 +46,13 @@ type RawAircraftData struct {
 // ADSBTarget represents a single aircraft in the raw ADS-B data
 // This corresponds to entries in the adsb_targets table
 type ADSBTarget struct {
-	Hex            string   `json:"hex"`
-	Type           string   `json:"type"`
-	Flight         string   `json:"flight"`
-	Registration   string   `json:"r,omitempty"` // External API specific field (r)
-	AircraftType   string   `json:"t,omitempty"` // External API specific field (t)
-	AltBaro        float64  `json:"alt_baro"`
-	AltGeom        float64  `json:"alt_geom"`
+	Hex            string          `json:"hex"`
+	Type           string          `json:"type"`
+	Flight         string          `json:"flight"`
+	Registration   string          `json:"r,omitempty"` // External API specific field (r)
+	AircraftType   string          `json:"t,omitempty"` // External API specific field (t)
+	AltBaro        FlexibleFloat64 `json:"alt_baro"`    // Can be "ground" string or numeric
+	AltGeom        FlexibleFloat64 `json:"alt_geom"`    // Can be "ground" string or numeric
 	GS             float64  `json:"gs"`
 	IAS            float64  `json:"ias"`
 	TAS            float64  `json:"tas"`
@@ -169,6 +201,35 @@ type Position struct {
 
 // AircraftMap is a map of aircraft keyed by hex ID
 type AircraftMap map[string]*Aircraft
+
+// AircraftSimple represents a lightweight aircraft with essential fields only
+type AircraftSimple struct {
+	Hex              string   `json:"hex"`
+	Callsign         string   `json:"callsign,omitempty"`
+	Registration     string   `json:"registration,omitempty"`
+	AircraftType     string   `json:"aircraft_type,omitempty"`
+	Manufacturer     string   `json:"manufacturer,omitempty"`
+	RegisteredOwners string   `json:"registered_owners,omitempty"`
+	Airline          string   `json:"airline,omitempty"`
+	Category         string   `json:"category,omitempty"`
+	Lat              float64  `json:"lat,omitempty"`
+	Lon              float64  `json:"lon,omitempty"`
+	AltBaro          float64  `json:"alt_baro"`
+	GroundSpeed      float64  `json:"gs"`
+	Track            float64  `json:"track"`
+	VerticalRate     float64  `json:"vertical_rate"`
+	Squawk           string   `json:"squawk,omitempty"`
+	Distance         *float64 `json:"distance,omitempty"`
+	Phase            string   `json:"phase,omitempty"`
+	Status           string   `json:"status"`
+}
+
+// AircraftSimpleResponse represents the API response for simplified aircraft data
+type AircraftSimpleResponse struct {
+	Timestamp time.Time         `json:"timestamp"`
+	Count     int               `json:"count"`
+	Aircraft  []*AircraftSimple `json:"aircraft"`
+}
 
 // AircraftCounts represents the counts of aircraft by ground/air and active/total
 type AircraftCounts struct {

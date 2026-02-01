@@ -161,8 +161,8 @@ func (s *Service) GenerateADSBData() []adsb.ADSBTarget {
 			AircraftType: aircraft.AircraftType,
 			Lat:          aircraft.CurrentLat,
 			Lon:          aircraft.CurrentLon,
-			AltBaro:      aircraft.CurrentAltitude,
-			AltGeom:      aircraft.CurrentAltitude,
+			AltBaro:      adsb.FlexibleFloat64(aircraft.CurrentAltitude),
+			AltGeom:      adsb.FlexibleFloat64(aircraft.CurrentAltitude),
 			TAS:          aircraft.TargetSpeed,
 			GS:           aircraft.TargetSpeed, // Simplified: assume no wind
 			Track:        aircraft.TargetHeading,

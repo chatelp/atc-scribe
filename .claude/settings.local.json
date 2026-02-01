@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(go get:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(.build.ps1)"
     ]
   }
 }

@@ -776,11 +776,12 @@
                                             <div class="flex-1 h-px bg-gray-600"></div>
                                         </div>
                                         
-                                        <div class="flex items-stretch rounded-lg overflow-hidden border transition-all duration-0 bg-black/30 mt-1"
+                                        <!-- PERFORMANCE: Use CSS hover instead of Alpine hoveredAircraft state to prevent full table re-renders -->
+                                        <div class="flex items-stretch rounded-lg overflow-hidden border transition-all duration-0 bg-black/30 mt-1 group-hover:border-gray-400/30 group-hover:bg-gray-500/10"
                                              :class="{
-                                                'border-gray-400/50 bg-gray-500/20': $store.atc.hoveredAircraft?.hex === aircraft.hex || $store.atc.selectedAircraft?.hex === aircraft.hex,
-                                                'border-border hover:border-gray-400/30 hover:bg-gray-500/10': !($store.atc.hoveredAircraft?.hex === aircraft.hex || $store.atc.selectedAircraft?.hex === aircraft.hex) && !($store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex)),
-                                                'border-green-400/35': $store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex) && !($store.atc.hoveredAircraft?.hex === aircraft.hex || $store.atc.selectedAircraft?.hex === aircraft.hex)
+                                                'border-gray-400/50 bg-gray-500/20': $store.atc.selectedAircraft?.hex === aircraft.hex,
+                                                'border-border': !($store.atc.selectedAircraft?.hex === aircraft.hex) && !($store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex)),
+                                                'border-green-400/35': $store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex) && !($store.atc.selectedAircraft?.hex === aircraft.hex)
                                              }">
                                             <!-- Phase cell -->
                                             <div class="p-1.5 text-center w-[70px] flex items-center justify-center">
