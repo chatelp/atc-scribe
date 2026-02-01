@@ -357,8 +357,10 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 				sa.Lat = a.ADSB.Lat
 				sa.Lon = a.ADSB.Lon
 				sa.AltBaro = math.Round(a.ADSB.AltBaro.Float64()/100) * 100
-				sa.GroundSpeed = a.ADSB.GS
-				sa.Track = a.ADSB.Track
+				sa.GroundSpeed = math.Round(a.ADSB.GS)
+				sa.TrueAirspeed = math.Round(a.ADSB.TAS)
+				sa.Track = math.Round(a.ADSB.Track)
+				sa.MagHeading = math.Round(a.ADSB.MagHeading)
 				sa.VerticalRate = math.Round(a.ADSB.BaroRate/100) * 100
 				sa.Squawk = a.ADSB.Squawk
 				sa.Category = a.ADSB.Category

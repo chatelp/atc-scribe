@@ -215,8 +215,10 @@ type AircraftSimple struct {
 	Lat              float64  `json:"lat,omitempty"`
 	Lon              float64  `json:"lon,omitempty"`
 	AltBaro          float64  `json:"alt_baro"`
-	GroundSpeed      float64  `json:"gs"`
+	GroundSpeed      float64  `json:"ground_speed"`
+	TrueAirspeed     float64  `json:"true_speed,omitempty"`
 	Track            float64  `json:"track"`
+	MagHeading       float64  `json:"mag_heading,omitempty"`
 	VerticalRate     float64  `json:"vertical_rate"`
 	Squawk           string   `json:"squawk,omitempty"`
 	Distance         *float64 `json:"distance,omitempty"`
