@@ -118,7 +118,7 @@ cd co-atc
 go mod download
 
 # Build the application using the build script
-.\build.ps1
+.\build_windows.ps1
 ```
 
 #### Mac
@@ -130,8 +130,8 @@ cd co-atc
 # Install dependencies
 go mod download
 
-# Build the application using the build script (for macOS ARM64)
-./build.sh
+# Build the application using the build script (for macOS)
+./build_mac.sh
 ```
 
 #### Linux
@@ -143,7 +143,7 @@ cd co-atc
 # Install dependencies
 go mod download
 
-# Build the application using the build script (for Linux AMD64)
+# Build the application using the build script (auto-detects architecture)
 chmod +x ./build_linux.sh
 ./build_linux.sh
 ```

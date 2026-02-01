@@ -10,7 +10,7 @@ Co-ATC is an AI-enhanced aircraft monitoring system for air traffic control oper
 
 ```powershell
 # Build (Windows - always use this, not 'go run')
-.\build.ps1
+.\build_windows.ps1
 
 # Run
 .\bin\co-atc.exe
@@ -20,8 +20,13 @@ Co-ATC is an AI-enhanced aircraft monitoring system for air traffic control oper
 ```
 
 ```bash
-# Build (macOS/Linux)
-./build.sh
+# Build (macOS)
+./build_mac.sh
+
+# Build (Linux)
+./build_linux.sh
+
+# Run
 ./bin/co-atc
 ```
 
@@ -86,7 +91,7 @@ docs/                       # Documentation
 
 ### Backend
 - Use PowerShell terminal commands (Windows dev environment)
-- Build via `build.ps1`, never `go run`
+- Build via `build_windows.ps1`, never `go run`
 - Update `docs/api_spec.md` when changing APIs
 - Clean up duplicate/dead code
 

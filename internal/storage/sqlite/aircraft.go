@@ -229,6 +229,18 @@ func initDatabase(db *sql.DB, log *logger.Logger) error {
 		return fmt.Errorf("failed to create index on phase_changes.phase_timestamp: %w", err)
 	}
 
+	// Index for phase + hex queries (used in takeoff/landing time lookups)
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_phase_changes_hex_phase_timestamp ON phase_changes(hex, phase, timestamp DESC)`)
+	if err != nil {
+		return fmt.Errorf("failed to create index on phase_changes.hex_phase_timestamp: %w", err)
+	}
+
+	// Covering index for the uniqueness check query in isUniqueADSBTarget
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_adsb_targets_unique_check ON adsb_targets(aircraft_hex, lat, lon, alt_baro, gs, tas, track)`)
+	if err != nil {
+		return fmt.Errorf("failed to create index on adsb_targets unique check: %w", err)
+	}
+
 	log.Info("Database schema initialized successfully")
 	return nil
 }
@@ -364,30 +376,34 @@ func (s *AircraftStorage) getAllAircraft() ([]*adsb.Aircraft, error) {
 	phaseDuration := time.Since(phaseStart)
 	s.logger.Debug("Phase data population completed", logger.Duration("duration", phaseDuration))
 
-	// Populate DateLanded and DateTookoff fields from phase_changes table
+	// PERFORMANCE: Batch query for takeoff and landing times instead of N individual queries
 	dateStart := time.Now()
-	s.logger.Debug("Starting date_landed/date_tookoff population", logger.Int("aircraft_count", len(aircraftMap)))
+	s.logger.Debug("Starting date_landed/date_tookoff population (batch)", logger.Int("aircraft_count", len(aircraftMap)))
 
-	for hex, aircraft := range aircraftMap {
-		// Get latest takeoff time
-		takeoffTime, err := s.GetLatestTakeoffTime(hex)
-		if err != nil {
-			s.logger.Error("Failed to get latest takeoff time", logger.Error(err), logger.String("hex", hex))
-		} else {
-			aircraft.DateTookoff = takeoffTime
+	takeoffTimes, err := s.GetLatestTakeoffTimesBatch(hexCodes)
+	if err != nil {
+		s.logger.Error("Failed to get takeoff times batch", logger.Error(err))
+	} else {
+		for hex, aircraft := range aircraftMap {
+			if takeoffTime, exists := takeoffTimes[hex]; exists {
+				aircraft.DateTookoff = takeoffTime
+			}
 		}
+	}
 
-		// Get latest landing time
-		landingTime, err := s.GetLatestLandingTime(hex)
-		if err != nil {
-			s.logger.Error("Failed to get latest landing time", logger.Error(err), logger.String("hex", hex))
-		} else {
-			aircraft.DateLanded = landingTime
+	landingTimes, err := s.GetLatestLandingTimesBatch(hexCodes)
+	if err != nil {
+		s.logger.Error("Failed to get landing times batch", logger.Error(err))
+	} else {
+		for hex, aircraft := range aircraftMap {
+			if landingTime, exists := landingTimes[hex]; exists {
+				aircraft.DateLanded = landingTime
+			}
 		}
 	}
 
 	dateDuration := time.Since(dateStart)
-	s.logger.Debug("Date population completed", logger.Duration("duration", dateDuration))
+	s.logger.Debug("Date population completed (batch)", logger.Duration("duration", dateDuration))
 
 	// Convert map to slice
 	aircraft := make([]*adsb.Aircraft, 0, len(aircraftMap))
@@ -450,7 +466,7 @@ func (s *AircraftStorage) getLatestADSBDataBatch(hexCodes []string) (map[string]
 		args[i] = hex
 	}
 
-	// Simple and fast query - just get latest timestamp for each aircraft
+	// Use correlated subquery - relies on idx_adsb_targets_hex_timestamp index
 	query := fmt.Sprintf(`
 		SELECT
 			aircraft_hex,
@@ -467,9 +483,7 @@ func (s *AircraftStorage) getLatestADSBDataBatch(hexCodes []string) (map[string]
 		)
 	`, strings.Join(placeholders, ","))
 
-	allArgs := args
-
-	rows, err := s.db.Query(query, allArgs...)
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query latest ADSB data batch: %w", err)
 	}
@@ -1753,4 +1767,116 @@ func (s *AircraftStorage) InsertPhaseChangesBatch(changes []adsb.PhaseChangeInse
 		logger.Int("count", len(changes)))
 
 	return nil
+}
+
+// GetLatestTakeoffTimesBatch returns the latest takeoff times for multiple aircraft in a single query
+func (s *AircraftStorage) GetLatestTakeoffTimesBatch(hexCodes []string) (map[string]*time.Time, error) {
+	if len(hexCodes) == 0 {
+		return make(map[string]*time.Time), nil
+	}
+
+	// Create placeholders for the IN clause
+	placeholders := make([]string, len(hexCodes))
+	args := make([]interface{}, len(hexCodes))
+	for i, hex := range hexCodes {
+		placeholders[i] = "?"
+		args[i] = hex
+	}
+
+	query := fmt.Sprintf(`
+		WITH latest_takeoffs AS (
+			SELECT hex, timestamp,
+				   ROW_NUMBER() OVER (PARTITION BY hex ORDER BY timestamp DESC) as rn
+			FROM phase_changes
+			WHERE hex IN (%s) AND phase = 'T/O'
+		)
+		SELECT hex, timestamp
+		FROM latest_takeoffs
+		WHERE rn = 1
+	`, strings.Join(placeholders, ","))
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query latest takeoff times batch: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]*time.Time)
+	for rows.Next() {
+		var hex, timestampStr string
+
+		if err := rows.Scan(&hex, &timestampStr); err != nil {
+			return nil, fmt.Errorf("failed to scan takeoff time row: %w", err)
+		}
+
+		timestamp, err := time.Parse(time.RFC3339, timestampStr)
+		if err != nil {
+			s.logger.Error("Failed to parse takeoff timestamp", logger.Error(err), logger.String("hex", hex))
+			continue
+		}
+
+		result[hex] = &timestamp
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating takeoff time rows: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetLatestLandingTimesBatch returns the latest landing times for multiple aircraft in a single query
+func (s *AircraftStorage) GetLatestLandingTimesBatch(hexCodes []string) (map[string]*time.Time, error) {
+	if len(hexCodes) == 0 {
+		return make(map[string]*time.Time), nil
+	}
+
+	// Create placeholders for the IN clause
+	placeholders := make([]string, len(hexCodes))
+	args := make([]interface{}, len(hexCodes))
+	for i, hex := range hexCodes {
+		placeholders[i] = "?"
+		args[i] = hex
+	}
+
+	query := fmt.Sprintf(`
+		WITH latest_landings AS (
+			SELECT hex, timestamp,
+				   ROW_NUMBER() OVER (PARTITION BY hex ORDER BY timestamp DESC) as rn
+			FROM phase_changes
+			WHERE hex IN (%s) AND phase = 'T/D'
+		)
+		SELECT hex, timestamp
+		FROM latest_landings
+		WHERE rn = 1
+	`, strings.Join(placeholders, ","))
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query latest landing times batch: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]*time.Time)
+	for rows.Next() {
+		var hex, timestampStr string
+
+		if err := rows.Scan(&hex, &timestampStr); err != nil {
+			return nil, fmt.Errorf("failed to scan landing time row: %w", err)
+		}
+
+		timestamp, err := time.Parse(time.RFC3339, timestampStr)
+		if err != nil {
+			s.logger.Error("Failed to parse landing timestamp", logger.Error(err), logger.String("hex", hex))
+			continue
+		}
+
+		result[hex] = &timestamp
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating landing time rows: %w", err)
+	}
+
+	return result, nil
 }
