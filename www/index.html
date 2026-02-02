@@ -816,16 +816,9 @@
                                                           class="text-sm"></span>
                                                     <div class="flex items-center gap-1 -mt-1">
                                                         <span class="text-[9px] text-gray-500" x-text="aircraft.adsb?.category || ''"></span>
-                                                        <span x-show="aircraft.adsb?.squawk"
-                                                              class="text-[8px] font-mono"
-                                                              :class="{
-                                                                  'text-red-400': aircraft.adsb?.squawk === '7700',
-                                                                  'text-orange-400': aircraft.adsb?.squawk === '7600',
-                                                                  'text-purple-400': aircraft.adsb?.squawk === '7500',
-                                                                  'text-gray-400': !['7500', '7600', '7700'].includes(aircraft.adsb?.squawk)
-                                                              }"
-                                                              :title="aircraft.adsb?.squawk === '7700' ? 'EMERGENCY' : aircraft.adsb?.squawk === '7600' ? 'RADIO FAILURE' : aircraft.adsb?.squawk === '7500' ? 'HIJACK' : 'Squawk'"
-                                                              x-text="aircraft.adsb?.squawk">
+                                                        <span class="text-[8px] text-gray-400"
+                                                              :title="aircraft.bsdb?.icao_type_code || aircraft.bsdb?.manufacturer || aircraft.bsdb?.type || aircraft.adsb?.aircraft_type || 'Unknown'"
+                                                              x-text="(aircraft.bsdb?.icao_type_code || aircraft.bsdb?.manufacturer || aircraft.bsdb?.type || aircraft.adsb?.aircraft_type || 'N/A').substring(0, 10)">
                                                         </span>
                                                     </div>
                                                 </div>

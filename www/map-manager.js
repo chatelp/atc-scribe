@@ -1192,9 +1192,15 @@ class MapManager {
 
         Object.keys(this.store.aircraft).forEach(hex => {
             const aircraft = this.store.aircraft[hex];
-            const markerInfo = this.markers[hex];
+            let markerInfo = this.markers[hex];
 
-            if (!markerInfo) return;
+            // If aircraft exists in store but has no marker, create it now
+            // This ensures aircraft that arrived while filtered still get markers
+            if (!markerInfo) {
+                this._ensureLeafletObjects(aircraft);
+                markerInfo = this.markers[hex];
+                if (!markerInfo) return; // Still failed to create marker, skip
+            }
 
             // Filter by last seen time
             let isVisibleByLastSeen = true;

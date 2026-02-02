@@ -402,15 +402,19 @@ document.addEventListener('alpine:init', () => {
                     }
                 }
 
-                // Filter by search term - now includes callsign, type, and category
+                // Filter by search term - includes callsign, type, category, manufacturer
                 if (searchLower) {
                     const callsign = (aircraft.flight || aircraft.hex).toLowerCase();
                     const type = (aircraft.adsb?.type || '').toLowerCase();
                     const category = (aircraft.adsb?.category || '').toLowerCase();
+                    const manufacturer = (aircraft.bsdb?.manufacturer || '').toLowerCase();
+                    const bsdbType = (aircraft.bsdb?.type || '').toLowerCase();
 
                     const matchesSearch = callsign.includes(searchLower) ||
                                         type.includes(searchLower) ||
-                                        category.includes(searchLower);
+                                        category.includes(searchLower) ||
+                                        manufacturer.includes(searchLower) ||
+                                        bsdbType.includes(searchLower);
 
                     if (!matchesSearch) return false;
                 }
@@ -741,6 +745,7 @@ document.addEventListener('alpine:init', () => {
                     ['Operator', aircraftOperator],
                     ['Hex', aircraft.hex],
                     ['Type', aircraftType],
+                    ['Manufacturer', bsdbData.manufacturer || 'N/A'],
                     ['Registration', aircraftReg],
                     ['Category', adsbData.category || 'N/A'],
                     ['Squawk', adsbData.squawk || 'N/A'],
@@ -2967,6 +2972,9 @@ async initAircraftDataSource() {
             if (delta.phase !== undefined && aircraft.phase !== delta.phase) aircraft.phase = delta.phase;
             if (delta.distance !== undefined && aircraft.distance !== delta.distance) aircraft.distance = delta.distance;
 
+            // Apply BSDB (BaseStation.sqb enrichment) data if provided
+            if (delta.bsdb !== undefined) aircraft.bsdb = delta.bsdb;
+
             // last_seen = now (we just received an update)
             aircraft.last_seen = new Date().toISOString();
         },
@@ -3101,16 +3109,20 @@ async initAircraftDataSource() {
             // Apply all current filters to determine if aircraft should be displayed
             const searchLower = this.searchTerm.toLowerCase();
             
-            // Search filter
+            // Search filter - includes callsign, type, category, manufacturer
             if (searchLower) {
                 const callsign = (aircraft.flight || aircraft.hex).toLowerCase();
                 const type = (aircraft.adsb?.type || '').toLowerCase();
                 const category = (aircraft.adsb?.category || '').toLowerCase();
-                
+                const manufacturer = (aircraft.bsdb?.manufacturer || '').toLowerCase();
+                const bsdbType = (aircraft.bsdb?.type || '').toLowerCase();
+
                 const matchesSearch = callsign.includes(searchLower) ||
                                     type.includes(searchLower) ||
-                                    category.includes(searchLower);
-                
+                                    category.includes(searchLower) ||
+                                    manufacturer.includes(searchLower) ||
+                                    bsdbType.includes(searchLower);
+
                 if (!matchesSearch) return false;
             }
             

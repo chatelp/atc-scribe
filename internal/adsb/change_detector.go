@@ -154,6 +154,11 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 		delta["distance"] = current.Distance
 	}
 
+	// Compare BSDB data (BaseStation.sqb enrichment)
+	if !bsdbDataEqual(previous.BSDB, current.BSDB) {
+		delta["bsdb"] = current.BSDB
+	}
+
 	// last_seen is set client-side to current time when receiving any update
 
 	return delta
@@ -184,4 +189,24 @@ func phaseDataEqual(a, b *PhaseData) bool {
 		}
 	}
 	return true
+}
+
+// bsdbDataEqual compares two BSDBData structs without using reflection
+// Returns true if both are equal (including both nil)
+func bsdbDataEqual(a, b *BSDBData) bool {
+	// Both nil = equal
+	if a == nil && b == nil {
+		return true
+	}
+	// One nil, one not = not equal
+	if a == nil || b == nil {
+		return false
+	}
+	// Compare all fields
+	return a.Registration == b.Registration &&
+		a.ICAOTypeCode == b.ICAOTypeCode &&
+		a.OperatorFlagCode == b.OperatorFlagCode &&
+		a.Manufacturer == b.Manufacturer &&
+		a.Type == b.Type &&
+		a.RegisteredOwners == b.RegisteredOwners
 }
