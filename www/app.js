@@ -211,6 +211,9 @@ document.addEventListener('alpine:init', () => {
         // Add property to track previous settings for change detection
         previousSettings: {},
         needsFullReload: false,
+        _settingsSaveTimeoutId: null,
+        _settingsSaveDebounceMs: 300,
+        _lastSettingsHash: null,
         
         // Simulation state
         showCreateSimulatedAircraft: false,
@@ -275,9 +278,27 @@ document.addEventListener('alpine:init', () => {
             this.previousSettings = { ...this.settings };
         },
 
+        // Debounced settings save to reduce frequent writes and reactivity churn
+        queueSaveSettings() {
+            const settingsHash = JSON.stringify(this.settings);
+            if (this._lastSettingsHash === settingsHash) {
+                return;
+            }
+            this._lastSettingsHash = settingsHash;
+
+            if (this._settingsSaveTimeoutId) {
+                clearTimeout(this._settingsSaveTimeoutId);
+            }
+
+            this._settingsSaveTimeoutId = setTimeout(() => {
+                this._settingsSaveTimeoutId = null;
+                this.saveSettings();
+            }, this._settingsSaveDebounceMs);
+        },
+
         // Enhanced settings change handlers for WebSocket
         onFilterChange() {
-            this.saveSettings();
+            this.queueSaveSettings();
             
             // Check if this is a server-side filter change that requires bulk reload
             if (this.needsFullReload) {
@@ -477,7 +498,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             // Create maps for efficient lookups
-            const currentMap = new Map(this._filteredAircraftCache.map(aircraft => [aircraft.hex, aircraft]));
+            const currentMap = new Map(this._filteredAircraftCache.map((aircraft, index) => [aircraft.hex, { aircraft, index }]));
             const newMap = new Map(newFiltered.map(aircraft => [aircraft.hex, aircraft]));
 
             // Track aircraft that need animations
@@ -496,12 +517,12 @@ document.addEventListener('alpine:init', () => {
             // Update existing aircraft and add new ones
             const finalArray = [];
             for (const newAircraft of newFiltered) {
-                const existingIndex = this._filteredAircraftCache.findIndex(a => a.hex === newAircraft.hex);
+                const existingEntry = currentMap.get(newAircraft.hex);
                 
-                if (existingIndex >= 0) {
+                if (existingEntry) {
                     // Update existing aircraft in-place
-                    Object.assign(this._filteredAircraftCache[existingIndex], newAircraft);
-                    finalArray.push(this._filteredAircraftCache[existingIndex]);
+                    Object.assign(existingEntry.aircraft, newAircraft);
+                    finalArray.push(existingEntry.aircraft);
                 } else {
                     // Add new aircraft
                     addedAircraft.push(newAircraft);
@@ -1887,14 +1908,14 @@ document.addEventListener('alpine:init', () => {
                 Alpine.effect(() => {
                     const showLocalDates = this.showLocalDates;
                     this.settings.showLocalDates = showLocalDates;
-                    this.saveSettings();
+                    this.queueSaveSettings();
                 });
 
                 // Watch for changes to settings
                 Alpine.effect(() => {
-                    // Create a copy of the settings to trigger the effect when any setting changes
-                    const settingsCopy = JSON.parse(JSON.stringify(this.settings));
-                    this.saveSettings();
+                    // Trigger effect on any setting changes without deep clone churn
+                    JSON.stringify(this.settings);
+                    this.queueSaveSettings();
                 });
                 
                 isAppInitialized = true;

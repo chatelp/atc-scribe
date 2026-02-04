@@ -1385,10 +1385,6 @@ class MapManager {
         
         // Update proximity circle if active
         this.updateProximityCircle();
-        
-        if (this.map) {
-            this.map.invalidateSize(false); // Invalidate map size in case of layout changes
-        }
     }
     
     // Update list of aircraft visible on map for UI indicators
