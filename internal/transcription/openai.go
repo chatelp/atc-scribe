@@ -64,7 +64,7 @@ func (c *OpenAIClient) CreateSession(ctx context.Context, config Config) (string
 		logger.String("model", c.model),
 		logger.String("language", config.Language),
 		logger.String("noise_reduction", config.NoiseReduction))
-	// Create request body using the exact same structure as the POC
+	// Build request body using flat fields (the creation endpoint uses this format)
 	type InputAudioNoiseReduction struct {
 		Type string `json:"type"`
 	}
@@ -99,8 +99,8 @@ func (c *OpenAIClient) CreateSession(ctx context.Context, config Config) (string
 		},
 	}
 
-	// Add noise reduction if specified
-	if config.NoiseReduction != "" {
+	// Add noise reduction if specified (omit for "none" or empty — API requires null to disable)
+	if config.NoiseReduction != "" && config.NoiseReduction != "none" {
 		reqBody.InputAudioNoiseReduction = &InputAudioNoiseReduction{
 			Type: config.NoiseReduction,
 		}
@@ -185,9 +185,13 @@ func (c *OpenAIClient) CreateSession(ctx context.Context, config Config) (string
 	}
 
 	// Log the parsed result
+	secretPrefix := result.ClientSecret.Value
+	if len(secretPrefix) > 10 {
+		secretPrefix = secretPrefix[:10] + "..."
+	}
 	c.logger.Debug("Parsed OpenAI API response",
 		logger.String("session_id", result.SessionID),
-		logger.String("client_secret_value_prefix", result.ClientSecret.Value[:10]+"..."),
+		logger.String("client_secret_value_prefix", secretPrefix),
 		logger.Int64("client_secret_expires_at", result.ClientSecret.ExpiresAt))
 
 	return result.SessionID, result.ClientSecret.Value, nil

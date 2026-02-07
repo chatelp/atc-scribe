@@ -274,6 +274,7 @@ func (p *CentralAudioProcessor) processSRTOutput() {
 	buffer := make([]byte, 4096)
 	bytesProcessed := 0
 	lastLogTime := time.Now()
+	headerChecked := false
 
 	for {
 		select {
@@ -327,20 +328,40 @@ func (p *CentralAudioProcessor) processSRTOutput() {
 			}
 
 			if n > 0 {
-				bytesProcessed += n
+				data := buffer[:n]
+
+				// On first read, detect and strip WAV header if present.
+				// The SRT server in WAV mode sends a 44-byte RIFF header as the
+				// first message. We strip it so all downstream consumers get raw PCM.
+				if !headerChecked {
+					headerChecked = true
+					if n >= 4 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' {
+						const wavHeaderSize = 44
+						if n <= wavHeaderSize {
+							p.logger.Info("Stripped WAV header from SRT stream",
+								Int("header_bytes", n))
+							continue
+						}
+						p.logger.Info("Stripped WAV header from SRT stream",
+							Int("header_bytes", wavHeaderSize))
+						data = data[wavHeaderSize:]
+					}
+				}
+
+				bytesProcessed += len(data)
 				p.lastActivity = time.Now()
 
 				// Log progress every 30 seconds
 				if time.Since(lastLogTime) > 30*time.Second {
 					p.logger.Debug("SRT processing progress",
 						Int("bytes_processed", bytesProcessed),
-						Int("bytes_this_read", n),
+						Int("bytes_this_read", len(data)),
 						String("duration", time.Since(lastLogTime).String()))
 					lastLogTime = time.Now()
 				}
 
 				// Write to multi-reader
-				if _, err := p.multiReader.Write(buffer[:n]); err != nil {
+				if _, err := p.multiReader.Write(data); err != nil {
 					p.logger.Error("Error writing to multi-reader", Error(err),
 						Int("bytes_processed_before_error", bytesProcessed))
 					return
@@ -563,7 +584,7 @@ func (p *CentralAudioProcessor) startMonitoring() {
 	}()
 }
 
-// CreateReader creates a new reader for the audio stream
+// CreateReader creates a new reader for the audio stream (with WAV header for browser playback)
 func (p *CentralAudioProcessor) CreateReader(id string) (io.ReadCloser, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -584,6 +605,28 @@ func (p *CentralAudioProcessor) CreateReader(id string) (io.ReadCloser, error) {
 	// Create a reader with WAV header
 	reader := p.multiReader.CreateReader(id)
 	return NewWAVReader(reader, p.sampleRate, p.channels), nil
+}
+
+// CreateRawReader creates a new reader for raw PCM audio (no WAV header, for transcription)
+func (p *CentralAudioProcessor) CreateRawReader(id string) (io.ReadCloser, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if !p.isRunning {
+		var err error
+		if p.sourceType == sourceTypeSRT {
+			err = p.startSRT()
+		} else {
+			err = p.startFFmpeg()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to start processor: %w", err)
+		}
+		p.isRunning = true
+	}
+
+	// Return raw PCM reader without WAV header
+	return p.multiReader.CreateReader(id), nil
 }
 
 // RemoveReader removes a reader
