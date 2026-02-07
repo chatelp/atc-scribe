@@ -501,7 +501,7 @@ func (s *AircraftStorage) getLatestADSBData(hex string) (*adsb.ADSBTarget, error
 // getLatestADSBDataBatch returns the latest ADSB data for multiple aircraft in a single query
 func (s *AircraftStorage) getLatestADSBDataBatch(hexCodes []string) (map[string]*adsb.ADSBTarget, error) {
 	start := time.Now()
-	s.logger.Info("Starting batch ADSB query", logger.Int("hex_count", len(hexCodes)))
+	s.logger.Debug("Starting batch ADSB query", logger.Int("hex_count", len(hexCodes)))
 
 	if len(hexCodes) == 0 {
 		return make(map[string]*adsb.ADSBTarget), nil
@@ -512,8 +512,8 @@ func (s *AircraftStorage) getLatestADSBDataBatch(hexCodes []string) (map[string]
 	args := make([]interface{}, len(hexCodes)*2) // Double args: once for subquery, once for main query
 	for i, hex := range hexCodes {
 		placeholders[i] = "?"
-		args[i] = hex                   // First set for subquery
-		args[i+len(hexCodes)] = hex     // Second set for outer WHERE
+		args[i] = hex               // First set for subquery
+		args[i+len(hexCodes)] = hex // Second set for outer WHERE
 	}
 
 	// Use GROUP BY + JOIN pattern - more efficient than correlated subquery on large tables
