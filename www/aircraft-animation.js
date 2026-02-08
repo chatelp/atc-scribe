@@ -504,9 +504,17 @@ class AircraftAnimationEngine {
             interpolatedAlt += vector.vz * timeFactor;
         }
         
+        const newLat = state.lastKnownPosition.lat + adjustedDeltaLat;
+        const newLon = state.lastKnownPosition.lon + adjustedDeltaLon;
+
+        // Guard against NaN from incomplete ADSB data (e.g. missing lon or velocity)
+        if (!Number.isFinite(newLat) || !Number.isFinite(newLon)) {
+            return null;
+        }
+
         return {
-            lat: state.lastKnownPosition.lat + adjustedDeltaLat,
-            lon: state.lastKnownPosition.lon + adjustedDeltaLon,
+            lat: newLat,
+            lon: newLon,
             alt: interpolatedAlt,
             confidence: confidence,
             interpolated: true,

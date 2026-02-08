@@ -267,11 +267,12 @@ type AircraftFutureResponse struct {
 
 // AircraftTracksResponse represents the API response for aircraft tracks (combined history and future)
 type AircraftTracksResponse struct {
-	Hex      string     `json:"hex"`
-	Flight   string     `json:"flight"`
-	Distance *float64   `json:"distance,omitempty"` // Distance in NM from station
-	History  []Position `json:"history"`            // Historical positions
-	Future   []Position `json:"future"`             // Future predicted positions
+	Hex          string        `json:"hex"`
+	Flight       string        `json:"flight"`
+	Distance     *float64      `json:"distance,omitempty"`     // Distance in NM from station
+	History      []Position    `json:"history"`                // Historical positions
+	Future       []Position    `json:"future"`                 // Future predicted positions
+	PhaseHistory []PhaseChange `json:"phase_history,omitempty"` // Phase change history (newest first)
 }
 
 // RunwayApproachInfo contains information about aircraft's approach to a runway

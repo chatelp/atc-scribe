@@ -599,31 +599,43 @@ class MapManager {
     }
 
     _ensureLeafletObjects(aircraft) {
+        // Skip aircraft without a valid numeric GPS position (covers mode_s, partial deltas, etc.)
+        const lat = aircraft.adsb?.lat;
+        const lon = aircraft.adsb?.lon;
+        const hasPosition = typeof lat === 'number' && typeof lon === 'number' && (lat !== 0 || lon !== 0);
+        if (!hasPosition) return;
+
+        const isStalePosition = aircraft.stale_position === true;
         const now = new Date();
 
-        if (!this.trails[aircraft.hex]) {
-            this.trails[aircraft.hex] = [];
-        }
-        this.trails[aircraft.hex].push({
-            lat: aircraft.adsb ? aircraft.adsb.lat : 0,
-            lon: aircraft.adsb ? aircraft.adsb.lon : 0,
-            alt_baro: aircraft.adsb ? aircraft.adsb.alt_baro : 0,
-            time: now,
-            isHistorical: false
-        });
-
-        // Use trailLength from settings, default to 2 minutes if not set
-        const trailLengthMinutes = this.store.settings.trailLength !== undefined ? this.store.settings.trailLength : 2;
-        const cutoffTime = new Date(now.getTime() - (trailLengthMinutes * 60 * 1000));
-        this.trails[aircraft.hex] = this.trails[aircraft.hex].filter(point => point.time >= cutoffTime);
-
-        // Hard limit on trail points to prevent memory leaks during long flights
-        const maxTrailPoints = 500;
-        if (this.trails[aircraft.hex].length > maxTrailPoints) {
-            this.trails[aircraft.hex] = this.trails[aircraft.hex].slice(-maxTrailPoints);
+        // Only add trail points for aircraft with live (non-stale) positions
+        if (!isStalePosition) {
+            if (!this.trails[aircraft.hex]) {
+                this.trails[aircraft.hex] = [];
+            }
+            this.trails[aircraft.hex].push({
+                lat: lat,
+                lon: lon,
+                alt_baro: aircraft.adsb?.alt_baro || 0,
+                time: now,
+                isHistorical: false
+            });
         }
 
-        const position = aircraft.adsb ? [aircraft.adsb.lat, aircraft.adsb.lon] : [0, 0];
+        // Prune old trail points (only if trail data exists)
+        if (this.trails[aircraft.hex]) {
+            const trailLengthMinutes = this.store.settings.trailLength !== undefined ? this.store.settings.trailLength : 2;
+            const cutoffTime = new Date(now.getTime() - (trailLengthMinutes * 60 * 1000));
+            this.trails[aircraft.hex] = this.trails[aircraft.hex].filter(point => point.time >= cutoffTime);
+
+            // Hard limit on trail points to prevent memory leaks during long flights
+            const maxTrailPoints = 500;
+            if (this.trails[aircraft.hex].length > maxTrailPoints) {
+                this.trails[aircraft.hex] = this.trails[aircraft.hex].slice(-maxTrailPoints);
+            }
+        }
+
+        const position = [lat, lon];
         const heading = this.store.getHeadingWithFallback(aircraft); // Use same fallback as label text
         const icon = this.createAircraftIcon(heading);
         const newLabelContent = this.store.createLabelContent(aircraft, (aircraft.flight || aircraft.hex).trim(), aircraft.adsb ? aircraft.adsb.alt_baro : 0, this.getVerticalTrend(aircraft));
@@ -744,7 +756,8 @@ class MapManager {
             const currentTrend = this.getVerticalTrend(aircraft);
 
             // Version key for comparing if label needs regeneration (excludes lastSeen)
-            const labelVersion = `${currentCallsign}_${Math.round(currentAltitude/100)}_${Math.round(currentSpeed/10)}_${currentPhase}_${currentStatus}_${currentTrend}`;
+            const isStale = aircraft.stale_position ? '1' : '0';
+            const labelVersion = `${currentCallsign}_${Math.round(currentAltitude/100)}_${Math.round(currentSpeed/10)}_${currentPhase}_${currentStatus}_${currentTrend}_${isStale}`;
 
             // Only regenerate label if actual data changed (not just lastSeen time)
             if (existing.lastLabelVersion !== labelVersion) {
@@ -830,12 +843,12 @@ class MapManager {
             // Show trail if marker is visible OR if aircraft is selected (selected always shows)
             const shouldShowTrail = markerIsOnMap || isSelectedAircraft;
 
-            // If aircraft marker isn't visible and isn't selected, remove its trail
+            // If aircraft marker isn't visible and isn't selected, remove trail layers
+            // from the map but KEEP the trail data so it redraws instantly when visible again
             if (!shouldShowTrail) {
                 this._removeTrailLayersByHex(hex);
                 delete this.trailLayersByHex[hex];
                 delete this.trailVersions[hex];
-                delete this.trails[hex];
                 return;
             }
 
@@ -877,7 +890,10 @@ class MapManager {
 
             // Draw real-time trail if we have trail data
             if (trail && trail.length >= 2) {
-                const currentPoints = trail.map(point => [point.lat, point.lon]);
+                const currentPoints = trail
+                    .filter(point => typeof point.lat === 'number' && typeof point.lon === 'number')
+                    .map(point => [point.lat, point.lon]);
+                if (currentPoints.length < 2) return;
 
                 const polyline = this.L.polyline(currentPoints, {
                     weight: 2,
@@ -1069,17 +1085,22 @@ class MapManager {
         const isFadedDueToOtherSelection = Alpine.store('atc').selectedAircraft && !isActuallySelected && !isInProximity;
 
         let targetOpacity = 1.0;
+        const isStalePosition = aircraftData.stale_position === true;
 
         if (isFadedDueToOtherSelection) {
             targetOpacity = this.CONFIG.selectedFadeOpacity;
         } else {
             if (isActuallySelected || isHovered || isInProximity) {
-                targetOpacity = 1.0;
+                targetOpacity = isStalePosition ? 0.6 : 1.0;
             } else {
-                switch (aircraftData.status) {
-                    case 'stale': targetOpacity = 0.7; break;
-                    case 'signal_lost': targetOpacity = 0.5; break;
-                    default: targetOpacity = 1.0;
+                if (isStalePosition) {
+                    targetOpacity = 0.35;
+                } else {
+                    switch (aircraftData.status) {
+                        case 'stale': targetOpacity = 0.7; break;
+                        case 'signal_lost': targetOpacity = 0.5; break;
+                        default: targetOpacity = 1.0;
+                    }
                 }
             }
         }
@@ -2095,7 +2116,7 @@ class MapManager {
             'T/O': '#FB923C',    // orange-400
             'DEP': '#4ADE80',    // green-400
             'CRZ': '#60A5FA',    // blue-400
-            'ARR': '#F87171',    // red-400
+            'ARR': '#F9A8D4',    // pink-300
             'APP': '#FACC15',    // yellow-400
             'T/D': '#2DD4BF'     // teal-400
         };

@@ -527,6 +527,18 @@ func (c *Config) ValidateFlightPhases() error {
 	if c.FlightPhases.PhaseFlappingPreventionSeconds == 0 {
 		c.FlightPhases.PhaseFlappingPreventionSeconds = 300 // 5 minutes default
 	}
+	if c.FlightPhases.HighAltitudeOverrideFt == 0 {
+		c.FlightPhases.HighAltitudeOverrideFt = 5000.0
+	}
+	if c.FlightPhases.ImpossibleAltDropThresholdFt == 0 {
+		c.FlightPhases.ImpossibleAltDropThresholdFt = 10000.0
+	}
+	if c.FlightPhases.ImpossibleSpeedDropThresholdKts == 0 {
+		c.FlightPhases.ImpossibleSpeedDropThresholdKts = 100.0
+	}
+	if c.FlightPhases.ImpossibleSpeedDropMinAltFt == 0 {
+		c.FlightPhases.ImpossibleSpeedDropMinAltFt = 5000.0
+	}
 	if c.FlightPhases.SignalLostLandingMaxAltFt == 0 {
 		c.FlightPhases.SignalLostLandingMaxAltFt = 1000.0
 	}

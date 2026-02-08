@@ -640,7 +640,7 @@
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('ARR')"
                                     :class="{
-                                        'bg-red-500/20 border-red-500/50 text-red-400': $store.atc.settings.phaseFilters?.ARR !== false,
+                                        'bg-pink-400/15 border-pink-400/40 text-pink-300': $store.atc.settings.phaseFilters?.ARR !== false,
                                         'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.ARR === false
                                     }"
                                     class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
@@ -792,7 +792,7 @@
                                                           'bg-blue-500/20 text-blue-400 border border-blue-500/30': $store.atc.getCurrentPhase(aircraft) === 'CRZ',
                                                           'bg-green-500/20 text-green-400 border border-green-500/30': $store.atc.getCurrentPhase(aircraft) === 'DEP',
                                                           'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': $store.atc.getCurrentPhase(aircraft) === 'APP',
-                                                          'bg-red-500/20 text-red-400 border border-red-500/30': $store.atc.getCurrentPhase(aircraft) === 'ARR',
+                                                          'bg-pink-400/15 text-pink-300 border border-pink-400/25': $store.atc.getCurrentPhase(aircraft) === 'ARR',
                                                           'bg-purple-500/20 text-purple-400 border border-purple-500/30': $store.atc.getCurrentPhase(aircraft) === 'TAX',
                                                           'bg-orange-500/20 text-orange-400 border border-orange-500/30': $store.atc.getCurrentPhase(aircraft) === 'T/O',
                                                           'bg-teal-500/20 text-teal-400 border border-teal-500/30': $store.atc.getCurrentPhase(aircraft) === 'T/D',
@@ -815,6 +815,12 @@
                                                           }"
                                                           class="text-sm"></span>
                                                     <div class="flex items-center gap-1 -mt-1">
+                                                        <span x-show="aircraft.stale_position"
+                                                              title="Last known position — GPS data lost"
+                                                              class="text-[8px] text-orange-500/80 font-medium">LP</span>
+                                                        <span x-show="!aircraft.stale_position && (!aircraft.adsb || (aircraft.adsb.lat === 0 && aircraft.adsb.lon === 0))"
+                                                              title="Mode S — no GPS position"
+                                                              class="text-[8px] text-yellow-600/80 font-medium">S</span>
                                                         <span class="text-[9px] text-gray-500" x-text="aircraft.adsb?.category || ''"></span>
                                                         <span class="text-[8px] text-gray-400"
                                                               :title="aircraft.bsdb?.icao_type_code || aircraft.bsdb?.manufacturer || aircraft.bsdb?.type || aircraft.adsb?.aircraft_type || 'Unknown'"
@@ -905,7 +911,7 @@
                                               'bg-blue-500/20 text-blue-400 border border-blue-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'CRZ',
                                               'bg-green-500/20 text-green-400 border border-green-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'DEP',
                                               'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'APP',
-                                              'bg-red-500/20 text-red-400 border border-red-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'ARR',
+                                              'bg-pink-400/15 text-pink-300 border border-pink-400/25': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'ARR',
                                               'bg-purple-500/20 text-purple-400 border border-purple-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'TAX',
                                               'bg-orange-500/20 text-orange-400 border border-orange-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'T/O',
                                               'bg-teal-500/20 text-teal-400 border border-teal-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'T/D',
@@ -1206,6 +1212,9 @@
                                                 <td class="p-1.5 text-left border-b border-border whitespace-nowrap">
                                                     <span x-text="$store.atc.formatDate(position.timestamp, true)"></span>
                                                     <span class="text-text/70 text-[10px] ml-1" x-text="Math.floor((new Date() - new Date(position.timestamp)) / 1000) + 's'"></span>
+                                                    <span x-show="position.lat === 0 && position.lon === 0"
+                                                          title="Mode S — no GPS position"
+                                                          class="text-[8px] text-yellow-600/80 font-medium ml-1">S</span>
                                                 </td>
                                                 <td class="p-1.5 text-right border-b border-border">
                                                     <div class="flex items-center justify-end">
@@ -1260,7 +1269,7 @@
                                                                   'bg-blue-500/20 text-blue-400 border border-blue-500/30': phase.phase === 'CRZ',
                                                                   'bg-green-500/20 text-green-400 border border-green-500/30': phase.phase === 'DEP',
                                                                   'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': phase.phase === 'APP',
-                                                                  'bg-red-500/20 text-red-400 border border-red-500/30': phase.phase === 'ARR',
+                                                                  'bg-pink-400/15 text-pink-300 border border-pink-400/25': phase.phase === 'ARR',
                                                                   'bg-purple-500/20 text-purple-400 border border-purple-500/30': phase.phase === 'TAX',
                                                                   'bg-orange-500/20 text-orange-400 border border-orange-500/30': phase.phase === 'T/O',
                                                                   'bg-teal-500/20 text-teal-400 border border-teal-500/30': phase.phase === 'T/D',

@@ -129,6 +129,15 @@ type Storage interface {
 	GetCurrentPhasesBatch(hexCodes []string) (map[string]*PhaseChange, error)
 	GetLatestADSBTargetIDsBatch(hexCodes []string) (map[string]*int, error)
 	InsertPhaseChangesBatch(changes []PhaseChangeInsert) error
+
+	// Batch methods for fetch hot path optimization
+	GetAircraftOnGroundBatch(hexCodes []string) (map[string]bool, error)
+	GetLatestADSBDataBatch(hexCodes []string) (map[string]*ADSBTarget, error)
+	GetLatestTakeoffTimesBatch(hexCodes []string) (map[string]*time.Time, error)
+	GetLatestLandingTimesBatch(hexCodes []string) (map[string]*time.Time, error)
+
+	// Targeted query for inactive aircraft status updates
+	GetStaleActiveAircraft(activeHexCodes []string, cutoff time.Time) ([]*Aircraft, error)
 }
 
 // SimulationService defines the interface for simulation service
@@ -488,16 +497,32 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 		activeAircraft[a.Hex] = true
 	}
 
+	// Collect all hex codes for batch operations
+	hexCodes := make([]string, len(newAircraft))
+	for i, a := range newAircraft {
+		hexCodes[i] = a.Hex
+	}
+
+	// PERFORMANCE: Batch queries replace ~8000 per-aircraft queries with 6 batch queries per cycle
+	existingOnGround, _ := s.storage.GetAircraftOnGroundBatch(hexCodes)
+	existingADSB, _ := s.storage.GetLatestADSBDataBatch(hexCodes)
+	takeoffTimes, _ := s.storage.GetLatestTakeoffTimesBatch(hexCodes)
+	landingTimes, _ := s.storage.GetLatestLandingTimesBatch(hexCodes)
+	currentPhases, _ := s.storage.GetCurrentPhasesBatch(hexCodes)
+	adsbTargetIDs, _ := s.storage.GetLatestADSBTargetIDsBatch(hexCodes)
+
 	// Process each aircraft for ground state determination and takeoff/landing detection
 	for _, a := range newAircraft {
-		// Get previous state from database for sensor validation
-		existingAircraft, found := s.storage.GetByHex(a.Hex)
+		// Check if aircraft exists in database using pre-fetched batch data
+		_, found := existingOnGround[a.Hex]
 
 		var prevTAS, prevGS, prevAlt float64
-		if found && existingAircraft.ADSB != nil {
-			prevTAS = existingAircraft.ADSB.TAS
-			prevGS = existingAircraft.ADSB.GS
-			prevAlt = existingAircraft.ADSB.AltBaro.Float64()
+		if found {
+			if adsbData, ok := existingADSB[a.Hex]; ok && adsbData != nil {
+				prevTAS = adsbData.TAS
+				prevGS = adsbData.GS
+				prevAlt = adsbData.AltBaro.Float64()
+			}
 		}
 
 		// Validate and correct sensor data for potential errors
@@ -509,25 +534,11 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 			&s.flightPhasesConfig,
 		)
 
-		// Determine if aircraft is currently flying using corrected values and config
-		currentlyFlying := IsFlying(correctedTAS, correctedGS, correctedAlt, &s.flightPhasesConfig)
-
-		// Always set on_ground based on flying state
-		a.OnGround = !currentlyFlying
-
-		if found {
-			// Get the latest takeoff and landing times from phase_changes table
-			takeoffTime, _ := s.storage.GetLatestTakeoffTime(a.Hex)
-			landingTime, _ := s.storage.GetLatestLandingTime(a.Hex)
-
-			a.DateTookoff = takeoffTime
-			a.DateLanded = landingTime
-
-			// Flying state detection moved to after phase determination
-
-			// Log sensor corrections if they occurred
-			if correctedTAS != a.ADSB.TAS || correctedGS != a.ADSB.GS || correctedAlt != a.ADSB.AltBaro.Float64() {
-				s.logger.Debug("Sensor data corrected for flying determination",
+		// Apply corrected values back to ADSB data so the entire pipeline
+		// (phase detection, DB storage, change detector) uses consistent corrected data
+		if correctedTAS != a.ADSB.TAS || correctedGS != a.ADSB.GS || correctedAlt != a.ADSB.AltBaro.Float64() {
+			if found {
+				s.logger.Debug("Sensor data corrected",
 					logger.String("hex", a.Hex),
 					logger.String("flight", a.Flight),
 					logger.Float64("original_tas", a.ADSB.TAS),
@@ -538,69 +549,57 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 					logger.Float64("corrected_alt", correctedAlt),
 				)
 			}
-
-			// Flying state detection moved to after phase determination
+			a.ADSB.TAS = correctedTAS
+			a.ADSB.GS = correctedGS
+			a.ADSB.AltBaro = FlexibleFloat64(correctedAlt)
 		}
 
-		// DO NOT update the aircraft in the database yet - we need to detect ground state transitions first
-		// s.storage.Upsert(a) -- MOVED TO AFTER GROUND STATE DETECTION
+		// Determine if aircraft is currently flying using corrected values and config
+		currentlyFlying := IsFlying(a.ADSB.TAS, a.ADSB.GS, a.ADSB.AltBaro.Float64(), &s.flightPhasesConfig)
 
-		// Populate phase data for the aircraft
-		phaseHistory, err := s.storage.GetPhaseHistory(a.Hex)
-		if err == nil && len(phaseHistory) > 0 {
-			// Create phase data structure
-			a.Phase = &PhaseData{
-				Current: []PhaseChange{phaseHistory[0]},
-				History: phaseHistory,
+		// Always set on_ground based on flying state
+		a.OnGround = !currentlyFlying
+
+		if found {
+			// Use pre-fetched takeoff and landing times
+			a.DateTookoff = takeoffTimes[a.Hex]
+			a.DateLanded = landingTimes[a.Hex]
+		} else {
+			// New aircraft — log and send WebSocket notification
+			s.logger.Info("New aircraft detected",
+				logger.String("hex", a.Hex),
+				logger.String("flight", a.Flight),
+				logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
+				logger.Bool("on_ground", a.OnGround),
+			)
+			if s.wsServer != nil {
+				s.wsServer.Broadcast(&websocket.Message{
+					Type: "status_update",
+					Data: map[string]interface{}{
+						"hex":        a.Hex,
+						"flight":     a.Flight,
+						"altitude":   a.ADSB.AltBaro.Float64(),
+						"on_ground":  a.OnGround,
+						"timestamp":  time.Now().UTC().Format(time.RFC3339),
+						"new_status": "new_aircraft",
+					},
+				})
 			}
 		}
 	}
 
 	// PRIORITY 1: Handle immediate ground state transitions (takeoff/landing)
-	immediatePhaseChanges := s.detectGroundStateTransitions(newAircraft)
+	immediatePhaseChanges := s.detectGroundStateTransitions(newAircraft, existingOnGround, currentPhases, adsbTargetIDs)
 	if len(immediatePhaseChanges) > 0 {
 		err := s.storage.InsertPhaseChangesBatch(immediatePhaseChanges)
 		if err != nil {
 			s.logger.Error("Failed to insert immediate ground transition phases", logger.Error(err))
 		} else {
-			// Send immediate alerts for takeoff/landing events
 			s.sendImmediateGroundTransitionAlerts(immediatePhaseChanges)
-
-			// IMPORTANT: Update the phase data for aircraft that just had transitions
-			// This ensures the Phase, DateTookoff, and DateLanded fields are populated
-			for _, change := range immediatePhaseChanges {
-				// Find the aircraft in our newAircraft slice
-				for _, a := range newAircraft {
-					if a.Hex == change.Hex {
-						// Get the updated phase data from storage
-						phaseHistory, err := s.storage.GetPhaseHistory(a.Hex)
-						if err == nil && len(phaseHistory) > 0 {
-							// Create phase data structure
-							a.Phase = &PhaseData{
-								Current: []PhaseChange{phaseHistory[0]},
-								History: phaseHistory,
-							}
-
-							// Update takeoff/landing times based on phase
-							if change.Phase == "T/O" {
-								takeoffTime := change.Timestamp
-								a.DateTookoff = &takeoffTime
-							} else if change.Phase == "T/D" {
-								landingTime := change.Timestamp
-								a.DateLanded = &landingTime
-							}
-
-							// Update the aircraft in storage with the new phase data
-							// s.storage.Upsert(a) -- MOVED TO AFTER ALL PROCESSING
-						}
-						break
-					}
-				}
-			}
 		}
 	}
 
-	// NOW update all aircraft in the database after ground state transitions have been detected
+	// Update all aircraft in the database
 	for _, a := range newAircraft {
 		s.storage.Upsert(a)
 	}
@@ -609,15 +608,38 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 	s.updateAircraftStatus(activeAircraft)
 
 	// PRIORITY 2: Handle all other phase changes (normal phase detection)
-	s.processPhaseChangesBatch(newAircraft, immediatePhaseChanges)
+	newPhaseChanges := s.processPhaseChangesBatch(newAircraft, immediatePhaseChanges, currentPhases, adsbTargetIDs, takeoffTimes)
 
-	s.setLastFetchTime(time.Now().UTC()) // Use UTC for last fetch time
+	s.setLastFetchTime(time.Now().UTC())
 
-	// CRITICAL FIX: Only detect and broadcast changes if WebSocket streaming is enabled
+	// Detect and broadcast changes using enriched newAircraft (no DB read)
 	if s.changeDetector != nil && s.broadcastChan != nil {
-		allAircraft := s.GetAllAircraft()
-		changes := s.changeDetector.DetectChanges(allAircraft)
+		// Enrich newAircraft with phase data from batch + new changes
+		phaseMap := make(map[string]PhaseChange)
+		for hex, phase := range currentPhases {
+			if phase != nil {
+				phaseMap[hex] = *phase
+			}
+		}
+		// Override with immediate phase changes
+		for _, change := range immediatePhaseChanges {
+			phaseMap[change.Hex] = PhaseChange{Phase: change.Phase, Timestamp: change.Timestamp}
+		}
+		// Override with newly detected phase changes
+		for _, change := range newPhaseChanges {
+			phaseMap[change.Hex] = PhaseChange{Phase: change.Phase, Timestamp: change.Timestamp}
+		}
+		for _, a := range newAircraft {
+			if phase, ok := phaseMap[a.Hex]; ok {
+				a.Phase = &PhaseData{Current: []PhaseChange{phase}}
+			}
+		}
 
+		// Enrich with BSDB and simulation data (in-memory lookups)
+		s.enrichWithBSDB(newAircraft)
+		s.updateSimulationFields(newAircraft)
+
+		changes := s.changeDetector.DetectChanges(newAircraft)
 		if len(changes) > 0 {
 			s.logger.Debug("Detected aircraft changes",
 				logger.Int("change_count", len(changes)))
@@ -733,6 +755,11 @@ func (s *Service) GetAllPositionHistory(hex string) ([]Position, error) {
 // GetPositionHistoryWithLimit returns position history for an aircraft with a specified limit
 func (s *Service) GetPositionHistoryWithLimit(hex string, limit int) ([]Position, error) {
 	return s.storage.GetPositionHistoryWithLimit(hex, limit)
+}
+
+// GetPhaseHistory returns the phase change history for an aircraft (newest first)
+func (s *Service) GetPhaseHistory(hex string) ([]PhaseChange, error) {
+	return s.storage.GetPhaseHistory(hex)
 }
 
 // GetFilteredAircraft returns aircraft filtered by altitude, status, and date ranges
@@ -1009,78 +1036,59 @@ func (s *Service) GetEffectiveStationCoords() (lat, lon float64) {
 	return s.stationLat, s.stationLon
 }
 
-// updateAircraftStatus updates the status of aircraft that are no longer active
+// updateAircraftStatus updates the status of aircraft that are no longer active.
+// Uses a targeted query instead of GetAll() — only fetches aircraft that actually need status updates.
 func (s *Service) updateAircraftStatus(activeAircraft map[string]bool) {
-	// Get all current aircraft
-	allAircraft := s.storage.GetAll()
-	now := time.Now().UTC() // Use UTC for current time
+	now := time.Now().UTC()
+	cutoff := now.Add(-s.signalLostTimeout)
+
+	// Build list of active hex codes for exclusion
+	activeHexCodes := make([]string, 0, len(activeAircraft))
+	for hex := range activeAircraft {
+		activeHexCodes = append(activeHexCodes, hex)
+	}
+
+	// Targeted query: only aircraft that are active, not currently broadcasting, and stale
+	staleAircraft, err := s.storage.GetStaleActiveAircraft(activeHexCodes, cutoff)
+	if err != nil {
+		s.logger.Error("Failed to get stale active aircraft", logger.Error(err))
+		return
+	}
 
 	var inactiveAircraft []*Aircraft
 
-	for _, aircraft := range allAircraft {
-		// Skip aircraft with no position data
-		if aircraft.ADSB == nil || (aircraft.ADSB.Lat == 0 && aircraft.ADSB.Lon == 0) {
-			continue
-		}
+	for _, aircraft := range staleAircraft {
+		aircraft.Status = "signal_lost"
+		s.storage.Upsert(aircraft)
 
-		// Skip active aircraft (they're handled in fetchAndProcess)
-		if activeAircraft[aircraft.Hex] {
-			continue
-		}
-
-		// Handle inactive aircraft status updates
-		timeSinceLastSeen := now.Sub(aircraft.LastSeen)
-		newStatus := aircraft.Status // Default to current status
-
-		// Apply new status logic:
-		// - If last seen > configured timeout: signal_lost
-		if timeSinceLastSeen > s.signalLostTimeout {
-			newStatus = "signal_lost"
+		// Only track aircraft with position for signal-lost landing detection
+		hasPosition := aircraft.ADSB != nil && (aircraft.ADSB.Lat != 0 || aircraft.ADSB.Lon != 0)
+		if hasPosition {
 			inactiveAircraft = append(inactiveAircraft, aircraft)
 		}
 
-		// Only update if status changed
-		if aircraft.Status != newStatus {
-			aircraft.Status = newStatus
-			s.storage.Upsert(aircraft)
+		timeSinceLastSeen := now.Sub(aircraft.LastSeen)
+		s.logger.Info("Aircraft status updated",
+			logger.String("hex", aircraft.Hex),
+			logger.String("flight", aircraft.Flight),
+			logger.String("new_status", "signal_lost"),
+			logger.Bool("on_ground", aircraft.OnGround),
+			logger.Duration("time_since_last_seen", timeSinceLastSeen),
+		)
 
-			s.logger.Info("Aircraft status updated",
-				logger.String("hex", aircraft.Hex),
-				logger.String("flight", aircraft.Flight),
-				logger.String("new_status", aircraft.Status),
-				logger.Bool("on_ground", aircraft.OnGround),
-				logger.Duration("time_since_last_seen", timeSinceLastSeen),
-			)
-
-			// Send WebSocket message for status change event
-			if s.wsServer != nil {
-				// For signal_lost status, only send WebSocket message if aircraft is NOT on the ground
-				// For other status changes, always send the message
-				if newStatus != "signal_lost" || !aircraft.OnGround {
-					// Create message data
-					data := map[string]interface{}{
-						"hex":                  aircraft.Hex,
-						"flight":               aircraft.Flight,
-						"new_status":           newStatus,
-						"on_ground":            aircraft.OnGround,
-						"time_since_last_seen": timeSinceLastSeen.Seconds(),
-						"timestamp":            now.Format(time.RFC3339),
-					}
-
-					// Broadcast the message
-					s.wsServer.Broadcast(&websocket.Message{
-						Type: "status_update",
-						Data: data,
-					})
-				} else {
-					// Log that we're skipping the WebSocket message for a grounded aircraft
-					s.logger.Debug("Skipping signal_lost WebSocket message for grounded aircraft",
-						logger.String("hex", aircraft.Hex),
-						logger.String("flight", aircraft.Flight),
-						logger.Bool("on_ground", aircraft.OnGround),
-					)
-				}
-			}
+		// Send WebSocket message (skip for grounded aircraft)
+		if s.wsServer != nil && !aircraft.OnGround {
+			s.wsServer.Broadcast(&websocket.Message{
+				Type: "status_update",
+				Data: map[string]interface{}{
+					"hex":                  aircraft.Hex,
+					"flight":               aircraft.Flight,
+					"new_status":           "signal_lost",
+					"on_ground":            aircraft.OnGround,
+					"time_since_last_seen": timeSinceLastSeen.Seconds(),
+					"timestamp":            now.Format(time.RFC3339),
+				},
+			})
 		}
 	}
 
@@ -1096,31 +1104,32 @@ func (s *Service) updateAircraftStatus(activeAircraft map[string]bool) {
 	}
 }
 
-// detectGroundStateTransitions detects immediate takeoff/landing events
-func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft) []PhaseChangeInsert {
+// detectGroundStateTransitions detects immediate takeoff/landing events.
+// Uses pre-fetched batch data to avoid per-aircraft database queries.
+func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnGround map[string]bool, currentPhases map[string]*PhaseChange, adsbTargetIDs map[string]*int) []PhaseChangeInsert {
 	var immediatePhaseChanges []PhaseChangeInsert
 	now := time.Now().UTC()
 
 	for _, a := range aircraft {
-		// Get previous state from database
-		existingAircraft, found := s.storage.GetByHex(a.Hex)
+		// Check if aircraft exists using pre-fetched batch data
+		prevOnGround, found := existingOnGround[a.Hex]
 		if !found {
 			continue // New aircraft - will be handled by normal phase detection
 		}
 
 		// Check if ground state changed
-		if existingAircraft.OnGround != a.OnGround {
+		if prevOnGround != a.OnGround {
 			var newPhase string
 			var eventType string
 
-			// Get current phase to prevent rapid T/O ↔ T/D flapping
-			currentPhase, err := s.storage.GetCurrentPhase(a.Hex)
+			// Get current phase from pre-fetched batch data to prevent rapid T/O ↔ T/D flapping
+			currentPhase := currentPhases[a.Hex]
 
-			if !existingAircraft.OnGround && a.OnGround {
+			if !prevOnGround && a.OnGround {
 				// Aircraft was airborne, now on ground = LANDING
 
 				// Anti-flapping: Prevent T/O → T/D transition if T/O was recent
-				if err == nil && currentPhase != nil && currentPhase.Phase == "T/O" {
+				if currentPhase != nil && currentPhase.Phase == "T/O" {
 					timeSinceTakeoff := time.Since(currentPhase.Timestamp).Seconds()
 					flappingThreshold := float64(s.flightPhasesConfig.PhaseFlappingPreventionSeconds)
 					if timeSinceTakeoff < flappingThreshold {
@@ -1141,17 +1150,33 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft) []PhaseChan
 				s.logger.Info("IMMEDIATE LANDING DETECTED",
 					logger.String("hex", a.Hex),
 					logger.String("flight", a.Flight),
-					logger.Bool("was_on_ground", existingAircraft.OnGround),
+					logger.Bool("was_on_ground", prevOnGround),
 					logger.Bool("now_on_ground", a.OnGround),
 					logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
 					logger.Float64("ground_speed", a.ADSB.GS),
 				)
 
-			} else if existingAircraft.OnGround && !a.OnGround {
+			} else if prevOnGround && !a.OnGround {
 				// Aircraft was on ground, now airborne = TAKEOFF
 
+				// Guard against false takeoff from incomplete ADSB data:
+				// When an aircraft first appears with no/zero altitude it gets marked on_ground=true.
+				// If the next cycle delivers real altitude showing the aircraft well above ground level,
+				// that's data becoming available — not an actual takeoff. Skip T/O and let normal
+				// phase detection (determineFlightPhase) assign the correct phase (e.g. CRZ).
+				alt := a.ADSB.AltBaro.Float64()
+				if alt > float64(s.flightPhasesConfig.DepartureAltitudeFt) {
+					s.logger.Info("Skipping false takeoff — altitude above departure threshold (incomplete data becoming available)",
+						logger.String("hex", a.Hex),
+						logger.String("flight", a.Flight),
+						logger.Float64("altitude", alt),
+						logger.Float64("departure_threshold_ft", float64(s.flightPhasesConfig.DepartureAltitudeFt)),
+					)
+					continue
+				}
+
 				// Anti-flapping: Prevent T/D → T/O transition if T/D was recent
-				if err == nil && currentPhase != nil && currentPhase.Phase == "T/D" {
+				if currentPhase != nil && currentPhase.Phase == "T/D" {
 					timeSinceLanding := time.Since(currentPhase.Timestamp).Seconds()
 					flappingThreshold := float64(s.flightPhasesConfig.PhaseFlappingPreventionSeconds)
 					if timeSinceLanding < flappingThreshold {
@@ -1172,7 +1197,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft) []PhaseChan
 				s.logger.Info("IMMEDIATE TAKEOFF DETECTED",
 					logger.String("hex", a.Hex),
 					logger.String("flight", a.Flight),
-					logger.Bool("was_on_ground", existingAircraft.OnGround),
+					logger.Bool("was_on_ground", prevOnGround),
 					logger.Bool("now_on_ground", a.OnGround),
 					logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
 					logger.Float64("ground_speed", a.ADSB.GS),
@@ -1180,8 +1205,8 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft) []PhaseChan
 			}
 
 			if newPhase != "" {
-				// Get ADSB target ID for this aircraft
-				adsbId, _ := s.storage.GetLatestADSBTargetID(a.Hex)
+				// Use pre-fetched ADSB target ID
+				adsbId := adsbTargetIDs[a.Hex]
 
 				immediatePhaseChanges = append(immediatePhaseChanges, PhaseChangeInsert{
 					Hex:       a.Hex,
@@ -1189,7 +1214,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft) []PhaseChan
 					Phase:     newPhase,
 					Timestamp: now,
 					ADSBId:    adsbId,
-					EventType: eventType, // New field to track the type of transition
+					EventType: eventType,
 				})
 			}
 		}
@@ -1266,48 +1291,26 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 }
 
 // hasRecentTakeoff determines if an aircraft has taken off recently
-// This is used to identify aircraft in the departure phase even if they're not
-// perfectly aligned with a runway (e.g., after turning to their departure heading)
+// Uses pre-fetched takeoff time to avoid per-aircraft DB queries.
 //
 // Returns true if ANY of these conditions are met:
-// 1. Aircraft has a T/O (takeoff) phase record within the timeout period
-// 2. Database shows a recent ground-to-air transition time
-// 3. Aircraft is low altitude and close to the airport (likely just departed)
-func (s *Service) hasRecentTakeoff(aircraft *Aircraft) bool {
+// 1. Pre-fetched takeoff time is within the timeout period
+// 2. Aircraft is low altitude and close to the airport (likely just departed)
+func (s *Service) hasRecentTakeoff(aircraft *Aircraft, takeoffTime *time.Time) bool {
 	config := s.flightPhasesConfig
-	// Convert timeout from minutes to a Duration (typically 30 minutes)
 	timeoutDuration := time.Duration(config.RecentTakeoffTimeoutMinutes) * time.Minute
 
-	// METHOD 1: Check phase history for recent T/O phase
-	// This is the most reliable method as T/O phases are recorded immediately on takeoff
-	phaseHistory, err := s.storage.GetPhaseHistory(aircraft.Hex)
-	if err == nil {
-		for _, phase := range phaseHistory {
-			if phase.Phase == "T/O" && time.Since(phase.Timestamp) <= timeoutDuration {
-				return true
-			}
-		}
-	}
-
-	// METHOD 2: Check for recent ground-to-air transition in database
-	// This catches cases where we might have missed the T/O phase recording
-	takeoffTime, err := s.storage.GetLatestTakeoffTime(aircraft.Hex)
-	if err == nil && takeoffTime != nil && time.Since(*takeoffTime) <= timeoutDuration {
+	// Check pre-fetched takeoff time (latest T/O phase timestamp from batch query)
+	if takeoffTime != nil && time.Since(*takeoffTime) <= timeoutDuration {
 		return true
 	}
 
-	// METHOD 3: Proximity and altitude check
+	// Proximity and altitude check — pure in-memory calculation
 	// Aircraft close to airport at low altitude are likely recent departures
-	// This helps catch aircraft we just started tracking after they took off
 	if aircraft.ADSB != nil {
 		distanceFromStation := MetersToNM(Haversine(aircraft.ADSB.Lat, aircraft.ADSB.Lon, s.stationLat, s.stationLon))
-
-		// Check if aircraft is:
-		// - Within 2x normal airport range (e.g., 10 NM if airport range is 5 NM)
-		// - Below 2x departure altitude (e.g., 6000 ft if departure altitude is 3000 ft)
-		// These multipliers give us a larger catch zone for recent departures
-		if distanceFromStation <= float64(config.AirportRangeNM)*2 && // Within 2x airport range
-			aircraft.ADSB.AltBaro.Float64() <= float64(config.DepartureAltitudeFt)*2 { // Within 2x departure altitude
+		if distanceFromStation <= float64(config.AirportRangeNM)*2 &&
+			aircraft.ADSB.AltBaro.Float64() <= float64(config.DepartureAltitudeFt)*2 {
 			return true
 		}
 	}
@@ -1358,9 +1361,8 @@ func (s *Service) detectRunwayDeparture(aircraft *Aircraft) *RunwayDepartureInfo
 // - T/D: Touchdown/Landing phase (preserved for 60 seconds after air->ground transition)
 //
 // The function uses a priority-based system where certain conditions override others
-func (s *Service) determineFlightPhase(aircraft *Aircraft) string {
+func (s *Service) determineFlightPhase(aircraft *Aircraft, currentPhase *PhaseChange, takeoffTime *time.Time) string {
 	// STEP 1: Data Validation
-	// If we don't have ADS-B position/altitude data, we can't determine phase accurately
 	if aircraft.ADSB == nil {
 		return "NEW"
 	}
@@ -1369,49 +1371,34 @@ func (s *Service) determineFlightPhase(aircraft *Aircraft) string {
 	config := s.flightPhasesConfig
 
 	// STEP 2: Emergency Aircraft Detection
-	// Check if aircraft is squawking emergency code (7500=hijack, 7600=radio fail, 7700=emergency)
-	// We still determine phase normally but log the emergency for awareness
 	for _, emergencyCode := range config.EmergencySquawkCodes {
 		if adsb.Squawk == emergencyCode {
 			s.logger.Warn("Emergency squawk detected",
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
 				logger.String("squawk", adsb.Squawk))
-			// For emergency aircraft, determine phase normally but log the emergency
 			break
 		}
 	}
 
 	// STEP 3: GROUND PHASE DETERMINATION
-	// Ground phases are determined first as they override any altitude-based logic
 	if aircraft.OnGround {
-		// Get the aircraft's current phase to make intelligent decisions
-		latestPhase, err := s.storage.GetCurrentPhase(aircraft.Hex)
-
 		// STEP 3A: Check if aircraft is taxiing
-		// Taxiing = moving on ground between 1-50 knots ground speed
-		// This covers aircraft moving to/from runway, between gates, etc.
 		if adsb.GS >= float64(config.TaxiingMinSpeedKts) && adsb.GS <= float64(config.TaxiingMaxSpeedKts) {
 			return "TAX"
 		}
 
 		// STEP 3B: Stationary aircraft handling
-		// Aircraft on ground but not moving (parked at gate, holding short, etc.)
-		if err != nil || latestPhase == nil {
-			// This is a brand new aircraft we haven't seen before
+		if currentPhase == nil {
 			return "NEW"
 		}
 
-		// For existing aircraft, preserve TAX phase even when stopped
-		// This prevents flapping between TAX and NEW when aircraft stops briefly
-		if latestPhase.Phase == "TAX" {
-			// Keep aircraft in TAX phase until takeoff or timeout
-			// The timeout is handled in evaluatePhaseChange
+		// Preserve TAX phase even when stopped (prevents flapping)
+		if currentPhase.Phase == "TAX" {
 			return "TAX"
 		}
 
-		// For all other phases, preserve the current phase
-		return latestPhase.Phase
+		return currentPhase.Phase
 	}
 
 	// STEP 4: AIRBORNE PHASE DETERMINATION
@@ -1460,7 +1447,7 @@ func (s *Service) determineFlightPhase(aircraft *Aircraft) string {
 
 	// Check two conditions for departure:
 	// 1. Aircraft took off recently (within configured timeout, typically 30 minutes)
-	hasRecentTakeoff := s.hasRecentTakeoff(aircraft)
+	hasRecentTakeoff := s.hasRecentTakeoff(aircraft, takeoffTime)
 
 	// 2. Aircraft is on runway heading climbing away from airport
 	departureInfo := s.detectRunwayDeparture(aircraft)
@@ -1497,14 +1484,16 @@ func (s *Service) determineFlightPhase(aircraft *Aircraft) string {
 	return "ARR"
 }
 
-// processPhaseChangesBatch handles phase detection using batch operations for better performance
-func (s *Service) processPhaseChangesBatch(aircraft []*Aircraft, immediatePhaseChanges []PhaseChangeInsert) {
+// processPhaseChangesBatch handles phase detection using pre-fetched batch data.
+// Returns any new phase changes that were inserted (for downstream enrichment).
+func (s *Service) processPhaseChangesBatch(aircraft []*Aircraft, immediatePhaseChanges []PhaseChangeInsert,
+	currentPhases map[string]*PhaseChange, adsbTargetIDs map[string]*int, takeoffTimes map[string]*time.Time) []PhaseChangeInsert {
 	if !s.flightPhasesConfig.Enabled {
-		return // Phase detection is disabled
+		return nil
 	}
 
 	if len(aircraft) == 0 {
-		return
+		return nil
 	}
 
 	// Create map of aircraft that just had immediate ground transitions
@@ -1513,38 +1502,16 @@ func (s *Service) processPhaseChangesBatch(aircraft []*Aircraft, immediatePhaseC
 		immediateTransitions[change.Hex] = change.Phase
 	}
 
-	// Step 1: Get all aircraft hex codes
-	hexCodes := make([]string, len(aircraft))
-	aircraftMap := make(map[string]*Aircraft)
-	for i, a := range aircraft {
-		hexCodes[i] = a.Hex
-		aircraftMap[a.Hex] = a
-	}
-
-	// Step 2: Batch query for current phases
-	currentPhases, err := s.storage.GetCurrentPhasesBatch(hexCodes)
-	if err != nil {
-		s.logger.Error("Failed to get current phases batch", logger.Error(err))
-		return
-	}
-
-	// Step 3: Batch query for ADSB target IDs
-	adsbTargetIDs, err := s.storage.GetLatestADSBTargetIDsBatch(hexCodes)
-	if err != nil {
-		s.logger.Error("Failed to get ADSB target IDs batch", logger.Error(err))
-		return
-	}
-
-	// Step 4: Process each aircraft with simple logic
+	// Process each aircraft using pre-fetched batch data
 	var phaseChanges []PhaseChangeInsert
 	for _, a := range aircraft {
 		// Skip aircraft that just had immediate ground transitions
 		if _, hasImmediate := immediateTransitions[a.Hex]; hasImmediate {
-			continue // Already handled by immediate ground transition detection
+			continue
 		}
 
 		currentPhase := currentPhases[a.Hex]
-		newPhase := s.determineFlightPhase(a)
+		newPhase := s.determineFlightPhase(a, currentPhase, takeoffTimes[a.Hex])
 
 		// Apply phase stability rules and determine if change needed
 		finalPhase, shouldInsert := s.evaluatePhaseChange(a, currentPhase, newPhase)
@@ -1560,17 +1527,19 @@ func (s *Service) processPhaseChangesBatch(aircraft []*Aircraft, immediatePhaseC
 		}
 	}
 
-	// Step 5: Batch insert all phase changes
+	// Batch insert all phase changes
 	if len(phaseChanges) > 0 {
 		err := s.storage.InsertPhaseChangesBatch(phaseChanges)
 		if err != nil {
 			s.logger.Error("Failed to insert phase changes batch", logger.Error(err))
-			return
+			return nil
 		}
 
-		// Step 6: Send WebSocket alerts and log changes
+		// Send WebSocket alerts and log changes
 		s.sendPhaseChangeAlerts(phaseChanges, currentPhases)
 	}
+
+	return phaseChanges
 }
 
 // evaluatePhaseChange applies phase stability rules and determines if a phase change should be inserted
@@ -1895,22 +1864,9 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 	aircraft := make([]*Aircraft, 0, len(rawData.Aircraft))
 	now := time.Now().UTC() // Ensure we use UTC time
 
-	// Create a map of active aircraft hex codes
-	activeAircraft := make(map[string]bool)
-	for _, rawItem := range rawData.Aircraft { // Renamed to avoid editor/linter confusion with field name
-		activeAircraft[rawItem.Hex] = true
-	}
-
-	// Create a map of existing aircraft for quick lookup
-	existingAircraftMap := make(map[string]bool)
-	existingAircraft := s.storage.GetAll()
-	for _, a := range existingAircraft {
-		existingAircraftMap[a.Hex] = true
-	}
-
 	for _, raw := range rawData.Aircraft {
-		// Skip aircraft without position data
-		if raw.Lat == 0 && raw.Lon == 0 {
+		// Skip aircraft without a hex identifier (unusable data)
+		if raw.Hex == "" {
 			continue
 		}
 
@@ -1967,54 +1923,8 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 			}
 		}
 
-		// Determine if aircraft is on ground based on speed and altitude
-		// Get previous data for sensor validation if this aircraft exists
-		var prevTAS, prevGS, prevAlt float64
-		if existingAircraftMap[raw.Hex] {
-			// Find the existing aircraft data for sensor validation
-			for _, existing := range existingAircraft {
-				if existing.Hex == raw.Hex && existing.ADSB != nil {
-					prevTAS = existing.ADSB.TAS
-					prevGS = existing.ADSB.GS
-					prevAlt = existing.ADSB.AltBaro.Float64()
-					break
-				}
-			}
-		}
+		// Sensor validation and OnGround determination handled by fetchAndProcess using batch data
 
-		// Validate and correct sensor data for potential errors
-		correctedTAS, correctedGS, correctedAlt := ValidateSensorData(
-			raw.TAS, raw.GS, raw.AltBaro.Float64(),
-			prevTAS, prevGS, prevAlt,
-			raw.Lat, raw.Lon, s.stationLat, s.stationLon,
-			s.flightPhasesConfig.AirportRangeNM,
-			&s.flightPhasesConfig,
-		)
-
-		// Determine ground state using corrected values
-		onGround := !IsFlying(correctedTAS, correctedGS, correctedAlt, &s.flightPhasesConfig)
-
-		// Log sensor corrections if they occurred
-		if correctedTAS != raw.TAS || correctedGS != raw.GS || correctedAlt != raw.AltBaro.Float64() {
-			s.logger.Debug("Sensor data corrected in ProcessRawData",
-				logger.String("hex", raw.Hex),
-				logger.String("flight", flightName),
-				logger.Float64("original_tas", raw.TAS),
-				logger.Float64("corrected_tas", correctedTAS),
-				logger.Float64("original_gs", raw.GS),
-				logger.Float64("corrected_gs", correctedGS),
-				logger.Float64("original_alt", raw.AltBaro.Float64()),
-				logger.Float64("corrected_alt", correctedAlt),
-			)
-		}
-
-		// Check if this is a new aircraft (first time seen)
-		isNewAircraft := !existingAircraftMap[raw.Hex]
-
-		// Process aircraft data
-		// Set status to "active" for aircraft that are currently transmitting
-		// This ensures aircraft marked as "signal_lost" are restored to "active" when they reappear
-		// Set status to "active" for aircraft that are currently transmitting
 		aircraftStatus := "active" // Always set to active for aircraft in current ADSB data
 
 		// Check if this is a simulated aircraft
@@ -2035,45 +1945,11 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 			Hex:                raw.Hex,
 			Flight:             flightName,
 			Airline:            airlineName,
-			Status:             aircraftStatus,                                  // Set to active for aircraft in current ADSB data
-			Phase:              nil,                                             // Phase will be handled separately
-			LastSeen:           now.Add(-time.Duration(raw.Seen) * time.Second), // Already in UTC since now is UTC
-			OnGround:           onGround,
+			Status:             aircraftStatus,
+			LastSeen:           now.Add(-time.Duration(raw.Seen) * time.Second),
 			ADSB:               &raw,
 			IsSimulated:        isSimulated,
 			SimulationControls: simulationControls,
-		}
-
-		// TODO: Phase detection will be implemented separately using the new phase_changes table
-		// For now, we just process the aircraft data without phase detection
-
-		// If this is a new aircraft, log it and send a WebSocket message
-		if isNewAircraft {
-			s.logger.Info("New aircraft detected",
-				logger.String("hex", a.Hex),
-				logger.String("flight", a.Flight),
-				logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
-				logger.Bool("on_ground", a.OnGround),
-			)
-
-			// Send WebSocket message for new aircraft
-			if s.wsServer != nil {
-				// Create message data
-				data := map[string]interface{}{
-					"hex":        a.Hex,
-					"flight":     a.Flight,
-					"altitude":   a.ADSB.AltBaro.Float64(),
-					"on_ground":  a.OnGround,
-					"timestamp":  time.Now().UTC().Format(time.RFC3339),
-					"new_status": "new_aircraft",
-				}
-
-				// Broadcast the message
-				s.wsServer.Broadcast(&websocket.Message{
-					Type: "status_update",
-					Data: data,
-				})
-			}
 		}
 
 		// Calculate future positions if we have the necessary data

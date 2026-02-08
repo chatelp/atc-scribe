@@ -13,9 +13,6 @@ import (
 
 // Constants for aviation calculations
 const (
-	// DEPRECATED: These constants are replaced by config values
-	// FLYING_MIN_TAS = 50.0  // DEPRECATED: Use config.FlightPhasesConfig.FlyingMinTASKts instead
-	// FLYING_MIN_ALT = 700.0 // DEPRECATED: Use config.FlightPhasesConfig.FlyingMinAltFt instead
 
 	// Conversion factors
 	METERS_PER_NM  = 1852.0  // Meters per nautical mile
@@ -27,57 +24,102 @@ const (
 	SPEED_ADJUST_PERCENT  = 0.25 // Maximum speed adjustment (25%)
 )
 
-// ValidateSensorData detects and corrects likely sensor errors when values suddenly drop to 0
-// from previously high values, which commonly happens when aircraft leave ADS-B range.
-// Enhanced to detect impossible altitude/speed drops that would indicate signal loss rather than actual flight changes.
-func ValidateSensorData(currentTAS, currentGS, currentAlt, prevTAS, prevGS, prevAlt, aircraftLat, aircraftLon, stationLat, stationLon, airportRangeNM float64, config *config.FlightPhasesConfig) (float64, float64, float64) {
+// ValidateSensorData detects and corrects ADS-B signal degradation.
+//
+// When aircraft leave ADS-B receiver coverage, the signal often degrades
+// before disappearing entirely. Common patterns seen in real data:
+//
+//   - Altitude drops to 0 while ground speed persists (partial loss)
+//   - All values drop to 0 simultaneously (complete loss)
+//   - Speed drops to 0 while altitude persists (partial loss)
+//   - Position (lat/lon) drops to 0 while other fields persist
+//
+// This function compares current values against the previous cycle's stored
+// values and carries forward the previous data when the drop pattern matches
+// known signal degradation rather than actual flight state changes.
+//
+// Three tiers of correction, checked in priority order:
+//
+//  1. Total signal loss — all values drop to zero from a clearly airborne state.
+//     Unambiguous regardless of location. Corrects everything.
+//
+//  2. High-value drops — a single value drops to zero from above a configurable
+//     threshold (e.g., altitude was >10,000 ft, or speed was >100 kts at altitude).
+//     Physically impossible in one polling cycle. Corrects regardless of location.
+//
+//  3. Location-aware drops — a value drops to zero from a moderate level while
+//     the aircraft is far from the station. Near the airport, zero altitude or
+//     zero speed can be legitimate (landing, taxi, parked). Requires position data.
+//
+// Limitations:
+//   - Only corrects drops TO zero. Non-zero glitches (e.g., 37000→500) cannot
+//     be distinguished from legitimate descent during a coverage gap without
+//     comparing timestamps, which this function does not have access to.
+//   - When aircraft position is unknown (lat/lon = 0), distance-based (tier 3)
+//     rules are skipped to avoid false corrections from Haversine(0,0,...).
+func ValidateSensorData(currentTAS, currentGS, currentAlt, prevTAS, prevGS, prevAlt,
+	aircraftLat, aircraftLon, stationLat, stationLon, airportRangeNM float64,
+	config *config.FlightPhasesConfig) (float64, float64, float64) {
+
 	correctedTAS := currentTAS
 	correctedGS := currentGS
 	correctedAlt := currentAlt
 
-	// Calculate distance to airport for context
-	distanceToAirportNM := MetersToNM(Haversine(aircraftLat, aircraftLon, stationLat, stationLon))
-
-	// ENHANCED LOGIC: Detect impossible altitude drops regardless of distance to airport
-	// Aircraft cannot go from cruise altitude to zero instantly - this indicates signal loss
-	if currentAlt == 0 && prevAlt > config.ImpossibleAltDropThresholdFt {
-		// Impossible drop from cruise altitude to zero - definitely sensor error
-		correctedAlt = prevAlt
-	} else if currentAlt == 0 && prevAlt > 5000 && distanceToAirportNM > airportRangeNM {
-		// High altitude drop when far from airport - likely sensor error
-		correctedAlt = prevAlt
-	} else if currentAlt == 0 && prevAlt > 1000 && distanceToAirportNM > airportRangeNM {
-		// Original logic: only apply when far from airport for lower altitudes
-		correctedAlt = prevAlt
+	// ── Tier 1: Total signal loss ──────────────────────────────────────
+	// All three values going to zero simultaneously from a flying state is
+	// unambiguous signal loss, regardless of distance to airport. This catches
+	// cases the individual rules below would miss (e.g., 3000 ft / 200 kts
+	// near the airport where tier-3 distance rules don't apply).
+	if currentAlt == 0 && currentTAS == 0 && currentGS == 0 {
+		wasAirborne := prevAlt >= config.HighAltitudeOverrideFt ||
+			(prevAlt > config.FlyingMinAltFt && (prevTAS >= config.FlyingMinTASKts || prevGS >= config.FlyingMinTASKts))
+		if wasAirborne {
+			return prevTAS, prevGS, prevAlt
+		}
 	}
 
-	// ENHANCED LOGIC: Detect impossible speed drops
-	// Aircraft at high altitude cannot suddenly have zero speed
-	if currentTAS == 0 && prevTAS > config.ImpossibleSpeedDropThresholdKts && prevAlt > config.ImpossibleSpeedDropMinAltFt {
-		// High speed aircraft at altitude cannot suddenly have zero TAS - sensor error
-		correctedTAS = prevTAS
-	} else if currentTAS == 0 && prevTAS > 42 && distanceToAirportNM > airportRangeNM {
-		// Original logic: apply when far from airport
-		correctedTAS = prevTAS
+	// ── Distance context for tier-3 rules ──────────────────────────────
+	// Only meaningful when we have real position data. With lat/lon = 0
+	// (mode_s or signal loss), Haversine produces a misleading large distance
+	// that would incorrectly trigger "far from airport" corrections.
+	hasPosition := aircraftLat != 0 || aircraftLon != 0
+	farFromAirport := false
+	if hasPosition {
+		farFromAirport = MetersToNM(Haversine(aircraftLat, aircraftLon, stationLat, stationLon)) > airportRangeNM
 	}
 
-	if currentGS == 0 && prevGS > config.ImpossibleSpeedDropThresholdKts && prevAlt > config.ImpossibleSpeedDropMinAltFt {
-		// High speed aircraft at altitude cannot suddenly have zero GS - sensor error
-		correctedGS = prevGS
-	} else if currentGS == 0 && prevGS > 42 && distanceToAirportNM > airportRangeNM {
-		// Original logic: apply when far from airport
-		correctedGS = prevGS
+	// ── Altitude: detect drops to zero ─────────────────────────────────
+	if currentAlt == 0 && prevAlt > 0 {
+		if prevAlt >= config.ImpossibleAltDropThresholdFt {
+			// Tier 2: above cruise threshold (default 10,000 ft) — always signal loss
+			correctedAlt = prevAlt
+		} else if prevAlt > 1000 && farFromAirport {
+			// Tier 3: 1,000–10,000 ft far from airport — likely signal loss
+			// (near the airport, alt=0 can be a legitimate landing/taxi)
+			correctedAlt = prevAlt
+		}
 	}
 
-	// ADDITIONAL LOGIC: Detect impossible combined drops
-	// If all three values (alt, TAS, GS) drop to zero simultaneously from high values,
-	// this is almost certainly signal loss, not a legitimate flight state change
-	if currentAlt == 0 && currentTAS == 0 && currentGS == 0 &&
-		prevAlt > 1000 && (prevTAS > 50 || prevGS > 50) {
-		// All values dropped to zero from flying state - definitely signal loss
-		correctedAlt = prevAlt
-		correctedTAS = prevTAS
-		correctedGS = prevGS
+	// ── TAS: detect drops to zero ──────────────────────────────────────
+	if currentTAS == 0 && prevTAS > 0 {
+		if prevTAS >= config.ImpossibleSpeedDropThresholdKts && prevAlt >= config.ImpossibleSpeedDropMinAltFt {
+			// Tier 2: fast aircraft at altitude (default >100 kts, >5,000 ft)
+			correctedTAS = prevTAS
+		} else if prevTAS > 42 && farFromAirport {
+			// Tier 3: moderate speed far from airport
+			correctedTAS = prevTAS
+		}
+	}
+
+	// ── GS: detect drops to zero (same logic as TAS) ───────────────────
+	if currentGS == 0 && prevGS > 0 {
+		if prevGS >= config.ImpossibleSpeedDropThresholdKts && prevAlt >= config.ImpossibleSpeedDropMinAltFt {
+			// Tier 2: fast aircraft at altitude
+			correctedGS = prevGS
+		} else if prevGS > 42 && farFromAirport {
+			// Tier 3: moderate speed far from airport
+			correctedGS = prevGS
+		}
 	}
 
 	return correctedTAS, correctedGS, correctedAlt
@@ -96,6 +138,12 @@ func IsFlying(tas, gs, altitude float64, config *config.FlightPhasesConfig) bool
 	// High altitude override: If altitude is very high, aircraft must be flying
 	// regardless of speed data (handles bad ADSB speed data at cruise altitude)
 	if altitude >= config.HighAltitudeOverrideFt {
+		return true
+	}
+
+	// Mode S aircraft: only report altitude (no position/speed). When both TAS and GS
+	// are exactly 0 (no speed data available), use altitude alone as evidence of flight.
+	if tas == 0 && gs == 0 && altitude >= config.FlyingMinAltFt {
 		return true
 	}
 

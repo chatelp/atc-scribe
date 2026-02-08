@@ -508,13 +508,23 @@ func (h *Handler) GetAircraftTracks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fetch phase history
+	phaseHistory, err := h.adsbService.GetPhaseHistory(hex)
+	if err != nil {
+		h.logger.Error("Failed to get phase history",
+			logger.Error(err),
+			logger.String("hex", hex))
+		phaseHistory = []adsb.PhaseChange{}
+	}
+
 	// Create response
 	response := adsb.AircraftTracksResponse{
-		Hex:      aircraft.Hex,
-		Flight:   aircraft.Flight,
-		Distance: distance,
-		History:  history,
-		Future:   future,
+		Hex:          aircraft.Hex,
+		Flight:       aircraft.Flight,
+		Distance:     distance,
+		History:      history,
+		Future:       future,
+		PhaseHistory: phaseHistory,
 	}
 
 	// Debug: Print some mag_heading values from history

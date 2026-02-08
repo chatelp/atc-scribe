@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yegors/co-atc/internal/adsb"
@@ -22,6 +23,7 @@ type AircraftRecord struct {
 // AircraftStorage is a SQLite-based storage for aircraft data
 type AircraftStorage struct {
 	db                *sql.DB
+	writeMu           sync.Mutex // Serializes all write operations (SQLite supports concurrent readers but only one writer)
 	logger            *logger.Logger
 	maxPositionsInAPI int
 }
@@ -33,29 +35,18 @@ func NewAircraftStorage(dbPath string, maxPositionsInAPI int, log *logger.Logger
 	storageLogger.Info("Initializing SQLite storage",
 		logger.String("path", dbPath))
 
-	// Open the database
-	db, err := sql.Open("sqlite", dbPath)
+	// Open the database with pragmas in the connection string so every pooled connection gets them
+	connStr := fmt.Sprintf("%s?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_pragma=cache_size(10000)",
+		dbPath,
+	)
+	db, err := sql.Open("sqlite", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Set connection pool limits
-	db.SetMaxOpenConns(1) // SQLite only supports one writer at a time
-	db.SetMaxIdleConns(1)
-
-	// Set pragmas for better performance and concurrency
-	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		return nil, fmt.Errorf("failed to set journal mode: %w", err)
-	}
-	if _, err := db.Exec("PRAGMA synchronous=NORMAL"); err != nil {
-		return nil, fmt.Errorf("failed to set synchronous mode: %w", err)
-	}
-	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
-		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
-	}
-	if _, err := db.Exec("PRAGMA cache_size=10000"); err != nil {
-		return nil, fmt.Errorf("failed to set cache size: %w", err)
-	}
+	// Allow multiple concurrent readers; writes are serialized via writeMu
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
 
 	// Create tables if they don't exist
 	if err := initDatabase(db, storageLogger); err != nil {
@@ -373,7 +364,7 @@ func (s *AircraftStorage) getAllAircraftInternal(lastSeenMinutes int, minimal bo
 	adsbStart := time.Now()
 	s.logger.Debug("Starting ADSB data population (batch)", logger.Int("aircraft_count", len(aircraftMap)))
 
-	adsbDataMap, err := s.getLatestADSBDataBatch(hexCodes)
+	adsbDataMap, err := s.GetLatestADSBDataBatch(hexCodes)
 	if err != nil {
 		s.logger.Error("Failed to get ADSB data batch", logger.Error(err))
 	} else {
@@ -498,8 +489,8 @@ func (s *AircraftStorage) getLatestADSBData(hex string) (*adsb.ADSBTarget, error
 	return &rawData, nil
 }
 
-// getLatestADSBDataBatch returns the latest ADSB data for multiple aircraft in a single query
-func (s *AircraftStorage) getLatestADSBDataBatch(hexCodes []string) (map[string]*adsb.ADSBTarget, error) {
+// GetLatestADSBDataBatch returns the latest ADSB data for multiple aircraft in a single query
+func (s *AircraftStorage) GetLatestADSBDataBatch(hexCodes []string) (map[string]*adsb.ADSBTarget, error) {
 	start := time.Now()
 	s.logger.Debug("Starting batch ADSB query", logger.Int("hex_count", len(hexCodes)))
 
@@ -1007,35 +998,16 @@ func (s *AircraftStorage) GetByHex(hex string) (*adsb.Aircraft, bool) {
 
 // Upsert updates or inserts an aircraft
 func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
 	// Ensure all timestamps are in UTC
 	aircraft.LastSeen = aircraft.LastSeen.UTC()
 
-	// Try to begin a transaction with retries
-	var tx *sql.Tx
-	var err error
-
-	// Retry up to 3 times with exponential backoff
-	for i := 0; i < 3; i++ {
-		tx, err = s.db.Begin()
-		if err == nil {
-			break
-		}
-
-		s.logger.Warn("Failed to begin transaction, retrying...",
-			logger.Error(err),
-			logger.String("hex", aircraft.Hex),
-			logger.Int("attempt", i+1))
-
-		// Exponential backoff: 100ms, 200ms, 400ms
-		time.Sleep(time.Duration(100*(1<<i)) * time.Millisecond)
-	}
-
+	// Begin transaction
+	tx, err := s.db.Begin()
 	if err != nil {
-		s.logger.Error("Failed to begin transaction after retries", logger.Error(err), logger.String("hex", aircraft.Hex))
-		return
-	}
-	if err != nil {
-		s.logger.Error("Failed to begin transaction", logger.Error(err))
+		s.logger.Error("Failed to begin transaction", logger.Error(err), logger.String("hex", aircraft.Hex))
 		return
 	}
 	defer func() {
@@ -1097,14 +1069,7 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 		}
 	}
 
-	// Check if this is a unique ADSB target
-	isUnique, err := s.isUniqueADSBTarget(tx, aircraft)
-	if err != nil {
-		s.logger.Error("Failed to check for unique ADSB target", logger.Error(err), logger.String("hex", aircraft.Hex))
-		return
-	}
-
-	if isUnique && aircraft.ADSB != nil {
+	if aircraft.ADSB != nil {
 		// Convert ADSB data to JSON
 		rawData, err := json.Marshal(aircraft.ADSB)
 		if err != nil {
@@ -1138,9 +1103,9 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 			//	logger.String("aircraft_type", aircraftType))
 		}
 
-		// Insert the ADSB target
+		// Insert the ADSB target (OR IGNORE handles dedup via UNIQUE constraint)
 		_, err = tx.Exec(`
-			INSERT INTO adsb_targets (
+			INSERT OR IGNORE INTO adsb_targets (
 				aircraft_hex, hex, type, flight, registration, aircraft_type, alt_baro, alt_geom, gs, ias, tas, mach, wd, ws, oat, tat,
 				track, track_rate, roll, mag_heading, true_heading, baro_rate, geom_rate, squawk, emergency,
 				category, nav_qnh, nav_altitude_mcp, nav_altitude_fms, nav_heading, nav_modes, lat, lon,
@@ -1175,52 +1140,10 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 		}
 	}
 
-	// Commit transaction with retries
-	for i := 0; i < 3; i++ {
-		err = tx.Commit()
-		if err == nil {
-			break
-		}
-
-		s.logger.Warn("Failed to commit transaction, retrying...",
-			logger.Error(err),
-			logger.String("hex", aircraft.Hex),
-			logger.Int("attempt", i+1))
-
-		// Exponential backoff: 100ms, 200ms, 400ms
-		time.Sleep(time.Duration(100*(1<<i)) * time.Millisecond)
+	// Commit transaction
+	if commitErr := tx.Commit(); commitErr != nil {
+		s.logger.Error("Failed to commit transaction", logger.Error(commitErr), logger.String("hex", aircraft.Hex))
 	}
-
-	if err != nil {
-		s.logger.Error("Failed to commit transaction after retries", logger.Error(err), logger.String("hex", aircraft.Hex))
-	}
-}
-
-// isUniqueADSBTarget checks if the ADSB target represents a unique position/state
-func (s *AircraftStorage) isUniqueADSBTarget(tx *sql.Tx, aircraft *adsb.Aircraft) (bool, error) {
-	if aircraft.ADSB == nil {
-		return false, nil
-	}
-
-	var count int
-	err := tx.QueryRow(`
-		SELECT COUNT(*) FROM adsb_targets
-		WHERE aircraft_hex = ? AND lat = ? AND lon = ? AND alt_baro = ? AND gs = ? AND tas = ? AND track = ?
-	`, aircraft.Hex, aircraft.ADSB.Lat, aircraft.ADSB.Lon, aircraft.ADSB.AltBaro, aircraft.ADSB.GS, aircraft.ADSB.TAS, aircraft.ADSB.Track).Scan(&count)
-
-	if err != nil {
-		s.logger.Error("Error checking for unique ADSB target",
-			logger.Error(err),
-			logger.String("hex", aircraft.Hex))
-		return false, err
-	}
-
-	//s.logger.Debug("Checked for unique ADSB target",
-	//	logger.String("hex", aircraft.Hex),
-	//	logger.Int("count", count),
-	//	logger.Bool("is_unique", count == 0))
-
-	return count == 0, nil
 }
 
 // Count returns the number of aircraft in the database
@@ -1425,6 +1348,8 @@ func (s *AircraftStorage) GetActiveAircraft() ([]*AircraftRecord, error) {
 
 // InsertPhaseChange inserts a new phase change record
 func (s *AircraftStorage) InsertPhaseChange(hex, flight, phase string, timestamp time.Time, adsbId *int) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 
 	_, err := s.db.Exec(`
 		INSERT INTO phase_changes (hex, flight, phase, timestamp, adsb_id)
@@ -1784,6 +1709,9 @@ func (s *AircraftStorage) InsertPhaseChangesBatch(changes []adsb.PhaseChangeInse
 		return nil
 	}
 
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
 	// Begin transaction
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -1927,6 +1855,116 @@ func (s *AircraftStorage) GetLatestLandingTimesBatch(hexCodes []string) (map[str
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating landing time rows: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetStaleActiveAircraft returns aircraft that are no longer broadcasting and need status updates.
+// Filters to: status='active', hex NOT IN activeHexCodes, last_seen < cutoff.
+// Returns aircraft with their latest ADSB data populated.
+func (s *AircraftStorage) GetStaleActiveAircraft(activeHexCodes []string, cutoff time.Time) ([]*adsb.Aircraft, error) {
+	// Build NOT IN clause
+	args := make([]interface{}, 0, len(activeHexCodes)+1)
+	notInClause := ""
+	if len(activeHexCodes) > 0 {
+		placeholders := make([]string, len(activeHexCodes))
+		for i, hex := range activeHexCodes {
+			placeholders[i] = "?"
+			args = append(args, hex)
+		}
+		notInClause = fmt.Sprintf("AND hex NOT IN (%s)", strings.Join(placeholders, ","))
+	}
+	args = append(args, cutoff.Format(time.RFC3339))
+
+	query := fmt.Sprintf(`
+		SELECT hex, flight, airline, status, last_seen, on_ground
+		FROM aircraft
+		WHERE status = 'active' %s AND last_seen < ?
+	`, notInClause)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query stale active aircraft: %w", err)
+	}
+	defer rows.Close()
+
+	var aircraft []*adsb.Aircraft
+	var hexCodes []string
+	for rows.Next() {
+		var a adsb.Aircraft
+		var lastSeen string
+		var onGround int
+		if err := rows.Scan(&a.Hex, &a.Flight, &a.Airline, &a.Status, &lastSeen, &onGround); err != nil {
+			return nil, fmt.Errorf("failed to scan stale aircraft row: %w", err)
+		}
+		a.OnGround = onGround != 0
+		t, err := time.Parse(time.RFC3339, lastSeen)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse last_seen: %w", err)
+		}
+		a.LastSeen = t
+		aircraft = append(aircraft, &a)
+		hexCodes = append(hexCodes, a.Hex)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating stale aircraft rows: %w", err)
+	}
+	rows.Close()
+
+	// Batch-fetch ADSB data after closing the rows cursor (avoids SQLite single-connection deadlock)
+	if len(hexCodes) > 0 {
+		adsbDataMap, err := s.GetLatestADSBDataBatch(hexCodes)
+		if err == nil {
+			for _, a := range aircraft {
+				if adsbData, exists := adsbDataMap[a.Hex]; exists {
+					a.ADSB = adsbData
+				}
+			}
+		}
+	}
+
+	return aircraft, nil
+}
+
+// GetAircraftOnGroundBatch returns the on_ground state for multiple aircraft in a single query.
+// The returned map contains hex -> on_ground for aircraft that exist in the database.
+// Missing keys indicate the aircraft does not exist yet.
+func (s *AircraftStorage) GetAircraftOnGroundBatch(hexCodes []string) (map[string]bool, error) {
+	if len(hexCodes) == 0 {
+		return make(map[string]bool), nil
+	}
+
+	placeholders := make([]string, len(hexCodes))
+	args := make([]interface{}, len(hexCodes))
+	for i, hex := range hexCodes {
+		placeholders[i] = "?"
+		args[i] = hex
+	}
+
+	query := fmt.Sprintf(`
+		SELECT hex, on_ground FROM aircraft WHERE hex IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query aircraft on_ground batch: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]bool)
+	for rows.Next() {
+		var hex string
+		var onGround int
+		if err := rows.Scan(&hex, &onGround); err != nil {
+			return nil, fmt.Errorf("failed to scan aircraft on_ground row: %w", err)
+		}
+		result[hex] = onGround != 0
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating aircraft on_ground rows: %w", err)
 	}
 
 	return result, nil

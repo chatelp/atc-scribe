@@ -50,14 +50,24 @@ document.addEventListener('alpine:init', () => {
         aircraft: [],
         filteredAircraft: [],
         searchTerm: '',
-        count_active: 0,
-        count_stale: 0,
-        count_signal_lost: 0,
-        counts: {
-            ground_active: 0,
-            ground_total: 0,
-            air_active: 0,
-            air_total: 0
+        // Computed aircraft counts — derived from the live aircraft store so they stay
+        // in sync as WebSocket adds/updates/removes aircraft at runtime.
+        get counts() {
+            const now = Date.now();
+            const lastSeenCutoff = now - ((this.settings?.lastSeenMinutes || 10) * 60 * 1000);
+            let ground_active = 0, ground_total = 0, air_active = 0, air_total = 0;
+
+            for (const ac of Object.values(this.aircraft)) {
+                if (ac.last_seen && new Date(ac.last_seen).getTime() < lastSeenCutoff) continue;
+                if (ac.on_ground) {
+                    ground_total++;
+                    if (ac.status === 'active') ground_active++;
+                } else {
+                    air_total++;
+                    if (ac.status === 'active') air_active++;
+                }
+            }
+            return { ground_active, ground_total, air_active, air_total };
         },
         visibleAircraftOnMap: new Set(), // Track aircraft visible on map for UI indicators
         audioFrequencies: [],
@@ -74,13 +84,11 @@ document.addEventListener('alpine:init', () => {
             aircraft: false,
             tracks: new Map(), // Map of hex -> boolean for pending tracks requests
             proximity: false,
-            phaseHistory: new Map(), // Map of hex -> boolean for pending phase history requests
         },
 
         // Clear pending requests for a specific aircraft
         clearPendingRequestsForAircraft(hex) {
             this.pendingRequests.tracks.delete(hex);
-            this.pendingRequests.phaseHistory.delete(hex);
         },
 
         // Clear all pending requests
@@ -88,7 +96,6 @@ document.addEventListener('alpine:init', () => {
             this.pendingRequests.aircraft = false;
             this.pendingRequests.tracks.clear();
             this.pendingRequests.proximity = false;
-            this.pendingRequests.phaseHistory.clear();
         },
 
         // Internal state for tracking aircraft selection changes
@@ -347,24 +354,11 @@ document.addEventListener('alpine:init', () => {
         },
 
         // Helper function to safely get current phase
-        // PERFORMANCE: Cache the result on the aircraft object to avoid repeated nested property access
         getCurrentPhase(aircraft) {
             if (!aircraft) return 'NEW';
-
-            // Check if we have a cached phase and phase object hasn't changed
-            if (aircraft._cachedPhase !== undefined && aircraft._phaseVersion === aircraft.phase) {
-                return aircraft._cachedPhase;
-            }
-
-            // Calculate and cache the phase
-            const phase = (aircraft.phase && aircraft.phase.current && aircraft.phase.current.length > 0)
+            return (aircraft.phase && aircraft.phase.current && aircraft.phase.current.length > 0)
                 ? aircraft.phase.current[0].phase
                 : 'NEW';
-
-            aircraft._cachedPhase = phase;
-            aircraft._phaseVersion = aircraft.phase; // Track which phase object was used
-
-            return phase;
         },
 
         get filteredAircraft() {
@@ -604,7 +598,7 @@ document.addEventListener('alpine:init', () => {
 
         // RESTORING createLabelContent
         createLabelContent(aircraft, callsign, altitude, verticalTrend) {
-            const altitudeColorClass = verticalTrend === 'climbing' ? 'text-highlight' : verticalTrend === 'descending' ? 'text-danger' : 'text-text';
+            const altitudeColorClass = 'text-white';
             // Use alt_baro consistently across all components (same as details panel and flight strip)
             const altitudeDisplay = aircraft.adsb && aircraft.adsb.alt_baro !== undefined ?
                 `${Math.round(aircraft.adsb.alt_baro/100)*100}` : '0';
@@ -623,14 +617,22 @@ document.addEventListener('alpine:init', () => {
             }
 
             const altitudeTrendIconClass = this.getAltitudeTrendIcon(aircraft);
+            const altitudeTrendColorClass = this.getAltitudeTrendClasses(aircraft);
 
             // Determine callsign color based on aircraft status
             let callsignColorClass = 'text-highlight'; // Default green for active aircraft
             if (aircraft.status === 'signal_lost') {
                 callsignColorClass = 'text-red-400'; // Red for signal lost (matching table)
+            } else if (aircraft.stale_position) {
+                callsignColorClass = 'text-orange-400'; // Orange for stale position (GPS lost)
             } else if (aircraft.on_ground) {
                 callsignColorClass = 'text-white'; // White for grounded aircraft
             }
+
+            // Stale position badge — shown when aircraft lost GPS but marker remains at last known location
+            const staleBadge = aircraft.stale_position
+                ? '<span class="text-[7px] font-bold text-orange-400/80 ml-1" title="Last known position — GPS data lost">LP</span>'
+                : '';
 
             // Create phase badge (identical to table formatting)
             let phaseBadge = '';
@@ -640,7 +642,7 @@ document.addEventListener('alpine:init', () => {
                     'CRZ': 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
                     'DEP': 'bg-green-500/20 text-green-400 border border-green-500/30',
                     'APP': 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
-                    'ARR': 'bg-red-500/20 text-red-400 border border-red-500/30',
+                    'ARR': 'bg-pink-400/15 text-pink-300 border border-pink-400/25',
                     'TAX': 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
                     'T/O': 'bg-orange-500/20 text-orange-400 border border-orange-500/30',
                     'T/D': 'bg-teal-500/20 text-teal-400 border border-teal-500/30',
@@ -654,19 +656,23 @@ document.addEventListener('alpine:init', () => {
             const aircraftType = aircraft.adsb?.t || 'N/A';
             const airlineTypeDisplay = aircraft.airline ? `${aircraft.airline} (${aircraftType})` : aircraftType;
 
+            const borderClass = aircraft.stale_position
+                ? 'border border-orange-500/40 border-dashed'
+                : 'border border-white/10';
+
             if (aircraft.on_ground) {
                 return `
-                    <div class="bg-black/80 backdrop-blur-sm border border-white/10 p-1.5 rounded text-[11px] whitespace-nowrap min-w-[140px] flex flex-col gap-1 transition-all duration-200 group cursor-pointer
+                    <div class="bg-black/80 backdrop-blur-sm ${borderClass} p-1.5 rounded text-[11px] whitespace-nowrap min-w-[140px] flex flex-col gap-1 transition-all duration-200 group cursor-pointer
                                 hover:bg-black/90 hover:border-highlight/50 hover:shadow-[0_0_10px_rgba(76,175,80,0.1)]">
                         <div class="flex justify-between items-center">
                             <div class="flex items-center">
                                 ${phaseBadge}
-                                <span class="font-bold ${callsignColorClass} text-xs group-hover:text-white/90 ${phaseBadge ? 'ml-1.5' : ''}">${callsign}</span>
+                                <span class="font-bold ${callsignColorClass} text-xs group-hover:text-white/90 ${phaseBadge ? 'ml-1.5' : ''}">${callsign}</span>${staleBadge}
                             </div>
                             <span class="text-text/70 text-[10px]" data-lastseen>${lastSeenText}</span>
                         </div>
                         <div class="grid grid-cols-2 gap-1 text-[10px]">
-                            <div class="${altitudeColorClass}">ALT ${altitudeDisplay} <span class="${altitudeTrendIconClass}"></span></div>
+                            <div class="${altitudeColorClass}">ALT ${altitudeDisplay} <span class="${altitudeTrendIconClass} ${altitudeTrendColorClass}"></span></div>
                             <div>${speedLabel} ${speedValue}</div>
                         </div>
                     </div>
@@ -674,17 +680,17 @@ document.addEventListener('alpine:init', () => {
             }
 
             return `
-                <div class="bg-black/80 backdrop-blur-sm border border-white/10 p-1.5 rounded text-[11px] whitespace-nowrap min-w-[140px] flex flex-col gap-1 transition-all duration-200 group cursor-pointer
+                <div class="bg-black/80 backdrop-blur-sm ${borderClass} p-1.5 rounded text-[11px] whitespace-nowrap min-w-[140px] flex flex-col gap-1 transition-all duration-200 group cursor-pointer
                             hover:bg-black/90 hover:border-highlight/50 hover:shadow-[0_0_10px_rgba(76,175,80,0.1)]">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center">
                             ${phaseBadge}
-                            <span class="font-bold ${callsignColorClass} text-xs ${phaseBadge ? 'ml-1.5' : ''}">${callsign}</span>
+                            <span class="font-bold ${callsignColorClass} text-xs ${phaseBadge ? 'ml-1.5' : ''}">${callsign}</span>${staleBadge}
                         </div>
                         <span class="text-text/70 text-[10px]" data-lastseen>${lastSeenText}</span>
                     </div>
                     <div class="grid grid-cols-2 gap-1 text-[10px]">
-                        <div class="${altitudeColorClass}">ALT ${altitudeDisplay} <span class="${altitudeTrendIconClass}"></span></div>
+                        <div class="${altitudeColorClass}">ALT ${altitudeDisplay} <span class="${altitudeTrendIconClass} ${altitudeTrendColorClass}"></span></div>
                         <div>${speedLabel} ${speedValue}</div>
                     </div>
                 </div>
@@ -1097,7 +1103,7 @@ document.addEventListener('alpine:init', () => {
                 'T/O': 'text-orange-400',
                 'DEP': 'text-green-400',
                 'CRZ': 'text-blue-400',
-                'ARR': 'text-red-400',
+                'ARR': 'text-pink-300',
                 'APP': 'text-yellow-400',
                 'T/D': 'text-teal-400'
             };
@@ -1326,12 +1332,10 @@ document.addEventListener('alpine:init', () => {
                     this.showProximityView = false;
                 }
                 
-                // Always load phase history data for Details tab
+                // Phase history is loaded as part of the tracks API response
                 this.phaseHistoryAircraftHex = this.selectedAircraft.hex;
-                this.loadPhaseHistoryData();
-                this.startPhaseHistoryRefresh();
-                
-                // Always load tracks data for map trails when aircraft is selected
+
+                // Load tracks data (includes phase history) for map trails when aircraft is selected
                 this.aircraftDetailsLoadTracks();
                 
                 // Start refresh interval to keep map trails updated
@@ -1403,6 +1407,18 @@ document.addEventListener('alpine:init', () => {
                 this.aircraftDetailsFutureData = data.future || [];
                 this.aircraftDetailsHistoryCount = this.aircraftDetailsHistoryData.length;
 
+                // Populate phase history from the same response (avoids separate API call)
+                const phaseHistory = data.phase_history || [];
+                if (phaseHistory.length > 0) {
+                    this.phaseHistoryData = phaseHistory.map((phase, index) => ({
+                        ...phase,
+                        is_current: index === 0,
+                        id: phase.id !== undefined ? phase.id : `phase-${index}`
+                    }));
+                } else {
+                    this.phaseHistoryData = [];
+                }
+
                 // Update tracks mini-map and main map trails
                 if (this.mapManager && this.mapManager.updateTracksMiniMap) {
                     this.mapManager.updateTracksMiniMap();
@@ -1414,6 +1430,7 @@ document.addEventListener('alpine:init', () => {
                 this.aircraftDetailsHistoryData = [];
                 this.aircraftDetailsFutureData = [];
                 this.aircraftDetailsHistoryCount = 0;
+                this.phaseHistoryData = [];
             } finally {
                 this.aircraftDetailsHistoryLoading = false;
                 this.pendingRequests.tracks.delete(hex);
@@ -1580,17 +1597,16 @@ document.addEventListener('alpine:init', () => {
         // Show phase history for an aircraft (now always shown in Tracks tab)
         showPhaseHistory(hex) {
             if (!hex) return;
-            
+
             // Set the aircraft hex for phase history
             this.phaseHistoryAircraftHex = hex;
-            
+
             // Switch to tracks view to show phase history
             this.aircraftDetailsShowHistoryView = true;
             this.showProximityView = false;
-            
-            // Load phase history data
-            this.loadPhaseHistoryData();
-            this.startPhaseHistoryRefresh();
+
+            // Phase history is loaded as part of the tracks API response
+            this.aircraftDetailsLoadTracks();
         },
 
         // Navigate to Tracks tab and highlight a specific row by ADSB ID
@@ -1679,65 +1695,14 @@ document.addEventListener('alpine:init', () => {
             this.mapManager.clearPositionHighlight();
         },
 
-        // Load phase history data for the selected aircraft
-        async loadPhaseHistoryData() {
-            if (!this.phaseHistoryAircraftHex) return;
+        // Phase history is now loaded from the tracks API response (aircraftDetailsLoadTracks).
+        // No separate fetch or refresh needed.
 
-            const hex = this.phaseHistoryAircraftHex;
-
-            // Check if there's already a pending phase history request for this aircraft
-            if (this.pendingRequests.phaseHistory.get(hex)) return;
-
-            this.pendingRequests.phaseHistory.set(hex, true);
-            this.phaseHistoryLoading = true;
-
-            try {
-                // Use the existing aircraft phase data if available
-                const aircraft = this.aircraft[hex];
-
-                if (aircraft && aircraft.phase) {
-                    // Use only the history array since it already includes the current phase
-                    if (aircraft.phase.history && aircraft.phase.history.length > 0) {
-                        // Mark the first (most recent) phase as current
-                        const historyWithCurrent = aircraft.phase.history.map((phase, index) => ({
-                            ...phase,
-                            is_current: index === 0,
-                            id: phase.id !== undefined ? phase.id : `phase-${index}`
-                        }));
-                        this.phaseHistoryData = historyWithCurrent;
-                    } else {
-                        this.phaseHistoryData = [];
-                    }
-                } else {
-                    this.phaseHistoryData = [];
-                }
-            } catch (error) {
-                this.phaseHistoryData = [];
-            } finally {
-                this.phaseHistoryLoading = false;
-                this.pendingRequests.phaseHistory.delete(hex);
-            }
-        },
-
-        // Close phase history view (now just clears data since it's always in Tracks tab)
+        // Close phase history view (clears data)
         closePhaseHistory() {
             this.phaseHistoryData = [];
             this.phaseHistoryAircraftHex = null;
             this.stopPhaseHistoryRefresh();
-        },
-
-        // Start automatic refresh for phase history
-        startPhaseHistoryRefresh() {
-            if (this.phaseHistoryRefreshInterval) {
-                clearInterval(this.phaseHistoryRefreshInterval);
-            }
-
-            // Refresh every 5 seconds like other views
-            this.phaseHistoryRefreshInterval = setInterval(() => {
-                if (this.phaseHistoryAircraftHex) {
-                    this.loadPhaseHistoryData();
-                }
-            }, 5000);
         },
 
         // Stop automatic refresh for phase history
@@ -1863,6 +1828,13 @@ document.addEventListener('alpine:init', () => {
                     this.currentTimeForPhases = new Date(); // Update time for phase history
                     if (this.connected && this.lastUpdate) {
                         this.lastUpdateSeconds = Math.floor((new Date() - this.lastUpdate) / 1000);
+                    }
+                    // Purge stale aircraft from the store every 30s
+                    // Uses the same lastSeenMinutes threshold the server uses on bulk load
+                    this._staleCleanupCounter = (this._staleCleanupCounter || 0) + 1;
+                    if (this._staleCleanupCounter >= 30) {
+                        this._staleCleanupCounter = 0;
+                        this._purgeStaleAircraft();
                     }
                 }, 1000);
 
@@ -2070,18 +2042,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         processSampleData() {
-            this.processAircraftData({ 
-                aircraft: [], 
-                counts: {
-                    ground_active: 0,
-                    ground_total: 0,
-                    air_active: 0,
-                    air_total: 0
-                },
-                count_active: 0, 
-                count_stale: 0, 
-                count_signal_lost: 0 
-            }); // Ensure counts are reset for sample data
+            this.processAircraftData({ aircraft: [] });
         },
 
         // Settings methods
@@ -2745,42 +2706,24 @@ async initAircraftDataSource() {
         
         // Handle status update message
         handleStatusUpdateMessage(data) {
-            if (data && data.hex) {
-                console.log(`Status update for ${data.flight || data.hex}: ${data.new_status}`, data);
-                
-                // Skip new_aircraft alerts - these are now handled by phase changes
-                if (data.new_status === "new_aircraft") {
-                    return;
-                }
-                
-                // Skip signal_lost alerts for CRZ phase and grounded aircraft - these are expected/normal and create spam
-                // Still alert for signal loss in critical phases like DEP, ARR, APP, T/O, T/D
-                if (data.new_status === "signal_lost") {
-                    const aircraft = this.aircraft[data.hex];
-                    if (aircraft) {
-                        // Update the aircraft status in the local store
-                        aircraft.status = data.new_status;
-                        
-                        // Skip alerts for CRZ phase or grounded aircraft (expected signal loss)
-                        const currentPhase = aircraft.phase?.current?.[0]?.phase;
-                        if (currentPhase === 'CRZ' || data.on_ground) {
-                            return;
-                        }
-                        // For other phases (DEP, ARR, APP, T/O, T/D, etc.), continue to show alert
-                    } else {
-                        // If aircraft not found in store, skip the alert (likely already removed)
-                        return;
-                    }
-                }
-                
-                // Update the aircraft status in the local store if it exists
-                if (this.aircraft[data.hex]) {
-                    this.aircraft[data.hex].status = data.new_status;
-                    
-                    // Add alert for status change
-                    this.addStatusAlert(data);
-                }
+            if (!data || !data.hex) return;
+
+            // Skip new_aircraft alerts - handled by phase changes
+            if (data.new_status === 'new_aircraft') return;
+
+            const aircraft = this.aircraft[data.hex];
+            if (!aircraft) return;
+
+            // Update status
+            aircraft.status = data.new_status;
+
+            // For signal_lost: skip alerts for CRZ phase or grounded aircraft (expected/noisy)
+            if (data.new_status === 'signal_lost') {
+                const currentPhase = aircraft.phase?.current?.[0]?.phase;
+                if (currentPhase === 'CRZ' || data.on_ground) return;
             }
+
+            this.addStatusAlert(data);
         },
         
         // Request initial aircraft data via WebSocket
@@ -2818,15 +2761,7 @@ async initAircraftDataSource() {
                     this.aircraft[aircraft.hex] = aircraft;
                 }
             }
-            
-            // Update counts
-            this.counts = data.counts || {
-                ground_active: 0,
-                ground_total: 0,
-                air_active: 0,
-                air_total: 0
-            };
-            
+
             // Update connection status
             this.connected = true;
             this.lastUpdate = new Date();
@@ -2972,9 +2907,25 @@ async initAircraftDataSource() {
             // Initialize adsb object if needed
             if (!aircraft.adsb) aircraft.adsb = {};
 
-            // Apply ADSB position/flight data - only if value changed
-            if (delta.lat !== undefined && aircraft.adsb.lat !== delta.lat) aircraft.adsb.lat = delta.lat;
-            if (delta.lon !== undefined && aircraft.adsb.lon !== delta.lon) aircraft.adsb.lon = delta.lon;
+            // Preserve last known position when GPS drops out (ADS-B → mode_s transition).
+            // If the delta sends lat=0 and lon=0 but the aircraft previously had a valid position,
+            // keep the old lat/lon and flag the position as stale so the map can show
+            // the marker at its last known location with a distinct visual style.
+            const hadValidPosition = aircraft.adsb.lat && aircraft.adsb.lat !== 0 || aircraft.adsb.lon && aircraft.adsb.lon !== 0;
+            const deltaDropsPosition = delta.lat === 0 && delta.lon === 0;
+
+            if (hadValidPosition && deltaDropsPosition) {
+                // Don't overwrite — mark position as stale
+                aircraft.stale_position = true;
+            } else {
+                // Apply position normally
+                if (delta.lat !== undefined && aircraft.adsb.lat !== delta.lat) aircraft.adsb.lat = delta.lat;
+                if (delta.lon !== undefined && aircraft.adsb.lon !== delta.lon) aircraft.adsb.lon = delta.lon;
+                // Clear stale flag if we got valid position data back
+                if (delta.lat !== undefined && delta.lon !== undefined && (delta.lat !== 0 || delta.lon !== 0)) {
+                    aircraft.stale_position = false;
+                }
+            }
             if (delta.alt_baro !== undefined && aircraft.adsb.alt_baro !== delta.alt_baro) aircraft.adsb.alt_baro = delta.alt_baro;
             if (delta.track !== undefined && aircraft.adsb.track !== delta.track) aircraft.adsb.track = delta.track;
             if (delta.gs !== undefined && aircraft.adsb.gs !== delta.gs) aircraft.adsb.gs = delta.gs;
@@ -2983,8 +2934,21 @@ async initAircraftDataSource() {
             if (delta.mag_heading !== undefined && aircraft.adsb.mag_heading !== delta.mag_heading) aircraft.adsb.mag_heading = delta.mag_heading;
             if (delta.true_heading !== undefined && aircraft.adsb.true_heading !== delta.true_heading) aircraft.adsb.true_heading = delta.true_heading;
 
-            // Apply full adsb object if provided
-            if (delta.adsb !== undefined) aircraft.adsb = delta.adsb;
+            // Apply full adsb object if provided — preserve last known position if new object has no GPS
+            if (delta.adsb !== undefined) {
+                const oldLat = aircraft.adsb?.lat;
+                const oldLon = aircraft.adsb?.lon;
+                const oldHadPosition = (oldLat && oldLat !== 0) || (oldLon && oldLon !== 0);
+                aircraft.adsb = delta.adsb;
+                const newHasPosition = (delta.adsb.lat && delta.adsb.lat !== 0) || (delta.adsb.lon && delta.adsb.lon !== 0);
+                if (oldHadPosition && !newHasPosition) {
+                    aircraft.adsb.lat = oldLat;
+                    aircraft.adsb.lon = oldLon;
+                    aircraft.stale_position = true;
+                } else if (newHasPosition) {
+                    aircraft.stale_position = false;
+                }
+            }
 
             // Apply top-level aircraft properties - only if value changed
             if (delta.flight !== undefined && aircraft.flight !== delta.flight) aircraft.flight = delta.flight;
@@ -3006,22 +2970,21 @@ async initAircraftDataSource() {
                 return;
             }
 
-            if (this.aircraft[data.hex]) {
-                delete this.aircraft[data.hex];
+            const aircraft = this.aircraft[data.hex];
+            if (aircraft) {
+                // Don't delete from the store — mark as signal_lost and let the
+                // lastSeenMinutes filter handle eventual cleanup. This keeps
+                // signal-lost aircraft visible in the sidebar list.
+                if (aircraft.status !== 'signal_lost') {
+                    aircraft.status = 'signal_lost';
+                }
 
-                // Remove from map
+                // Remove from map and animation (no marker/trail for non-broadcasting aircraft)
                 if (this.mapManager) {
                     this.mapManager.removeAircraft(data.hex);
                 }
-
-                // Remove from animation engine
                 if (this.animationEngine) {
                     this.animationEngine.removeAircraft(data.hex);
-                }
-
-                // Deselect if this was the selected aircraft
-                if (this.selectedAircraft && this.selectedAircraft.hex === data.hex) {
-                    this.selectedAircraft = null;
                 }
 
                 // Queue cache invalidation
@@ -3029,7 +2992,27 @@ async initAircraftDataSource() {
             }
         },
 
-        // Removed applyAircraftChanges method - no longer needed since we receive full aircraft objects
+        // Purge aircraft from the store whose last_seen exceeds the lastSeenMinutes setting.
+        // This mirrors the server-side filter used on bulk load, keeping client and server in sync.
+        _purgeStaleAircraft() {
+            const cutoff = Date.now() - (this.settings.lastSeenMinutes * 60 * 1000);
+            let purged = 0;
+            for (const hex of Object.keys(this.aircraft)) {
+                const ac = this.aircraft[hex];
+                if (ac.last_seen && new Date(ac.last_seen).getTime() < cutoff) {
+                    delete this.aircraft[hex];
+                    if (this.mapManager) this.mapManager.removeAircraft(hex);
+                    if (this.animationEngine) this.animationEngine.removeAircraft(hex);
+                    if (this.selectedAircraft && this.selectedAircraft.hex === hex) {
+                        this.selectedAircraft = null;
+                    }
+                    purged++;
+                }
+            }
+            if (purged > 0) {
+                this.queueCacheInvalidation();
+            }
+        },
 
         // Queue map updates for throttling
         queueMapUpdate(hex) {
