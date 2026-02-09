@@ -187,6 +187,8 @@ document.addEventListener('alpine:init', () => {
         lastAudioUpdateIntervalId: null, // Interval ID for updating secondsSinceLastAudio
         frequencyTranscriptions: {}, // Stores transcriptions per frequency_id
         transcriptionViewerVisible: {}, // Stores visibility state for each frequency's viewer
+        unreadTranscriptions: {}, // Unread count per frequency (only live WS messages while viewer is closed)
+        _readDividerId: {}, // ID of the first already-read message when viewer opens with unread
         isReconnecting: false, // Flag to prevent duplicate reconnection attempts
         frequencyConnectionStatus: {}, // Tracks connection status per frequency (connecting, connected, failed)
 
@@ -2466,8 +2468,11 @@ async initAircraftDataSource() {
             if (this.frequencyTranscriptions[freqId].length > 99) {
                 this.frequencyTranscriptions[freqId].pop();
             }
-            
-            console.log('Transcription for', freqId, data);
+
+            // Increment unread count only when viewer is closed
+            if (!this.transcriptionViewerVisible[freqId]) {
+                this.unreadTranscriptions[freqId] = (this.unreadTranscriptions[freqId] || 0) + 1;
+            }
         },
         
         // Filter transcriptions based on search term
@@ -2680,6 +2685,20 @@ async initAircraftDataSource() {
         // Aircraft events are now handled as phase changes (T/O and T/D)
         
         // Highlight search term in text with a subtle red underline
+        formatTimeAgo(timestamp) {
+            if (!timestamp) return '';
+            // Reading currentTimeForPhases triggers Alpine reactivity every second
+            const now = this.currentTimeForPhases || new Date();
+            const ts = new Date(timestamp);
+            const diffS = Math.floor((now - ts) / 1000);
+            if (diffS < 60) return diffS + 's';
+            const diffM = Math.floor(diffS / 60);
+            if (diffM < 60) return diffM + 'm';
+            const diffH = Math.floor(diffM / 60);
+            if (diffH < 24) return diffH + 'h ' + (diffM % 60) + 'm';
+            return ts.toLocaleDateString();
+        },
+
         highlightSearchTerm(text) {
             if (!text || !this.transcriptionSearchTerm || this.transcriptionSearchTerm.trim() === '') {
                 return text;
@@ -3543,7 +3562,7 @@ async initAircraftDataSource() {
         },
 
         getTranscriptionCount(frequencyId) {
-            return this.frequencyTranscriptions[frequencyId]?.length || 0;
+            return this.unreadTranscriptions[frequencyId] || 0;
         },
 
         toggleTranscriptionViewer(frequencyId) {
@@ -3555,7 +3574,24 @@ async initAircraftDataSource() {
             // Toggle the state
             const newState = !this.transcriptionViewerVisible[frequencyId];
             this.transcriptionViewerVisible[frequencyId] = newState;
-            
+
+            // When opening: set read divider if there are unread messages, then clear count
+            if (newState) {
+                const unreadCount = this.unreadTranscriptions[frequencyId] || 0;
+                const txns = this.frequencyTranscriptions[frequencyId];
+                if (unreadCount > 0 && txns && txns.length > unreadCount) {
+                    this._readDividerId[frequencyId] = txns[unreadCount]?.id;
+                } else {
+                    delete this._readDividerId[frequencyId];
+                }
+                this.unreadTranscriptions[frequencyId] = 0;
+            }
+
+            // When closing: clear the read divider
+            if (!newState) {
+                delete this._readDividerId[frequencyId];
+            }
+
             // If closing the viewer, reset the search term
             if (!newState && this.transcriptionSearchTerm) {
                 this.transcriptionSearchTerm = '';
@@ -3588,8 +3624,14 @@ async initAircraftDataSource() {
                 if (response.ok) {
                     const data = await response.json();
                     if (data && data.transcriptions) {
+                        // Normalize API field names to match WS format
+                        const normalized = data.transcriptions.map(t => ({
+                            ...t,
+                            timestamp: t.created_at || t.timestamp,
+                            text: t.content || t.text,
+                        }));
                         // Sort newest first
-                        this.frequencyTranscriptions[frequencyId] = data.transcriptions.sort((a, b) =>
+                        this.frequencyTranscriptions[frequencyId] = normalized.sort((a, b) =>
                             new Date(b.timestamp) - new Date(a.timestamp)
                         );
                     }
@@ -3866,6 +3908,23 @@ async initAircraftDataSource() {
                             console.log(`Frequency ${freq.id} initial status: ${freq.status}`, freq.last_error || '');
                         }
                     });
+
+                    // Load historical transcriptions per frequency
+                    if (data.transcriptions) {
+                        for (const [freqId, txns] of Object.entries(data.transcriptions)) {
+                            if (txns && txns.length > 0) {
+                                // Normalize API field names to match WS format and mark as historical
+                                const normalized = txns.map(t => ({
+                                    ...t,
+                                    timestamp: t.created_at,
+                                    text: t.content,
+                                    _historical: true
+                                }));
+                                this.frequencyTranscriptions[freqId] = normalized;
+                                this.originalTranscriptions[freqId] = [...normalized];
+                            }
+                        }
+                    }
 
                     // DO NOT connect to all frequencies immediately here.
                     // Let the user click "Start Radios"
