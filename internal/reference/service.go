@@ -160,6 +160,28 @@ func (s *Service) GetAirports() []*AirportInfo {
 	return s.airports
 }
 
+// GetAirportsOnly returns airports (excluding heliports) within the display range.
+func (s *Service) GetAirportsOnly() []*AirportInfo {
+	result := make([]*AirportInfo, 0)
+	for _, ap := range s.airports {
+		if ap.Type != "heliport" {
+			result = append(result, ap)
+		}
+	}
+	return result
+}
+
+// GetHeliportsOnly returns only heliports within the display range.
+func (s *Service) GetHeliportsOnly() []*AirportInfo {
+	result := make([]*AirportInfo, 0)
+	for _, ap := range s.airports {
+		if ap.Type == "heliport" {
+			result = append(result, ap)
+		}
+	}
+	return result
+}
+
 // GetAirport returns a single airport by ICAO ident, or nil if not found.
 func (s *Service) GetAirport(ident string) *AirportInfo {
 	return s.airportMap[strings.ToUpper(ident)]

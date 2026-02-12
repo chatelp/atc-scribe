@@ -85,6 +85,7 @@ func (r *Router) Routes() http.Handler {
 		// Reference data (airports, navaids, runways)
 		router.Get("/airports", r.handler.GetAirports)
 		router.Get("/airports/{ident}", r.handler.GetAirportByIdent)
+		router.Get("/heliports", r.handler.GetHeliports)
 		router.Get("/navaids", r.handler.GetNavaids)
 		router.Get("/navaids/{ident}", r.handler.GetNavaidByIdent)
 		router.Get("/runways", r.handler.GetRunways)

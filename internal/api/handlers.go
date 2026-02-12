@@ -766,7 +766,16 @@ func (h *Handler) GetAirports(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, []interface{}{})
 		return
 	}
-	WriteJSON(w, http.StatusOK, h.refService.GetAirports())
+	WriteJSON(w, http.StatusOK, h.refService.GetAirportsOnly())
+}
+
+// GetHeliports returns all heliports within the configured display range
+func (h *Handler) GetHeliports(w http.ResponseWriter, r *http.Request) {
+	if h.refService == nil {
+		WriteJSON(w, http.StatusOK, []interface{}{})
+		return
+	}
+	WriteJSON(w, http.StatusOK, h.refService.GetHeliportsOnly())
 }
 
 // GetAirportByIdent returns a single airport with full details including frequencies

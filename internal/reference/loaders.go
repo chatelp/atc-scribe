@@ -159,11 +159,16 @@ func loadAirportsCSV(path string, stationLat, stationLon, rangeNM float64) ([]*A
 			continue
 		}
 
+		apType := getField(record, idx, "type")
+		if apType == "closed" {
+			continue
+		}
+
 		ident := getField(record, idx, "ident")
 		ap := &AirportInfo{
 			ID:           parseInt(getField(record, idx, "id")),
 			Ident:        ident,
-			Type:         getField(record, idx, "type"),
+			Type:         apType,
 			Name:         getField(record, idx, "name"),
 			Latitude:     lat,
 			Longitude:    lon,

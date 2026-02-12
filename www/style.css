@@ -517,9 +517,12 @@ input[type=range].dual-range-max:focus {
     text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
 }
 
-/* Airport and navaid label styling */
+/* Airport, heliport, and navaid label styling */
 .airport-label-container,
-.navaid-label-container {
+.heliport-label-container,
+.heliport-icon-container,
+.navaid-label-container,
+.navaid-icon-container {
     background: transparent !important;
     border: none !important;
     z-index: 1 !important;
@@ -527,6 +530,17 @@ input[type=range].dual-range-max:focus {
 
 .airport-label {
     color: #93C5FD;
+    font-size: 9px;
+    font-weight: bold;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 1px 3px;
+    border-radius: 2px;
+    white-space: nowrap;
+}
+
+.heliport-label {
+    color: #FDBA74;
     font-size: 9px;
     font-weight: bold;
     text-align: center;

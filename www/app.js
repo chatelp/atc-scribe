@@ -160,6 +160,7 @@ document.addEventListener('alpine:init', () => {
         weatherFetchErrors: [],
         runwayData: null, // Store runway data
         airportsData: null, // Airport reference data
+        heliportsData: null, // Heliport reference data
         navaidsData: null, // Navaid reference data
         allRunwaysData: null, // All runways within range
         metarDetailsVisible: false,
@@ -201,6 +202,7 @@ document.addEventListener('alpine:init', () => {
             showPaths: JSON.parse(localStorage.getItem('showPaths')) ?? true,
             showRings: JSON.parse(localStorage.getItem('showRings')) ?? true,
             showAirports: JSON.parse(localStorage.getItem('showAirports')) ?? true,
+            showHeliports: JSON.parse(localStorage.getItem('showHeliports')) ?? true,
             showNavaids: JSON.parse(localStorage.getItem('showNavaids')) ?? true,
             showAllRunways: JSON.parse(localStorage.getItem('showAllRunways')) ?? true,
             minAltitude: parseInt(localStorage.getItem('minAltitude')) || 0,
@@ -266,6 +268,7 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('phaseFilters', JSON.stringify(this.settings.phaseFilters));
             localStorage.setItem('excludeOtherAirportsGrounded', this.settings.excludeOtherAirportsGrounded);
             localStorage.setItem('showAirports', this.settings.showAirports);
+            localStorage.setItem('showHeliports', this.settings.showHeliports);
             localStorage.setItem('showNavaids', this.settings.showNavaids);
             localStorage.setItem('showAllRunways', this.settings.showAllRunways);
 
@@ -1114,11 +1117,13 @@ document.addEventListener('alpine:init', () => {
                 'NEW': 'text-gray-400',
                 'TAX': 'text-purple-400',
                 'T/O': 'text-orange-400',
+                'CLB': 'text-lime-400',
                 'DEP': 'text-green-400',
                 'CRZ': 'text-blue-400',
                 'ARR': 'text-pink-300',
                 'APP': 'text-yellow-400',
-                'T/D': 'text-teal-400'
+                'T/D': 'text-teal-400',
+                'UNK': 'text-slate-400'
             };
             return phaseColorMap[phase] || 'text-gray-400';
         },
@@ -2096,6 +2101,13 @@ document.addEventListener('alpine:init', () => {
             this.saveSettings();
             if (this.mapManager) {
                 this.mapManager.toggleLayerVisibility('airports', this.settings.showAirports);
+            }
+        },
+
+        toggleHeliports() {
+            this.saveSettings();
+            if (this.mapManager) {
+                this.mapManager.toggleLayerVisibility('heliports', this.settings.showHeliports);
             }
         },
 
@@ -3763,8 +3775,9 @@ async initAircraftDataSource() {
         async fetchReferenceData() {
             // Fetch airports, navaids, and all runways in parallel
             try {
-                const [airportsRes, navaidsRes, runwaysRes] = await Promise.all([
+                const [airportsRes, heliportsRes, navaidsRes, runwaysRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/airports`),
+                    fetch(`${API_BASE_URL}/heliports`),
                     fetch(`${API_BASE_URL}/navaids`),
                     fetch(`${API_BASE_URL}/runways`)
                 ]);
@@ -3776,6 +3789,17 @@ async initAircraftDataSource() {
                         this.mapManager.drawAirports(this.airportsData);
                         if (!this.settings.showAirports) {
                             this.mapManager.toggleLayerVisibility('airports', false);
+                        }
+                    }
+                }
+
+                if (heliportsRes.ok) {
+                    this.heliportsData = await heliportsRes.json();
+                    console.log(`Heliports loaded: ${this.heliportsData.length}`);
+                    if (this.mapManager) {
+                        this.mapManager.drawHeliports(this.heliportsData);
+                        if (!this.settings.showHeliports) {
+                            this.mapManager.toggleLayerVisibility('heliports', false);
                         }
                     }
                 }
