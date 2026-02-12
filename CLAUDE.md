@@ -81,7 +81,7 @@ docs/                       # Documentation
 2. Audio Stream → Transcription → OpenAI Whisper → SQLite → WebSocket
 
 ### Flight Phases
-8-phase system: NEW, TAX, T/O, DEP, CRZ, ARR, APP, T/D
+10-phase system: NEW, TAX, T/O, CLB, DEP, CRZ, ARR, APP, T/D, UNK
 
 ### Database
 - Daily rotation: `data/co-atc-YYYY-MM-DD.db`

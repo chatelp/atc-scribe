@@ -1,63 +1,48 @@
 package adsb
 
 /*
-FLIGHT PHASE DETECTION SYSTEM OVERVIEW
-======================================
+FLIGHT PHASE DETECTION SYSTEM
+==============================
 
-The Co-ATC system uses a unified landing/takeoff detection system that provides immediate,
-accurate phase transitions for aircraft. This system is designed to solve the critical
-timing issue where ground state changes (landing/takeoff) were detected several seconds
-before the corresponding phase changes were recorded.
+The Co-ATC system uses a two-tier approach for flight phase detection:
 
-KEY CONCEPTS:
+  PRIORITY 1 — Immediate ground state transitions (T/O and T/D)
+    Detected instantly when the OnGround state flips via IsFlying().
+    These are binary state changes that do not benefit from trajectory analysis.
 
-1. FLIGHT PHASES - The stages of an aircraft's journey:
-   - NEW: Newly detected aircraft or parked/stationary on ground
-   - TAX: Taxiing on ground (1-50 knots ground speed)
-   - T/O: Takeoff phase (ground to air transition, preserved for 60 seconds)
-   - DEP: Departure phase (climbing away from airport)
-   - CRZ: Cruise phase (high altitude flight, typically above 10,000 ft)
-   - ARR: Arrival phase (descending towards destination)
-   - APP: Approach phase (aligned with runway, descending to land)
-   - T/D: Touchdown/Landing phase (air to ground transition, preserved for 60 seconds)
+  PRIORITY 2 — All other phases via trajectory analysis
+    The TrajectoryTracker (trajectory.go, trajectory_phase.go) maintains a rolling
+    window of ~90 seconds of ADS-B observations per aircraft and uses statistical
+    analysis (OLS regression, median filtering, distance trends) to classify each
+    aircraft into one of 10 phases:
 
-2. PRIORITY-BASED DETECTION:
-   The system uses a two-priority approach:
-   - PRIORITY 1: Immediate ground state transitions (T/O and T/D)
-     Detected instantly when OnGround state changes
-   - PRIORITY 2: All other phase changes (TAX, DEP, CRZ, ARR, APP)
-     Detected through normal phase detection logic
+      NEW — Newly detected or parked on ground
+      TAX — Taxiing (1–50 kts ground speed)
+      T/O — Takeoff (ground→air transition, preserved for UI visibility)
+      CLB — Initial climb out (runway heading, near airport, hasRecentTakeoff)
+      DEP — Departure (climbing away, below cruise — general)
+      CRZ — Cruise (above cruise altitude)
+      ARR — Arrival (approaching station, below cruise, descending/level)
+      APP — Approach (on final, descending, runway-aligned)
+      T/D — Touchdown (air→ground transition, preserved for UI visibility)
+      UNK — Unknown (airborne but doesn't match any specific condition)
 
-3. GROUND STATE DETERMINATION:
-   Uses the IsFlying() function with configurable thresholds:
-   - Minimum True Airspeed (TAS): 50 knots (configurable)
-   - Minimum Altitude: 700 feet (configurable)
-   - Special handling for helicopters and high-speed ground movements
+  ARR is NOT a catch-all — it requires the aircraft to be genuinely approaching
+  the station. UNK is the honest catch-all for anything that doesn't match.
 
-4. SPECIAL FEATURES:
-   - Hysteresis: Prevents rapid flapping between states
-   - Signal Lost Landing Detection: Automatically marks aircraft as landed
-     when signal is lost near airport at low altitude
-   - Phase Preservation: T/O and T/D phases are preserved for 60 seconds
-     to ensure they're visible in the UI
-   - Sensor Data Validation: Corrects erroneous sensor readings
-
-5. WEBSOCKET EVENTS:
-   The system sends immediate WebSocket alerts for critical events:
-   - "aircraft_event" with event="takeoff" for immediate takeoffs
-   - "aircraft_event" with event="landing" for immediate landings
-   - "phase_change" for all other phase transitions
-
-This unified system ensures that the most critical aircraft events (takeoff/landing)
-are detected and recorded with zero delay, providing accurate timestamps and immediate
-user notifications.
+SPECIAL FEATURES:
+  - Trajectory-based noise resistance: decisions use windowed trends, not single readings
+  - Signal Lost Landing: auto-marks aircraft as landed when signal lost near airport,
+    enhanced by trajectory descent trend analysis
+  - Phase Preservation: T/O and T/D kept visible for configurable duration
+  - Sensor Data Validation: corrects erroneous readings before trajectory ingestion
+  - Data gap detection: handles coverage gaps without spurious phase flips
 */
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 	"sync"
@@ -178,6 +163,7 @@ type Service struct {
 	broadcastChan      chan []AircraftChange     // Channel for broadcasting changes
 	simulationService  SimulationService         // Simulation service for simulated aircraft
 	bsdbService        BSDBService               // BaseStation.sqb lookup service
+	trajectoryTracker  *TrajectoryTracker        // Trajectory-based phase detection
 }
 
 // AircraftBulkResponse represents server response with bulk aircraft data
@@ -255,6 +241,36 @@ func NewService(
 		if err := service.loadRunwayData(stationCfg.RunwaysDBPath); err != nil {
 			service.logger.Error("Failed to load runway data: " + err.Error())
 		}
+	}
+
+	// Initialize trajectory tracker for phase detection
+	if flightPhasesConfig.Enabled {
+		fetchIntervalSec := adsbCfg.FetchIntervalSecs
+		if fetchIntervalSec < 1 {
+			fetchIntervalSec = 1
+		}
+		bufferCap := flightPhasesConfig.TrajectoryBufferDurationSec/fetchIntervalSec + 10 // +10 margin
+		service.trajectoryTracker = NewTrajectoryTracker(
+			TrajectoryConfig{
+				BufferDurationSec:       flightPhasesConfig.TrajectoryBufferDurationSec,
+				BufferCapacity:          bufferCap,
+				FetchIntervalSec:        fetchIntervalSec,
+				MinPointsForAnalysis:    flightPhasesConfig.TrajectoryMinPoints,
+				StaleTimeoutSec:         flightPhasesConfig.TrajectoryStaleTimeoutSec,
+				CleanupIntervalSec:      flightPhasesConfig.TrajectoryCleanupIntervalSec,
+				DescentVRThresholdFPM:   flightPhasesConfig.TrajectoryDescentThresholdFPM,
+				ClimbVRThresholdFPM:     flightPhasesConfig.TrajectoryClimbThresholdFPM,
+				LevelAltBandFt:          flightPhasesConfig.TrajectoryLevelBandFt,
+				TurningRateThresholdDeg: flightPhasesConfig.TrajectoryTurningRateDeg,
+				DecelerationThreshold:   -0.5,
+				AccelerationThreshold:   0.5,
+			},
+			stationCfg.Latitude,
+			stationCfg.Longitude,
+			service.runwayData,
+			&service.flightPhasesConfig,
+			logger,
+		)
 	}
 
 	return service
@@ -441,6 +457,9 @@ func (s *Service) Stop() {
 	s.logger.Info("Stopping ADS-B service")
 	close(s.stopCh)
 	s.wg.Wait()
+	if s.trajectoryTracker != nil {
+		s.trajectoryTracker.Stop()
+	}
 	s.logger.Info("ADS-B service stopped")
 }
 
@@ -559,6 +578,12 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 
 		// Always set on_ground based on flying state
 		a.OnGround = !currentlyFlying
+
+		// Feed corrected data into trajectory tracker for phase analysis
+		if s.trajectoryTracker != nil && a.ADSB != nil {
+			snap := TrajectorySnapshotFromADSB(a.ADSB, a.OnGround, time.Now().UTC())
+			s.trajectoryTracker.Ingest(a.Hex, snap)
+		}
 
 		if found {
 			// Use pre-fetched takeoff and landing times
@@ -1131,13 +1156,13 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 				// Anti-flapping: Prevent T/O → T/D transition if T/O was recent
 				if currentPhase != nil && currentPhase.Phase == "T/O" {
 					timeSinceTakeoff := time.Since(currentPhase.Timestamp).Seconds()
-					flappingThreshold := float64(s.flightPhasesConfig.PhaseFlappingPreventionSeconds)
-					if timeSinceTakeoff < flappingThreshold {
+					preservationThreshold := float64(s.flightPhasesConfig.PhasePreservationSeconds)
+					if timeSinceTakeoff < preservationThreshold {
 						s.logger.Warn("Preventing rapid T/O → T/D flapping",
 							logger.String("hex", a.Hex),
 							logger.String("flight", a.Flight),
 							logger.Float64("time_since_takeoff", timeSinceTakeoff),
-							logger.Float64("threshold_seconds", flappingThreshold),
+							logger.Float64("threshold_seconds", preservationThreshold),
 							logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
 						)
 						continue // Skip this transition
@@ -1162,8 +1187,8 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 				// Guard against false takeoff from incomplete ADSB data:
 				// When an aircraft first appears with no/zero altitude it gets marked on_ground=true.
 				// If the next cycle delivers real altitude showing the aircraft well above ground level,
-				// that's data becoming available — not an actual takeoff. Skip T/O and let normal
-				// phase detection (determineFlightPhase) assign the correct phase (e.g. CRZ).
+				// that's data becoming available — not an actual takeoff. Skip T/O and let the
+				// trajectory tracker assign the correct phase (e.g. CRZ, ARR, UNK).
 				alt := a.ADSB.AltBaro.Float64()
 				if alt > float64(s.flightPhasesConfig.DepartureAltitudeFt) {
 					s.logger.Info("Skipping false takeoff — altitude above departure threshold (incomplete data becoming available)",
@@ -1178,13 +1203,13 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 				// Anti-flapping: Prevent T/D → T/O transition if T/D was recent
 				if currentPhase != nil && currentPhase.Phase == "T/D" {
 					timeSinceLanding := time.Since(currentPhase.Timestamp).Seconds()
-					flappingThreshold := float64(s.flightPhasesConfig.PhaseFlappingPreventionSeconds)
-					if timeSinceLanding < flappingThreshold {
+					preservationThreshold := float64(s.flightPhasesConfig.PhasePreservationSeconds)
+					if timeSinceLanding < preservationThreshold {
 						s.logger.Warn("Preventing rapid T/D → T/O flapping",
 							logger.String("hex", a.Hex),
 							logger.String("flight", a.Flight),
 							logger.Float64("time_since_landing", timeSinceLanding),
-							logger.Float64("threshold_seconds", flappingThreshold),
+							logger.Float64("threshold_seconds", preservationThreshold),
 							logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
 						)
 						continue // Skip this transition
@@ -1247,9 +1272,18 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 			continue
 		}
 
-		// Only consider aircraft that were in APP phase or low altitude ARR
+		// Check if the trajectory shows the aircraft was descending toward the station.
+		// This is a stronger signal than phase alone — if the trajectory buffer confirms
+		// a steady descent toward the airport, we can be confident this is a landing.
+		trajectoryConfirms := false
+		if s.trajectoryTracker != nil {
+			trajectoryConfirms = s.trajectoryTracker.WasDescendingTowardStation(aircraft.Hex)
+		}
+
+		// Accept aircraft in APP phase, low altitude ARR, or trajectory-confirmed descent
 		if currentPhase.Phase != "APP" &&
-			!(currentPhase.Phase == "ARR" && aircraft.ADSB.AltBaro.Float64() < 2000) {
+			!(currentPhase.Phase == "ARR" && aircraft.ADSB.AltBaro.Float64() < 2000) &&
+			!trajectoryConfirms {
 			continue
 		}
 
@@ -1290,200 +1324,6 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 	return landingPhaseChanges
 }
 
-// hasRecentTakeoff determines if an aircraft has taken off recently
-// Uses pre-fetched takeoff time to avoid per-aircraft DB queries.
-//
-// Returns true if ANY of these conditions are met:
-// 1. Pre-fetched takeoff time is within the timeout period
-// 2. Aircraft is low altitude and close to the airport (likely just departed)
-func (s *Service) hasRecentTakeoff(aircraft *Aircraft, takeoffTime *time.Time) bool {
-	config := s.flightPhasesConfig
-	timeoutDuration := time.Duration(config.RecentTakeoffTimeoutMinutes) * time.Minute
-
-	// Check pre-fetched takeoff time (latest T/O phase timestamp from batch query)
-	if takeoffTime != nil && time.Since(*takeoffTime) <= timeoutDuration {
-		return true
-	}
-
-	// Proximity and altitude check — pure in-memory calculation
-	// Aircraft close to airport at low altitude are likely recent departures
-	if aircraft.ADSB != nil {
-		distanceFromStation := MetersToNM(Haversine(aircraft.ADSB.Lat, aircraft.ADSB.Lon, s.stationLat, s.stationLon))
-		if distanceFromStation <= float64(config.AirportRangeNM)*2 &&
-			aircraft.ADSB.AltBaro.Float64() <= float64(config.DepartureAltitudeFt)*2 {
-			return true
-		}
-	}
-
-	return false
-}
-
-// detectRunwayDeparture determines if an aircraft is departing from any runway
-// This helps identify aircraft in the departure phase based on their position
-// relative to runway centerlines and their direction of travel
-//
-// Returns RunwayDepartureInfo if aircraft is:
-// - Aligned with a runway (within tolerance)
-// - Moving away from the airport
-// - At appropriate altitude for departure
-//
-// This is particularly useful for catching departures when we didn't see the
-// actual takeoff event (e.g., started tracking after aircraft was airborne)
-func (s *Service) detectRunwayDeparture(aircraft *Aircraft) *RunwayDepartureInfo {
-	// Skip if no runway data is configured for this airport
-	if s.runwayData.Airport == "" {
-		return nil // No runway data available
-	}
-
-	// Delegate to the runway detection utility function
-	// This checks all configured runways to see if aircraft is on a departure path
-	return DetectRunwayDeparture(
-		aircraft.ADSB.Lat,
-		aircraft.ADSB.Lon,
-		aircraft.ADSB.Track,
-		s.runwayData,
-		s.stationLat,
-		s.stationLon,
-		s.flightPhasesConfig,
-	)
-}
-
-// determineFlightPhase determines the current flight phase based on simplified logic
-//
-// Flight phases represent different stages of an aircraft's journey:
-// - NEW: Aircraft just appeared or is parked/stationary on ground
-// - TAX: Aircraft is taxiing on ground (moving between 1-50 knots)
-// - T/O: Takeoff phase (preserved for 60 seconds after ground->air transition)
-// - DEP: Departure phase (climbing away from airport)
-// - CRZ: Cruise phase (high altitude, typically above 10,000 ft)
-// - ARR: Arrival phase (descending towards destination, default airborne phase)
-// - APP: Approach phase (aligned with runway, descending to land)
-// - T/D: Touchdown/Landing phase (preserved for 60 seconds after air->ground transition)
-//
-// The function uses a priority-based system where certain conditions override others
-func (s *Service) determineFlightPhase(aircraft *Aircraft, currentPhase *PhaseChange, takeoffTime *time.Time) string {
-	// STEP 1: Data Validation
-	if aircraft.ADSB == nil {
-		return "NEW"
-	}
-
-	adsb := aircraft.ADSB
-	config := s.flightPhasesConfig
-
-	// STEP 2: Emergency Aircraft Detection
-	for _, emergencyCode := range config.EmergencySquawkCodes {
-		if adsb.Squawk == emergencyCode {
-			s.logger.Warn("Emergency squawk detected",
-				logger.String("hex", aircraft.Hex),
-				logger.String("flight", aircraft.Flight),
-				logger.String("squawk", adsb.Squawk))
-			break
-		}
-	}
-
-	// STEP 3: GROUND PHASE DETERMINATION
-	if aircraft.OnGround {
-		// STEP 3A: Check if aircraft is taxiing
-		if adsb.GS >= float64(config.TaxiingMinSpeedKts) && adsb.GS <= float64(config.TaxiingMaxSpeedKts) {
-			return "TAX"
-		}
-
-		// STEP 3B: Stationary aircraft handling
-		if currentPhase == nil {
-			return "NEW"
-		}
-
-		// Preserve TAX phase even when stopped (prevents flapping)
-		if currentPhase.Phase == "TAX" {
-			return "TAX"
-		}
-
-		return currentPhase.Phase
-	}
-
-	// STEP 4: AIRBORNE PHASE DETERMINATION
-	// Aircraft is flying - determine which flight phase based on altitude, location, and behavior
-	altitude := adsb.AltBaro.Float64() // Barometric altitude in feet
-	verticalRate := adsb.BaroRate      // Vertical speed in feet per minute
-
-	// STEP 4A: CRUISE PHASE - Highest Priority
-	// Aircraft at cruise altitude (typically 10,000+ ft) are in cruise phase
-	// This overrides all other airborne phases as cruise is unambiguous
-	if altitude >= float64(config.CruiseAltitudeFt) {
-		return "CRZ"
-	}
-
-	// STEP 4B: APPROACH PHASE - Second Priority
-	// Detect if aircraft is on final approach to land
-	var onRunwayCenterline bool
-	var approachingAirport bool
-
-	// Only check approach phase for low altitude aircraft (below typical pattern altitude)
-	if altitude <= float64(config.TakeoffAltitudeThresholdFt) {
-		// Check if aircraft is aligned with any runway (extended centerline)
-		runwayInfo := DetectRunwayApproach(adsb.Lat, adsb.Lon, adsb.Track, altitude, s.runwayData, config)
-		if runwayInfo != nil && runwayInfo.OnApproach {
-			onRunwayCenterline = true
-
-			// IMPORTANT: Verify aircraft is flying TOWARDS the airport, not away
-			// This prevents departing aircraft from being marked as approaching
-			bearingToStation := CalculateBearing(adsb.Lat, adsb.Lon, s.stationLat, s.stationLon)
-			headingDiff := math.Abs(adsb.Track - bearingToStation)
-			if headingDiff > 180 {
-				headingDiff = 360 - headingDiff
-			}
-			// Aircraft heading should be within 90° of direct path to airport
-			approachingAirport = headingDiff <= 90
-		}
-	}
-
-	// Confirm approach phase: must be aligned with runway, heading towards airport, and descending
-	if onRunwayCenterline && approachingAirport && verticalRate <= float64(config.ApproachVerticalRateThresholdFPM) {
-		return "APP"
-	}
-
-	// STEP 4C: DEPARTURE PHASE
-	// Detect if aircraft is in initial climb after takeoff
-
-	// Check two conditions for departure:
-	// 1. Aircraft took off recently (within configured timeout, typically 30 minutes)
-	hasRecentTakeoff := s.hasRecentTakeoff(aircraft, takeoffTime)
-
-	// 2. Aircraft is on runway heading climbing away from airport
-	departureInfo := s.detectRunwayDeparture(aircraft)
-	isMovingAwayFromStation := departureInfo != nil && departureInfo.OnDeparture
-
-	// Aircraft qualifies for departure phase if it meets either condition above
-	if hasRecentTakeoff || isMovingAwayFromStation {
-		// For aircraft with recent takeoff, be more lenient with DEP phase detection
-		if hasRecentTakeoff {
-			// Aircraft that recently took off should be in DEP phase if:
-			// - Below cruise altitude AND (climbing OR low altitude after takeoff)
-			if altitude < float64(config.CruiseAltitudeFt) &&
-				(verticalRate > 0 || altitude < float64(config.DepartureAltitudeFt)*2) {
-				return "DEP"
-			}
-		}
-
-		// For aircraft moving away from station, use stricter criteria:
-		// - Above departure altitude and climbing, OR
-		// - On runway centerline, climbing, and below pattern altitude
-		if (altitude >= float64(config.DepartureAltitudeFt) && verticalRate > float64(config.ClimbingVerticalRateFPM)) ||
-			(onRunwayCenterline && verticalRate > float64(config.ClimbingVerticalRateFPM) && altitude < float64(config.TakeoffAltitudeThresholdFt)) {
-			return "DEP"
-		}
-	}
-
-	// STEP 4D: ARRIVAL PHASE - Default
-	// Any airborne aircraft that doesn't meet criteria for CRZ, APP, or DEP
-	// This includes:
-	// - Aircraft descending from cruise (but not yet on approach)
-	// - Aircraft in holding patterns
-	// - Aircraft maneuvering in terminal area
-	// - General aviation aircraft below cruise altitude
-	return "ARR"
-}
-
 // processPhaseChangesBatch handles phase detection using pre-fetched batch data.
 // Returns any new phase changes that were inserted (for downstream enrichment).
 func (s *Service) processPhaseChangesBatch(aircraft []*Aircraft, immediatePhaseChanges []PhaseChangeInsert,
@@ -1511,7 +1351,7 @@ func (s *Service) processPhaseChangesBatch(aircraft []*Aircraft, immediatePhaseC
 		}
 
 		currentPhase := currentPhases[a.Hex]
-		newPhase := s.determineFlightPhase(a, currentPhase, takeoffTimes[a.Hex])
+		newPhase := s.trajectoryTracker.DeterminePhase(a, currentPhase, takeoffTimes[a.Hex])
 
 		// Apply phase stability rules and determine if change needed
 		finalPhase, shouldInsert := s.evaluatePhaseChange(a, currentPhase, newPhase)
@@ -1542,147 +1382,78 @@ func (s *Service) processPhaseChangesBatch(aircraft []*Aircraft, immediatePhaseC
 	return phaseChanges
 }
 
-// evaluatePhaseChange applies phase stability rules and determines if a phase change should be inserted
+// evaluatePhaseChange applies phase stability rules and determines if a phase change
+// should be inserted into the database.
 //
-// TIMEOUT CONFIGURATION CLARIFICATION:
+// The trajectory-based phase detection (TrajectoryTracker.DeterminePhase) already provides
+// noise-resistant classification through trajectory window analysis, so airborne flapping
+// prevention is no longer needed. This function handles only:
 //
-// 1. PhaseChangeTimeoutSeconds (default: 3600 seconds = 1 hour)
-//   - Used for INACTIVE aircraft that haven't been seen recently
-//   - If an aircraft hasn't changed phase for this duration, it reverts to NEW
-//   - This handles aircraft that have been parked for a long time
-//   - Example: Aircraft lands, taxis to gate, stays there for > 1 hour → NEW
-//
-// 2. PhaseTransitionTimeoutSeconds (default: 60 seconds, but 1800 = 30 min recommended)
-//   - Used to prevent rapid flapping between certain phase transitions
-//   - Specifically prevents TAX→NEW and T/D→NEW transitions from happening too quickly
-//   - This handles brief stops during taxiing or after landing
-//   - Example: Aircraft stops taxiing for 30 seconds → stays in TAX (not NEW)
-//
-// 3. PhasePreservationSeconds (default: 60 seconds)
-//   - Used to preserve T/O and T/D phases for visibility
-//   - These critical phases are kept for at least this duration
-//   - Ensures pilots/controllers can see takeoff/landing events in the UI
-//
-// 4. PhaseFlappingPreventionSeconds (default: 300 seconds = 5 minutes)
-//   - Used to prevent rapid flapping between airborne phases
-//   - Specifically prevents DEP↔APP and ARR↔DEP transitions
-//   - Much shorter than PhaseChangeTimeoutSeconds as these are active aircraft
-//   - Example: Aircraft briefly meets APP criteria → stays in DEP for 5 minutes
-//
-// The key difference: PhaseChangeTimeoutSeconds is for long-term inactive aircraft,
-// PhaseTransitionTimeoutSeconds prevents ground phase flapping, and
-// PhaseFlappingPreventionSeconds prevents airborne phase flapping.
+//  1. T/O preservation — Keep takeoff phase visible for PhasePreservationSeconds
+//  2. T/D post-landing flow — Transition T/D → TAX or T/D → NEW based on ground speed
+//  3. Ground phase protection — Prevent premature TAX→NEW and T/D→NEW transitions
+//  4. Inactive aircraft timeout — Revert long-parked aircraft to NEW
 func (s *Service) evaluatePhaseChange(aircraft *Aircraft, latestPhase *PhaseChange, newPhase string) (string, bool) {
 	currentPhase := newPhase
 
-	// Apply phase stability rules to prevent flapping
-	if latestPhase != nil {
-		timeSinceLastPhase := time.Since(latestPhase.Timestamp).Seconds()
-
-		// Phase flapping prevention
-		shouldPreventFlapping := false
-		var flappingType string
-
-		if latestPhase.Phase == "DEP" && currentPhase == "APP" {
-			shouldPreventFlapping = true
-			flappingType = "DEP → APP"
-		} else if (latestPhase.Phase == "ARR" && currentPhase == "DEP") ||
-			(latestPhase.Phase == "DEP" && currentPhase == "ARR") {
-			shouldPreventFlapping = true
-			flappingType = "ARR ↔ DEP"
-		}
-
-		if shouldPreventFlapping && timeSinceLastPhase < float64(s.flightPhasesConfig.PhaseFlappingPreventionSeconds) {
-			currentPhase = latestPhase.Phase // Keep current phase
-			s.logger.Debug("Prevented phase flapping",
-				logger.String("hex", aircraft.Hex),
-				logger.String("flight", aircraft.Flight),
-				logger.String("flapping_type", flappingType),
-				logger.String("prev_phase", latestPhase.Phase),
-				logger.String("attempted_phase", newPhase),
-				logger.Float64("time_since_last_phase", timeSinceLastPhase),
-				logger.Int("timeout_seconds", s.flightPhasesConfig.PhaseFlappingPreventionSeconds))
-		}
-	}
-
-	// Special handling for aircraft that just landed (T/D phase)
+	// ── T/D post-landing flow ────────────────────────────────────────
+	// After landing, guide the aircraft through T/D → TAX → NEW gracefully.
 	if latestPhase != nil && latestPhase.Phase == "T/D" {
 		if currentPhase == "NEW" {
-			// Check if aircraft is moving on ground (taxiing)
-			if aircraft.OnGround && aircraft.ADSB.GS >= float64(s.flightPhasesConfig.TaxiingMinSpeedKts) && aircraft.ADSB.GS <= float64(s.flightPhasesConfig.TaxiingMaxSpeedKts) {
+			if aircraft.OnGround && aircraft.ADSB != nil &&
+				aircraft.ADSB.GS >= float64(s.flightPhasesConfig.TaxiingMinSpeedKts) &&
+				aircraft.ADSB.GS <= float64(s.flightPhasesConfig.TaxiingMaxSpeedKts) {
 				currentPhase = "TAX"
 			} else {
-				// Aircraft is stationary after landing, keep it as T/D for a minimum time
+				// Keep T/D visible for the preservation period
 				timeSinceLanding := time.Since(latestPhase.Timestamp).Seconds()
-				if timeSinceLanding < float64(s.flightPhasesConfig.PhasePreservationSeconds) { // Use config value
-					currentPhase = "T/D" // Keep current phase
+				if timeSinceLanding < float64(s.flightPhasesConfig.PhasePreservationSeconds) {
+					currentPhase = "T/D"
+				} else if aircraft.ADSB != nil && aircraft.ADSB.GS >= float64(s.flightPhasesConfig.TaxiingMinSpeedKts) {
+					currentPhase = "TAX"
 				} else {
-					// After minimum time, allow transition to NEW only if truly stationary
-					if aircraft.ADSB.GS < float64(s.flightPhasesConfig.TaxiingMinSpeedKts) {
-						currentPhase = "NEW"
-					} else {
-						currentPhase = "TAX"
-					}
+					currentPhase = "NEW"
 				}
 			}
 		}
 	}
 
-	// Special handling for aircraft that just took off (T/O phase)
+	// ── T/O preservation ─────────────────────────────────────────────
+	// Keep takeoff phase visible for at least PhasePreservationSeconds so
+	// controllers can see it in the UI before it transitions to DEP.
 	if latestPhase != nil && latestPhase.Phase == "T/O" {
-		// Preserve T/O phase for minimum time to ensure visibility
 		timeSinceTakeoff := time.Since(latestPhase.Timestamp).Seconds()
 		if timeSinceTakeoff < float64(s.flightPhasesConfig.PhasePreservationSeconds) {
-			currentPhase = "T/O" // Keep T/O phase
-			s.logger.Debug("Preserving T/O phase",
-				logger.String("hex", aircraft.Hex),
-				logger.String("flight", aircraft.Flight),
-				logger.String("attempted_phase", newPhase),
-				logger.Float64("time_since_takeoff", timeSinceTakeoff),
-				logger.Int("preservation_seconds", s.flightPhasesConfig.PhasePreservationSeconds))
+			currentPhase = "T/O"
 		}
-		// After preservation time, allow normal phase transitions (DEP, ARR, etc.)
 	}
 
-	// Check if phase has changed or if this is a new aircraft
+	// ── Determine if a phase change should be recorded ───────────────
 	var shouldInsert bool
 
 	if latestPhase == nil {
-		// New aircraft - insert NEW phase
+		// Brand new aircraft — record initial phase
 		shouldInsert = true
-	} else {
-		// Check if phase has changed
-		if latestPhase.Phase != currentPhase {
-			// Special handling for transitions to NEW phase
-			if currentPhase == "NEW" {
-				// Prevent immediate transitions to NEW from active phases
-				// Apply timeout protection for T/D, TAX phases
-				if latestPhase.Phase == "T/D" || latestPhase.Phase == "TAX" {
-					timeSinceLastPhase := time.Since(latestPhase.Timestamp).Seconds()
-					if timeSinceLastPhase < float64(s.flightPhasesConfig.PhaseTransitionTimeoutSeconds) { // Use config value
-						currentPhase = latestPhase.Phase // Keep current phase
-						s.logger.Debug("Prevented premature transition to NEW",
-							logger.String("hex", aircraft.Hex),
-							logger.String("flight", aircraft.Flight),
-							logger.String("prev_phase", latestPhase.Phase),
-							logger.Float64("time_since_last_phase", timeSinceLastPhase))
-					} else {
-						shouldInsert = true
-					}
-				} else {
-					shouldInsert = true
-				}
+	} else if latestPhase.Phase != currentPhase {
+		// Phase changed — check for premature ground transitions
+		if currentPhase == "NEW" && (latestPhase.Phase == "T/D" || latestPhase.Phase == "TAX") {
+			timeSinceLastPhase := time.Since(latestPhase.Timestamp).Seconds()
+			if timeSinceLastPhase < float64(s.flightPhasesConfig.PhaseTransitionTimeoutSeconds) {
+				// Too soon — keep the current ground phase
+				currentPhase = latestPhase.Phase
 			} else {
 				shouldInsert = true
 			}
 		} else {
-			// Check timeout for inactive aircraft (revert to NEW phase)
-			if latestPhase.Phase != "NEW" {
-				timeSinceLastPhase := time.Since(latestPhase.Timestamp).Seconds()
-				if timeSinceLastPhase > float64(s.flightPhasesConfig.PhaseChangeTimeoutSeconds) {
-					currentPhase = "NEW"
-					shouldInsert = true
-				}
+			shouldInsert = true
+		}
+	} else {
+		// Phase unchanged — check inactive aircraft timeout
+		if latestPhase.Phase != "NEW" {
+			timeSinceLastPhase := time.Since(latestPhase.Timestamp).Seconds()
+			if timeSinceLastPhase > float64(s.flightPhasesConfig.PhaseChangeTimeoutSeconds) {
+				currentPhase = "NEW"
+				shouldInsert = true
 			}
 		}
 	}

@@ -290,22 +290,13 @@ phase_transition_timeout_seconds = 1800
 # Ensures pilots/controllers can see these important events
 phase_preservation_seconds = 30
 
-# 4. Phase flapping prevention (default: 600 seconds = 10 minutes)
-# Prevents rapid transitions between DEP↔APP, ARR↔DEP, and T/O↔T/D
-# Much shorter than phase_change_timeout as these are active aircraft
-phase_flapping_prevention_seconds = 600
-
-# 5. Recent takeoff detefction window (default: 30 minutes)
+# 4. Recent takeoff detection window (default: 30 minutes)
 # How long after takeoff an aircraft is considered "recently departed"
 # Used for DEP phase eligibility
 recent_takeoff_timeout_minutes = 30
 
 # Other phase detection parameters
 airport_range_nm = 5                          # Distance considered "close to airport"
-climbing_vertical_rate_fpm = 500              # Minimum vertical rate for climbing
-takeoff_altitude_threshold_ft = 2000          # Altitude threshold for takeoff detection
-emergency_squawk_codes = ["7500", "7600", "7700"]  # Emergency squawk codes
-approach_vertical_rate_threshold_fpm = 100    # Maximum vertical rate for approach
 
 # Ground detection thresholds
 flying_min_tas_kts = 50                       # Minimum true airspeed to be considered flying
@@ -322,6 +313,19 @@ impossible_speed_drop_min_alt_ft = 5000       # Minimum altitude for impossible 
 # Signal lost landing detection
 signal_lost_landing_enabled = true            # Enable automatic landing detection for signal lost aircraft
 signal_lost_landing_max_alt_ft = 1000         # Max altitude for signal lost landing detection
+
+# Trajectory-based phase detection
+# The trajectory system maintains a rolling window of recent ADS-B observations per
+# aircraft and uses statistical analysis (OLS regression, median filtering) to make
+# noise-resistant phase decisions instead of relying on single data points.
+trajectory_buffer_duration_sec = 90           # Seconds of ADS-B history per aircraft
+trajectory_min_points = 5                     # Min valid data points before full trajectory analysis
+trajectory_stale_timeout_sec = 300            # Remove aircraft not seen for this long (seconds)
+trajectory_cleanup_interval_sec = 30          # How often to check for stale aircraft (seconds)
+trajectory_descent_threshold_fpm = -200       # Altitude trend below this = descending (feet/min)
+trajectory_climb_threshold_fpm = 200          # Altitude trend above this = climbing (feet/min)
+trajectory_level_band_ft = 200               # Altitude variation within this = level flight (feet)
+trajectory_turning_rate_deg = 1.5            # Track rate above this = turning (degrees/sec)
 
 #######################################################
 # Weather Data Configuration

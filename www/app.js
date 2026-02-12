@@ -206,7 +206,7 @@ document.addEventListener('alpine:init', () => {
             showAirAircraft: JSON.parse(localStorage.getItem('showAirAircraft')) ?? true,
             showGroundAircraft: JSON.parse(localStorage.getItem('showGroundAircraft')) ?? true,
             showLocalDates: JSON.parse(localStorage.getItem('showLocalDates')) ?? false, // Default to UTC (false)
-            phaseFilters: JSON.parse(localStorage.getItem('phaseFilters')) || { CRZ: true, DEP: true, APP: true, ARR: true, TAX: true, 'T/O': true, 'T/D': true, NEW: true },
+            phaseFilters: JSON.parse(localStorage.getItem('phaseFilters')) || { CRZ: true, CLB: true, DEP: true, APP: true, ARR: true, TAX: true, 'T/O': true, 'T/D': true, NEW: true, UNK: true },
             excludeOtherAirportsGrounded: JSON.parse(localStorage.getItem('excludeOtherAirportsGrounded')) ?? false, // Default to false (show all grounded aircraft)
             // Aircraft animation settings
             aircraftAnimation: {
@@ -642,13 +642,15 @@ document.addEventListener('alpine:init', () => {
             if (currentPhase) {
                 const phaseClasses = {
                     'CRZ': 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+                    'CLB': 'bg-lime-500/20 text-lime-400 border border-lime-500/30',
                     'DEP': 'bg-green-500/20 text-green-400 border border-green-500/30',
                     'APP': 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
                     'ARR': 'bg-pink-400/15 text-pink-300 border border-pink-400/25',
                     'TAX': 'bg-purple-500/20 text-purple-400 border border-purple-500/30',
                     'T/O': 'bg-orange-500/20 text-orange-400 border border-orange-500/30',
                     'T/D': 'bg-teal-500/20 text-teal-400 border border-teal-500/30',
-                    'NEW': 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                    'NEW': 'bg-gray-500/20 text-gray-400 border border-gray-500/30',
+                    'UNK': 'bg-slate-500/15 text-slate-400 border border-slate-500/25'
                 };
                 const phaseClass = phaseClasses[currentPhase] || phaseClasses['NEW'];
                 phaseBadge = `<span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${phaseClass}">${currentPhase}</span>`;
@@ -939,7 +941,7 @@ document.addEventListener('alpine:init', () => {
         // Toggle flight phase filter
         togglePhaseFilter(phase) {
             if (!this.settings.phaseFilters) {
-                this.settings.phaseFilters = { CRZ: true, DEP: true, APP: true, ARR: true, TAX: true, 'T/O': true, 'T/D': true, NEW: true };
+                this.settings.phaseFilters = { CRZ: true, CLB: true, DEP: true, APP: true, ARR: true, TAX: true, 'T/O': true, 'T/D': true, NEW: true, UNK: true };
             }
             this.settings.phaseFilters[phase] = !this.settings.phaseFilters[phase];
             this.saveSettings();
@@ -4112,16 +4114,18 @@ async initAircraftDataSource() {
                     console.log('[Hotkey] Toggled Ground filter:', this.settings.showGroundAircraft);
                 }
                 
-                // Flight phase hotkeys (1-8) - matches UI filter bar order
+                // Flight phase hotkeys (1-9, 0) - matches UI filter bar order
                 const phaseKeys = {
                     '1': 'NEW',   // New
                     '2': 'TAX',   // Taxi
                     '3': 'T/O',   // Takeoff
-                    '4': 'DEP',   // Departure
-                    '5': 'CRZ',   // Cruise
-                    '6': 'ARR',   // Arrival
-                    '7': 'APP',   // Approach
-                    '8': 'T/D'    // Touchdown
+                    '4': 'CLB',   // Climb
+                    '5': 'DEP',   // Departure
+                    '6': 'CRZ',   // Cruise
+                    '7': 'ARR',   // Arrival
+                    '8': 'APP',   // Approach
+                    '9': 'T/D',   // Touchdown
+                    '0': 'UNK'    // Unknown
                 };
                 
                 if (phaseKeys[e.key]) {

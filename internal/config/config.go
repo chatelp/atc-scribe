@@ -185,22 +185,13 @@ type FlightPhasesConfig struct {
 	// Ensures pilots/controllers can see these important events
 	PhasePreservationSeconds int `toml:"phase_preservation_seconds"`
 
-	// 4. Phase flapping prevention (NEW - default: 300 seconds = 5 minutes)
-	// Prevents rapid transitions between DEP↔APP, ARR↔DEP, and T/O↔T/D
-	// Much shorter than phase_change_timeout as these are active aircraft
-	PhaseFlappingPreventionSeconds int `toml:"phase_flapping_prevention_seconds"`
-
-	// 5. Recent takeoff detection window (default: 30 minutes)
+	// 4. Recent takeoff detection window (default: 30 minutes)
 	// How long after takeoff an aircraft is considered "recently departed"
 	// Used for DEP phase eligibility
 	RecentTakeoffTimeoutMinutes int `toml:"recent_takeoff_timeout_minutes"`
 
 	// Other phase detection parameters
-	AirportRangeNM                   float64  `toml:"airport_range_nm"`                     // Distance considered "close to airport"
-	ClimbingVerticalRateFPM          int      `toml:"climbing_vertical_rate_fpm"`           // Minimum vertical rate for climbing
-	TakeoffAltitudeThresholdFt       int      `toml:"takeoff_altitude_threshold_ft"`        // Altitude threshold for takeoff detection
-	EmergencySquawkCodes             []string `toml:"emergency_squawk_codes"`               // List of emergency squawk codes
-	ApproachVerticalRateThresholdFPM int      `toml:"approach_vertical_rate_threshold_fpm"` // Maximum vertical rate for approach
+	AirportRangeNM float64 `toml:"airport_range_nm"` // Distance considered "close to airport"
 
 	// Ground detection thresholds (NEW - making existing constants configurable)
 	FlyingMinTASKts         float64 `toml:"flying_min_tas_kts"`        // Minimum true airspeed to be considered flying
@@ -214,9 +205,22 @@ type FlightPhasesConfig struct {
 	ImpossibleSpeedDropThresholdKts float64 `toml:"impossible_speed_drop_threshold_kts"` // Speed above which drops to zero at altitude are considered sensor errors
 	ImpossibleSpeedDropMinAltFt     float64 `toml:"impossible_speed_drop_min_alt_ft"`    // Minimum altitude for impossible speed drop detection
 
-	// Signal lost landing detection (NEW)
+	// Signal lost landing detection
 	SignalLostLandingEnabled  bool    `toml:"signal_lost_landing_enabled"`    // Enable automatic landing detection for signal lost aircraft
 	SignalLostLandingMaxAltFt float64 `toml:"signal_lost_landing_max_alt_ft"` // Max altitude for signal lost landing detection
+
+	// Trajectory-based phase detection
+	// The trajectory system maintains a rolling window of recent ADS-B observations per
+	// aircraft and uses statistical analysis (linear regression, median filtering) to make
+	// noise-resistant phase decisions instead of relying on single data points.
+	TrajectoryBufferDurationSec  int     `toml:"trajectory_buffer_duration_sec"`  // Seconds of ADS-B history per aircraft (default: 90)
+	TrajectoryMinPoints          int     `toml:"trajectory_min_points"`           // Min valid points before full trajectory analysis (default: 5)
+	TrajectoryStaleTimeoutSec    int     `toml:"trajectory_stale_timeout_sec"`    // Remove aircraft not seen for this long (default: 300)
+	TrajectoryCleanupIntervalSec int     `toml:"trajectory_cleanup_interval_sec"` // Cleanup goroutine interval (default: 30)
+	TrajectoryDescentThresholdFPM  float64 `toml:"trajectory_descent_threshold_fpm"`  // Altitude trend below this = descending (default: -200)
+	TrajectoryClimbThresholdFPM    float64 `toml:"trajectory_climb_threshold_fpm"`    // Altitude trend above this = climbing (default: 200)
+	TrajectoryLevelBandFt          float64 `toml:"trajectory_level_band_ft"`          // (AltMax-AltMin) within this = level flight (default: 200)
+	TrajectoryTurningRateDeg       float64 `toml:"trajectory_turning_rate_deg"`       // |TrackRate| above this = turning (default: 1.5 deg/sec)
 }
 
 // Load loads the configuration from the specified file path
@@ -524,9 +528,6 @@ func (c *Config) ValidateFlightPhases() error {
 	if c.FlightPhases.PhaseTransitionTimeoutSeconds == 0 {
 		c.FlightPhases.PhaseTransitionTimeoutSeconds = 60
 	}
-	if c.FlightPhases.PhaseFlappingPreventionSeconds == 0 {
-		c.FlightPhases.PhaseFlappingPreventionSeconds = 300 // 5 minutes default
-	}
 	if c.FlightPhases.HighAltitudeOverrideFt == 0 {
 		c.FlightPhases.HighAltitudeOverrideFt = 5000.0
 	}
@@ -541,6 +542,32 @@ func (c *Config) ValidateFlightPhases() error {
 	}
 	if c.FlightPhases.SignalLostLandingMaxAltFt == 0 {
 		c.FlightPhases.SignalLostLandingMaxAltFt = 1000.0
+	}
+
+	// Trajectory defaults
+	if c.FlightPhases.TrajectoryBufferDurationSec == 0 {
+		c.FlightPhases.TrajectoryBufferDurationSec = 90
+	}
+	if c.FlightPhases.TrajectoryMinPoints == 0 {
+		c.FlightPhases.TrajectoryMinPoints = 5
+	}
+	if c.FlightPhases.TrajectoryStaleTimeoutSec == 0 {
+		c.FlightPhases.TrajectoryStaleTimeoutSec = 300
+	}
+	if c.FlightPhases.TrajectoryCleanupIntervalSec == 0 {
+		c.FlightPhases.TrajectoryCleanupIntervalSec = 30
+	}
+	if c.FlightPhases.TrajectoryDescentThresholdFPM == 0 {
+		c.FlightPhases.TrajectoryDescentThresholdFPM = -200
+	}
+	if c.FlightPhases.TrajectoryClimbThresholdFPM == 0 {
+		c.FlightPhases.TrajectoryClimbThresholdFPM = 200
+	}
+	if c.FlightPhases.TrajectoryLevelBandFt == 0 {
+		c.FlightPhases.TrajectoryLevelBandFt = 200
+	}
+	if c.FlightPhases.TrajectoryTurningRateDeg == 0 {
+		c.FlightPhases.TrajectoryTurningRateDeg = 1.5
 	}
 
 	// Validate altitude thresholds
@@ -592,10 +619,6 @@ func (c *Config) ValidateFlightPhases() error {
 	if c.FlightPhases.PhaseTransitionTimeoutSeconds <= 0 {
 		return fmt.Errorf("phase_transition_timeout_seconds must be positive: %d", c.FlightPhases.PhaseTransitionTimeoutSeconds)
 	}
-	if c.FlightPhases.PhaseFlappingPreventionSeconds <= 0 {
-		return fmt.Errorf("phase_flapping_prevention_seconds must be positive: %d", c.FlightPhases.PhaseFlappingPreventionSeconds)
-	}
-
 	// Validate signal lost landing detection
 	if c.FlightPhases.SignalLostLandingEnabled && c.FlightPhases.SignalLostLandingMaxAltFt <= 0 {
 		return fmt.Errorf("signal_lost_landing_max_alt_ft must be positive when signal_lost_landing_enabled is true: %f", c.FlightPhases.SignalLostLandingMaxAltFt)

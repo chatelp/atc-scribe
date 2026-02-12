@@ -592,7 +592,7 @@
 
                     <!-- Flight Phase Filter Buttons -->
                     <div class="mb-2.5">
-                        <div class="grid grid-cols-8 gap-1.5">
+                        <div class="grid grid-cols-10 gap-1.5">
                             <button @click="$store.atc.togglePhaseFilter('NEW')"
                                     :class="{
                                         'bg-gray-500/20 border-gray-500/50 text-gray-400': $store.atc.settings.phaseFilters?.NEW !== false,
@@ -620,13 +620,22 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">3</span>
                                 <span class="whitespace-nowrap">T/O</span>
                             </button>
+                            <button @click="$store.atc.togglePhaseFilter('CLB')"
+                                    :class="{
+                                        'bg-lime-500/20 border-lime-500/50 text-lime-400': $store.atc.settings.phaseFilters?.CLB !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.CLB === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">4</span>
+                                <span class="whitespace-nowrap">CLB</span>
+                            </button>
                             <button @click="$store.atc.togglePhaseFilter('DEP')"
                                     :class="{
                                         'bg-green-500/20 border-green-500/50 text-green-400': $store.atc.settings.phaseFilters?.DEP !== false,
                                         'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.DEP === false
                                     }"
                                     class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">4</span>
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">5</span>
                                 <span class="whitespace-nowrap">DEP</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('CRZ')"
@@ -635,7 +644,7 @@
                                         'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.CRZ === false
                                     }"
                                     class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">5</span>
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">6</span>
                                 <span class="whitespace-nowrap">CRZ</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('ARR')"
@@ -644,7 +653,7 @@
                                         'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.ARR === false
                                     }"
                                     class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">6</span>
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">7</span>
                                 <span class="whitespace-nowrap">ARR</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('APP')"
@@ -653,7 +662,7 @@
                                         'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.APP === false
                                     }"
                                     class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">7</span>
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">8</span>
                                 <span class="whitespace-nowrap">APP</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('T/D')"
@@ -662,8 +671,17 @@
                                         'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.['T/D'] === false
                                     }"
                                     class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">8</span>
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">9</span>
                                 <span class="whitespace-nowrap">T/D</span>
+                            </button>
+                            <button @click="$store.atc.togglePhaseFilter('UNK')"
+                                    :class="{
+                                        'bg-slate-500/15 border-slate-500/40 text-slate-400': $store.atc.settings.phaseFilters?.UNK !== false,
+                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.UNK === false
+                                    }"
+                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">0</span>
+                                <span class="whitespace-nowrap">UNK</span>
                             </button>
                         </div>
                     </div>
