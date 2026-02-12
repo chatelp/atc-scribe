@@ -8,6 +8,7 @@ import (
 	"github.com/yegors/co-atc/internal/atcchat"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
+	"github.com/yegors/co-atc/internal/reference"
 	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/weather"
@@ -24,9 +25,9 @@ type Router struct {
 }
 
 // NewRouter creates a new API router
-func NewRouter(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, atcChatService *atcchat.Service, simulationService *simulation.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Router {
+func NewRouter(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, atcChatService *atcchat.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Router {
 	return &Router{
-		handler:    NewHandler(adsbService, frequenciesService, weatherService, atcChatService, simulationService, config, logger, wsServer, transcriptionStorage, clearanceStorage),
+		handler:    NewHandler(adsbService, frequenciesService, weatherService, atcChatService, simulationService, refService, config, logger, wsServer, transcriptionStorage, clearanceStorage),
 		middleware: NewMiddleware(logger),
 		config:     config,
 		logger:     logger.Named("api-router"),
@@ -79,7 +80,14 @@ func (r *Router) Routes() http.Handler {
 		router.Post("/station", r.handler.SetStationOverride) // New route for station override
 
 		// Weather Data
-		router.Get("/wx", r.handler.GetWeatherData) // New route for weather data
+		router.Get("/wx", r.handler.GetWeatherData)
+
+		// Reference data (airports, navaids, runways)
+		router.Get("/airports", r.handler.GetAirports)
+		router.Get("/airports/{ident}", r.handler.GetAirportByIdent)
+		router.Get("/navaids", r.handler.GetNavaids)
+		router.Get("/navaids/{ident}", r.handler.GetNavaidByIdent)
+		router.Get("/runways", r.handler.GetRunways)
 
 		// ATC Chat routes
 		router.Post("/atc-chat/session", r.handler.CreateATCChatSession)

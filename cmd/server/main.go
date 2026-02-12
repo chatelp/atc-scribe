@@ -15,9 +15,9 @@ import (
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/api"
 	"github.com/yegors/co-atc/internal/atcchat"
-	"github.com/yegors/co-atc/internal/bsdb"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
+	"github.com/yegors/co-atc/internal/reference"
 	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/templating"
@@ -26,42 +26,28 @@ import (
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
-// bsdbAdapter wraps bsdb.Service to implement adsb.BSDBService interface
-type bsdbAdapter struct {
-	service *bsdb.Service
+// refAdapter wraps reference.Service to implement adsb.ReferenceService interface
+type refAdapter struct {
+	service *reference.Service
 }
 
-func (a *bsdbAdapter) Lookup(hex string) *adsb.BSDBInfo {
-	info := a.service.Lookup(hex)
+func (a *refAdapter) LookupAircraft(hex string) *adsb.ReferenceAircraftInfo {
+	info := a.service.LookupAircraft(hex)
 	if info == nil {
 		return nil
 	}
-	return &adsb.BSDBInfo{
-		Registration:     info.Registration,
-		ICAOTypeCode:     info.ICAOTypeCode,
-		OperatorFlagCode: info.OperatorFlagCode,
-		Manufacturer:     info.Manufacturer,
-		Type:             info.Type,
-		RegisteredOwners: info.RegisteredOwners,
+	return &adsb.ReferenceAircraftInfo{
+		Hex:               info.Hex,
+		Registration:      info.Registration,
+		TypeCode:          info.TypeCode,
+		ManufacturerModel: info.ManufacturerModel,
+		Year:              info.Year,
+		Owner:             info.Owner,
 	}
 }
 
-func (a *bsdbAdapter) LookupBatch(hexCodes []string) map[string]*adsb.BSDBInfo {
-	result := make(map[string]*adsb.BSDBInfo)
-	batch := a.service.LookupBatch(hexCodes)
-	for hex, info := range batch {
-		if info != nil {
-			result[hex] = &adsb.BSDBInfo{
-				Registration:     info.Registration,
-				ICAOTypeCode:     info.ICAOTypeCode,
-				OperatorFlagCode: info.OperatorFlagCode,
-				Manufacturer:     info.Manufacturer,
-				Type:             info.Type,
-				RegisteredOwners: info.RegisteredOwners,
-			}
-		}
-	}
-	return result
+func (a *refAdapter) LookupAirline(code string) string {
+	return a.service.LookupAirline(code)
 }
 
 func main() {
@@ -164,7 +150,6 @@ func main() {
 		adsbStorage,
 		time.Duration(cfg.ADSB.FetchIntervalSecs)*time.Second,
 		cfg.Storage.MaxPositionsInAPI,
-		cfg.ADSB.AirlineDBPath,
 		log,
 		cfg.Station,
 		cfg.ADSB,
@@ -173,19 +158,28 @@ func main() {
 		simulationService,
 	)
 
-	// Load BaseStation.sqb database for aircraft enrichment
-	bsdbPath := filepath.Join("assets", "BaseStation.sqb")
-	bsdbService, err := bsdb.NewService(bsdbPath, true) // preload for fast lookups
+	// Load reference data (aircraft, airlines, airports, runways, navaids)
+	refService, err := reference.NewService(reference.ServiceConfig{
+		AircraftCSVPath:    cfg.Reference.AircraftCSVPath,
+		AirlinesDATPath:    cfg.Reference.AirlinesDATPath,
+		AirportsCSVPath:    cfg.Reference.AirportsCSVPath,
+		FrequenciesCSVPath: cfg.Reference.FrequenciesCSVPath,
+		RunwaysCSVPath:     cfg.Reference.RunwaysCSVPath,
+		NavaidsCSVPath:     cfg.Reference.NavaidsCSVPath,
+		StationLat:         cfg.Station.Latitude,
+		StationLon:         cfg.Station.Longitude,
+		HomeAirportCode:    cfg.Station.AirportCode,
+		DisplayRangeNM:     cfg.Station.DisplayRangeNM,
+		ExtensionLengthNM:  cfg.Station.RunwayExtensionLengthNM,
+	}, log)
 	if err != nil {
-		log.Warn("Failed to load BaseStation.sqb database - aircraft enrichment disabled",
-			logger.Error(err),
-			logger.String("path", bsdbPath))
+		log.Warn("Failed to load reference data", logger.Error(err))
 	} else {
-		adsbService.SetBSDBService(&bsdbAdapter{service: bsdbService})
-		log.Info("BaseStation.sqb database loaded",
-			logger.String("path", bsdbPath),
-			logger.Int("aircraft_count", bsdbService.Count()))
-		defer bsdbService.Close()
+		adsbService.SetReferenceService(&refAdapter{service: refService})
+		adsbService.SetRunwayData(refService.GetHomeRunwayData())
+		log.Info("Reference data loaded",
+			logger.Int("aircraft_count", refService.AircraftCount()),
+			logger.Int("airline_count", refService.AirlineCount()))
 	}
 
 	// Create and set WebSocket message handler for ADSB
@@ -270,7 +264,7 @@ func main() {
 	}
 
 	// Create API router
-	router := api.NewRouter(adsbService, frequenciesService, weatherService, atcChatService, simulationService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
+	router := api.NewRouter(adsbService, frequenciesService, weatherService, atcChatService, simulationService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
 
 	// --- Setup for multiple HTTP servers ---
 	var servers []*http.Server

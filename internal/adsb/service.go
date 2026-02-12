@@ -41,9 +41,7 @@ SPECIAL FEATURES:
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -58,32 +56,20 @@ type WebSocketServer interface {
 	Broadcast(message *websocket.Message)
 }
 
-// BSDBService defines the interface for BaseStation.sqb lookup service
-type BSDBService interface {
-	Lookup(hex string) *BSDBInfo
-	LookupBatch(hexCodes []string) map[string]*BSDBInfo
+// ReferenceService defines the interface for reference data lookups (aircraft, airlines)
+type ReferenceService interface {
+	LookupAircraft(hex string) *ReferenceAircraftInfo
+	LookupAirline(code string) string
 }
 
-// BSDBInfo represents aircraft info from BaseStation.sqb (interface type for dependency injection)
-type BSDBInfo struct {
-	Registration     string
-	ICAOTypeCode     string
-	OperatorFlagCode string
-	Manufacturer     string
-	Type             string
-	RegisteredOwners string
-}
-
-// Airline represents an airline from the airlines.json file
-type Airline struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Alias    string `json:"alias"`
-	IATA     string `json:"iata"`
-	ICAO     string `json:"icao"`
-	Callsign string `json:"callsign"`
-	Country  string `json:"country"`
-	Active   string `json:"active"`
+// ReferenceAircraftInfo represents aircraft info from the reference data service
+type ReferenceAircraftInfo struct {
+	Hex               string
+	Registration      string
+	TypeCode          string
+	ManufacturerModel string
+	Year              string
+	Owner             string
 }
 
 // Storage defines the interface for aircraft data storage
@@ -147,8 +133,7 @@ type Service struct {
 	mu                 sync.RWMutex
 	stopCh             chan struct{}
 	wg                 sync.WaitGroup
-	airlineMap         map[string]string         // Map of ICAO code to airline name
-	airlineDBPath      string                    // Path to airlines.json file
+	refService         ReferenceService          // Reference data lookup service
 	stationLat         float64                   // Station latitude from config
 	stationLon         float64                   // Station longitude from config
 	stationElevFeet    float64                   // Station elevation in feet
@@ -162,7 +147,6 @@ type Service struct {
 	changeDetector     *ChangeDetector           // Tracks aircraft changes
 	broadcastChan      chan []AircraftChange     // Channel for broadcasting changes
 	simulationService  SimulationService         // Simulation service for simulated aircraft
-	bsdbService        BSDBService               // BaseStation.sqb lookup service
 	trajectoryTracker  *TrajectoryTracker        // Trajectory-based phase detection
 }
 
@@ -179,7 +163,6 @@ func NewService(
 	storage Storage,
 	fetchInterval time.Duration,
 	maxPositionsInAPI int,
-	airlineDBPath string,
 	logger *logger.Logger,
 	stationCfg config.StationConfig,
 	adsbCfg config.ADSBConfig,
@@ -200,8 +183,6 @@ func NewService(
 		maxPositionsInAPI:  maxPositionsInAPI,
 		logger:             logger.Named("adsb"),
 		stopCh:             make(chan struct{}),
-		airlineMap:         make(map[string]string),
-		airlineDBPath:      airlineDBPath,
 		stationLat:         stationCfg.Latitude,
 		stationLon:         stationCfg.Longitude,
 		stationElevFeet:    float64(stationCfg.ElevationFeet),
@@ -228,20 +209,6 @@ func NewService(
 		},
 	}
 	SetConfig(predictionConfig)
-
-	// Load airline data
-	if airlineDBPath != "" {
-		if err := service.loadAirlineData(); err != nil {
-			service.logger.Error("Failed to load airline data: " + err.Error())
-		}
-	}
-
-	// Load runway data
-	if stationCfg.RunwaysDBPath != "" {
-		if err := service.loadRunwayData(stationCfg.RunwaysDBPath); err != nil {
-			service.logger.Error("Failed to load runway data: " + err.Error())
-		}
-	}
 
 	// Initialize trajectory tracker for phase detection
 	if flightPhasesConfig.Enabled {
@@ -324,66 +291,6 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 	}
 }
 
-// loadAirlineData loads airline data from the airlines.json file
-func (s *Service) loadAirlineData() error {
-	s.logger.Info("Loading airline data from: " + s.airlineDBPath)
-
-	// Read the file
-	data, err := os.ReadFile(s.airlineDBPath)
-	if err != nil {
-		return err
-	}
-
-	// Parse the JSON
-	var airlines []Airline
-	if err := json.Unmarshal(data, &airlines); err != nil {
-		return err
-	}
-
-	// Create the mapping
-	for _, airline := range airlines {
-		// Map ICAO code to airline name
-		if airline.ICAO != "" && airline.ICAO != "N/A" {
-			s.airlineMap[airline.ICAO] = airline.Name
-		}
-
-		// Also map IATA code to airline name if available
-		// This handles callsigns that use IATA codes (e.g., AA123 instead of AAL123)
-		if airline.IATA != "" && airline.IATA != "-" && airline.IATA != "N/A" {
-			s.airlineMap[airline.IATA] = airline.Name
-		}
-	}
-
-	// Airline map is now used directly in ProcessRawData
-
-	// Print the map size for debugging
-	s.logger.Info("Airline map loaded", logger.Int("count", len(s.airlineMap)))
-
-	s.logger.Info("Loaded airline data",
-		logger.Int("count", len(s.airlineMap)))
-	return nil
-}
-
-// loadRunwayData loads runway data from the runways.json file
-func (s *Service) loadRunwayData(runwayDBPath string) error {
-	s.logger.Info("Loading runway data from: " + runwayDBPath)
-
-	// Read the file
-	data, err := os.ReadFile(runwayDBPath)
-	if err != nil {
-		return err
-	}
-
-	// Parse the JSON
-	if err := json.Unmarshal(data, &s.runwayData); err != nil {
-		return err
-	}
-
-	s.logger.Info("Loaded runway data",
-		logger.String("airport", s.runwayData.Airport),
-		logger.Int("runway_count", len(s.runwayData.RunwayThresholds)))
-	return nil
-}
 
 // sendPhaseChangeAlert sends a phase change alert via WebSocket
 func (s *Service) sendPhaseChangeAlert(aircraft *Aircraft, fromPhase, toPhase string, runwayInfo *RunwayApproachInfo) {
@@ -661,7 +568,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 		}
 
 		// Enrich with BSDB and simulation data (in-memory lookups)
-		s.enrichWithBSDB(newAircraft)
+		s.enrichWithRefData(newAircraft)
 		s.updateSimulationFields(newAircraft)
 
 		changes := s.changeDetector.DetectChanges(newAircraft)
@@ -703,26 +610,39 @@ func (s *Service) updateSimulationFields(aircraft []*Aircraft) {
 	}
 }
 
-// SetBSDBService sets the BaseStation.sqb lookup service
-func (s *Service) SetBSDBService(bsdbService BSDBService) {
-	s.bsdbService = bsdbService
+// SetReferenceService sets the reference data lookup service and updates runway data
+func (s *Service) SetReferenceService(refService ReferenceService) {
+	s.refService = refService
 }
 
-// enrichWithBSDB enriches aircraft data with BaseStation.sqb information
-func (s *Service) enrichWithBSDB(aircraft []*Aircraft) {
-	if s.bsdbService == nil {
+// SetRunwayData sets the runway data for approach/departure detection
+// Called after reference service provides home runway data
+func (s *Service) SetRunwayData(data RunwayData) {
+	s.runwayData = data
+	if s.trajectoryTracker != nil {
+		s.trajectoryTracker.runwayData = data
+	}
+}
+
+// GetRunwayData returns the current runway data
+func (s *Service) GetRunwayData() RunwayData {
+	return s.runwayData
+}
+
+// enrichWithRefData enriches aircraft data with reference data (aircraft.csv)
+func (s *Service) enrichWithRefData(aircraft []*Aircraft) {
+	if s.refService == nil {
 		return
 	}
 
 	for _, a := range aircraft {
-		if info := s.bsdbService.Lookup(a.Hex); info != nil {
+		if info := s.refService.LookupAircraft(a.Hex); info != nil {
 			a.BSDB = &BSDBData{
 				Registration:     info.Registration,
-				ICAOTypeCode:     info.ICAOTypeCode,
-				OperatorFlagCode: info.OperatorFlagCode,
-				Manufacturer:     info.Manufacturer,
-				Type:             info.Type,
-				RegisteredOwners: info.RegisteredOwners,
+				ICAOTypeCode:     info.TypeCode,
+				Manufacturer:     info.ManufacturerModel,
+				Type:             info.ManufacturerModel,
+				RegisteredOwners: info.Owner,
 			}
 		}
 	}
@@ -740,7 +660,7 @@ func (s *Service) UpdateSimulationControls(hex string, heading, speed, verticalR
 func (s *Service) GetAllAircraft() []*Aircraft {
 	aircraft := s.storage.GetAll()
 	s.updateSimulationFields(aircraft)
-	s.enrichWithBSDB(aircraft)
+	s.enrichWithRefData(aircraft)
 	return aircraft
 }
 
@@ -749,7 +669,7 @@ func (s *Service) GetAllAircraft() []*Aircraft {
 func (s *Service) GetAllAircraftWithLastSeenFilter(lastSeenMinutes int) []*Aircraft {
 	aircraft := s.storage.GetAllWithLastSeenFilter(lastSeenMinutes)
 	s.updateSimulationFields(aircraft)
-	s.enrichWithBSDB(aircraft)
+	s.enrichWithRefData(aircraft)
 	return aircraft
 }
 
@@ -758,7 +678,7 @@ func (s *Service) GetAllAircraftWithLastSeenFilter(lastSeenMinutes int) []*Aircr
 func (s *Service) GetAllAircraftMinimal(lastSeenMinutes int) []*Aircraft {
 	aircraft := s.storage.GetAllMinimal(lastSeenMinutes)
 	s.updateSimulationFields(aircraft)
-	s.enrichWithBSDB(aircraft)
+	s.enrichWithRefData(aircraft)
 	return aircraft
 }
 
@@ -767,7 +687,7 @@ func (s *Service) GetAircraftByHex(hex string) (*Aircraft, bool) {
 	aircraft, found := s.storage.GetByHex(hex)
 	if found && aircraft != nil {
 		s.updateSimulationFields([]*Aircraft{aircraft})
-		s.enrichWithBSDB([]*Aircraft{aircraft})
+		s.enrichWithRefData([]*Aircraft{aircraft})
 	}
 	return aircraft, found
 }
@@ -799,7 +719,7 @@ func (s *Service) GetFilteredAircraft(
 		tookOffAfter, tookOffBefore, landedAfter, landedBefore,
 	)
 	s.updateSimulationFields(aircraft)
-	s.enrichWithBSDB(aircraft)
+	s.enrichWithRefData(aircraft)
 	return aircraft
 }
 
@@ -807,7 +727,7 @@ func (s *Service) GetFilteredAircraft(
 func (s *Service) GetFilteredAircraftSimple(minAltitude, maxAltitude float64, status ...string) []*Aircraft {
 	aircraft := s.storage.GetFiltered(minAltitude, maxAltitude, status, nil, nil, nil, nil)
 	s.updateSimulationFields(aircraft)
-	s.enrichWithBSDB(aircraft)
+	s.enrichWithRefData(aircraft)
 	return aircraft
 }
 
@@ -1686,7 +1606,9 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 			// Only lookup airline if it's a valid flight number (3 letters + 1-4 numbers)
 			if isAllLetters && isAllDigits && len(remainingChars) >= 1 && len(remainingChars) <= 4 {
 				icaoCode := firstThree
-				airlineName = s.airlineMap[icaoCode]
+				if s.refService != nil {
+					airlineName = s.refService.LookupAirline(icaoCode)
+				}
 				s.logger.Debug("Detected valid flight number",
 					logger.String("flight", flightName),
 					logger.String("airline_code", icaoCode),

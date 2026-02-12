@@ -7,7 +7,6 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/yegors/co-atc/internal/atcchat"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
+	"github.com/yegors/co-atc/internal/reference"
 	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/weather"
@@ -32,6 +32,7 @@ type Handler struct {
 	weatherService       *weather.Service
 	atcChatService       *atcchat.Service
 	simulationService    *simulation.Service
+	refService           *reference.Service
 	config               *config.Config
 	logger               *logger.Logger
 	wsServer             *websocket.Server
@@ -40,13 +41,14 @@ type Handler struct {
 }
 
 // NewHandler creates a new API handler
-func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, atcChatService *atcchat.Service, simulationService *simulation.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Handler {
+func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, atcChatService *atcchat.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Handler {
 	return &Handler{
 		adsbService:          adsbService,
 		frequenciesService:   frequenciesService,
 		weatherService:       weatherService,
 		atcChatService:       atcChatService,
 		simulationService:    simulationService,
+		refService:           refService,
 		config:               config,
 		logger:               logger.Named("api-handler"),
 		wsServer:             wsServer,
@@ -615,20 +617,10 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 	// Track if we have any data fetch failures
 	var fetchErrors []string
 
-	// Fetch runway data if path is configured
-	if h.config.Station.RunwaysDBPath != "" {
-		runwayData, err := h.fetchRunwayData(h.config.Station.RunwaysDBPath)
-		if err == nil {
-			stationCfg.Runways = runwayData
-		} else {
-			h.logger.Error("Failed to fetch runway data",
-				logger.String("path", h.config.Station.RunwaysDBPath),
-				logger.Error(err))
-			fetchErrors = append(fetchErrors, fmt.Sprintf("Runways: %s", err.Error()))
-
-			// Set empty object instead of null for better client handling
-			stationCfg.Runways = map[string]interface{}{}
-		}
+	// Build runway data from reference service
+	if h.refService != nil {
+		runwayData := h.buildRunwayResponse()
+		stationCfg.Runways = runwayData
 	}
 
 	// Add fetch errors to response if any occurred
@@ -729,109 +721,116 @@ func (h *Handler) GetWeatherData(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, weatherData)
 }
 
-// fetchRunwayData loads runway data from the specified file and calculates extended centerlines
-func (h *Handler) fetchRunwayData(filePath string) (interface{}, error) {
-	// Read the runway data file
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read runway data file: %w", err)
-	}
+// buildRunwayResponse builds the runway JSON response from precomputed reference data.
+// Matches the same JSON shape the frontend drawRunways() expects.
+func (h *Handler) buildRunwayResponse() interface{} {
+	homeData := h.refService.GetHomeRunwayData()
+	extensions := h.refService.GetHomeRunwayExtensions()
 
-	// Parse the JSON data
-	var runwayData struct {
-		Airport          string `json:"airport"`
-		RunwayThresholds map[string]map[string]struct {
-			Latitude  float64 `json:"latitude"`
-			Longitude float64 `json:"longitude"`
-		} `json:"runway_thresholds"`
-	}
-	if err := json.Unmarshal(data, &runwayData); err != nil {
-		return nil, fmt.Errorf("failed to parse runway data: %w", err)
-	}
-
-	// Define the point structure with distance field
 	type Point struct {
 		Latitude  float64 `json:"latitude"`
 		Longitude float64 `json:"longitude"`
-		Distance  float64 `json:"distance,omitempty"` // Include distance for markers
+		Distance  float64 `json:"distance,omitempty"`
 	}
 
-	// Create the response structure with extended centerlines
-	response := struct {
-		Airport          string `json:"airport"`
+	// Convert extensions to the Point type the frontend expects
+	extResponse := make(map[string]map[string][]Point)
+	for pairKey, ends := range extensions {
+		extResponse[pairKey] = make(map[string][]Point)
+		for endID, pts := range ends {
+			points := make([]Point, len(pts))
+			for i, p := range pts {
+				points[i] = Point{Latitude: p.Latitude, Longitude: p.Longitude, Distance: p.Distance}
+			}
+			extResponse[pairKey][endID] = points
+		}
+	}
+
+	return struct {
+		Airport          string                         `json:"airport"`
 		RunwayThresholds map[string]map[string]struct {
 			Latitude  float64 `json:"latitude"`
 			Longitude float64 `json:"longitude"`
 		} `json:"runway_thresholds"`
 		RunwayExtensions map[string]map[string][]Point `json:"runway_extensions"`
 	}{
-		Airport:          runwayData.Airport,
-		RunwayThresholds: runwayData.RunwayThresholds,
-		RunwayExtensions: make(map[string]map[string][]Point),
+		Airport:          homeData.Airport,
+		RunwayThresholds: homeData.RunwayThresholds,
+		RunwayExtensions: extResponse,
+	}
+}
+
+// GetAirports returns all airports within the configured display range
+func (h *Handler) GetAirports(w http.ResponseWriter, r *http.Request) {
+	if h.refService == nil {
+		WriteJSON(w, http.StatusOK, []interface{}{})
+		return
+	}
+	WriteJSON(w, http.StatusOK, h.refService.GetAirports())
+}
+
+// GetAirportByIdent returns a single airport with full details including frequencies
+func (h *Handler) GetAirportByIdent(w http.ResponseWriter, r *http.Request) {
+	ident := strings.ToUpper(chi.URLParam(r, "ident"))
+	if h.refService == nil {
+		WriteJSON(w, http.StatusNotFound, map[string]string{"error": "reference service not available"})
+		return
+	}
+	airport := h.refService.GetAirport(ident)
+	if airport == nil {
+		WriteJSON(w, http.StatusNotFound, map[string]string{"error": "airport not found"})
+		return
 	}
 
-	// Calculate extended centerlines for each runway
-	for runwayID, thresholds := range runwayData.RunwayThresholds {
-		response.RunwayExtensions[runwayID] = make(map[string][]Point)
-
-		// Process each end of the runway
-		for endID, threshold := range thresholds {
-			// Find the opposite end
-			var oppositeThreshold struct {
-				Latitude  float64 `json:"latitude"`
-				Longitude float64 `json:"longitude"`
-			}
-			for otherEndID, otherThreshold := range thresholds {
-				if otherEndID != endID {
-					oppositeThreshold = otherThreshold
-					break
-				}
-			}
-
-			// Calculate the bearing from this threshold to the opposite threshold
-			bearing := calculateBearing(
-				threshold.Latitude, threshold.Longitude,
-				oppositeThreshold.Latitude, oppositeThreshold.Longitude,
-			)
-
-			// Calculate the opposite bearing (for the extension)
-			oppositeBearing := math.Mod(bearing+180, 360)
-
-			// Create points for the extended centerline (10 nm from threshold)
-			extensionPoints := []Point{
-				// Start with the threshold point
-				{
-					Latitude:  threshold.Latitude,
-					Longitude: threshold.Longitude,
-					Distance:  0.0,
-				},
-			}
-
-			// Get the configured runway extension length (default to 5 nm if not set)
-			extensionLengthNM := 5.0
-			if h.config.Station.RunwayExtensionLengthNM > 0 {
-				extensionLengthNM = h.config.Station.RunwayExtensionLengthNM
-			}
-
-			// Add points at 1 nm intervals up to the configured length
-			for distance := 1.0; distance <= extensionLengthNM; distance += 1.0 {
-				lat, lon := calculateDestinationPoint(
-					threshold.Latitude, threshold.Longitude,
-					oppositeBearing, distance,
-				)
-				extensionPoints = append(extensionPoints, Point{
-					Latitude:  lat,
-					Longitude: lon,
-					Distance:  distance,
-				})
-			}
-
-			// Add the extension points to the response
-			response.RunwayExtensions[runwayID][endID] = extensionPoints
+	// Also include associated runways
+	var airportRunways []*reference.RunwayInfo
+	for _, rwy := range h.refService.GetRunways() {
+		if strings.EqualFold(rwy.AirportIdent, ident) {
+			airportRunways = append(airportRunways, rwy)
 		}
 	}
 
-	return response, nil
+	response := struct {
+		*reference.AirportInfo
+		Runways []*reference.RunwayInfo `json:"runways,omitempty"`
+	}{
+		AirportInfo: airport,
+		Runways:     airportRunways,
+	}
+	WriteJSON(w, http.StatusOK, response)
+}
+
+// GetNavaids returns all navaids within the configured display range
+func (h *Handler) GetNavaids(w http.ResponseWriter, r *http.Request) {
+	if h.refService == nil {
+		WriteJSON(w, http.StatusOK, []interface{}{})
+		return
+	}
+	WriteJSON(w, http.StatusOK, h.refService.GetNavaids())
+}
+
+// GetNavaidByIdent returns all navaids matching the given ident
+func (h *Handler) GetNavaidByIdent(w http.ResponseWriter, r *http.Request) {
+	ident := strings.ToUpper(chi.URLParam(r, "ident"))
+	if h.refService == nil {
+		WriteJSON(w, http.StatusNotFound, map[string]string{"error": "reference service not available"})
+		return
+	}
+	navaids := h.refService.GetNavaidsByIdent(ident)
+	if len(navaids) == 0 {
+		WriteJSON(w, http.StatusNotFound, map[string]string{"error": "navaid not found"})
+		return
+	}
+	WriteJSON(w, http.StatusOK, navaids)
+}
+
+// GetRunways returns all runways within the configured display range
+func (h *Handler) GetRunways(w http.ResponseWriter, r *http.Request) {
+	if h.refService == nil {
+		WriteJSON(w, http.StatusOK, []interface{}{})
+		return
+	}
+	WriteJSON(w, http.StatusOK, h.refService.GetRunways())
 }
 
 // calculateBearing calculates the initial bearing from point 1 to point 2

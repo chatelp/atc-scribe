@@ -1,6 +1,6 @@
 # Co-ATC Docker Setup
 
-This guide provides instructions for deploying Co-ATC using Docker and Docker Compose.
+This guide provides instructions for deploying Co-ATC using Docker and Docker Compose. But seriously, don't do this, run this natively. 
 
 ## Overview
 

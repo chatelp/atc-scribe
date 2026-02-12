@@ -132,7 +132,28 @@
                                             <span class="slider"></span>
                                         </label>
                                     </div>
-                                    
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Airports</span>
+                                        <label class="switch">
+                                            <input type="checkbox" x-model="$store.atc.settings.showAirports" @change="$store.atc.toggleAirports()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Navaids</span>
+                                        <label class="switch">
+                                            <input type="checkbox" x-model="$store.atc.settings.showNavaids" @change="$store.atc.toggleNavaids()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">All Runways</span>
+                                        <label class="switch">
+                                            <input type="checkbox" x-model="$store.atc.settings.showAllRunways" @change="$store.atc.toggleAllRunways()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+
                                     <!-- Aircraft Animation Settings -->
                                     <div class="border-t border-border pt-2.5 mt-2.5">
                                         <div class="flex items-center justify-between gap-2.5 mb-2">

@@ -224,7 +224,10 @@ class MapManager {
             aircraft: this.L.layerGroup(),
             trails: this.L.layerGroup(),
             rangeRings: this.L.layerGroup(),
-            runways: this.L.layerGroup(), // New layer for runways
+            runways: this.L.layerGroup(),
+            airports: this.L.layerGroup(),
+            navaids: this.L.layerGroup(),
+            allRunways: this.L.layerGroup(),
         };
         this.markers = {}; // Stores Leaflet marker objects { hex: { aircraft: marker, label: labelMarker } }
         this.trails = {}; // Trails managed by MapManager
@@ -235,6 +238,9 @@ class MapManager {
 
         // Runway rendering state
         this.runwayData = null;
+        this.airportsData = null;
+        this.navaidsData = null;
+        this.allRunwaysData = null;
         this.runwayZoomListener = null;
         this.runwayUpdateTimeout = null;
 
@@ -389,9 +395,12 @@ class MapManager {
             maxZoom: 19
         }).addTo(this.map);
 
+        this.layers.allRunways.addTo(this.map);
+        this.layers.airports.addTo(this.map);
+        this.layers.navaids.addTo(this.map);
         this.layers.aircraft.addTo(this.map);
         this.layers.trails.addTo(this.map);
-        this.layers.runways.addTo(this.map); // Add the runways layer
+        this.layers.runways.addTo(this.map);
         
         // Only add range rings layer and rings if the setting is enabled
         if (this.store.settings.showRings) {
@@ -1910,6 +1919,235 @@ class MapManager {
                     }
                 }
             }
+        }
+    }
+
+    // Draw airport markers on the map
+    drawAirports(airports) {
+        if (!this.map) return;
+        this.airportsData = airports;
+        this._renderAirports();
+
+        // Hook into existing zoom listener to update airport visibility
+        if (!this._refDataZoomListener) {
+            this._refDataZoomListener = () => {
+                clearTimeout(this._refDataZoomTimeout);
+                this._refDataZoomTimeout = setTimeout(() => {
+                    this._renderAirports();
+                    this._renderNavaids();
+                    this._renderAllRunways();
+                }, 150);
+            };
+            this.map.on('zoomend', this._refDataZoomListener);
+        }
+    }
+
+    _renderAirports() {
+        if (!this.map || !this.airportsData) return;
+        this.layers.airports.clearLayers();
+
+        const zoom = this.map.getZoom();
+        if (zoom < 8) return; // Hide airports when zoomed out
+
+        const airportTypeIcons = {
+            'large_airport': { color: '#60A5FA', radius: 6, minZoom: 8 },
+            'medium_airport': { color: '#34D399', radius: 5, minZoom: 9 },
+            'small_airport': { color: '#A78BFA', radius: 4, minZoom: 10 },
+            'heliport': { color: '#FB923C', radius: 3, minZoom: 11 },
+            'seaplane_base': { color: '#2DD4BF', radius: 3, minZoom: 11 },
+            'closed': { color: '#6B7280', radius: 3, minZoom: 12 },
+        };
+
+        for (const ap of this.airportsData) {
+            const cfg = airportTypeIcons[ap.type] || airportTypeIcons['small_airport'];
+            if (zoom < cfg.minZoom) continue;
+
+            const freqRows = (ap.frequencies || []).map(f =>
+                `<tr><td class="ref-popup-type">${f.type}</td><td>${f.description}</td><td class="ref-popup-freq">${f.frequency_mhz}</td></tr>`
+            ).join('');
+            const freqTable = freqRows
+                ? `<table class="ref-popup-table"><tr><th>Type</th><th>Desc</th><th>MHz</th></tr>${freqRows}</table>`
+                : '';
+
+            const popup = `<div class="ref-popup">
+                <div class="ref-popup-title">${ap.name}</div>
+                <div class="ref-popup-subtitle">${ap.ident} &middot; ${ap.type.replace(/_/g, ' ')} &middot; ${ap.elevation_ft || '?'} ft</div>
+                ${ap.municipality ? `<div class="ref-popup-detail">${ap.municipality}, ${ap.iso_country}</div>` : ''}
+                ${ap.iata_code ? `<div class="ref-popup-detail">IATA: ${ap.iata_code}</div>` : ''}
+                ${freqTable}
+            </div>`;
+
+            this.L.circleMarker([ap.latitude, ap.longitude], {
+                radius: cfg.radius,
+                color: cfg.color,
+                fillColor: cfg.color,
+                fillOpacity: 0.6,
+                opacity: 0.8,
+                weight: 1,
+                renderer: this.canvasRenderer
+            }).bindPopup(popup, { className: 'ref-popup-container', maxWidth: 300 })
+              .addTo(this.layers.airports);
+
+            // Show ident label at higher zoom levels
+            if (zoom >= 11) {
+                this.L.marker([ap.latitude, ap.longitude], {
+                    icon: this.L.divIcon({
+                        html: `<div class="airport-label">${ap.ident}</div>`,
+                        className: 'airport-label-container',
+                        iconSize: [40, 14],
+                        iconAnchor: [20, -8]
+                    })
+                }).addTo(this.layers.airports);
+            }
+        }
+    }
+
+    // Draw navaid markers on the map
+    drawNavaids(navaids) {
+        if (!this.map) return;
+        this.navaidsData = navaids;
+        this._renderNavaids();
+
+        // Reuse the same zoom listener (drawAirports sets it up)
+        if (!this._refDataZoomListener) {
+            this._refDataZoomListener = () => {
+                clearTimeout(this._refDataZoomTimeout);
+                this._refDataZoomTimeout = setTimeout(() => {
+                    this._renderAirports();
+                    this._renderNavaids();
+                    this._renderAllRunways();
+                }, 150);
+            };
+            this.map.on('zoomend', this._refDataZoomListener);
+        }
+    }
+
+    _renderNavaids() {
+        if (!this.map || !this.navaidsData) return;
+        this.layers.navaids.clearLayers();
+
+        const zoom = this.map.getZoom();
+        if (zoom < 9) return;
+
+        const navaidStyles = {
+            'VOR': { color: '#60A5FA', shape: 'circle', radius: 4 },
+            'VOR-DME': { color: '#60A5FA', shape: 'circle', radius: 4 },
+            'VORTAC': { color: '#818CF8', shape: 'circle', radius: 4 },
+            'NDB': { color: '#F59E0B', shape: 'circle', radius: 3 },
+            'NDB-DME': { color: '#F59E0B', shape: 'circle', radius: 3 },
+            'DME': { color: '#A78BFA', shape: 'circle', radius: 3 },
+            'TACAN': { color: '#818CF8', shape: 'circle', radius: 3 },
+        };
+
+        for (const nav of this.navaidsData) {
+            const style = navaidStyles[nav.type] || { color: '#9CA3AF', shape: 'circle', radius: 3 };
+
+            const freqDisplay = nav.frequency_khz ? `${(nav.frequency_khz / 1000).toFixed(nav.frequency_khz >= 100000 ? 2 : 1)} ${nav.frequency_khz >= 100000 ? 'MHz' : 'kHz'}` : '';
+
+            const popup = `<div class="ref-popup">
+                <div class="ref-popup-title">${nav.ident} - ${nav.name}</div>
+                <div class="ref-popup-subtitle">${nav.type}${freqDisplay ? ' &middot; ' + freqDisplay : ''}</div>
+                ${nav.elevation_ft ? `<div class="ref-popup-detail">Elev: ${nav.elevation_ft} ft</div>` : ''}
+                ${nav.associated_airport ? `<div class="ref-popup-detail">Airport: ${nav.associated_airport}</div>` : ''}
+                ${nav.usage_type ? `<div class="ref-popup-detail">Usage: ${nav.usage_type}${nav.power ? ' &middot; ' + nav.power : ''}</div>` : ''}
+            </div>`;
+
+            this.L.circleMarker([nav.latitude, nav.longitude], {
+                radius: style.radius,
+                color: style.color,
+                fillColor: style.color,
+                fillOpacity: 0.5,
+                opacity: 0.7,
+                weight: 1,
+                renderer: this.canvasRenderer
+            }).bindPopup(popup, { className: 'ref-popup-container', maxWidth: 280 })
+              .addTo(this.layers.navaids);
+
+            if (zoom >= 11) {
+                this.L.marker([nav.latitude, nav.longitude], {
+                    icon: this.L.divIcon({
+                        html: `<div class="navaid-label">${nav.ident}</div>`,
+                        className: 'navaid-label-container',
+                        iconSize: [36, 14],
+                        iconAnchor: [18, -6]
+                    })
+                }).addTo(this.layers.navaids);
+            }
+        }
+    }
+
+    // Draw all runways (non-home-airport) as simple lines
+    drawAllRunways(runways) {
+        if (!this.map) return;
+        this.allRunwaysData = runways;
+        this._renderAllRunways();
+
+        if (!this._refDataZoomListener) {
+            this._refDataZoomListener = () => {
+                clearTimeout(this._refDataZoomTimeout);
+                this._refDataZoomTimeout = setTimeout(() => {
+                    this._renderAirports();
+                    this._renderNavaids();
+                    this._renderAllRunways();
+                }, 150);
+            };
+            this.map.on('zoomend', this._refDataZoomListener);
+        }
+    }
+
+    _renderAllRunways() {
+        if (!this.map || !this.allRunwaysData) return;
+        this.layers.allRunways.clearLayers();
+
+        const zoom = this.map.getZoom();
+        if (zoom < 10) return;
+
+        for (const rwy of this.allRunwaysData) {
+            if (!rwy.le_latitude || !rwy.le_longitude || !rwy.he_latitude || !rwy.he_longitude) continue;
+
+            const coords = [
+                [rwy.le_latitude, rwy.le_longitude],
+                [rwy.he_latitude, rwy.he_longitude]
+            ];
+
+            this.L.polyline(coords, {
+                color: '#9CA3AF',
+                weight: Math.max(2, Math.min(5, zoom - 8)),
+                opacity: 0.6,
+                renderer: this.canvasRenderer
+            }).addTo(this.layers.allRunways);
+
+            if (zoom >= 12) {
+                if (rwy.le_ident) {
+                    this.L.marker([rwy.le_latitude, rwy.le_longitude], {
+                        icon: this.L.divIcon({
+                            html: `<div class="runway-label" style="font-size:8px;opacity:0.7">${rwy.le_ident}</div>`,
+                            className: 'runway-label-container',
+                            iconSize: [24, 14]
+                        })
+                    }).addTo(this.layers.allRunways);
+                }
+                if (rwy.he_ident) {
+                    this.L.marker([rwy.he_latitude, rwy.he_longitude], {
+                        icon: this.L.divIcon({
+                            html: `<div class="runway-label" style="font-size:8px;opacity:0.7">${rwy.he_ident}</div>`,
+                            className: 'runway-label-container',
+                            iconSize: [24, 14]
+                        })
+                    }).addTo(this.layers.allRunways);
+                }
+            }
+        }
+    }
+
+    // Toggle layer visibility
+    toggleLayerVisibility(layerName, visible) {
+        const layer = this.layers[layerName];
+        if (!layer || !this.map) return;
+        if (visible) {
+            if (!this.map.hasLayer(layer)) layer.addTo(this.map);
+        } else {
+            if (this.map.hasLayer(layer)) this.map.removeLayer(layer);
         }
     }
 

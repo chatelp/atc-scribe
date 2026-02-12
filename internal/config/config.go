@@ -16,6 +16,7 @@ type Config struct {
 	Logging        LoggingConfig        `toml:"logging"`         // Application logging settings
 	Storage        StorageConfig        `toml:"storage"`         // Data persistence settings
 	Station        StationConfig        `toml:"station"`         // Physical location settings
+	Reference      ReferenceConfig      `toml:"reference"`       // Reference data (aircraft, airlines, airports, runways, navaids)
 	Transcription  TranscriptionConfig  `toml:"transcription"`   // Audio transcription settings
 	PostProcessing PostProcessingConfig `toml:"post_processing"` // Post-processing settings for transcriptions
 	FlightPhases   FlightPhasesConfig   `toml:"flight_phases"`   // Flight phase detection settings
@@ -53,9 +54,8 @@ type ADSBConfig struct {
 	SearchRadiusNM    int    `toml:"search_radius_nm"`    // Search radius in nautical miles for external API queries
 
 	// Common settings for both source types
-	FetchIntervalSecs     int    `toml:"fetch_interval_seconds"`      // How often to fetch new aircraft data (in seconds)
-	SignalLostTimeoutSecs int    `toml:"signal_lost_timeout_seconds"` // Time after which aircraft is marked as signal_lost (in seconds, default: 60)
-	AirlineDBPath         string `toml:"airline_db_path"`             // Path to airline database JSON file for aircraft operator lookups
+	FetchIntervalSecs     int `toml:"fetch_interval_seconds"`      // How often to fetch new aircraft data (in seconds)
+	SignalLostTimeoutSecs int `toml:"signal_lost_timeout_seconds"` // Time after which aircraft is marked as signal_lost (in seconds, default: 60)
 }
 
 // LoggingConfig contains application logging configuration
@@ -77,9 +77,19 @@ type StationConfig struct {
 	Longitude               float64 `toml:"longitude"`                  // Longitude of the station in decimal degrees (-180 to 180)
 	ElevationFeet           int     `toml:"elevation_feet"`             // Elevation of the station above sea level in feet
 	AirportCode             string  `toml:"airport_code"`               // ICAO code of the airport (e.g., "CYYZ")
-	RunwaysDBPath           string  `toml:"runways_db_path"`            // Path to runway database JSON file
 	RunwayExtensionLengthNM float64 `toml:"runway_extension_length_nm"` // Length of runway extensions in nautical miles
 	AirportRangeNM          float64 `toml:"airport_range_nm"`           // Range in nautical miles to consider aircraft as being at this airport (default: 5.0)
+	DisplayRangeNM          float64 `toml:"display_range_nm"`           // Range in nautical miles for displaying airports, runways, and navaids on map (default: 100.0)
+}
+
+// ReferenceConfig contains paths to reference data CSV files
+type ReferenceConfig struct {
+	AircraftCSVPath    string `toml:"aircraft_csv_path"`             // Path to aircraft.csv (wiedehopf/tar1090-db)
+	AirlinesDATPath    string `toml:"airlines_dat_path"`             // Path to airlines.dat (OpenFlights)
+	AirportsCSVPath    string `toml:"airports_csv_path"`             // Path to airports.csv (OurAirports)
+	FrequenciesCSVPath string `toml:"airport_frequencies_csv_path"`  // Path to airport-frequencies.csv (OurAirports)
+	RunwaysCSVPath     string `toml:"runways_csv_path"`              // Path to runways.csv (OurAirports)
+	NavaidsCSVPath     string `toml:"navaids_csv_path"`              // Path to navaids.csv (OurAirports)
 }
 
 // TranscriptionConfig contains settings for audio transcription services
@@ -422,6 +432,11 @@ func (c *Config) ValidateStation() error {
 	}
 
 	// Airport code validation is now handled in ValidateWeather method
+
+	// Default display range
+	if c.Station.DisplayRangeNM <= 0 {
+		c.Station.DisplayRangeNM = 100.0
+	}
 
 	return nil
 }

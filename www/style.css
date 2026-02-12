@@ -517,6 +517,106 @@ input[type=range].dual-range-max:focus {
     text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
 }
 
+/* Airport and navaid label styling */
+.airport-label-container,
+.navaid-label-container {
+    background: transparent !important;
+    border: none !important;
+    z-index: 1 !important;
+}
+
+.airport-label {
+    color: #93C5FD;
+    font-size: 9px;
+    font-weight: bold;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 1px 3px;
+    border-radius: 2px;
+    white-space: nowrap;
+}
+
+.navaid-label {
+    color: #C4B5FD;
+    font-size: 9px;
+    font-weight: bold;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 1px 3px;
+    border-radius: 2px;
+    white-space: nowrap;
+}
+
+/* Reference data popup styling */
+.ref-popup-container .leaflet-popup-content-wrapper {
+    background: rgba(17, 24, 39, 0.95);
+    color: #e5e7eb;
+    border: 1px solid rgba(75, 85, 99, 0.6);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.ref-popup-container .leaflet-popup-tip {
+    background: rgba(17, 24, 39, 0.95);
+    border: 1px solid rgba(75, 85, 99, 0.6);
+}
+
+.ref-popup-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #f9fafb;
+    margin-bottom: 2px;
+}
+
+.ref-popup-subtitle {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-bottom: 4px;
+    text-transform: capitalize;
+}
+
+.ref-popup-detail {
+    font-size: 11px;
+    color: #d1d5db;
+    margin-bottom: 2px;
+}
+
+.ref-popup-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-size: 10px;
+}
+
+.ref-popup-table th {
+    color: #9ca3af;
+    text-align: left;
+    padding: 2px 4px;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.4);
+    font-weight: 500;
+}
+
+.ref-popup-table td {
+    padding: 2px 4px;
+    color: #d1d5db;
+}
+
+.ref-popup-table tr:hover td {
+    background: rgba(55, 65, 81, 0.3);
+}
+
+.ref-popup-type {
+    color: #93c5fd;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.ref-popup-freq {
+    color: #34d399;
+    font-family: monospace;
+    text-align: right;
+}
+
 /* Proximity circle animation */
 @keyframes proximityPulse {
     0%, 100% {

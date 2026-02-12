@@ -184,23 +184,28 @@ func (da *DataAggregator) getWeatherData() (*weather.WeatherData, error) {
 	return weatherData, nil
 }
 
-// getRunwayData retrieves runway configuration
+// getRunwayData retrieves runway configuration from the reference data loaded at startup
 func (da *DataAggregator) getRunwayData() ([]RunwayInfo, error) {
-	// For now, return static runway data from config
-	// This matches the current ATC chat implementation
-	runways := []RunwayInfo{
-		{Name: "05", LengthFt: 11000, Active: true, Operations: []string{"departure", "arrival"}},
-		{Name: "23", LengthFt: 11000, Active: true, Operations: []string{"departure", "arrival"}},
-		{Name: "06L", LengthFt: 9000, Active: true, Operations: []string{"departure", "arrival"}},
-		{Name: "24R", LengthFt: 9000, Active: true, Operations: []string{"departure", "arrival"}},
-		{Name: "06R", LengthFt: 11500, Active: true, Operations: []string{"departure", "arrival"}},
-		{Name: "24L", LengthFt: 11500, Active: true, Operations: []string{"departure", "arrival"}},
-		{Name: "15L", LengthFt: 9600, Active: true, Operations: []string{"departure", "arrival"}},
-		{Name: "33R", LengthFt: 9600, Active: true, Operations: []string{"departure", "arrival"}},
-		{Name: "15R", LengthFt: 10700, Active: true, Operations: []string{"departure", "arrival"}},
-		{Name: "33L", LengthFt: 10700, Active: true, Operations: []string{"departure", "arrival"}},
+	if da.adsbService == nil {
+		return nil, fmt.Errorf("adsb service not available")
 	}
 
+	rwData := da.adsbService.GetRunwayData()
+	if len(rwData.RunwayThresholds) == 0 {
+		return []RunwayInfo{}, nil
+	}
+
+	// Extract unique runway end identifiers from the threshold data
+	var runways []RunwayInfo
+	for _, thresholds := range rwData.RunwayThresholds {
+		for endID := range thresholds {
+			runways = append(runways, RunwayInfo{
+				Name:       endID,
+				Active:     true,
+				Operations: []string{"departure", "arrival"},
+			})
+		}
+	}
 	return runways, nil
 }
 

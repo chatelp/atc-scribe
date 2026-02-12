@@ -159,6 +159,9 @@ document.addEventListener('alpine:init', () => {
         weatherLastUpdated: null,
         weatherFetchErrors: [],
         runwayData: null, // Store runway data
+        airportsData: null, // Airport reference data
+        navaidsData: null, // Navaid reference data
+        allRunwaysData: null, // All runways within range
         metarDetailsVisible: false,
         tafDetailsVisible: false,
         notamDetailsVisible: false,
@@ -197,6 +200,9 @@ document.addEventListener('alpine:init', () => {
             showLabels: JSON.parse(localStorage.getItem('showLabels')) ?? true,
             showPaths: JSON.parse(localStorage.getItem('showPaths')) ?? true,
             showRings: JSON.parse(localStorage.getItem('showRings')) ?? true,
+            showAirports: JSON.parse(localStorage.getItem('showAirports')) ?? true,
+            showNavaids: JSON.parse(localStorage.getItem('showNavaids')) ?? true,
+            showAllRunways: JSON.parse(localStorage.getItem('showAllRunways')) ?? true,
             minAltitude: parseInt(localStorage.getItem('minAltitude')) || 0,
             maxAltitude: parseInt(localStorage.getItem('maxAltitude')) || 60000,
             trailLength: parseInt(localStorage.getItem('trailLength')) || 2,
@@ -259,7 +265,10 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('showLocalDates', this.settings.showLocalDates);
             localStorage.setItem('phaseFilters', JSON.stringify(this.settings.phaseFilters));
             localStorage.setItem('excludeOtherAirportsGrounded', this.settings.excludeOtherAirportsGrounded);
-            
+            localStorage.setItem('showAirports', this.settings.showAirports);
+            localStorage.setItem('showNavaids', this.settings.showNavaids);
+            localStorage.setItem('showAllRunways', this.settings.showAllRunways);
+
             // Save aircraft animation settings
             localStorage.setItem('aircraftAnimationEnabled', this.settings.aircraftAnimation.enabled);
             localStorage.setItem('aircraftAnimationFps', this.settings.aircraftAnimation.interpolationFps);
@@ -1815,7 +1824,10 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 this.fetchAudioFrequencies();
-                
+
+                // Fetch reference data (airports, navaids, runways) after map init
+                this.fetchReferenceData();
+
                 // CRITICAL FIX: Check server config to determine if WebSocket streaming is enabled
                 await this.initAircraftDataSource();
 
@@ -2077,6 +2089,27 @@ document.addEventListener('alpine:init', () => {
                     this.animationEngine.stop();
                     console.log('Aircraft animation disabled');
                 }
+            }
+        },
+
+        toggleAirports() {
+            this.saveSettings();
+            if (this.mapManager) {
+                this.mapManager.toggleLayerVisibility('airports', this.settings.showAirports);
+            }
+        },
+
+        toggleNavaids() {
+            this.saveSettings();
+            if (this.mapManager) {
+                this.mapManager.toggleLayerVisibility('navaids', this.settings.showNavaids);
+            }
+        },
+
+        toggleAllRunways() {
+            this.saveSettings();
+            if (this.mapManager) {
+                this.mapManager.toggleLayerVisibility('allRunways', this.settings.showAllRunways);
             }
         },
 
@@ -3724,6 +3757,52 @@ async initAircraftDataSource() {
                 this.stationLatitude = 43.6777; // Default fallback on error
                 this.stationLongitude = -79.6248; // Default fallback on error
                 this.stationElevationFeet = 569;    // Default fallback on error
+            }
+        },
+
+        async fetchReferenceData() {
+            // Fetch airports, navaids, and all runways in parallel
+            try {
+                const [airportsRes, navaidsRes, runwaysRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/airports`),
+                    fetch(`${API_BASE_URL}/navaids`),
+                    fetch(`${API_BASE_URL}/runways`)
+                ]);
+
+                if (airportsRes.ok) {
+                    this.airportsData = await airportsRes.json();
+                    console.log(`Airports loaded: ${this.airportsData.length}`);
+                    if (this.mapManager) {
+                        this.mapManager.drawAirports(this.airportsData);
+                        if (!this.settings.showAirports) {
+                            this.mapManager.toggleLayerVisibility('airports', false);
+                        }
+                    }
+                }
+
+                if (navaidsRes.ok) {
+                    this.navaidsData = await navaidsRes.json();
+                    console.log(`Navaids loaded: ${this.navaidsData.length}`);
+                    if (this.mapManager) {
+                        this.mapManager.drawNavaids(this.navaidsData);
+                        if (!this.settings.showNavaids) {
+                            this.mapManager.toggleLayerVisibility('navaids', false);
+                        }
+                    }
+                }
+
+                if (runwaysRes.ok) {
+                    this.allRunwaysData = await runwaysRes.json();
+                    console.log(`All runways loaded: ${this.allRunwaysData.length}`);
+                    if (this.mapManager) {
+                        this.mapManager.drawAllRunways(this.allRunwaysData);
+                        if (!this.settings.showAllRunways) {
+                            this.mapManager.toggleLayerVisibility('allRunways', false);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching reference data:', error);
             }
         },
 

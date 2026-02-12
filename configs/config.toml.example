@@ -55,7 +55,6 @@ search_radius_nm = 50
 # Common configuration for both source types
 fetch_interval_seconds = 1      # How often to fetch new aircraft data
 signal_lost_timeout_seconds = 60 # How long to wait before considering a signal lost
-airline_db_path = "assets/airlines.json"  # Path to airline database for aircraft operator lookups
 
 #######################################################
 # Logging Configuration
@@ -98,14 +97,27 @@ elevation_feet = 569
 # ICAO code of the airport (e.g., "CYYZ" for Toronto Pearson)
 airport_code = "CYYZ"
 
-# Path to runway database JSON file
-runways_db_path = "assets/runways.json"
-
 # Length of runway extensions in nautical miles (default: 10.0)
 runway_extension_length_nm = 10.0
 
 # Range in nautical miles to consider aircraft as being at this airport (default: 5.0)
 airport_range_nm = 5.0
+
+# Range in nautical miles for displaying airports, runways, and navaids on the map (default: 100.0)
+display_range_nm = 100.0
+
+#######################################################
+# Reference Data Configuration
+# CSV files used for aircraft enrichment, airport/runway/navaid display.
+# Download with: .\scripts\download_assets.ps1
+#######################################################
+[reference]
+aircraft_csv_path = "assets/aircraft.csv"
+airlines_dat_path = "assets/airlines.dat"
+airports_csv_path = "assets/airports.csv"
+airport_frequencies_csv_path = "assets/airport-frequencies.csv"
+runways_csv_path = "assets/runways.csv"
+navaids_csv_path = "assets/navaids.csv"
 
 #######################################################
 # Radio Frequencies Configuration
