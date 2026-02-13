@@ -60,6 +60,7 @@ type WebSocketServer interface {
 type ReferenceService interface {
 	LookupAircraft(hex string) *ReferenceAircraftInfo
 	LookupAirline(code string) string
+	LookupAirlineCountry(code string) string
 }
 
 // ReferenceAircraftInfo represents aircraft info from the reference data service
@@ -116,8 +117,8 @@ type SimulationService interface {
 	UpdatePositions()
 	GenerateADSBData() []ADSBTarget
 	IsSimulated(hex string) bool
-	GetAllAircraft() interface{}                                       // Returns simulation aircraft data
-	GetAircraft(hex string) (interface{}, bool)                        // Returns specific simulated aircraft
+	GetAllAircraft() interface{}                                           // Returns simulation aircraft data
+	GetAircraft(hex string) (interface{}, bool)                            // Returns specific simulated aircraft
 	UpdateControls(hex string, heading, speed, verticalRate float64) error // Update simulation controls
 }
 
@@ -290,7 +291,6 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 		s.wsServer.Broadcast(message)
 	}
 }
-
 
 // sendPhaseChangeAlert sends a phase change alert via WebSocket
 func (s *Service) sendPhaseChangeAlert(aircraft *Aircraft, fromPhase, toPhase string, runwayInfo *RunwayApproachInfo) {
@@ -483,8 +483,22 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 		// Determine if aircraft is currently flying using corrected values and config
 		currentlyFlying := IsFlying(a.ADSB.TAS, a.ADSB.GS, a.ADSB.AltBaro.Float64(), &s.flightPhasesConfig)
 
-		// Always set on_ground based on flying state
-		a.OnGround = !currentlyFlying
+		// Guard against false on_ground from missing data: Mode S first contacts may
+		// report zero altitude, zero speed, and no position. That's "no data available",
+		// not "on the ground". Defaulting to on_ground here would cause a false T/O
+		// when real data arrives on the next cycle.
+		noUsableData := a.ADSB.AltBaro.Float64() == 0 && a.ADSB.GS == 0 && a.ADSB.TAS == 0
+		if noUsableData {
+			// No sensor data at all — preserve previous ground state if known,
+			// otherwise assume airborne (safer than triggering false T/O later)
+			if prevOnGround, known := existingOnGround[a.Hex]; known {
+				a.OnGround = prevOnGround
+			} else {
+				a.OnGround = false
+			}
+		} else {
+			a.OnGround = !currentlyFlying
+		}
 
 		// Feed corrected data into trajectory tracker for phase analysis
 		if s.trajectoryTracker != nil && a.ADSB != nil {
@@ -570,6 +584,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 		// Enrich with BSDB and simulation data (in-memory lookups)
 		s.enrichWithRefData(newAircraft)
 		s.updateSimulationFields(newAircraft)
+		s.enrichWithATCDerivedData(newAircraft)
 
 		changes := s.changeDetector.DetectChanges(newAircraft)
 		if len(changes) > 0 {
@@ -610,6 +625,15 @@ func (s *Service) updateSimulationFields(aircraft []*Aircraft) {
 	}
 }
 
+func (s *Service) enrichWithATCDerivedData(aircraft []*Aircraft) {
+	for _, a := range aircraft {
+		if a == nil || a.ADSB == nil {
+			continue
+		}
+		a.ADSB.ATCDerived = computeATCDerivedMetrics(a.ADSB, a.Distance)
+	}
+}
+
 // SetReferenceService sets the reference data lookup service and updates runway data
 func (s *Service) SetReferenceService(refService ReferenceService) {
 	s.refService = refService
@@ -645,6 +669,10 @@ func (s *Service) enrichWithRefData(aircraft []*Aircraft) {
 				RegisteredOwners: info.Owner,
 			}
 		}
+		// Enrich airline country from airline code (not stored in DB, derived at runtime)
+		if a.Airline != "" && a.AirlineCountry == "" && len(a.Flight) >= 3 {
+			a.AirlineCountry = s.refService.LookupAirlineCountry(strings.ToUpper(a.Flight[:3]))
+		}
 	}
 }
 
@@ -661,6 +689,7 @@ func (s *Service) GetAllAircraft() []*Aircraft {
 	aircraft := s.storage.GetAll()
 	s.updateSimulationFields(aircraft)
 	s.enrichWithRefData(aircraft)
+	s.enrichWithATCDerivedData(aircraft)
 	return aircraft
 }
 
@@ -670,6 +699,7 @@ func (s *Service) GetAllAircraftWithLastSeenFilter(lastSeenMinutes int) []*Aircr
 	aircraft := s.storage.GetAllWithLastSeenFilter(lastSeenMinutes)
 	s.updateSimulationFields(aircraft)
 	s.enrichWithRefData(aircraft)
+	s.enrichWithATCDerivedData(aircraft)
 	return aircraft
 }
 
@@ -679,6 +709,7 @@ func (s *Service) GetAllAircraftMinimal(lastSeenMinutes int) []*Aircraft {
 	aircraft := s.storage.GetAllMinimal(lastSeenMinutes)
 	s.updateSimulationFields(aircraft)
 	s.enrichWithRefData(aircraft)
+	s.enrichWithATCDerivedData(aircraft)
 	return aircraft
 }
 
@@ -688,6 +719,7 @@ func (s *Service) GetAircraftByHex(hex string) (*Aircraft, bool) {
 	if found && aircraft != nil {
 		s.updateSimulationFields([]*Aircraft{aircraft})
 		s.enrichWithRefData([]*Aircraft{aircraft})
+		s.enrichWithATCDerivedData([]*Aircraft{aircraft})
 	}
 	return aircraft, found
 }
@@ -720,6 +752,7 @@ func (s *Service) GetFilteredAircraft(
 	)
 	s.updateSimulationFields(aircraft)
 	s.enrichWithRefData(aircraft)
+	s.enrichWithATCDerivedData(aircraft)
 	return aircraft
 }
 
@@ -728,6 +761,7 @@ func (s *Service) GetFilteredAircraftSimple(minAltitude, maxAltitude float64, st
 	aircraft := s.storage.GetFiltered(minAltitude, maxAltitude, status, nil, nil, nil, nil)
 	s.updateSimulationFields(aircraft)
 	s.enrichWithRefData(aircraft)
+	s.enrichWithATCDerivedData(aircraft)
 	return aircraft
 }
 
@@ -1348,6 +1382,17 @@ func (s *Service) evaluatePhaseChange(aircraft *Aircraft, latestPhase *PhaseChan
 		}
 	}
 
+	// ── Phase stability: suppress directional→UNK flapping ──────────
+	// Directional airborne phases (CLB, DEP, ARR) shouldn't downgrade to
+	// UNK just because a brief turn reverses the distance trend. Only allow
+	// transitions to other meaningful phases, not to UNK.
+	if latestPhase != nil && currentPhase == "UNK" {
+		switch latestPhase.Phase {
+		case "CLB", "DEP", "ARR":
+			currentPhase = latestPhase.Phase
+		}
+	}
+
 	// ── Determine if a phase change should be recorded ───────────────
 	var shouldInsert bool
 
@@ -1581,7 +1626,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 		}
 
 		// Determine airline from callsign only for valid flight numbers (3 letters + 1-4 numbers)
-		var airlineName string
+		var airlineName, airlineCountry string
 		if len(flightName) >= 4 && len(flightName) <= 7 {
 			// Check if the first 3 characters are letters
 			firstThree := strings.ToUpper(flightName[:3])
@@ -1608,6 +1653,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 				icaoCode := firstThree
 				if s.refService != nil {
 					airlineName = s.refService.LookupAirline(icaoCode)
+					airlineCountry = s.refService.LookupAirlineCountry(icaoCode)
 				}
 				s.logger.Debug("Detected valid flight number",
 					logger.String("flight", flightName),
@@ -1638,12 +1684,15 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 			Hex:                raw.Hex,
 			Flight:             flightName,
 			Airline:            airlineName,
+			AirlineCountry:     airlineCountry,
 			Status:             aircraftStatus,
 			LastSeen:           now.Add(-time.Duration(raw.Seen) * time.Second),
 			ADSB:               &raw,
 			IsSimulated:        isSimulated,
 			SimulationControls: simulationControls,
 		}
+
+		a.ADSB.ATCDerived = computeATCDerivedMetrics(a.ADSB, a.Distance)
 
 		// Calculate future positions if we have the necessary data
 		if raw.Lat != 0 && raw.Lon != 0 && raw.AltBaro.Float64() != 0 {

@@ -65,8 +65,8 @@ func loadAircraftCSV(path string) (map[string]*AircraftInfo, error) {
 
 // loadAirlineDAT parses airlines.dat (comma-separated, no header)
 // Format: ID,Name,Alias,IATA,ICAO,Callsign,Country,Active
-// Returns map[ICAO/IATA code] -> airline name
-func loadAirlineDAT(path string) (map[string]string, error) {
+// Returns map[ICAO/IATA code] -> AirlineInfo (name + country)
+func loadAirlineDAT(path string) (map[string]AirlineInfo, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open airlines.dat: %w", err)
@@ -77,7 +77,7 @@ func loadAirlineDAT(path string) (map[string]string, error) {
 	r.LazyQuotes = true
 	r.FieldsPerRecord = -1 // variable field count
 
-	m := make(map[string]string, 7000)
+	m := make(map[string]AirlineInfo, 7000)
 	for {
 		record, err := r.Read()
 		if err == io.EOF {
@@ -86,23 +86,25 @@ func loadAirlineDAT(path string) (map[string]string, error) {
 		if err != nil {
 			continue // skip malformed lines
 		}
-		if len(record) < 6 {
+		if len(record) < 7 {
 			continue
 		}
 
 		name := cleanDATField(record[1])
 		iata := cleanDATField(record[3])
 		icao := cleanDATField(record[4])
+		country := cleanDATField(record[6])
 
 		if name == "" {
 			continue
 		}
 
+		info := AirlineInfo{Name: name, Country: country}
 		if icao != "" && icao != "N/A" {
-			m[icao] = name
+			m[icao] = info
 		}
 		if iata != "" && iata != "-" && iata != "N/A" {
-			m[iata] = name
+			m[iata] = info
 		}
 	}
 	return m, nil

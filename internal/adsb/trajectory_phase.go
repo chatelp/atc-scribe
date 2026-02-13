@@ -377,29 +377,17 @@ func (tt *TrajectoryTracker) fewPointsAirbornePhase(
 	return "UNK"
 }
 
-// hasRecentTakeoff determines if an aircraft has taken off recently.
-// Reuses the same logic as the original Service method: checks the pre-fetched
-// takeoff timestamp and a proximity/altitude heuristic.
+// hasRecentTakeoff determines if an aircraft has taken off from our airport recently.
+// Only returns true if we actually observed the takeoff (T/O phase record in DB).
+// No proximity heuristic — aircraft appearing mid-flight near the airport are NOT
+// treated as recent takeoffs.
 func (tt *TrajectoryTracker) hasRecentTakeoff(aircraft *Aircraft, takeoffTime *time.Time) bool {
 	cfg := tt.phasesConfig
 	timeoutDuration := time.Duration(cfg.RecentTakeoffTimeoutMinutes) * time.Minute
 
-	// Check pre-fetched takeoff time from batch query
+	// Only trust actual observed takeoff records from the database
 	if takeoffTime != nil && time.Since(*takeoffTime) <= timeoutDuration {
 		return true
-	}
-
-	// Proximity and altitude heuristic — aircraft is close to airport and low
-	if aircraft.ADSB != nil {
-		distanceFromStation := MetersToNM(Haversine(
-			aircraft.ADSB.Lat, aircraft.ADSB.Lon,
-			tt.stationLat, tt.stationLon,
-		))
-		altitude := aircraft.ADSB.AltBaro.Float64()
-		if distanceFromStation <= cfg.AirportRangeNM*2 &&
-			altitude <= float64(cfg.DepartureAltitudeFt)*2 {
-			return true
-		}
 	}
 
 	return false

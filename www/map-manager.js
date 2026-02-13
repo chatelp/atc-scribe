@@ -237,14 +237,12 @@ class MapManager {
         this.proximityRefHex = null; // Reference aircraft hex for proximity
         this.proximityDistanceNM = null; // Distance in NM for proximity circle
 
-        // Runway rendering state
+        // Reference data rendering state
         this.runwayData = null;
         this.airportsData = null;
         this.heliportsData = null;
         this.navaidsData = null;
         this.allRunwaysData = null;
-        this.runwayZoomListener = null;
-        this.runwayUpdateTimeout = null;
 
         // Marker pooling for performance (reduces GC pressure)
         this.markerPool = {
@@ -258,12 +256,46 @@ class MapManager {
 
         // Trail layer tracking - maps hex to array of layers for O(1) removal
         this.trailLayersByHex = {};
+
+        // Coalesced refresh scheduling
+        this._refreshScheduled = false;
+        this._refreshThrottleTimer = null;
+        this._refreshThrottleMs = 120;
+        this._lastRefreshRunAt = 0;
+
+        // Per-aircraft caches to avoid redundant layer/DOM work
+        this._markerVisibilityState = {};
+        this._visualStateVersionByHex = {};
+        this._flightCardHoverStateByHex = {};
+
+        // Lightweight map performance counters (cumulative)
+        this._perfCounters = {
+            refreshRequested: 0,
+            refreshCoalesced: 0,
+            refreshExecuted: 0,
+            refreshDurationMs: 0,
+            markerAdds: 0,
+            markerRemoves: 0,
+            labelAdds: 0,
+            labelRemoves: 0,
+            visualStateApplied: 0,
+            visualStateSkipped: 0,
+            trailLayersAdded: 0,
+            trailLayersRemoved: 0,
+            singleAircraftUpdates: 0,
+            fullVisibilityPasses: 0
+        };
+        this._perfSnapshot = {
+            timestamp: performance.now(),
+            counters: { ...this._perfCounters }
+        };
     }
 
     // O(1) trail layer removal helper - removes all trail layers for a specific aircraft
     _removeTrailLayersByHex(hex) {
         const layers = this.trailLayersByHex[hex];
         if (layers && layers.length > 0) {
+            this._perfCounters.trailLayersRemoved += layers.length;
             for (let i = 0; i < layers.length; i++) {
                 this.layers.trails.removeLayer(layers[i]);
             }
@@ -274,6 +306,7 @@ class MapManager {
     // Helper to add a trail layer and track it for O(1) removal
     _addTrailLayer(hex, layer) {
         layer.addTo(this.layers.trails);
+        this._perfCounters.trailLayersAdded++;
         if (!this.trailLayersByHex[hex]) {
             this.trailLayersByHex[hex] = [];
         }
@@ -366,9 +399,9 @@ class MapManager {
             
         console.log(`MapManager: Centering map on station coordinates: ${centerLat}, ${centerLon}`);
 
-        // Create Canvas renderer for better performance with many vector elements
-        // Higher padding ensures elements near viewport edges aren't clipped
-        this.canvasRenderer = this.L.canvas({ padding: 1.0 });
+        // Canvas renderer for vector layers (circles, polylines)
+        // padding: 0.5 = 50% buffer beyond viewport — enough for smooth pan without excess overdraw
+        this.canvasRenderer = this.L.canvas({ padding: 0.5 });
 
         this.map = this.L.map('map', {
             center: [centerLat, centerLon],
@@ -504,7 +537,10 @@ class MapManager {
                 // Update lastSeen text directly in DOM for stale aircraft
                 const labelElement = markerInfo.label.getElement();
                 if (labelElement) {
-                    const lastSeenSpan = labelElement.querySelector('[data-lastseen]');
+                    if (!markerInfo.lastSeenSpan || !markerInfo.lastSeenSpan.isConnected) {
+                        markerInfo.lastSeenSpan = labelElement.querySelector('[data-lastseen]');
+                    }
+                    const lastSeenSpan = markerInfo.lastSeenSpan;
                     if (lastSeenSpan) {
                         const secondsAgo = Math.floor(timeSinceUpdate / 1000);
                         const newText = `${secondsAgo}s`;
@@ -638,35 +674,44 @@ class MapManager {
         if (this.trails[aircraft.hex]) {
             const trailLengthMinutes = this.store.settings.trailLength !== undefined ? this.store.settings.trailLength : 2;
             const cutoffTime = new Date(now.getTime() - (trailLengthMinutes * 60 * 1000));
-            this.trails[aircraft.hex] = this.trails[aircraft.hex].filter(point => point.time >= cutoffTime);
+            // PERF: splice-based pruning avoids allocating a new array (filter creates a copy every call)
+            const trail = this.trails[aircraft.hex];
+            let pruneIdx = 0;
+            while (pruneIdx < trail.length && trail[pruneIdx].time < cutoffTime) pruneIdx++;
+            if (pruneIdx > 0) trail.splice(0, pruneIdx);
 
             // Hard limit on trail points to prevent memory leaks during long flights
-            const maxTrailPoints = 500;
-            if (this.trails[aircraft.hex].length > maxTrailPoints) {
-                this.trails[aircraft.hex] = this.trails[aircraft.hex].slice(-maxTrailPoints);
+            if (trail.length > 500) {
+                trail.splice(0, trail.length - 500);
             }
         }
 
         const position = [lat, lon];
-        const heading = this.store.getHeadingWithFallback(aircraft); // Use same fallback as label text
-        const icon = this.createAircraftIcon(heading);
-        const newLabelContent = this.store.createLabelContent(aircraft, (aircraft.flight || aircraft.hex).trim(), aircraft.adsb ? aircraft.adsb.alt_baro : 0, this.getVerticalTrend(aircraft));
-        const labelContentIcon = this.L.divIcon({
-            html: newLabelContent,
-            className: this.getLabelClassName(aircraft),
-            iconSize: [130, 40],
-            iconAnchor: [-8, 2] // Aircraft arrow positioned just off the top-left corner of the label
-        });
+        const heading = this.store.getHeadingWithFallback(aircraft);
 
         if (!this.markers[aircraft.hex]) {
-            // SAFETY CHECK: Ensure no existing markers are on the map for this aircraft
-            this.forceCleanupAircraft(aircraft.hex);
+            // --- NEW MARKER ---
+            // Build icon + label only when creating a new marker (not on every update)
+            const icon = this.createAircraftIcon(heading);
+            const callsign = (aircraft.flight || aircraft.hex).trim();
+            const altitude = aircraft.adsb ? aircraft.adsb.alt_baro : 0;
+            const currentSpeed = aircraft.adsb ? (aircraft.adsb.tas || aircraft.adsb.gs || 0) : 0;
+            const currentPhase = this.getCurrentPhase(aircraft);
+            const currentStatus = aircraft.status || 'active';
+            const currentTrend = this.getVerticalTrend(aircraft);
+            const isStale = aircraft.stale_position ? '1' : '0';
+            const labelVersion = `${callsign}_${Math.round(altitude/100)}_${Math.round(currentSpeed/10)}_${currentPhase}_${currentStatus}_${currentTrend}_${isStale}`;
+            const newLabelContent = this.store.createLabelContent(aircraft, callsign, altitude, currentTrend);
+            const labelContentIcon = this.L.divIcon({
+                html: newLabelContent,
+                className: this.getLabelClassName(aircraft),
+                iconSize: [130, 40],
+                iconAnchor: [-8, 2]
+            });
 
-            // Use pooled markers for better performance
             const marker = this._getPooledMarker(position, icon);
             const label = this._getPooledLabel(position, labelContentIcon);
-            
-            // Store last position, heading, label content, and altitude for change detection
+
             this.markers[aircraft.hex] = {
                 aircraft: marker,
                 label: label,
@@ -674,12 +719,14 @@ class MapManager {
                 lastLon: position[1],
                 lastHeading: heading,
                 lastLabelContent: newLabelContent,
-                lastAltitude: aircraft.adsb ? aircraft.adsb.alt_baro : 0,
-                created: Date.now() // Track creation time for debugging
+                lastLabelVersion: labelVersion,
+                lastAltitude: altitude,
+                created: Date.now(),
+                lastSeenSpan: null
             };
-            
-            // PERFORMANCE FIX: Apply initial CSS rotation instead of generating rotated SVG
-            setTimeout(() => {
+
+            // Apply initial CSS rotation after DOM insertion
+            requestAnimationFrame(() => {
                 const markerElement = marker.getElement();
                 if (markerElement) {
                     const iconContainer = markerElement.querySelector('.aircraft-icon-container');
@@ -689,8 +736,8 @@ class MapManager {
                         iconContainer.style.transition = 'transform 0.2s ease';
                     }
                 }
-            }, 0);
-            
+            });
+
             marker.on('mouseover', () => {
                 Alpine.store('atc').hoveredAircraft = aircraft;
                 this.updateVisualState(aircraft.hex, true);
@@ -717,10 +764,8 @@ class MapManager {
                 Alpine.store('atc').selectedAircraft = aircraft;
                 this.updateVisualState(aircraft.hex, true);
             });
-            
-            //console.log(`[MAP] Created new markers for ${aircraft.hex}`);
         } else {
-            // UPDATE EXISTING MARKER WITH COMPREHENSIVE CHANGE DETECTION
+            // --- UPDATE EXISTING MARKER ---
             const existing = this.markers[aircraft.hex];
 
             // Only update position if moved more than ~25 meters (0.0002 degrees ≈ 25m)
@@ -728,7 +773,6 @@ class MapManager {
                                    Math.abs(existing.lastLon - position[1]) > 0.0002;
 
             // ANIMATION FIX: Skip direct position updates when animation engine can interpolate
-            // Only skip if animation engine has valid velocity for this aircraft
             const animationEngine = this.store.animationEngine;
             const animState = animationEngine?.aircraftStates?.get(aircraft.hex);
             const canAnimate = animationEngine?.isRunning && animState?.hasValidVelocity?.();
@@ -737,17 +781,14 @@ class MapManager {
                 existing.aircraft.setLatLng(position);
                 existing.label.setLatLng(position);
             }
-            // Always track last position for change detection
             if (positionChanged) {
                 existing.lastLat = position[0];
                 existing.lastLon = position[1];
             }
-            
-            // PERFORMANCE FIX: Use CSS rotation instead of expensive setIcon() calls
+
+            // CSS rotation instead of setIcon()
             const headingChanged = Math.abs((existing.lastHeading || 0) - heading) > 5;
-            
             if (headingChanged) {
-                // Apply CSS rotation directly to marker element instead of regenerating icon
                 const markerElement = existing.aircraft.getElement();
                 if (markerElement) {
                     const iconContainer = markerElement.querySelector('.aircraft-icon-container');
@@ -758,24 +799,30 @@ class MapManager {
                 }
                 existing.lastHeading = heading;
             }
-            
-            // Create a version key based on data that matters (excludes lastSeen which updates separately)
+
+            // PERF: Compute label version FIRST — only build DOM label if data actually changed.
+            // This avoids createLabelContent() + L.divIcon() allocation on ~90-95% of updates.
             const currentAltitude = aircraft.adsb ? aircraft.adsb.alt_baro : 0;
             const currentSpeed = aircraft.adsb ? (aircraft.adsb.tas || aircraft.adsb.gs || 0) : 0;
             const currentPhase = this.getCurrentPhase(aircraft);
             const currentStatus = aircraft.status || 'active';
             const currentCallsign = (aircraft.flight || aircraft.hex).trim();
             const currentTrend = this.getVerticalTrend(aircraft);
-
-            // Version key for comparing if label needs regeneration (excludes lastSeen)
             const isStale = aircraft.stale_position ? '1' : '0';
             const labelVersion = `${currentCallsign}_${Math.round(currentAltitude/100)}_${Math.round(currentSpeed/10)}_${currentPhase}_${currentStatus}_${currentTrend}_${isStale}`;
 
-            // Only regenerate label if actual data changed (not just lastSeen time)
             if (existing.lastLabelVersion !== labelVersion) {
+                const newLabelContent = this.store.createLabelContent(aircraft, currentCallsign, currentAltitude, currentTrend);
+                const labelContentIcon = this.L.divIcon({
+                    html: newLabelContent,
+                    className: this.getLabelClassName(aircraft),
+                    iconSize: [130, 40],
+                    iconAnchor: [-8, 2]
+                });
                 existing.label.setIcon(labelContentIcon);
                 existing.lastLabelContent = newLabelContent;
                 existing.lastLabelVersion = labelVersion;
+                existing.lastSeenSpan = null;
 
                 // setIcon replaces the DOM element - re-apply visual state
                 this.updateVisualState(aircraft.hex);
@@ -1120,6 +1167,14 @@ class MapManager {
         // Only apply green highlighting to selected/hovered aircraft that are NOT in proximity
         const isHighlightedForStyle = (isActuallySelected || isHovered) && !isInProximity;
 
+        const visualVersion = `${targetOpacity}_${isInProximity ? 1 : 0}_${isHighlightedForStyle ? 1 : 0}`;
+        if (this._visualStateVersionByHex[hex] === visualVersion) {
+            this._perfCounters.visualStateSkipped++;
+            return;
+        }
+        this._visualStateVersionByHex[hex] = visualVersion;
+        this._perfCounters.visualStateApplied++;
+
         const checkAircraftIcon = (apply = false) => {
             // Removed hover color changes - aircraft icons maintain their original colors
             return true;
@@ -1191,6 +1246,11 @@ class MapManager {
 
     // Helper function to update flight card hover effect in table
     _updateFlightCardHover(hex, isHovered) {
+        if (this._flightCardHoverStateByHex[hex] === isHovered) {
+            return;
+        }
+        this._flightCardHoverStateByHex[hex] = isHovered;
+
         // Find the flight card element in the table by aircraft hex
         const flightCardElement = document.querySelector(`[data-aircraft-hex="${hex}"]`);
         if (flightCardElement) {
@@ -1210,6 +1270,7 @@ class MapManager {
     }
 
     updateMapMarkerAndLabelVisibility() {
+        this._perfCounters.fullVisibilityPasses++;
         const searchLower = this.store.searchTerm.toLowerCase();
 
         // Get current map bounds for viewport culling
@@ -1278,15 +1339,21 @@ class MapManager {
             // Aircraft should be visible if it matches ALL filters AND is in viewport OR if it's selected
             const shouldBeVisibleOnMap = ((matchesSearch && isVisibleByGroundState && isVisibleByAltitude && isVisibleByPhase && isVisibleByLastSeen && isInViewport) || isSelectedAircraft);
 
-            const markerIsOnMap = this.layers.aircraft.hasLayer(markerInfo.aircraft);
-            const labelIsOnMap = markerInfo.label && this.layers.aircraft.hasLayer(markerInfo.label);
+            const visibilityState = this._markerVisibilityState[hex] || {
+                markerVisible: this.layers.aircraft.hasLayer(markerInfo.aircraft),
+                labelVisible: markerInfo.label && this.layers.aircraft.hasLayer(markerInfo.label)
+            };
+            const markerIsOnMap = !!visibilityState.markerVisible;
+            const labelIsOnMap = !!visibilityState.labelVisible;
 
             if (shouldBeVisibleOnMap && !markerIsOnMap) {
                 markerInfo.aircraft.addTo(this.layers.aircraft);
+                visibilityState.markerVisible = true;
+                this._perfCounters.markerAdds++;
                 
                 // CRITICAL FIX: Apply heading rotation when aircraft becomes visible again
                 const heading = this.store.getHeadingWithFallback(aircraft);
-                setTimeout(() => {
+                requestAnimationFrame(() => {
                     const markerElement = markerInfo.aircraft.getElement();
                     if (markerElement) {
                         const iconContainer = markerElement.querySelector('.aircraft-icon-container');
@@ -1296,9 +1363,11 @@ class MapManager {
                             iconContainer.style.transition = 'transform 0.2s ease';
                         }
                     }
-                }, 0);
+                });
             } else if (!shouldBeVisibleOnMap && markerIsOnMap) {
                 this.layers.aircraft.removeLayer(markerInfo.aircraft);
+                visibilityState.markerVisible = false;
+                this._perfCounters.markerRemoves++;
             }
 
             // Labels should be visible if labels are enabled AND (aircraft matches filters OR is selected)
@@ -1306,10 +1375,16 @@ class MapManager {
             if (markerInfo.label) {
                 if (shouldLabelBeVisible && !labelIsOnMap) {
                     markerInfo.label.addTo(this.layers.aircraft);
+                    visibilityState.labelVisible = true;
+                    this._perfCounters.labelAdds++;
                 } else if (!shouldLabelBeVisible && labelIsOnMap) {
                     this.layers.aircraft.removeLayer(markerInfo.label);
+                    visibilityState.labelVisible = false;
+                    this._perfCounters.labelRemoves++;
                 }
             }
+
+            this._markerVisibilityState[hex] = visibilityState;
             
             if (shouldBeVisibleOnMap) {
                  this.updateVisualState(hex);
@@ -1335,6 +1410,7 @@ class MapManager {
     // Efficient single aircraft update for WebSocket performance
     updateSingleAircraft(hex, aircraft) {
         if (!aircraft) return;
+        this._perfCounters.singleAircraftUpdates++;
 
         // _ensureLeafletObjects handles all updates: position, label content (with version checking), etc.
         this._ensureLeafletObjects(aircraft);
@@ -1346,7 +1422,10 @@ class MapManager {
         if (markerInfo.label && aircraft.last_seen) {
             const labelElement = markerInfo.label.getElement();
             if (labelElement) {
-                const lastSeenSpan = labelElement.querySelector('[data-lastseen]');
+                if (!markerInfo.lastSeenSpan || !markerInfo.lastSeenSpan.isConnected) {
+                    markerInfo.lastSeenSpan = labelElement.querySelector('[data-lastseen]');
+                }
+                const lastSeenSpan = markerInfo.lastSeenSpan;
                 if (lastSeenSpan) {
                     const secondsAgo = Math.floor((Date.now() - new Date(aircraft.last_seen).getTime()) / 1000);
                     lastSeenSpan.textContent = `${secondsAgo}s`;
@@ -1389,14 +1468,35 @@ class MapManager {
         const isSelectedAircraft = this.store.selectedAircraft && this.store.selectedAircraft.hex === aircraft.hex;
         const shouldBeVisibleOnMap = (matchesSearch && isVisibleByGroundState && isVisibleByAltitude && isVisibleByPhase) || isSelectedAircraft;
         
-        const markerIsOnMap = this.layers.aircraft.hasLayer(markerInfo.aircraft);
-        const labelIsOnMap = markerInfo.label && this.layers.aircraft.hasLayer(markerInfo.label);
+        const visibilityState = this._markerVisibilityState[hex] || {
+            markerVisible: this.layers.aircraft.hasLayer(markerInfo.aircraft),
+            labelVisible: markerInfo.label && this.layers.aircraft.hasLayer(markerInfo.label)
+        };
+        const markerIsOnMap = !!visibilityState.markerVisible;
+        const labelIsOnMap = !!visibilityState.labelVisible;
         
         // Update marker visibility
         if (shouldBeVisibleOnMap && !markerIsOnMap) {
             markerInfo.aircraft.addTo(this.layers.aircraft);
+            visibilityState.markerVisible = true;
+            this._perfCounters.markerAdds++;
+
+            const heading = this.store.getHeadingWithFallback(aircraft);
+            requestAnimationFrame(() => {
+                const markerElement = markerInfo.aircraft.getElement();
+                if (markerElement) {
+                    const iconContainer = markerElement.querySelector('.aircraft-icon-container');
+                    if (iconContainer) {
+                        iconContainer.style.transform = `rotate(${heading}deg)`;
+                        iconContainer.style.transformOrigin = 'center';
+                        iconContainer.style.transition = 'transform 0.2s ease';
+                    }
+                }
+            });
         } else if (!shouldBeVisibleOnMap && markerIsOnMap) {
             this.layers.aircraft.removeLayer(markerInfo.aircraft);
+            visibilityState.markerVisible = false;
+            this._perfCounters.markerRemoves++;
         }
         
         // Update label visibility
@@ -1404,20 +1504,71 @@ class MapManager {
         if (markerInfo.label) {
             if (shouldLabelBeVisible && !labelIsOnMap) {
                 markerInfo.label.addTo(this.layers.aircraft);
+                visibilityState.labelVisible = true;
+                this._perfCounters.labelAdds++;
             } else if (!shouldLabelBeVisible && labelIsOnMap) {
                 this.layers.aircraft.removeLayer(markerInfo.label);
+                visibilityState.labelVisible = false;
+                this._perfCounters.labelRemoves++;
             }
         }
+
+        this._markerVisibilityState[hex] = visibilityState;
     }
 
     // Centralized place for map-related updates when filters change
-    applyFiltersAndRefreshView() {
+    applyFiltersAndRefreshView(options = {}) {
+        this._perfCounters.refreshRequested++;
+        if (options.immediate === true) {
+            if (this._refreshThrottleTimer) {
+                clearTimeout(this._refreshThrottleTimer);
+                this._refreshThrottleTimer = null;
+            }
+            this._refreshScheduled = false;
+            this._applyFiltersAndRefreshViewNow();
+            return;
+        }
+
+        if (this._refreshScheduled) {
+            this._perfCounters.refreshCoalesced++;
+            return;
+        }
+
+        const now = performance.now();
+        const elapsed = now - this._lastRefreshRunAt;
+        const waitMs = Math.max(0, this._refreshThrottleMs - elapsed);
+
+        this._refreshScheduled = true;
+        if (waitMs > 0) {
+            this._perfCounters.refreshCoalesced++;
+            this._refreshThrottleTimer = setTimeout(() => {
+                this._refreshThrottleTimer = null;
+                requestAnimationFrame(() => {
+                    this._refreshScheduled = false;
+                    this._applyFiltersAndRefreshViewNow();
+                });
+            }, waitMs);
+            return;
+        }
+
+        requestAnimationFrame(() => {
+            this._refreshScheduled = false;
+            this._applyFiltersAndRefreshViewNow();
+        });
+    }
+
+    _applyFiltersAndRefreshViewNow() {
+        const refreshStart = performance.now();
         this.updateMapMarkerAndLabelVisibility();
         this.updateFlightPaths();
         this.updateVisibleAircraftList();
         
         // Update proximity circle if active
         this.updateProximityCircle();
+
+        this._perfCounters.refreshExecuted++;
+        this._perfCounters.refreshDurationMs += (performance.now() - refreshStart);
+        this._lastRefreshRunAt = performance.now();
     }
     
     // Update list of aircraft visible on map for UI indicators
@@ -1486,6 +1637,9 @@ class MapManager {
                 delete this.trailVersions[hex]; // Also remove trail version tracking
                 this._removeTrailLayersByHex(hex); // Remove trail layers from map
                 delete this.trailLayersByHex[hex]; // Clean up tracking
+                delete this._markerVisibilityState[hex];
+                delete this._visualStateVersionByHex[hex];
+                delete this._flightCardHoverStateByHex[hex];
             }
         });
     }
@@ -1512,6 +1666,9 @@ class MapManager {
         delete this.trailVersions[hex]; // Also remove trail version tracking
         this._removeTrailLayersByHex(hex); // Remove trail layers from map
         delete this.trailLayersByHex[hex]; // Clean up tracking
+        delete this._markerVisibilityState[hex];
+        delete this._visualStateVersionByHex[hex];
+        delete this._flightCardHoverStateByHex[hex];
     }
 
     // Force cleanup of aircraft markers (prevents overlapping labels)
@@ -1651,15 +1808,6 @@ class MapManager {
                         labelDiv.style.opacity = '1'; // Full opacity
                         labelDiv.style.zIndex = '1500'; // Higher z-index
                         labelDiv.style.borderColor = ''; // Remove any border color to use the one from CSS
-                        
-                        // Add hover event listeners
-                        labelDiv.addEventListener('mouseenter', () => {
-                            labelDiv.classList.add('proximity-highlight-hover');
-                        });
-                        
-                        labelDiv.addEventListener('mouseleave', () => {
-                            labelDiv.classList.remove('proximity-highlight-hover');
-                        });
                     }
                 }
                 
@@ -1701,10 +1849,6 @@ class MapManager {
                         // Remove proximity classes
                         labelDiv.classList.remove('proximity-highlight');
                         labelDiv.classList.remove('proximity-highlight-hover');
-                        
-                        // Remove event listeners (clone and replace the element)
-                        const newLabelDiv = labelDiv.cloneNode(true);
-                        labelDiv.parentNode.replaceChild(newLabelDiv, labelDiv);
                         
                         if (!isSelectedAircraft) {
                             // Only reset these styles for non-selected aircraft
@@ -1752,175 +1896,98 @@ class MapManager {
 
     // Draw runways and extended centerlines
     drawRunways(runwayData) {
-        // Safety check: ensure map is initialized before drawing runways
         if (!this.map) {
             console.warn('MapManager: Cannot draw runways - map not initialized yet');
             return;
         }
-        
         if (!runwayData || !runwayData.runway_thresholds || !runwayData.runway_extensions) {
             console.warn("No runway data available");
             return;
         }
 
-        // Store runway data for zoom-aware rendering
+        // Store data — rendering is driven by _renderAllRefData() via the shared zoom listener
         this.runwayData = runwayData;
-        
-        // Initial render
         this.updateRunwayDisplay();
-        
-        // Add zoom event listener for dynamic detail adjustment (only once)
-        if (!this.runwayZoomListener) {
-            this.runwayZoomListener = () => {
-                // Debounce runway updates to prevent excessive redraws during zoom
-                clearTimeout(this.runwayUpdateTimeout);
-                this.runwayUpdateTimeout = setTimeout(() => {
-                    this.updateRunwayDisplay();
-                }, 150);
-            };
-            this.map.on('zoomend', this.runwayZoomListener);
-        }
+        this._ensureRefDataListeners();
     }
 
     updateRunwayDisplay() {
         if (!this.map || !this.runwayData) return;
-        
-        // Clear existing runway layers
         this.layers.runways.clearLayers();
-        
-        const currentZoom = this.map.getZoom();
-        const showExtensions = currentZoom >= 11; // Only show extensions when zoomed in
-        const showDistanceMarkers = currentZoom >= 13; // Only show distance markers when very zoomed in
-        
-        // Draw each runway with zoom-appropriate detail level
+
+        const zoom = this.map.getZoom();
+        if (zoom < 9) return; // Don't render home runways below zoom 9
+
+        const showLabels = zoom >= 10;
+        const showExtensions = zoom >= 11;
+        const showDistanceMarkers = zoom >= 13;
+        const lineWeight = Math.max(4, Math.min(8, zoom - 6));
+
         for (const runwayId in this.runwayData.runway_thresholds) {
             const thresholds = this.runwayData.runway_thresholds[runwayId];
             const extensions = this.runwayData.runway_extensions[runwayId];
-            
-            // Get the two ends of the runway
             const ends = Object.keys(thresholds);
             if (ends.length !== 2) continue;
-            
-            const end1 = ends[0];
-            const end2 = ends[1];
-            
-            // Always draw the runway itself (as a thick line)
-            const runwayCoords = [
+
+            const end1 = ends[0], end2 = ends[1];
+
+            // Runway line — canvas polyline, no culling
+            this.L.polyline([
                 [thresholds[end1].latitude, thresholds[end1].longitude],
                 [thresholds[end2].latitude, thresholds[end2].longitude]
-            ];
-            
-            this.L.polyline(runwayCoords, {
-                color: '#FFFFFF',
-                weight: Math.max(4, Math.min(8, currentZoom - 6)), // Scale line weight with zoom
-                opacity: 0.8,
-                renderer: this.canvasRenderer  // Canvas for performance
+            ], {
+                color: '#FFFFFF', weight: lineWeight, opacity: 0.8,
+                renderer: this.canvasRenderer
             }).addTo(this.layers.runways);
-            
-            // Only show runway labels when zoomed in enough
-            if (currentZoom >= 10) {
+
+            if (showLabels) {
                 this.L.marker([thresholds[end1].latitude, thresholds[end1].longitude], {
                     icon: this.L.divIcon({
                         html: `<div class="runway-label">${end1}</div>`,
-                        className: 'runway-label-container',
-                        iconSize: [30, 20]
-                    })
+                        className: 'runway-label-container', iconSize: [30, 20]
+                    }), interactive: false
                 }).addTo(this.layers.runways);
-                
                 this.L.marker([thresholds[end2].latitude, thresholds[end2].longitude], {
                     icon: this.L.divIcon({
                         html: `<div class="runway-label">${end2}</div>`,
-                        className: 'runway-label-container',
-                        iconSize: [30, 20]
-                    })
+                        className: 'runway-label-container', iconSize: [30, 20]
+                    }), interactive: false
                 }).addTo(this.layers.runways);
             }
-            
-            // Only draw extensions when zoomed in enough
+
             if (showExtensions && extensions) {
-                // Draw extension for end1
-                if (extensions[end1] && extensions[end1].length > 0) {
-                    const extensionCoords = extensions[end1].map(point =>
-                        [point.latitude, point.longitude]
-                    );
-                    
-                    this.L.polyline(extensionCoords, {
-                        color: '#76C76C',
-                        weight: 1.5,
-                        opacity: 0.4,
-                        dashArray: '8, 12',
-                        renderer: this.canvasRenderer  // Canvas for performance
-                    }).addTo(this.layers.runways);
-                    
-                    // Only add distance markers when very zoomed in
+                // Helper to draw one runway end's extension
+                const drawExtension = (endId) => {
+                    const pts = extensions[endId];
+                    if (!pts || pts.length === 0) return;
+
+                    this.L.polyline(
+                        pts.map(p => [p.latitude, p.longitude]),
+                        { color: '#76C76C', weight: 1.5, opacity: 0.4,
+                          dashArray: '8, 12', renderer: this.canvasRenderer }
+                    ).addTo(this.layers.runways);
+
                     if (showDistanceMarkers) {
-                        extensions[end1].forEach(point => {
-                            if (point.distance > 0 && point.distance % 2 === 0) { // Skip threshold and odd distances
-                                this.L.circleMarker([point.latitude, point.longitude], {
-                                    radius: 1.5,
-                                    color: '#76C76C',
-                                    fillColor: '#76C76C',
-                                    fillOpacity: 0.6,
-                                    opacity: 0.6,
-                                    weight: 1,
-                                    renderer: this.canvasRenderer  // Canvas for performance
-                                }).addTo(this.layers.runways);
-                                
-                                // Add distance label
-                                this.L.marker([point.latitude, point.longitude], {
-                                    icon: this.L.divIcon({
-                                        html: `<div class="runway-distance-label">${point.distance}</div>`,
-                                        className: 'runway-distance-label-container',
-                                        iconSize: [20, 16],
-                                        iconAnchor: [10, -5] // Position above the point
-                                    })
-                                }).addTo(this.layers.runways);
-                            }
-                        });
+                        for (let j = 0; j < pts.length; j++) {
+                            const p = pts[j];
+                            if (p.distance <= 0 || p.distance % 2 !== 0) continue;
+                            this.L.circleMarker([p.latitude, p.longitude], {
+                                radius: 1.5, color: '#76C76C', fillColor: '#76C76C',
+                                fillOpacity: 0.6, opacity: 0.6, weight: 1,
+                                renderer: this.canvasRenderer
+                            }).addTo(this.layers.runways);
+                            this.L.marker([p.latitude, p.longitude], {
+                                icon: this.L.divIcon({
+                                    html: `<div class="runway-distance-label">${p.distance}</div>`,
+                                    className: 'runway-distance-label-container',
+                                    iconSize: [20, 16], iconAnchor: [10, -5]
+                                }), interactive: false
+                            }).addTo(this.layers.runways);
+                        }
                     }
-                }
-                
-                // Draw extension for end2
-                if (extensions[end2] && extensions[end2].length > 0) {
-                    const extensionCoords = extensions[end2].map(point =>
-                        [point.latitude, point.longitude]
-                    );
-                    
-                    this.L.polyline(extensionCoords, {
-                        color: '#76C76C',
-                        weight: 1.5,
-                        opacity: 0.4,
-                        dashArray: '8, 12',
-                        renderer: this.canvasRenderer  // Canvas for performance
-                    }).addTo(this.layers.runways);
-                    
-                    // Only add distance markers when very zoomed in
-                    if (showDistanceMarkers) {
-                        extensions[end2].forEach(point => {
-                            if (point.distance > 0 && point.distance % 2 === 0) { // Skip threshold and odd distances
-                                this.L.circleMarker([point.latitude, point.longitude], {
-                                    radius: 1.5,
-                                    color: '#76C76C',
-                                    fillColor: '#76C76C',
-                                    fillOpacity: 0.6,
-                                    opacity: 0.6,
-                                    weight: 1,
-                                    renderer: this.canvasRenderer  // Canvas for performance
-                                }).addTo(this.layers.runways);
-                                
-                                // Add distance label
-                                this.L.marker([point.latitude, point.longitude], {
-                                    icon: this.L.divIcon({
-                                        html: `<div class="runway-distance-label">${point.distance}</div>`,
-                                        className: 'runway-distance-label-container',
-                                        iconSize: [20, 16],
-                                        iconAnchor: [10, -5] // Position above the point
-                                    })
-                                }).addTo(this.layers.runways);
-                            }
-                        });
-                    }
-                }
+                };
+                drawExtension(end1);
+                drawExtension(end2);
             }
         }
     }
@@ -1930,13 +1997,40 @@ class MapManager {
     // Performance: viewport culling, canvas markers, lazy popups, single zoom+move listener
 
     _ensureRefDataListeners() {
-        if (this._refDataZoomListener) return;
-        this._refDataZoomListener = () => {
-            clearTimeout(this._refDataZoomTimeout);
-            this._refDataZoomTimeout = setTimeout(() => this._renderAllRefData(), 150);
-        };
-        this.map.on('zoomend', this._refDataZoomListener);
-        this.map.on('moveend', this._refDataZoomListener);
+        if (this._refDataListenersBound) return;
+        this._refDataListenersBound = true;
+        this._lastRefZoom = this.map.getZoom();
+        this._lastRefCenter = this.map.getCenter();
+
+        // Single coalesced handler for both zoom and pan events.
+        // Zoom change → full rebuild (canvas markers + DOM labels).
+        // Pan only  → rebuild ONLY if panned > 30 % of viewport (distance gating).
+        //             This eliminates ~95 % of pan-triggered rebuilds while still
+        //             filling in labels that scroll into view on large pans.
+        this.map.on('zoomend moveend', () => {
+            clearTimeout(this._refTimeout);
+            this._refTimeout = setTimeout(() => {
+                const zoom = this.map.getZoom();
+                if (zoom !== this._lastRefZoom) {
+                    this._lastRefZoom = zoom;
+                    this._lastRefCenter = this.map.getCenter();
+                    this._renderAllRefData();
+                    return;
+                }
+                // Pan only — check if we moved far enough to warrant a label refresh
+                const center = this.map.getCenter();
+                const b = this.map.getBounds();
+                const threshold = Math.max(
+                    (b.getEast()  - b.getWest())  * 0.3,
+                    (b.getNorth() - b.getSouth()) * 0.3
+                );
+                if (Math.abs(center.lng - this._lastRefCenter.lng) > threshold ||
+                    Math.abs(center.lat - this._lastRefCenter.lat) > threshold) {
+                    this._lastRefCenter = center;
+                    this._renderAllRefData();
+                }
+            }, 120);
+        });
     }
 
     _renderAllRefData() {
@@ -1944,13 +2038,16 @@ class MapManager {
         this._renderHeliports();
         this._renderNavaids();
         this._renderAllRunways();
+        // Home-airport runways share the same zoom listener
+        if (this.runwayData) this.updateRunwayDisplay();
     }
 
-    // Shared: get padded viewport bounds for culling
+    // Viewport bounds with generous padding for DOM label culling.
+    // Canvas markers are added WITHOUT culling (the renderer clips internally).
+    // Labels use this padded bounds so they cover ~50 % extra in each direction,
+    // surviving moderate pans without a rebuild.
     _getViewBounds() {
-        const b = this.map.getBounds();
-        const pad = 0.15; // 15% padding so markers pop in before edge
-        return b.pad(pad);
+        return this.map.getBounds().pad(0.5);
     }
 
     drawAirports(airports) {
@@ -1967,20 +2064,21 @@ class MapManager {
         const zoom = this.map.getZoom();
         if (zoom < 8) return;
 
-        const bounds = this._getViewBounds();
         const typeCfg = {
-            'large_airport': { color: '#60A5FA', radius: 6, minZoom: 8 },
+            'large_airport':  { color: '#60A5FA', radius: 6, minZoom: 8 },
             'medium_airport': { color: '#34D399', radius: 5, minZoom: 9 },
-            'small_airport': { color: '#A78BFA', radius: 4, minZoom: 10 },
-            'seaplane_base': { color: '#2DD4BF', radius: 3, minZoom: 11 },
+            'small_airport':  { color: '#A78BFA', radius: 4, minZoom: 10 },
+            'seaplane_base':  { color: '#2DD4BF', radius: 3, minZoom: 11 },
         };
         const showLabels = zoom >= 12;
+        // Canvas markers: no viewport culling — renderer clips internally.
+        // DOM labels: viewport-culled with generous padding to survive moderate pans.
+        const labelBounds = showLabels ? this._getViewBounds() : null;
 
         for (let i = 0, len = this.airportsData.length; i < len; i++) {
             const ap = this.airportsData[i];
             const cfg = typeCfg[ap.type] || typeCfg['small_airport'];
             if (zoom < cfg.minZoom) continue;
-            if (!bounds.contains([ap.latitude, ap.longitude])) continue;
 
             this.L.circleMarker([ap.latitude, ap.longitude], {
                 radius: cfg.radius, color: cfg.color, fillColor: cfg.color,
@@ -1988,13 +2086,14 @@ class MapManager {
             }).bindPopup(() => this._airportPopup(ap), { className: 'ref-popup-container', maxWidth: 300 })
               .addTo(this.layers.airports);
 
-            if (showLabels) {
+            if (showLabels && labelBounds.contains([ap.latitude, ap.longitude])) {
                 this.L.marker([ap.latitude, ap.longitude], {
                     icon: this.L.divIcon({
                         html: `<div class="airport-label">${ap.ident}</div>`,
                         className: 'airport-label-container',
                         iconSize: [40, 14], iconAnchor: [20, -8]
-                    })
+                    }),
+                    interactive: false
                 }).addTo(this.layers.airports);
             }
         }
@@ -2029,12 +2128,11 @@ class MapManager {
         const zoom = this.map.getZoom();
         if (zoom < 11) return;
 
-        const bounds = this._getViewBounds();
         const showLabels = zoom >= 12;
+        const labelBounds = showLabels ? this._getViewBounds() : null;
 
         for (let i = 0, len = this.heliportsData.length; i < len; i++) {
             const hp = this.heliportsData[i];
-            if (!bounds.contains([hp.latitude, hp.longitude])) continue;
 
             this.L.circleMarker([hp.latitude, hp.longitude], {
                 radius: 4, color: '#FB923C', fillColor: '#FB923C',
@@ -2042,13 +2140,14 @@ class MapManager {
             }).bindPopup(() => this._heliportPopup(hp), { className: 'ref-popup-container', maxWidth: 300 })
               .addTo(this.layers.heliports);
 
-            if (showLabels) {
+            if (showLabels && labelBounds.contains([hp.latitude, hp.longitude])) {
                 this.L.marker([hp.latitude, hp.longitude], {
                     icon: this.L.divIcon({
                         html: `<div class="heliport-label">${hp.ident}</div>`,
                         className: 'heliport-label-container',
                         iconSize: [40, 14], iconAnchor: [20, -8]
-                    })
+                    }),
+                    interactive: false
                 }).addTo(this.layers.heliports);
             }
         }
@@ -2137,28 +2236,40 @@ class MapManager {
         const zoom = this.map.getZoom();
         if (zoom < 9) return;
 
-        const bounds = this._getViewBounds();
-        const useSVG = zoom >= 11; // DOM icons only when zoomed in (fewer visible)
+        const useSVG = zoom >= 11;
         const showLabels = zoom >= 12;
+        // DOM elements (SVG icons + labels) are viewport-culled; canvas markers are not.
+        const domBounds = (useSVG || showLabels) ? this._getViewBounds() : null;
 
         for (let i = 0, len = this.navaidsData.length; i < len; i++) {
             const nav = this.navaidsData[i];
-            if (!bounds.contains([nav.latitude, nav.longitude])) continue;
+            const pos = [nav.latitude, nav.longitude];
 
             if (useSVG) {
-                // SVG divIcon for aviation symbols (only at high zoom = fewer markers)
-                this.L.marker([nav.latitude, nav.longitude], {
-                    icon: this.L.divIcon({
-                        html: this._navaidSVG(nav.type),
-                        className: 'navaid-icon-container',
-                        iconSize: [18, 18], iconAnchor: [9, 9]
-                    })
+                // At high zoom: always add a tiny canvas marker for the popup hit target
+                const c = this._navaidCanvasColor(nav.type);
+                this.L.circleMarker(pos, {
+                    radius: 1, color: c, fillColor: c,
+                    fillOpacity: 0, opacity: 0, weight: 0,
+                    renderer: this.canvasRenderer
                 }).bindPopup(() => this._navaidPopup(nav), { className: 'ref-popup-container', maxWidth: 280 })
                   .addTo(this.layers.navaids);
+
+                // SVG divIcon — viewport-culled (DOM element)
+                if (domBounds.contains(pos)) {
+                    this.L.marker(pos, {
+                        icon: this.L.divIcon({
+                            html: this._navaidSVG(nav.type),
+                            className: 'navaid-icon-container',
+                            iconSize: [18, 18], iconAnchor: [9, 9]
+                        }),
+                        interactive: false
+                    }).addTo(this.layers.navaids);
+                }
             } else {
-                // Canvas circleMarker at zoom 9-10 for maximum performance
+                // Zoom 9-10: canvas circleMarkers only — no viewport culling needed
                 const c = this._navaidCanvasColor(nav.type);
-                this.L.circleMarker([nav.latitude, nav.longitude], {
+                this.L.circleMarker(pos, {
                     radius: 3, color: c, fillColor: c,
                     fillOpacity: 0.5, opacity: 0.7, weight: 1,
                     renderer: this.canvasRenderer
@@ -2166,13 +2277,14 @@ class MapManager {
                   .addTo(this.layers.navaids);
             }
 
-            if (showLabels) {
-                this.L.marker([nav.latitude, nav.longitude], {
+            if (showLabels && domBounds.contains(pos)) {
+                this.L.marker(pos, {
                     icon: this.L.divIcon({
                         html: `<div class="navaid-label">${nav.ident}</div>`,
                         className: 'navaid-label-container',
                         iconSize: [36, 14], iconAnchor: [18, -6]
-                    })
+                    }),
+                    interactive: false
                 }).addTo(this.layers.navaids);
             }
         }
@@ -2204,37 +2316,39 @@ class MapManager {
         const zoom = this.map.getZoom();
         if (zoom < 10) return;
 
-        const bounds = this._getViewBounds();
         const showLabels = zoom >= 12;
+        const labelBounds = showLabels ? this._getViewBounds() : null;
         const weight = Math.max(2, Math.min(5, zoom - 8));
 
         for (let i = 0, len = this.allRunwaysData.length; i < len; i++) {
             const rwy = this.allRunwaysData[i];
             if (!rwy.le_latitude || !rwy.le_longitude || !rwy.he_latitude || !rwy.he_longitude) continue;
-            // Viewport cull: check if either end is visible
-            if (!bounds.contains([rwy.le_latitude, rwy.le_longitude]) &&
-                !bounds.contains([rwy.he_latitude, rwy.he_longitude])) continue;
 
+            // Canvas polylines: no viewport culling — renderer clips internally
             this.L.polyline(
                 [[rwy.le_latitude, rwy.le_longitude], [rwy.he_latitude, rwy.he_longitude]],
                 { color: '#9CA3AF', weight, opacity: 0.6, renderer: this.canvasRenderer }
             ).addTo(this.layers.allRunways);
 
             if (showLabels) {
-                if (rwy.le_ident) {
+                const leInView = labelBounds.contains([rwy.le_latitude, rwy.le_longitude]);
+                const heInView = labelBounds.contains([rwy.he_latitude, rwy.he_longitude]);
+                if (rwy.le_ident && leInView) {
                     this.L.marker([rwy.le_latitude, rwy.le_longitude], {
                         icon: this.L.divIcon({
                             html: `<div class="runway-label" style="font-size:8px;opacity:0.7">${rwy.le_ident}</div>`,
                             className: 'runway-label-container', iconSize: [24, 14]
-                        })
+                        }),
+                        interactive: false
                     }).addTo(this.layers.allRunways);
                 }
-                if (rwy.he_ident) {
+                if (rwy.he_ident && heInView) {
                     this.L.marker([rwy.he_latitude, rwy.he_longitude], {
                         icon: this.L.divIcon({
                             html: `<div class="runway-label" style="font-size:8px;opacity:0.7">${rwy.he_ident}</div>`,
                             className: 'runway-label-container', iconSize: [24, 14]
-                        })
+                        }),
+                        interactive: false
                     }).addTo(this.layers.allRunways);
                 }
             }
@@ -2254,20 +2368,103 @@ class MapManager {
 
     // Clean up runway rendering resources
     cleanupRunwayRendering() {
-        // Clear any pending runway update timeout
-        if (this.runwayUpdateTimeout) {
-            clearTimeout(this.runwayUpdateTimeout);
-            this.runwayUpdateTimeout = null;
-        }
-        
-        // Remove zoom event listener
-        if (this.map && this.runwayZoomListener) {
-            this.map.off('zoomend', this.runwayZoomListener);
-            this.runwayZoomListener = null;
-        }
-        
-        // Clear runway data
         this.runwayData = null;
+        if (this.layers.runways) this.layers.runways.clearLayers();
+    }
+
+    // Release timers, listeners, and map references to avoid leaks on teardown/reload
+    cleanup() {
+        if (this.labelRefreshTimer) {
+            clearInterval(this.labelRefreshTimer);
+            this.labelRefreshTimer = null;
+        }
+        if (this._visibleListUpdateTimeout) {
+            clearTimeout(this._visibleListUpdateTimeout);
+            this._visibleListUpdateTimeout = null;
+        }
+        if (this._refTimeout) {
+            clearTimeout(this._refTimeout);
+            this._refTimeout = null;
+        }
+        if (this._refreshThrottleTimer) {
+            clearTimeout(this._refreshThrottleTimer);
+            this._refreshThrottleTimer = null;
+        }
+
+        this.cleanupTracksMiniMap();
+
+        if (this.map) {
+            try {
+                this.map.off();
+                this.map.remove();
+            } catch (error) {
+                console.warn('MapManager cleanup error:', error);
+            }
+            this.map = null;
+        }
+
+        Object.keys(this.markers).forEach(hex => {
+            this.removeAircraft(hex);
+        });
+
+        this.layers.aircraft.clearLayers();
+        this.layers.trails.clearLayers();
+        this.layers.rangeRings.clearLayers();
+        this.layers.runways.clearLayers();
+        this.layers.airports.clearLayers();
+        this.layers.heliports.clearLayers();
+        this.layers.navaids.clearLayers();
+        this.layers.allRunways.clearLayers();
+
+        this.markers = {};
+        this.trails = {};
+        this.trailVersions = {};
+        this.trailLayersByHex = {};
+        this._markerVisibilityState = {};
+        this._visualStateVersionByHex = {};
+        this._flightCardHoverStateByHex = {};
+        this.proximityHexSet = null;
+        this.proximityRefHex = null;
+        this.proximityDistanceNM = null;
+    }
+
+    // Return lightweight map performance stats for a recent time window.
+    getPerformanceStats() {
+        const now = performance.now();
+        const elapsedSeconds = Math.max(0.001, (now - this._perfSnapshot.timestamp) / 1000);
+
+        const delta = {};
+        const keys = Object.keys(this._perfCounters);
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            delta[key] = this._perfCounters[key] - (this._perfSnapshot.counters[key] || 0);
+        }
+
+        const refreshExecuted = delta.refreshExecuted || 0;
+        const avgRefreshMs = refreshExecuted > 0 ? (delta.refreshDurationMs / refreshExecuted) : 0;
+        const visualTotal = (delta.visualStateApplied || 0) + (delta.visualStateSkipped || 0);
+        const visualSkipPct = visualTotal > 0 ? ((delta.visualStateSkipped / visualTotal) * 100) : 0;
+        const markerOps = (delta.markerAdds || 0) + (delta.markerRemoves || 0) + (delta.labelAdds || 0) + (delta.labelRemoves || 0);
+        const coalescedRatio = (delta.refreshRequested || 0) > 0 ? (delta.refreshCoalesced / delta.refreshRequested) : 0;
+
+        const stats = {
+            windowSec: Number(elapsedSeconds.toFixed(1)),
+            refreshPerSec: Number((refreshExecuted / elapsedSeconds).toFixed(2)),
+            avgRefreshMs: Number(avgRefreshMs.toFixed(2)),
+            coalescedPct: Number((coalescedRatio * 100).toFixed(1)),
+            markerOpsPerSec: Number((markerOps / elapsedSeconds).toFixed(2)),
+            singleUpdatesPerSec: Number(((delta.singleAircraftUpdates || 0) / elapsedSeconds).toFixed(2)),
+            visualSkipPct: Number(visualSkipPct.toFixed(1)),
+            trailLayerOpsPerSec: Number((((delta.trailLayersAdded || 0) + (delta.trailLayersRemoved || 0)) / elapsedSeconds).toFixed(2)),
+            fullVisibilityPasses: delta.fullVisibilityPasses || 0
+        };
+
+        this._perfSnapshot = {
+            timestamp: now,
+            counters: { ...this._perfCounters }
+        };
+
+        return stats;
     }
     
     // Center the map on a specific aircraft

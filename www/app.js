@@ -185,6 +185,9 @@ document.addEventListener('alpine:init', () => {
         sortDirection: 'asc',
         lastUpdateSeconds: 0, // For footer status
         timeUpdateIntervalId: null, // Store ID for the time update interval
+        mapPerfUpdateIntervalId: null, // Interval for map performance stats polling
+        mapPerformanceStats: null,
+        _previousHeapUsedMB: null,
         userSetVolumes: {}, // Initialize as empty object
         lastSignificantAudioTime: {}, // Stores timestamp for each freqId
         secondsSinceLastAudio: {},  // Stores formatted string for display (e.g., "5s")
@@ -728,6 +731,111 @@ document.addEventListener('alpine:init', () => {
             return 'fas fa-arrows-alt-h'; // Level
         },
 
+        getATCDerivedMetrics(aircraft) {
+            const adsbData = aircraft?.adsb || {};
+            const serverDerived = adsbData.atc_derived || null;
+            const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+            const normalizeHeading = (v) => ((v % 360) + 360) % 360;
+            const signedAngleDiff = (a, b) => {
+                let d = normalizeHeading(a) - normalizeHeading(b);
+                while (d > 180) d -= 360;
+                while (d <= -180) d += 360;
+                return d;
+            };
+
+            const track = num(adsbData.track);
+            const trueHeading = num(adsbData.true_heading);
+            const magHeading = num(adsbData.mag_heading);
+            const windDir = num(adsbData.wd);
+            const windSpeed = num(adsbData.ws);
+            const gs = num(adsbData.gs);
+            const verticalRate = num(adsbData.baro_rate) ?? num(adsbData.geom_rate);
+            const trackRate = num(adsbData.track_rate);
+
+            const headingSource = serverDerived?.heading_source
+                || (trueHeading !== null ? 'TRUE' : (magHeading !== null ? 'MAG' : (track !== null ? 'TRACK' : 'N/A')));
+
+            let trackHeadingError = 'N/A';
+            if (num(serverDerived?.track_heading_error_deg) !== null) {
+                const drift = num(serverDerived.track_heading_error_deg);
+                trackHeadingError = `${drift >= 0 ? '+' : ''}${drift.toFixed(1)}°`;
+            } else {
+                const referenceHeading = trueHeading ?? magHeading ?? track;
+                if (track !== null && referenceHeading !== null) {
+                    const drift = signedAngleDiff(track, referenceHeading);
+                    trackHeadingError = `${drift >= 0 ? '+' : ''}${drift.toFixed(1)}°`;
+                }
+            }
+
+            let headTailWind = 'N/A';
+            let crossWind = 'N/A';
+            if (num(serverDerived?.head_tailwind_kt) !== null && num(serverDerived?.crosswind_kt) !== null) {
+                const headwind = num(serverDerived.head_tailwind_kt);
+                const crosswindVal = num(serverDerived.crosswind_kt);
+                const hwLabel = headwind >= 0 ? 'HW' : 'TW';
+                const cwLabel = crosswindVal >= 0 ? 'R' : 'L';
+                headTailWind = `${hwLabel} ${Math.abs(headwind).toFixed(1)} kt`;
+                crossWind = `${cwLabel} ${Math.abs(crosswindVal).toFixed(1)} kt`;
+            } else if (track !== null && windDir !== null && windSpeed !== null) {
+                const rel = signedAngleDiff(windDir, track) * Math.PI / 180;
+                const headwind = windSpeed * Math.cos(rel); // + headwind, - tailwind
+                const crosswindVal = windSpeed * Math.sin(rel); // + from right, - from left
+                const hwLabel = headwind >= 0 ? 'HW' : 'TW';
+                const cwLabel = crosswindVal >= 0 ? 'R' : 'L';
+                headTailWind = `${hwLabel} ${Math.abs(headwind).toFixed(1)} kt`;
+                crossWind = `${cwLabel} ${Math.abs(crosswindVal).toFixed(1)} kt`;
+            }
+
+            let flightPathAngle = 'N/A';
+            if (num(serverDerived?.flight_path_angle_deg) !== null) {
+                const fpa = num(serverDerived.flight_path_angle_deg);
+                flightPathAngle = `${fpa >= 0 ? '+' : ''}${fpa.toFixed(2)}°`;
+            } else if (verticalRate !== null && gs !== null && gs > 1) {
+                const gsFeetPerMin = gs * 101.2686;
+                const fpa = Math.atan2(verticalRate, gsFeetPerMin) * 180 / Math.PI;
+                flightPathAngle = `${fpa >= 0 ? '+' : ''}${fpa.toFixed(2)}°`;
+            }
+
+            let climbGradient = 'N/A';
+            if (num(serverDerived?.climb_gradient_ft_nm) !== null) {
+                const gradient = num(serverDerived.climb_gradient_ft_nm);
+                climbGradient = `${gradient >= 0 ? '+' : ''}${gradient.toFixed(0)} ft/NM`;
+            } else if (verticalRate !== null && gs !== null && gs > 1) {
+                const gradient = (verticalRate * 60.0) / gs;
+                climbGradient = `${gradient >= 0 ? '+' : ''}${gradient.toFixed(0)} ft/NM`;
+            }
+
+            let etaToStation = 'N/A';
+            if (num(serverDerived?.eta_station_sec) !== null) {
+                const totalSec = Math.max(0, Math.round(num(serverDerived.eta_station_sec)));
+                const whole = Math.floor(totalSec / 60);
+                const sec = totalSec % 60;
+                etaToStation = `${whole}m ${sec}s`;
+            } else {
+                const distanceNm = num(aircraft.distance);
+                if (distanceNm !== null && gs !== null && gs > 30) {
+                    const mins = (distanceNm / gs) * 60;
+                    const whole = Math.floor(mins);
+                    const sec = Math.round((mins - whole) * 60);
+                    etaToStation = `${whole}m ${sec}s`;
+                }
+            }
+
+            const turnRateSource = num(serverDerived?.turn_rate_deg_sec) ?? trackRate;
+            const turnRateText = turnRateSource !== null ? `${turnRateSource >= 0 ? '+' : ''}${turnRateSource.toFixed(2)}°/s` : 'N/A';
+
+            return {
+                headingSource,
+                trackHeadingError,
+                headTailWind,
+                crossWind,
+                flightPathAngle,
+                climbGradient,
+                etaToStation,
+                turnRateText
+            };
+        },
+
         // RESTORING formatAircraftDetails
         formatAircraftDetails() {
             if (!this.selectedAircraft) return '';
@@ -780,15 +888,16 @@ document.addEventListener('alpine:init', () => {
             const aircraftType = bsdbData.type || adsbData.t || 'N/A';
             const aircraftReg = bsdbData.registration || adsbData.r || 'N/A';
             const aircraftOperator = bsdbData.registered_owners || 'N/A';
+            const derived = this.getATCDerivedMetrics(aircraft);
 
             const fields = [
                 ['Basic Info', [
                     ['Callsign', aircraft.flight?.trim() || 'N/A'],
                     ['Airline', aircraft.airline || 'N/A'],
                     ['Operator', aircraftOperator],
+                    ['Country', aircraft.airline_country || 'N/A'],
                     ['Hex', aircraft.hex],
                     ['Type', aircraftType],
-                    ['Manufacturer', bsdbData.manufacturer || 'N/A'],
                     ['Registration', aircraftReg],
                     ['Category', adsbData.category || 'N/A'],
                     ['Squawk', adsbData.squawk || 'N/A'],
@@ -830,6 +939,16 @@ document.addEventListener('alpine:init', () => {
                     ['Wind Speed', `${adsbData.ws ?? 'N/A'} kts`],
                     ['OAT', `${adsbData.oat ?? 'N/A'}°C`],
                     ['TAT', `${adsbData.tat ?? 'N/A'}°C`]
+                ]],
+                ['ATC Derived', [
+                    ['Heading Source', derived.headingSource],
+                    ['Track-Heading Error', derived.trackHeadingError],
+                    ['Head/Tail Wind', derived.headTailWind],
+                    ['Crosswind (L/R)', derived.crossWind],
+                    ['Flight Path Angle', derived.flightPathAngle],
+                    ['Climb Gradient', derived.climbGradient],
+                    ['Turn Rate', derived.turnRateText],
+                    ['ETA to Station', derived.etaToStation]
                 ]],
                 ['ADSB Info', [
                     ['Version', adsbData.version ?? 'N/A'],
@@ -1868,6 +1987,15 @@ document.addEventListener('alpine:init', () => {
                     this.updateSecondsSinceLastAudio();
                 }, 1000);
 
+                // Poll map performance metrics every 2s (debug only, lightweight)
+                if (this.mapPerfUpdateIntervalId) {
+                    clearInterval(this.mapPerfUpdateIntervalId);
+                }
+                this.updateMapPerformanceStats();
+                this.mapPerfUpdateIntervalId = setInterval(() => {
+                    this.updateMapPerformanceStats();
+                }, 2000);
+
                 // Watch for hover changes and update map visual state
                 let previousHoveredHex = null;
                 Alpine.effect(() => {
@@ -1885,15 +2013,17 @@ document.addEventListener('alpine:init', () => {
 
                 let previousSelectedHex = null; // Keep this to know if an aircraft was just selected from null
                 Alpine.effect(() => {
-                    const currentSelectedAircraft = this.selectedAircraft;
-                    const currentHex = currentSelectedAircraft ? currentSelectedAircraft.hex : null;
+                    const currentHex = this.selectedAircraft ? this.selectedAircraft.hex : null;
+                    if (currentHex === previousSelectedHex) {
+                        return;
+                    }
 
-                    this.setupAircraftDetailsPanel(); 
+                    this.setupAircraftDetailsPanel();
 
                     if (this.mapManager) {
                         this.mapManager.applyFiltersAndRefreshView();
                     }
-                    
+
                     previousSelectedHex = currentHex;
                 });
                 
@@ -1937,6 +2067,7 @@ document.addEventListener('alpine:init', () => {
             const intervalIds = [
                 'timeUpdateIntervalId',
                 'lastAudioUpdateIntervalId',
+                'mapPerfUpdateIntervalId',
                 'stationRefreshInterval',
                 'weatherRefreshInterval',
                 'aircraftDetailsHistoryRefreshInterval',
@@ -1956,16 +2087,15 @@ document.addEventListener('alpine:init', () => {
                 window.animationEngine.stop();
             }
 
+            // Release map resources/listeners/timers
+            if (this.mapManager && this.mapManager.cleanup) {
+                this.mapManager.cleanup();
+            }
+
             // Disconnect WebSocket and clear listeners
             if (window.wsClient) {
                 window.wsClient.clearAllListeners();
                 window.wsClient.disconnect();
-            }
-
-            // Stop map label refresh timer
-            if (this.mapManager && this.mapManager.labelRefreshTimer) {
-                clearInterval(this.mapManager.labelRefreshTimer);
-                this.mapManager.labelRefreshTimer = null;
             }
 
             console.log('App cleanup: Complete');
@@ -2357,6 +2487,40 @@ document.addEventListener('alpine:init', () => {
             return null;
         },
 
+        // Poll map performance stats from MapManager
+        updateMapPerformanceStats() {
+            if (!this.mapManager || !this.mapManager.getPerformanceStats) return;
+            const mapStats = this.mapManager.getPerformanceStats();
+            const animationStats = this.animationEngine ? this.animationEngine.getStats() : null;
+            const measuredFps = animationStats && Number.isFinite(animationStats.measuredFps)
+                ? Number(animationStats.measuredFps.toFixed(1))
+                : 0;
+
+            const memory = performance && performance.memory ? performance.memory : null;
+            const heapUsedMB = memory && Number.isFinite(memory.usedJSHeapSize)
+                ? Number((memory.usedJSHeapSize / (1024 * 1024)).toFixed(1))
+                : null;
+            const heapLimitMB = memory && Number.isFinite(memory.jsHeapSizeLimit)
+                ? Number((memory.jsHeapSizeLimit / (1024 * 1024)).toFixed(1))
+                : null;
+            const heapUsagePct = (heapUsedMB !== null && heapLimitMB && heapLimitMB > 0)
+                ? Number(((heapUsedMB / heapLimitMB) * 100).toFixed(1))
+                : null;
+            const heapDeltaMB = (heapUsedMB !== null && this._previousHeapUsedMB !== null)
+                ? Number((heapUsedMB - this._previousHeapUsedMB).toFixed(1))
+                : null;
+            this._previousHeapUsedMB = heapUsedMB;
+
+            this.mapPerformanceStats = {
+                ...mapStats,
+                animationFps: measuredFps,
+                heapUsedMB: heapUsedMB,
+                heapLimitMB: heapLimitMB,
+                heapUsagePct: heapUsagePct,
+                heapDeltaMB: heapDeltaMB
+            };
+        },
+
         applyFilters() {
             this.onFilterChange();
         },
@@ -2375,7 +2539,7 @@ async initAircraftDataSource() {
 },
 
         // Initialize WebSocket connection
-                initWebSocket() {            if (!wsClient) {                console.error("wsClient not available during initWebSocket. This shouldn't happen.");                return;            }            // Reset reconnection attempts when manually initializing            if (wsClient.resetReconnectAttempts) {                wsClient.resetReconnectAttempts();            }            // Clear any existing listeners from previous initializations, if any            wsClient.listeners.transcription = [];            wsClient.listeners.transcription_update = [];            wsClient.listeners.phase_change = [];            wsClient.listeners.aircraft_event = [];            wsClient.listeners.open = [];            wsClient.listeners.close = [];            wsClient.listeners.error = [];
+            initWebSocket() {            if (!wsClient) {                console.error("wsClient not available during initWebSocket. This shouldn't happen.");                return;            }            // Always keep reconnect enabled for runtime disconnections            if (wsClient.enableAutoReconnect) {                wsClient.enableAutoReconnect();            }            // Reset reconnect backoff when manually initializing            if (wsClient.resetReconnectAttempts) {                wsClient.resetReconnectAttempts();            }            // Clear all existing listeners from previous initializations            if (wsClient.clearAllListeners) {                wsClient.clearAllListeners();            }
 
             // Add event listeners
             wsClient.addEventListener('transcription', (data) => {
@@ -2999,6 +3163,7 @@ async initAircraftDataSource() {
             if (delta.baro_rate !== undefined && aircraft.adsb.baro_rate !== delta.baro_rate) aircraft.adsb.baro_rate = delta.baro_rate;
             if (delta.mag_heading !== undefined && aircraft.adsb.mag_heading !== delta.mag_heading) aircraft.adsb.mag_heading = delta.mag_heading;
             if (delta.true_heading !== undefined && aircraft.adsb.true_heading !== delta.true_heading) aircraft.adsb.true_heading = delta.true_heading;
+            if (delta.atc_derived !== undefined && aircraft.adsb.atc_derived !== delta.atc_derived) aircraft.adsb.atc_derived = delta.atc_derived;
 
             // Apply full adsb object if provided — preserve last known position if new object has no GPS
             if (delta.adsb !== undefined) {
@@ -4264,19 +4429,32 @@ async initAircraftDataSource() {
             }
         },
 
-        // Get heading with fallback priority: mag_heading -> track -> true_heading
+        // Heading helpers for map icon rotation and label suffixes
+        normalizeHeading(value) {
+            if (!Number.isFinite(value)) return null;
+            return ((value % 360) + 360) % 360;
+        },
+
+        hasHeadingValue(value) {
+            return value !== undefined && value !== null && Number.isFinite(value);
+        },
+
+        // Get heading with fallback priority for direction of travel: track -> mag_heading -> true_heading
         getHeadingWithFallback(aircraft) {
             if (!aircraft.adsb) return 0;
             
-            // Priority order: mag_heading -> track -> true_heading
-            if (aircraft.adsb.mag_heading !== undefined && aircraft.adsb.mag_heading !== null && aircraft.adsb.mag_heading !== 0) {
-                return aircraft.adsb.mag_heading;
+            // Direction-of-travel first (track). Accept 0° as valid (northbound).
+            if (this.hasHeadingValue(aircraft.adsb.track)) {
+                const heading = this.normalizeHeading(aircraft.adsb.track);
+                if (heading !== null) return heading;
             }
-            if (aircraft.adsb.track !== undefined && aircraft.adsb.track !== null && aircraft.adsb.track !== 0) {
-                return aircraft.adsb.track;
+            if (this.hasHeadingValue(aircraft.adsb.mag_heading)) {
+                const heading = this.normalizeHeading(aircraft.adsb.mag_heading);
+                if (heading !== null) return heading;
             }
-            if (aircraft.adsb.true_heading !== undefined && aircraft.adsb.true_heading !== null && aircraft.adsb.true_heading !== 0) {
-                return aircraft.adsb.true_heading;
+            if (this.hasHeadingValue(aircraft.adsb.true_heading)) {
+                const heading = this.normalizeHeading(aircraft.adsb.true_heading);
+                if (heading !== null) return heading;
             }
             return 0; // Default fallback
         },
@@ -4284,15 +4462,17 @@ async initAircraftDataSource() {
         getHeadingWithType(aircraft) {
             if (!aircraft.adsb) return { value: 0, type: null };
             
-            // Priority order: mag_heading -> track -> true_heading
-            if (aircraft.adsb.mag_heading !== undefined && aircraft.adsb.mag_heading !== null && aircraft.adsb.mag_heading !== 0) {
-                return { value: aircraft.adsb.mag_heading, type: 'magnetic' };
+            if (this.hasHeadingValue(aircraft.adsb.track)) {
+                const heading = this.normalizeHeading(aircraft.adsb.track);
+                if (heading !== null) return { value: heading, type: 'track' };
             }
-            if (aircraft.adsb.track !== undefined && aircraft.adsb.track !== null && aircraft.adsb.track !== 0) {
-                return { value: aircraft.adsb.track, type: 'track' };
+            if (this.hasHeadingValue(aircraft.adsb.mag_heading)) {
+                const heading = this.normalizeHeading(aircraft.adsb.mag_heading);
+                if (heading !== null) return { value: heading, type: 'magnetic' };
             }
-            if (aircraft.adsb.true_heading !== undefined && aircraft.adsb.true_heading !== null && aircraft.adsb.true_heading !== 0) {
-                return { value: aircraft.adsb.true_heading, type: 'true' };
+            if (this.hasHeadingValue(aircraft.adsb.true_heading)) {
+                const heading = this.normalizeHeading(aircraft.adsb.true_heading);
+                if (heading !== null) return { value: heading, type: 'true' };
             }
             return { value: 0, type: null }; // Default fallback - no suffix when all are zeros
         },
@@ -4368,11 +4548,15 @@ async initAircraftDataSource() {
     // Watch for aircraft selection changes to clear pending requests and trails
     Alpine.effect(() => {
         const store = Alpine.store('atc');
-        const selectedAircraft = store.selectedAircraft;
-        const previousSelectedHex = store._previousSelectedHex;
+        const currentSelectedHex = store.selectedAircraft?.hex || null;
+        const previousSelectedHex = store._previousSelectedHex || null;
+
+        if (currentSelectedHex === previousSelectedHex) {
+            return;
+        }
 
         // If aircraft selection changed
-        if (previousSelectedHex && previousSelectedHex !== selectedAircraft?.hex) {
+        if (previousSelectedHex && previousSelectedHex !== currentSelectedHex) {
             // Clear pending requests for the previous aircraft
             store.clearPendingRequestsForAircraft(previousSelectedHex);
 
@@ -4383,7 +4567,7 @@ async initAircraftDataSource() {
         }
 
         // Store current selection for next comparison
-        store._previousSelectedHex = selectedAircraft?.hex;
+        store._previousSelectedHex = currentSelectedHex;
 
         // Refresh map visibility when selected aircraft changes to show/hide aircraft based on filters
         if (store.mapManager) {

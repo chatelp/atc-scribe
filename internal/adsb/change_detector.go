@@ -121,6 +121,11 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 		if previous.ADSB.TrueHeading != current.ADSB.TrueHeading {
 			delta["true_heading"] = current.ADSB.TrueHeading
 		}
+
+		// ATC derived metrics
+		if !atcDerivedEqual(previous.ADSB.ATCDerived, current.ADSB.ATCDerived) {
+			delta["atc_derived"] = current.ADSB.ATCDerived
+		}
 	} else if (previous.ADSB == nil) != (current.ADSB == nil) {
 		// ADSB data appeared or disappeared - send full ADSB object
 		if current.ADSB != nil {

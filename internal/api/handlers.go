@@ -298,6 +298,7 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Future array is now populated by the prediction algorithm
+		adsb.AttachATCDerivedMetrics(a)
 	}
 
 	// Calculate counts by ground/air and active/total
@@ -442,6 +443,8 @@ func (h *Handler) GetAircraftByHex(w http.ResponseWriter, r *http.Request) {
 		distNM := math.Round(distMeters/1852.0*10) / 10 // Convert meters to nautical miles and round to 1 decimal place
 		aircraft.Distance = &distNM
 	}
+
+	adsb.AttachATCDerivedMetrics(aircraft)
 
 	// Write response
 	WriteJSON(w, http.StatusOK, aircraft)
@@ -747,7 +750,7 @@ func (h *Handler) buildRunwayResponse() interface{} {
 	}
 
 	return struct {
-		Airport          string                         `json:"airport"`
+		Airport          string `json:"airport"`
 		RunwayThresholds map[string]map[string]struct {
 			Latitude  float64 `json:"latitude"`
 			Longitude float64 `json:"longitude"`

@@ -365,6 +365,41 @@
                                             <span x-text="$store.atc.wsUpdatesPaused ? 'Resume' : 'Pause'"></span>
                                         </button>
                                     </div>
+
+                                    <div x-show="$store.atc.mapPerformanceStats" class="text-xs text-text/70 bg-background/30 border border-border/40 rounded p-2 space-y-1">
+                                        <div class="flex items-center justify-between">
+                                            <span>Animation FPS</span>
+                                            <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.animationFps"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Heap (MB)</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.heapUsedMB !== null ? ($store.atc.mapPerformanceStats.heapUsedMB + ' / ' + $store.atc.mapPerformanceStats.heapLimitMB + ' (' + $store.atc.mapPerformanceStats.heapUsagePct + '%) • Δ ' + (($store.atc.mapPerformanceStats.heapDeltaMB === null || $store.atc.mapPerformanceStats.heapDeltaMB === undefined) ? 'n/a' : (($store.atc.mapPerformanceStats.heapDeltaMB > 0 ? '+' : '') + $store.atc.mapPerformanceStats.heapDeltaMB)) + ' MB') : 'n/a'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Map Refresh/s</span>
+                                            <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.refreshPerSec"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Avg Refresh (ms)</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.avgRefreshMs"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Coalesced (%)</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.coalescedPct"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Marker Ops/s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.markerOpsPerSec"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Visual Skip (%)</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.visualSkipPct"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Trail Ops/s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.trailLayerOpsPerSec"></span>
+                                        </div>
+                                    </div>
                                     
                                     <!-- Removed Map Updates and Data Only Mode debug toggles -->
                                 </div>
@@ -957,13 +992,15 @@
                                           class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center"
                                           :class="{
                                               'bg-blue-500/20 text-blue-400 border border-blue-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'CRZ',
+                                              'bg-lime-500/20 text-lime-400 border border-lime-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'CLB',
                                               'bg-green-500/20 text-green-400 border border-green-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'DEP',
                                               'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'APP',
                                               'bg-pink-400/15 text-pink-300 border border-pink-400/25': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'ARR',
                                               'bg-purple-500/20 text-purple-400 border border-purple-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'TAX',
                                               'bg-orange-500/20 text-orange-400 border border-orange-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'T/O',
                                               'bg-teal-500/20 text-teal-400 border border-teal-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'T/D',
-                                              'bg-gray-500/20 text-gray-400 border border-gray-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'NEW'
+                                              'bg-gray-500/20 text-gray-400 border border-gray-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'NEW',
+                                              'bg-slate-500/15 text-slate-400 border border-slate-500/25': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'UNK'
                                           }"></span>
                                     <span x-show="!$store.atc.selectedAircraft.phase || !$store.atc.selectedAircraft.phase.current || $store.atc.selectedAircraft.phase.current.length === 0"
                                           x-text="'NEW'"
@@ -976,20 +1013,7 @@
                                         <span x-html="$store.atc.highlightSearchMatch($store.atc.selectedAircraft.flight || $store.atc.selectedAircraft.hex)"
                                               :class="{'text-highlight': !$store.atc.selectedAircraft.on_ground, 'text-white': $store.atc.selectedAircraft.on_ground}"
                                               class="font-bold text-sm"></span>
-                                        <div class="flex items-center gap-1 -mt-1">
-                                            <span class="text-[9px] text-gray-500" x-text="$store.atc.selectedAircraft.adsb?.category || ''"></span>
-                                            <span x-show="$store.atc.selectedAircraft.adsb?.squawk"
-                                                  class="text-[8px] font-mono"
-                                                  :class="{
-                                                      'text-red-400': $store.atc.selectedAircraft.adsb?.squawk === '7700',
-                                                      'text-orange-400': $store.atc.selectedAircraft.adsb?.squawk === '7600',
-                                                      'text-purple-400': $store.atc.selectedAircraft.adsb?.squawk === '7500',
-                                                      'text-gray-400': !['7500', '7600', '7700'].includes($store.atc.selectedAircraft.adsb?.squawk)
-                                                  }"
-                                                  :title="$store.atc.selectedAircraft.adsb?.squawk === '7700' ? 'EMERGENCY' : $store.atc.selectedAircraft.adsb?.squawk === '7600' ? 'RADIO FAILURE' : $store.atc.selectedAircraft.adsb?.squawk === '7500' ? 'HIJACK' : 'Squawk'"
-                                                  x-text="$store.atc.selectedAircraft.adsb?.squawk">
-                                            </span>
-                                        </div>
+                                        <span class="text-[9px] text-gray-500 -mt-1" x-text="$store.atc.selectedAircraft.bsdb?.icao_type_code || $store.atc.selectedAircraft.adsb?.t || ''"></span>
                                     </div>
                                 </div>
                                 

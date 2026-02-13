@@ -16,7 +16,7 @@ type Service struct {
 
 	// Global (no geo-filter)
 	aircraftMap map[string]*AircraftInfo // key: uppercase hex
-	airlineMap  map[string]string        // key: ICAO or IATA code → airline name
+	airlineMap  map[string]AirlineInfo   // key: ICAO or IATA code → airline info
 
 	// Geo-filtered within display_range_nm of station
 	airports   []*AirportInfo
@@ -35,7 +35,7 @@ func NewService(cfg ServiceConfig, log *logger.Logger) (*Service, error) {
 	s := &Service{
 		logger:      log.Named("reference"),
 		aircraftMap: make(map[string]*AircraftInfo),
-		airlineMap:  make(map[string]string),
+		airlineMap:  make(map[string]AirlineInfo),
 		airportMap:  make(map[string]*AirportInfo),
 	}
 
@@ -137,7 +137,12 @@ func (s *Service) LookupAircraft(hex string) *AircraftInfo {
 
 // LookupAirline retrieves an airline name by ICAO or IATA code.
 func (s *Service) LookupAirline(code string) string {
-	return s.airlineMap[code]
+	return s.airlineMap[code].Name
+}
+
+// LookupAirlineCountry retrieves an airline's country by ICAO or IATA code.
+func (s *Service) LookupAirlineCountry(code string) string {
+	return s.airlineMap[code].Country
 }
 
 // AircraftCount returns the number of aircraft in the database.

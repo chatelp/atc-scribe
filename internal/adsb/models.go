@@ -46,57 +46,72 @@ type RawAircraftData struct {
 // ADSBTarget represents a single aircraft in the raw ADS-B data
 // This corresponds to entries in the adsb_targets table
 type ADSBTarget struct {
-	Hex            string          `json:"hex"`
-	Type           string          `json:"type"`
-	Flight         string          `json:"flight"`
-	Registration   string          `json:"r,omitempty"` // External API specific field (r)
-	AircraftType   string          `json:"t,omitempty"` // External API specific field (t)
-	AltBaro        FlexibleFloat64 `json:"alt_baro"`    // Can be "ground" string or numeric
-	AltGeom        FlexibleFloat64 `json:"alt_geom"`    // Can be "ground" string or numeric
-	GS             float64  `json:"gs"`
-	IAS            float64  `json:"ias"`
-	TAS            float64  `json:"tas"`
-	Mach           float64  `json:"mach"`
-	WD             float64  `json:"wd"`
-	WS             float64  `json:"ws"`
-	OAT            float64  `json:"oat"`
-	TAT            float64  `json:"tat"`
-	Track          float64  `json:"track"`
-	TrackRate      float64  `json:"track_rate"`
-	Roll           float64  `json:"roll"`
-	MagHeading     float64  `json:"mag_heading"`
-	TrueHeading    float64  `json:"true_heading"`
-	BaroRate       float64  `json:"baro_rate"`
-	GeomRate       float64  `json:"geom_rate"`
-	Squawk         string   `json:"squawk"`
-	Category       string   `json:"category"`
-	NavQNH         float64  `json:"nav_qnh"`
-	NavAltitudeMCP float64  `json:"nav_altitude_mcp"`
-	NavAltitudeFMS float64  `json:"nav_altitude_fms"`
-	NavHeading     float64  `json:"nav_heading"`
-	Lat            float64  `json:"lat"`
-	Lon            float64  `json:"lon"`
-	NIC            int      `json:"nic"`
-	RC             int      `json:"rc"`
-	SeenPos        float64  `json:"seen_pos"`
-	RDst           float64  `json:"r_dst"`
-	RDir           float64  `json:"r_dir"`
-	Version        int      `json:"version"`
-	NICBaro        int      `json:"nic_baro"`
-	NACP           int      `json:"nac_p"`
-	NACV           int      `json:"nac_v"`
-	SIL            int      `json:"sil"`
-	SILType        string   `json:"sil_type"`
-	GVA            int      `json:"gva"`
-	SDA            int      `json:"sda"`
-	Alert          int      `json:"alert"`
-	SPI            int      `json:"spi"`
-	MLAT           []string `json:"mlat"`
-	TISB           []string `json:"tisb"`
-	Messages       int      `json:"messages"`
-	Seen           float64  `json:"seen"`
-	RSSI           float64  `json:"rssi"`
-	SourceType     string   `json:"source_type,omitempty"` // Indicates whether data came from "local" or "external" source
+	Hex            string             `json:"hex"`
+	Type           string             `json:"type"`
+	Flight         string             `json:"flight"`
+	Registration   string             `json:"r,omitempty"` // External API specific field (r)
+	AircraftType   string             `json:"t,omitempty"` // External API specific field (t)
+	AltBaro        FlexibleFloat64    `json:"alt_baro"`    // Can be "ground" string or numeric
+	AltGeom        FlexibleFloat64    `json:"alt_geom"`    // Can be "ground" string or numeric
+	GS             float64            `json:"gs"`
+	IAS            float64            `json:"ias"`
+	TAS            float64            `json:"tas"`
+	Mach           float64            `json:"mach"`
+	WD             float64            `json:"wd"`
+	WS             float64            `json:"ws"`
+	OAT            float64            `json:"oat"`
+	TAT            float64            `json:"tat"`
+	Track          float64            `json:"track"`
+	TrackRate      float64            `json:"track_rate"`
+	Roll           float64            `json:"roll"`
+	MagHeading     float64            `json:"mag_heading"`
+	TrueHeading    float64            `json:"true_heading"`
+	BaroRate       float64            `json:"baro_rate"`
+	GeomRate       float64            `json:"geom_rate"`
+	Squawk         string             `json:"squawk"`
+	Category       string             `json:"category"`
+	NavQNH         float64            `json:"nav_qnh"`
+	NavAltitudeMCP float64            `json:"nav_altitude_mcp"`
+	NavAltitudeFMS float64            `json:"nav_altitude_fms"`
+	NavHeading     float64            `json:"nav_heading"`
+	Lat            float64            `json:"lat"`
+	Lon            float64            `json:"lon"`
+	NIC            int                `json:"nic"`
+	RC             int                `json:"rc"`
+	SeenPos        float64            `json:"seen_pos"`
+	RDst           float64            `json:"r_dst"`
+	RDir           float64            `json:"r_dir"`
+	Version        int                `json:"version"`
+	NICBaro        int                `json:"nic_baro"`
+	NACP           int                `json:"nac_p"`
+	NACV           int                `json:"nac_v"`
+	SIL            int                `json:"sil"`
+	SILType        string             `json:"sil_type"`
+	GVA            int                `json:"gva"`
+	SDA            int                `json:"sda"`
+	Alert          int                `json:"alert"`
+	SPI            int                `json:"spi"`
+	MLAT           []string           `json:"mlat"`
+	TISB           []string           `json:"tisb"`
+	Messages       int                `json:"messages"`
+	Seen           float64            `json:"seen"`
+	RSSI           float64            `json:"rssi"`
+	ATCDerived     *ATCDerivedMetrics `json:"atc_derived,omitempty"`
+	SourceType     string             `json:"source_type,omitempty"` // Indicates whether data came from "local" or "external" source
+}
+
+// ATCDerivedMetrics represents server-side derived operational metrics for ATC usage.
+// HeadTailwindKt sign: + headwind, - tailwind.
+// CrosswindKt sign: + from right, - from left.
+type ATCDerivedMetrics struct {
+	HeadingSource        string   `json:"heading_source,omitempty"`
+	TrackHeadingErrorDeg *float64 `json:"track_heading_error_deg,omitempty"`
+	HeadTailwindKt       *float64 `json:"head_tailwind_kt,omitempty"`
+	CrosswindKt          *float64 `json:"crosswind_kt,omitempty"`
+	FlightPathAngleDeg   *float64 `json:"flight_path_angle_deg,omitempty"`
+	ClimbGradientFtNm    *float64 `json:"climb_gradient_ft_nm,omitempty"`
+	TurnRateDegSec       *float64 `json:"turn_rate_deg_sec,omitempty"`
+	ETAStationSec        *float64 `json:"eta_station_sec,omitempty"`
 }
 
 // PositionMinimal represents a minimal historical position for map trails
@@ -146,6 +161,7 @@ type Aircraft struct {
 	Hex                string              `json:"hex"`
 	Flight             string              `json:"flight"`
 	Airline            string              `json:"airline"`
+	AirlineCountry     string              `json:"airline_country,omitempty"`
 	Status             string              `json:"status"`
 	LastSeen           time.Time           `json:"last_seen"`
 	OnGround           bool                `json:"on_ground"`
@@ -269,9 +285,9 @@ type AircraftFutureResponse struct {
 type AircraftTracksResponse struct {
 	Hex          string        `json:"hex"`
 	Flight       string        `json:"flight"`
-	Distance     *float64      `json:"distance,omitempty"`     // Distance in NM from station
-	History      []Position    `json:"history"`                // Historical positions
-	Future       []Position    `json:"future"`                 // Future predicted positions
+	Distance     *float64      `json:"distance,omitempty"`      // Distance in NM from station
+	History      []Position    `json:"history"`                 // Historical positions
+	Future       []Position    `json:"future"`                  // Future predicted positions
 	PhaseHistory []PhaseChange `json:"phase_history,omitempty"` // Phase change history (newest first)
 }
 

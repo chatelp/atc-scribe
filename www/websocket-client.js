@@ -7,8 +7,10 @@ class WebSocketClient {
         this.isReconnecting = false;
         this.autoReconnect = false;
         this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 10;
-        this.reconnectDelay = 5000;
+        this.baseReconnectDelay = 1000;
+        this.maxReconnectDelay = 30000;
+        this.reconnectJitterFactor = 0.25;
+        this.intentionalClose = false;
         this.listeners = {
             transcription: [],
             transcription_update: [],
@@ -35,6 +37,15 @@ class WebSocketClient {
 
     // Connect to the WebSocket server
     connect() {
+        // This is an active connect request, not an intentional shutdown
+        this.intentionalClose = false;
+
+        // Prevent duplicate reconnect timers from triggering additional connect() calls
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+
         // Prevent multiple simultaneous connection attempts
         if (this.isReconnecting) {
             console.log('WebSocket: Connection attempt already in progress');
@@ -66,16 +77,16 @@ class WebSocketClient {
             this.isReconnecting = false;
             this._notifyListeners('close', event);
 
-            // Only attempt auto-reconnect if enabled and under max attempts
-            if (this.autoReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+            // Reconnect forever unless intentionally disconnected
+            if (this.autoReconnect && !this.intentionalClose) {
                 this.reconnectAttempts++;
-                console.log(`WebSocket: Attempting reconnect ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+                const delayMs = this._getReconnectDelayMs();
+                console.log(`WebSocket: Attempting reconnect #${this.reconnectAttempts} in ${delayMs}ms`);
 
                 this.reconnectTimeout = setTimeout(() => {
+                    this.reconnectTimeout = null;
                     this.connect();
-                }, this.reconnectDelay);
-            } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                console.error('WebSocket: Max reconnection attempts reached. Stopping auto-reconnect.');
+                }, delayMs);
             }
         };
 
@@ -134,6 +145,15 @@ class WebSocketClient {
         this.connection.addEventListener('message', this._boundMessageHandler);
     }
 
+    _getReconnectDelayMs() {
+        const exponent = Math.max(0, this.reconnectAttempts-1);
+        const exponentialDelay = this.baseReconnectDelay * Math.pow(2, exponent);
+        const cappedDelay = Math.min(this.maxReconnectDelay, exponentialDelay);
+        const jitterRange = cappedDelay * this.reconnectJitterFactor;
+        const jitter = (Math.random() * 2 - 1) * jitterRange;
+        return Math.max(250, Math.round(cappedDelay + jitter));
+    }
+
     // Remove event handlers from connection (prevents memory leaks)
     _removeConnectionHandlers() {
         if (this.connection) {
@@ -161,6 +181,7 @@ class WebSocketClient {
     // Close the WebSocket connection
     disconnect() {
         this.autoReconnect = false; // Disable auto-reconnect when manually disconnecting
+        this.intentionalClose = true;
 
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
@@ -188,6 +209,7 @@ class WebSocketClient {
     // Enable auto-reconnect
     enableAutoReconnect() {
         this.autoReconnect = true;
+        this.intentionalClose = false;
     }
 
     // Disable auto-reconnect

@@ -11,6 +11,12 @@ type AircraftInfo struct {
 	Owner             string
 }
 
+// AirlineInfo represents airline data from airlines.dat (OpenFlights)
+type AirlineInfo struct {
+	Name    string
+	Country string
+}
+
 // AirportInfo represents airport data from airports.csv (OurAirports)
 type AirportInfo struct {
 	ID           int             `json:"id"`

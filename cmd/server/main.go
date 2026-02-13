@@ -50,6 +50,10 @@ func (a *refAdapter) LookupAirline(code string) string {
 	return a.service.LookupAirline(code)
 }
 
+func (a *refAdapter) LookupAirlineCountry(code string) string {
+	return a.service.LookupAirlineCountry(code)
+}
+
 func main() {
 	// Parse command line flags
 	configPath := flag.String("config", "", "Path to configuration file (optional - will search in configs/ and root directory)")

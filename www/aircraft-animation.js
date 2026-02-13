@@ -35,6 +35,9 @@ class AircraftAnimationEngine {
         this.frameTimeHistory = [];
         this.qualityLevel = 1.0;                     // 1.0 = full quality, 0.3 = minimum
         this.isRunning = false;
+        this.measuredFps = 0;
+        this._fpsWindowStart = performance.now();
+        this._fpsFrameCount = 0;
 
         // Pending marker updates for batching
         this.pendingMarkerUpdates = new Map();
@@ -77,6 +80,9 @@ class AircraftAnimationEngine {
         this.lastAnimationTime = performance.now();
         this.lastPhysicsTime = performance.now();
         this.lastCleanupTime = Date.now();
+        this.measuredFps = 0;
+        this._fpsWindowStart = performance.now();
+        this._fpsFrameCount = 0;
 
         // Start RAF loop
         this.rafLoop();
@@ -102,6 +108,9 @@ class AircraftAnimationEngine {
         // Clear all aircraft states
         this.aircraftStates.clear();
         this.pendingMarkerUpdates.clear();
+        this.measuredFps = 0;
+        this._fpsWindowStart = performance.now();
+        this._fpsFrameCount = 0;
     }
 
     // Reset CSS transforms on all markers
@@ -186,6 +195,15 @@ class AircraftAnimationEngine {
             // Performance monitoring
             const processingTime = performance.now() - startTime;
             this.performanceMonitor.recordFrameTime(processingTime);
+
+            // Measured FPS over a 1-second rolling window
+            this._fpsFrameCount++;
+            const fpsElapsedMs = now - this._fpsWindowStart;
+            if (fpsElapsedMs >= 1000) {
+                this.measuredFps = (this._fpsFrameCount * 1000) / fpsElapsedMs;
+                this._fpsFrameCount = 0;
+                this._fpsWindowStart = now;
+            }
 
             // Adaptive performance adjustment
             if (this.config.adaptivePerformance) {
@@ -578,6 +596,26 @@ class AircraftAnimationEngine {
         if (!this.mapManager || !this.mapManager.map) {
             return Object.values(this.store.aircraft || {});
         }
+
+        // Fast path: use precomputed visible set from MapManager (updated on move/zoom)
+        const precomputedVisibleSet = this.store.visibleAircraftOnMap;
+        if (precomputedVisibleSet && precomputedVisibleSet.size > 0) {
+            const visibleAircraft = [];
+            for (const hex of precomputedVisibleSet) {
+                const aircraft = this.store.aircraft?.[hex];
+                if (!aircraft) continue;
+                if (aircraft.status === 'signal_lost') continue;
+                visibleAircraft.push(aircraft);
+            }
+
+            // Always include selected aircraft even if currently outside viewport
+            const selected = this.store.selectedAircraft;
+            if (selected && selected.hex && !precomputedVisibleSet.has(selected.hex) && selected.status !== 'signal_lost') {
+                visibleAircraft.push(selected);
+            }
+
+            return visibleAircraft;
+        }
         
         const bounds = this.mapManager.map.getBounds();
         const currentZoom = this.mapManager.map.getZoom();
@@ -616,6 +654,7 @@ class AircraftAnimationEngine {
             isRunning: this.isRunning,
             aircraftCount: this.aircraftStates.size,
             qualityLevel: this.qualityLevel,
+            measuredFps: this.measuredFps,
             averageFrameTime: this.performanceMonitor.getAverageFrameTime(),
             config: this.config
         };
