@@ -1,5 +1,16 @@
-// WebSocket Client for Co-ATC
+/**
+ * WebSocket client for Co-ATC realtime streams.
+ *
+ * Responsibilities:
+ * - Maintain a single WebSocket connection.
+ * - Dispatch typed message events to local listeners.
+ * - Reconnect indefinitely with exponential backoff + jitter.
+ * - Surface connection state and reconnect telemetry for UI.
+ */
 class WebSocketClient {
+    /**
+     * @param {string} url WebSocket endpoint URL.
+     */
     constructor(url) {
         this.url = url;
         this.connection = null;
@@ -10,49 +21,59 @@ class WebSocketClient {
         this.baseReconnectDelay = 1000;
         this.maxReconnectDelay = 30000;
         this.reconnectJitterFactor = 0.25;
+        this.connectTimeoutMs = 10000;
         this.intentionalClose = false;
+        this.connectionState = 'idle'; // idle | connecting | connected | reconnecting | closed
+        this.nextReconnectDelayMs = null;
+        this._connectTimeoutHandle = null;
         this.listeners = {
             transcription: [],
             transcription_update: [],
             aircraft: [],
-            aircraft_added: [],         // NEW
-            aircraft_update: [],        // NEW
-            aircraft_removed: [],       // NEW
-            aircraft_bulk_response: [], // NEW - for bulk data responses
-            status_update: [], // Add new listener type for status updates
-            phase_change: [], // Add new listener type for phase changes
-            clearance_issued: [], // Add new listener type for clearance events
-            frequency_status: [], // Frequency connection status changes
+            aircraft_added: [],
+            aircraft_update: [],
+            aircraft_removed: [],
+            aircraft_bulk_response: [],
+            status_update: [],
+            phase_change: [],
+            clearance_issued: [],
+            frequency_status: [],
+            state_change: [],
+            reconnect_scheduled: [],
             open: [],
             close: [],
             error: []
         };
 
-        // Bound event handlers for proper cleanup
         this._boundOpenHandler = null;
         this._boundCloseHandler = null;
         this._boundErrorHandler = null;
         this._boundMessageHandler = null;
     }
 
-    // Connect to the WebSocket server
+    /**
+     * Connect (or reconnect) the socket.
+     *
+     * Behavior:
+     * - Clears pending reconnect timers.
+     * - Prevents concurrent connect attempts.
+     * - Replaces any existing socket instance.
+     * - Starts a watchdog timeout for stuck CONNECTING states.
+     */
     connect() {
-        // This is an active connect request, not an intentional shutdown
         this.intentionalClose = false;
 
-        // Prevent duplicate reconnect timers from triggering additional connect() calls
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
         }
+        this.nextReconnectDelayMs = null;
 
-        // Prevent multiple simultaneous connection attempts
         if (this.isReconnecting) {
             console.log('WebSocket: Connection attempt already in progress');
             return;
         }
 
-        // Close existing connection and cleanup handlers
         if (this.connection) {
             this._removeConnectionHandlers();
             this.connection.close();
@@ -60,48 +81,67 @@ class WebSocketClient {
         }
 
         this.isReconnecting = true;
+        this._setConnectionState('connecting');
 
-        // Create new WebSocket connection
         this.connection = new WebSocket(this.url);
 
-        // Create bound handlers for proper cleanup later
+        this._clearConnectTimeout();
+        this._connectTimeoutHandle = setTimeout(() => {
+            if (this.connection && this.connection.readyState === WebSocket.CONNECTING) {
+                console.warn('WebSocket: connect timeout reached, forcing reconnect');
+                try {
+                    this.connection.close();
+                } catch (error) {
+                    console.error('WebSocket: failed to close timed-out socket', error);
+                }
+            }
+        }, this.connectTimeoutMs);
+
         this._boundOpenHandler = (event) => {
             console.log('WebSocket connection established');
             this.isReconnecting = false;
-            this.reconnectAttempts = 0; // Reset retry counter
+            this.reconnectAttempts = 0;
+            this.nextReconnectDelayMs = null;
+            this._clearConnectTimeout();
+            this._setConnectionState('connected');
             this._notifyListeners('open', event);
         };
 
         this._boundCloseHandler = (event) => {
             console.log('WebSocket connection closed');
             this.isReconnecting = false;
+            this._clearConnectTimeout();
             this._notifyListeners('close', event);
 
-            // Reconnect forever unless intentionally disconnected
             if (this.autoReconnect && !this.intentionalClose) {
                 this.reconnectAttempts++;
                 const delayMs = this._getReconnectDelayMs();
+                this.nextReconnectDelayMs = delayMs;
+                this._setConnectionState('reconnecting');
+                this._notifyListeners('reconnect_scheduled', {
+                    attempt: this.reconnectAttempts,
+                    delayMs: delayMs,
+                });
                 console.log(`WebSocket: Attempting reconnect #${this.reconnectAttempts} in ${delayMs}ms`);
 
                 this.reconnectTimeout = setTimeout(() => {
                     this.reconnectTimeout = null;
                     this.connect();
                 }, delayMs);
+            } else {
+                this._setConnectionState('closed');
             }
         };
 
         this._boundErrorHandler = (event) => {
             console.error('WebSocket error:', event);
-            this.isReconnecting = false;
             this._notifyListeners('error', event);
         };
 
         this._boundMessageHandler = (event) => {
-            // Process messages directly - no setTimeout to avoid event loop flooding
             try {
                 const message = JSON.parse(event.data);
 
-                // Handle aircraft streaming messages
                 if (message.type === 'aircraft_added') {
                     this._notifyListeners('aircraft_added', message.data);
                 } else if (message.type === 'aircraft_update') {
@@ -116,14 +156,12 @@ class WebSocketClient {
                     this._notifyListeners('transcription_update', message.data);
                 } else if (message.type === 'aircraft') {
                     if (message.data && message.data.movement) {
-                        // Call the Alpine.js store method to handle the aircraft message
                         if (window.Alpine && Alpine.store('atc')) {
                             Alpine.store('atc').handleAircraftMessage(message.data);
                         }
                     }
                     this._notifyListeners('aircraft', message.data);
                 } else if (message.type === 'status_update') {
-                    // Call the Alpine.js store method to handle the status update
                     if (window.Alpine && Alpine.store('atc')) {
                         Alpine.store('atc').handleStatusUpdateMessage(message.data);
                     }
@@ -138,13 +176,16 @@ class WebSocketClient {
             }
         };
 
-        // Add event listeners
         this.connection.addEventListener('open', this._boundOpenHandler);
         this.connection.addEventListener('close', this._boundCloseHandler);
         this.connection.addEventListener('error', this._boundErrorHandler);
         this.connection.addEventListener('message', this._boundMessageHandler);
     }
 
+    /**
+     * Compute the next reconnect delay using capped exponential backoff with jitter.
+     * @returns {number} Delay in milliseconds.
+     */
     _getReconnectDelayMs() {
         const exponent = Math.max(0, this.reconnectAttempts-1);
         const exponentialDelay = this.baseReconnectDelay * Math.pow(2, exponent);
@@ -154,7 +195,44 @@ class WebSocketClient {
         return Math.max(250, Math.round(cappedDelay + jitter));
     }
 
-    // Remove event handlers from connection (prevents memory leaks)
+    /**
+     * Update connection state and emit a `state_change` event when state changes.
+     * @param {'idle'|'connecting'|'connected'|'reconnecting'|'closed'} state
+     */
+    _setConnectionState(state) {
+        if (this.connectionState === state) {
+            return;
+        }
+        this.connectionState = state;
+        this._notifyListeners('state_change', this.getConnectionStatus());
+    }
+
+    /**
+     * Clear the connect watchdog timer.
+     */
+    _clearConnectTimeout() {
+        if (this._connectTimeoutHandle) {
+            clearTimeout(this._connectTimeoutHandle);
+            this._connectTimeoutHandle = null;
+        }
+    }
+
+    /**
+     * Snapshot current connection/reconnect status for UI and diagnostics.
+     * @returns {{state: string, reconnectAttempts: number, nextRetryDelayMs: number|null, autoReconnect: boolean}}
+     */
+    getConnectionStatus() {
+        return {
+            state: this.connectionState,
+            reconnectAttempts: this.reconnectAttempts,
+            nextRetryDelayMs: this.nextReconnectDelayMs,
+            autoReconnect: this.autoReconnect,
+        };
+    }
+
+    /**
+     * Detach all event handlers from the current socket and clear handler references.
+     */
     _removeConnectionHandlers() {
         if (this.connection) {
             if (this._boundOpenHandler) {
@@ -171,24 +249,27 @@ class WebSocketClient {
             }
         }
 
-        // Clear references
         this._boundOpenHandler = null;
         this._boundCloseHandler = null;
         this._boundErrorHandler = null;
         this._boundMessageHandler = null;
+
+        this._clearConnectTimeout();
     }
 
-    // Close the WebSocket connection
+    /**
+     * Intentionally close the connection and disable automatic reconnect.
+     */
     disconnect() {
-        this.autoReconnect = false; // Disable auto-reconnect when manually disconnecting
+        this.autoReconnect = false;
         this.intentionalClose = true;
+        this.nextReconnectDelayMs = null;
 
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
         }
 
-        // Remove event handlers before closing to prevent memory leaks
         this._removeConnectionHandlers();
 
         if (this.connection) {
@@ -197,46 +278,67 @@ class WebSocketClient {
         }
 
         this.isReconnecting = false;
+        this._setConnectionState('idle');
     }
 
-    // Clear all custom event listeners (for cleanup on page unload)
+    /**
+     * Remove all registered listeners for every event type.
+     */
     clearAllListeners() {
         Object.keys(this.listeners).forEach(type => {
             this.listeners[type] = [];
         });
     }
 
-    // Enable auto-reconnect
+    /**
+     * Enable automatic reconnect after non-intentional disconnects.
+     */
     enableAutoReconnect() {
         this.autoReconnect = true;
         this.intentionalClose = false;
     }
 
-    // Disable auto-reconnect
+    /**
+     * Disable automatic reconnect.
+     */
     disableAutoReconnect() {
         this.autoReconnect = false;
     }
 
-    // Reset reconnection attempts
+    /**
+     * Reset reconnect telemetry counters.
+     */
     resetReconnectAttempts() {
         this.reconnectAttempts = 0;
+        this.nextReconnectDelayMs = null;
     }
 
-    // Add event listener
+    /**
+     * Register an event listener for a supported message/event type.
+     * @param {string} type
+     * @param {(data: any) => void} callback
+     */
     addEventListener(type, callback) {
         if (this.listeners[type]) {
             this.listeners[type].push(callback);
         }
     }
 
-    // Remove event listener
+    /**
+     * Remove a previously registered listener callback.
+     * @param {string} type
+     * @param {(data: any) => void} callback
+     */
     removeEventListener(type, callback) {
         if (this.listeners[type]) {
             this.listeners[type] = this.listeners[type].filter(cb => cb !== callback);
         }
     }
 
-    // Method to request bulk aircraft data via WebSocket
+    /**
+     * Request a bulk aircraft payload from the server.
+     * @param {Object} [filters={}] Optional server-side filter object.
+     */
     requestBulkAircraftData(filters = {}) {
         if (this.connection && this.connection.readyState === WebSocket.OPEN) {
             const message = {
@@ -253,10 +355,11 @@ class WebSocketClient {
         }
     }
 
-    // Note: updateFilters method removed - server-side filtering is no longer used.
-    // All filtering is done client-side.
-
-    // Notify all listeners of an event
+    /**
+     * Emit an internal event to all subscribers.
+     * @param {string} type
+     * @param {any} data
+     */
     _notifyListeners(type, data) {
         if (this.listeners[type]) {
             this.listeners[type].forEach(callback => {

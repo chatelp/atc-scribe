@@ -1,5 +1,16 @@
-// Audio Client for Co-ATC
+/**
+ * Audio streaming client for Co-ATC.
+ *
+ * Responsibilities:
+ * - Prepare and manage per-frequency HTMLAudioElement streams.
+ * - Maintain Web Audio analyser pipelines for UI visualization.
+ * - Provide mute/unmute and playback orchestration helpers.
+ * - Track time since last significant audio per frequency.
+ */
 class AudioClient {
+    /**
+     * @param {Object} store Alpine store instance.
+     */
     constructor(store) {
         this.store = store;
         this.audioContext = null;
@@ -11,8 +22,20 @@ class AudioClient {
         this.userSetVolumes = {};
         this.lastSignificantAudioTime = {};
         this.secondsSinceLastAudio = {};
+
+        this.mutedVolume = 0.01;
+        this.defaultVolume = 1.0;
+        this.visualizationTargetFps = 30;
+        this.significantAudioThresholdUnmuted = 0.10;
+        this.significantAudioThresholdMuted = 0.02;
+        this.visualizerMultiplierUnmuted = 150;
+        this.visualizerMultiplierMutedFactor = 5;
     }
 
+    /**
+     * Initialize and cache the AudioContext.
+     * @returns {AudioContext|null}
+     */
     initAudioContext() {
         if (!this.audioContext) {
             try {
@@ -25,126 +48,136 @@ class AudioClient {
         return this.audioContext;
     }
 
+    /**
+     * Ensure a frequency stream is prepared with element, source URL, and analyser pipeline.
+     * @param {{id: string|number, stream_port?: number|string, stream_url?: string}} frequency
+     */
     prepareFrequency(frequency) {
-        if (this.audioElements[frequency.id]?.element) {
-            console.log(`Frequency ${frequency.id} already prepared.`);
+        const frequencyId = this._normalizeFrequencyId(frequency?.id);
+        if (!frequencyId) {
+            console.error('prepareFrequency: missing frequency.id');
             return;
         }
-        console.log(`Preparing frequency: ${frequency.id}`);
+
+        if (this.audioElements[frequencyId]?.element) {
+            return;
+        }
+
+        console.log(`Preparing frequency: ${frequencyId}`);
         this.initAudioContext();
 
         const audioElement = document.createElement('audio');
-        audioElement.crossOrigin = "anonymous";
-        audioElement.preload = "metadata";
+        audioElement.crossOrigin = 'anonymous';
+        audioElement.preload = 'metadata';
+        audioElement.playsInline = true;
 
-        if (this.userSetVolumes === undefined) this.userSetVolumes = {};
-        this.userSetVolumes[frequency.id] = this.userSetVolumes[frequency.id] || 1.0;
+        this.userSetVolumes[frequencyId] = this.userSetVolumes[frequencyId] || this.defaultVolume;
 
-        // Build the stream URL using the current hostname and the port from the API
-        const streamPort = frequency.stream_port || window.location.port;
-        const streamPath = frequency.stream_url;
-        let streamUrl = `${window.location.protocol}//${window.location.hostname}:${streamPort}${streamPath}`;
-
-        if (streamUrl.includes('CLIENT_ID')) {
-            streamUrl = streamUrl.replace('CLIENT_ID', this.store.clientID);
-        } else {
-            streamUrl = `${streamUrl}?id=${this.store.clientID}`;
+        const streamUrl = this._buildStreamUrl(frequency);
+        if (!streamUrl) {
+            console.error(`prepareFrequency: invalid stream URL for ${frequencyId}`);
+            return;
         }
 
         audioElement.addEventListener('error', (e) => {
-            console.error(`Audio error for ${frequency.id}:`, e.target.error ? e.target.error.message : 'Unknown error');
+            const message = e.target && e.target.error ? e.target.error.message : 'Unknown error';
+            console.error(`Audio error for ${frequencyId}:`, message);
         });
         audioElement.addEventListener('playing', () => {
-            console.log(`Audio playing for ${frequency.id}`);
-            if (!this.visualizationFrameIds[frequency.id]) {
-                this.startVisualization(frequency.id);
+            if (!this.visualizationFrameIds[frequencyId]) {
+                this.startVisualization(frequencyId);
             }
         });
         audioElement.addEventListener('pause', () => {
-            console.log(`Audio paused for ${frequency.id}`);
-            // PERFORMANCE: Stop visualization when audio is paused to save CPU
-            this.cleanupVisualization(frequency.id);
+            this.cleanupVisualization(frequencyId);
         });
 
-        this.audioElements[frequency.id] = {
+        this.audioElements[frequencyId] = {
             element: audioElement,
             intendedSrc: streamUrl,
             isPrepared: true
         };
         
-        this.setupVisualization(frequency.id, audioElement);
+        this.setupVisualization(frequencyId, audioElement);
     }
 
+    /**
+     * Connect and start playback for a prepared frequency stream.
+     * @param {{id: string|number}} frequency
+     */
     connectToFrequency(frequency) {
-        if (!this.audioElements[frequency.id]?.element) {
-            console.warn(`Audio element for ${frequency.id} not found during connect. Preparing now.`);
+        const frequencyId = this._normalizeFrequencyId(frequency?.id);
+        if (!frequencyId) {
+            console.error('connectToFrequency: missing frequency.id');
+            return;
+        }
+
+        if (!this.audioElements[frequencyId]?.element) {
+            console.warn(`Audio element for ${frequencyId} not found during connect. Preparing now.`);
             this.prepareFrequency(frequency);
         }
         
-        const audioInfo = this.audioElements[frequency.id];
+        const audioInfo = this.audioElements[frequencyId];
         if (!audioInfo || !audioInfo.element || !audioInfo.intendedSrc) {
-            console.error(`Audio info incomplete for frequency: ${frequency.id}. Cannot connect.`);
+            console.error(`Audio info incomplete for frequency: ${frequencyId}. Cannot connect.`);
             return;
         }
 
         const audioElement = audioInfo.element;
         const intendedSrc = audioInfo.intendedSrc;
 
-        // Set volume first
-        audioElement.volume = this.store.unmutedFrequencies.has(frequency.id) ? (this.userSetVolumes[frequency.id] || 1.0) : 0.01;
+        audioElement.volume = this.store.unmutedFrequencies.has(frequencyId)
+            ? (this.userSetVolumes[frequencyId] || this.defaultVolume)
+            : this.mutedVolume;
 
         if (audioElement.currentSrc !== intendedSrc) {
-            console.log(`Setting src for ${frequency.id} to ${intendedSrc}`);
             audioElement.src = intendedSrc;
         }
 
-        if (!this.visualizationFrameIds[frequency.id] && this.audioAnalysers[frequency.id]) {
-            this.startVisualization(frequency.id);
+        if (!this.visualizationFrameIds[frequencyId] && this.audioAnalysers[frequencyId]) {
+            this.startVisualization(frequencyId);
         }
-        
-        console.log(`ConnectToFrequency: Attempting to load and play ${frequency.id}`);
-        
-        // Avoid calling load() if the element is already loading or has loaded the correct source
+
         if (audioElement.readyState === 0 || audioElement.currentSrc !== intendedSrc) {
             audioElement.load();
         }
-        
-        // Only attempt to play if not already playing or attempting to play
-        if (audioElement.paused && audioElement.readyState !== 1) { // readyState 1 = HAVE_METADATA (loading)
+
+        if (audioElement.paused) {
             const playPromise = audioElement.play();
             
             if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    // 'playing' event in prepareFrequency handles the main playing log
-                }).catch(error => {
-                    // Only log if it's not an AbortError (which is expected in some cases)
+                playPromise.catch(error => {
                     if (error.name !== 'AbortError') {
-                        console.error(`Error invoking play for ${frequency.id}:`, error);
+                        console.error(`Error invoking play for ${frequencyId}:`, error);
                     }
                 });
             }
         }
     }
 
+    /**
+     * Start playback attempts across all known radio frequencies.
+     */
     startAllRadios() {
         if (this.store.radiosStarted) {
-            console.log("Radios play command already issued.");
             return;
         }
-        console.log("Issuing play command for all prepared radio frequencies...");
+
         this.store.radiosStarted = true; 
-        this.initAudioContext();
+        const context = this.initAudioContext();
+        if (!context) {
+            console.error('startAllRadios: AudioContext unavailable');
+            return;
+        }
 
         const resumeContextAndPlay = () => {
             this.store.audioFrequencies.forEach(freq => {
                 this.connectToFrequency(freq);
             });
-            console.log("Finished issuing play commands for all radio frequencies.");
         };
 
-        if (this.audioContext.state === 'suspended') {
-            this.audioContext.resume().then(() => {
-                console.log("AudioContext resumed successfully");
+        if (context.state === 'suspended') {
+            context.resume().then(() => {
                 resumeContextAndPlay();
             }).catch(e => {
                 console.error("Error resuming audio context:", e);
@@ -155,20 +188,20 @@ class AudioClient {
         }
     }
 
+    /**
+     * Create analyser pipeline for a given frequency.
+     * @param {string} frequencyId
+     * @param {HTMLAudioElement} audioElement
+     */
     setupVisualization(frequencyId, audioElement) {
         if (!this.audioContext) {
-            console.warn("AudioContext not initialized. Skipping visualization setup for", frequencyId);
             return;
         }
 
-        if (this.sourceNodes[frequencyId]) {
-            try { this.sourceNodes[frequencyId].disconnect(); } catch (e) { /* ignore */ }
-            delete this.sourceNodes[frequencyId];
-        }
-        if (this.audioAnalysers[frequencyId]) {
-            try { this.audioAnalysers[frequencyId].disconnect(); } catch (e) { /* ignore */ }
-            delete this.audioAnalysers[frequencyId];
-        }
+        this._safeDisconnectNode(this.sourceNodes[frequencyId]);
+        this._safeDisconnectNode(this.audioAnalysers[frequencyId]);
+        delete this.sourceNodes[frequencyId];
+        delete this.audioAnalysers[frequencyId];
 
         try {
             const sourceNode = this.audioContext.createMediaElementSource(audioElement);
@@ -183,38 +216,26 @@ class AudioClient {
 
             sourceNode.connect(analyserNode);
             analyserNode.connect(this.audioContext.destination);
-            
-            console.log(`Visualization (analyser direct to destination) set up for frequency: ${frequencyId}`);
         } catch (e) {
             console.error(`Error setting up visualization for ${frequencyId}:`, e);
-            if (this.sourceNodes[frequencyId]) { try {this.sourceNodes[frequencyId].disconnect();} catch(err){} delete this.sourceNodes[frequencyId];}
-            if (this.audioAnalysers[frequencyId]) { try {this.audioAnalysers[frequencyId].disconnect();} catch(err){} delete this.audioAnalysers[frequencyId];}
+            this._safeDisconnectNode(this.sourceNodes[frequencyId]);
+            this._safeDisconnectNode(this.audioAnalysers[frequencyId]);
+            delete this.sourceNodes[frequencyId];
+            delete this.audioAnalysers[frequencyId];
         }
     }
 
+    /**
+     * Start bar visualization animation loop for a frequency.
+     * @param {string} frequencyId
+     */
     startVisualization(frequencyId) {
         if (this.visualizationFrameIds[frequencyId]) return;
-        
-        console.log(`Starting visualization for frequency: ${frequencyId}`);
-        
+
         let lastFrameTime = 0;
-        const targetFPS = 30; // Limit to 30 FPS instead of 60
-        const frameInterval = 1000 / targetFPS;
-        
-        const generateDummyData = () => {
-            const result = new Uint8Array(128);
-            for (let i = 0; i < result.length; i++) {
-                if (i > 5 && i < 40) {
-                    result[i] = Math.random() * 50;
-                } else {
-                    result[i] = Math.random() * 20;
-                }
-            }
-            return result;
-        };
+        const frameInterval = 1000 / this.visualizationTargetFps;
         
         const renderFrame = (currentTime) => {
-            // Throttle frame rate
             if (currentTime - lastFrameTime < frameInterval) {
                 this.visualizationFrameIds[frequencyId] = requestAnimationFrame(renderFrame);
                 return;
@@ -232,9 +253,8 @@ class AudioClient {
             try {
                 analyser.getByteFrequencyData(dataArray);
             } catch (e) {
-                const dummyData = generateDummyData();
-                for (let i = 0; i < Math.min(dataArray.length, dummyData.length); i++) {
-                    dataArray[i] = dummyData[i];
+                for (let i = 0; i < dataArray.length; i++) {
+                    dataArray[i] = 0;
                 }
             }
             
@@ -249,15 +269,13 @@ class AudioClient {
             
             const audioLevel = totalPoints > 0 ? (totalSum / totalPoints) / 255 : 0;
 
-            let significantAudioThreshold = 0.10; // Default threshold
-            
-            const unmutedMultiplier = 150; 
-            let visualizerMultiplier = unmutedMultiplier;
-            
-            if (!this.store.unmutedFrequencies.has(frequencyId)) { 
-                visualizerMultiplier = unmutedMultiplier * 5;
-                significantAudioThreshold = 0.02; // Lower threshold for muted frequencies
-            }
+            const isUnmuted = this.store.unmutedFrequencies.has(frequencyId);
+            const significantAudioThreshold = isUnmuted
+                ? this.significantAudioThresholdUnmuted
+                : this.significantAudioThresholdMuted;
+            const visualizerMultiplier = isUnmuted
+                ? this.visualizerMultiplierUnmuted
+                : (this.visualizerMultiplierUnmuted * this.visualizerMultiplierMutedFactor);
 
             if (audioLevel >= significantAudioThreshold) {
                 this.lastSignificantAudioTime[frequencyId] = Date.now();
@@ -274,12 +292,7 @@ class AudioClient {
                 const newWidth = (currentWidth * smoothingFactor) + (widthPercentage * (1 - smoothingFactor));
                 
                 barElement.style.width = newWidth + '%';
-                
-                if (this.store.unmutedFrequencies.has(frequencyId)) {
-                    barElement.style.backgroundColor = '#4CAF50';
-                } else {
-                    barElement.style.backgroundColor = '#888888';
-                }
+                barElement.style.backgroundColor = isUnmuted ? '#4CAF50' : '#888888';
                 
                 barElement.style.opacity = '1';
             }
@@ -290,6 +303,10 @@ class AudioClient {
         this.visualizationFrameIds[frequencyId] = requestAnimationFrame(renderFrame);
     }
 
+    /**
+     * Stop visualization animation for a frequency.
+     * @param {string} frequencyId
+     */
     cleanupVisualization(frequencyId) {
         if (this.visualizationFrameIds[frequencyId]) {
             cancelAnimationFrame(this.visualizationFrameIds[frequencyId]);
@@ -300,61 +317,73 @@ class AudioClient {
         }
     }
 
+    /**
+     * Toggle mute state for a frequency while preserving user-set volume.
+     * @param {{id: string|number}} frequency
+     */
     toggleMute(frequency) {
         if (!this.store.radiosStarted) {
             this.startAllRadios();
         }
 
-        const audioInfo = this.audioElements[frequency.id];
-        if (!audioInfo || !audioInfo.element) {
-            console.error(`No audio element found for frequency: ${frequency.id} in toggleMute.`);
-            this.prepareFrequency(frequency);
-            setTimeout(() => this.toggleMute(frequency), 250); 
+        const frequencyId = this._normalizeFrequencyId(frequency?.id);
+        if (!frequencyId) {
+            console.error('toggleMute: missing frequency.id');
             return;
+        }
+
+        let audioInfo = this.audioElements[frequencyId];
+        if (!audioInfo || !audioInfo.element) {
+            this.prepareFrequency(frequency);
+            audioInfo = this.audioElements[frequencyId];
+            if (!audioInfo || !audioInfo.element) {
+                console.error(`No audio element found for frequency: ${frequencyId} in toggleMute.`);
+                return;
+            }
         }
         const audioElement = audioInfo.element;
 
-        const isCurrentlyUnmuted = this.store.unmutedFrequencies.has(frequency.id);
+        const isCurrentlyUnmuted = this.store.unmutedFrequencies.has(frequencyId);
 
         if (isCurrentlyUnmuted) {
-            this.userSetVolumes[frequency.id] = audioElement.volume > 0.01 ? audioElement.volume : 1.0;
-            audioElement.volume = 0.01;
-            this.store.unmutedFrequencies.delete(frequency.id);
-            console.log(`Muted frequency: ${frequency.id} (audioElement.volume: 0.01)`);
+            this.userSetVolumes[frequencyId] = audioElement.volume > this.mutedVolume ? audioElement.volume : this.defaultVolume;
+            audioElement.volume = this.mutedVolume;
+            this.store.unmutedFrequencies.delete(frequencyId);
         } else {
-            audioElement.volume = this.userSetVolumes[frequency.id] || 1.0;
-            this.store.unmutedFrequencies.add(frequency.id);
-            console.log(`Unmuted frequency: ${frequency.id} (audioElement.volume: ${audioElement.volume.toFixed(2)})`);
+            audioElement.volume = this.userSetVolumes[frequencyId] || this.defaultVolume;
+            this.store.unmutedFrequencies.add(frequencyId);
         }
 
-        if (audioElement.paused && this.store.unmutedFrequencies.has(frequency.id) && this.store.radiosStarted) {
-            console.log(`Audio for ${frequency.id} was paused, attempting to play after unmute.`);
+        if (audioElement.paused && this.store.unmutedFrequencies.has(frequencyId) && this.store.radiosStarted) {
             setTimeout(() => {
-                if (audioElement.paused && this.store.unmutedFrequencies.has(frequency.id)) {
+                if (audioElement.paused && this.store.unmutedFrequencies.has(frequencyId)) {
                     audioElement.play().catch(err => {
-                        console.error(`Error playing audio for ${frequency.id} after unmute:`, err);
+                        if (err.name !== 'AbortError') {
+                            console.error(`Error playing audio for ${frequencyId} after unmute:`, err);
+                        }
                     });
                 }
             }, 100);
         }
     }
 
+    /**
+     * Release all resources for a frequency.
+     * @param {string} frequencyId
+     */
     cleanupFrequency(frequencyId) {
-        if (this.visualizationFrameIds[frequencyId]) {
-            cancelAnimationFrame(this.visualizationFrameIds[frequencyId]);
-            delete this.visualizationFrameIds[frequencyId];
-        }
-        if (this.audioAnalysers[frequencyId]) {
-            try { this.audioAnalysers[frequencyId].disconnect(); } catch(e) { /* ignore */ }
-            delete this.audioAnalysers[frequencyId];
-        }
-        if (this.sourceNodes[frequencyId]) {
-            try { this.sourceNodes[frequencyId].disconnect(); } catch(e) { /* ignore */ }
-            delete this.sourceNodes[frequencyId];
-        }
+        this.cleanupVisualization(frequencyId);
+
+        this._safeDisconnectNode(this.audioAnalysers[frequencyId]);
+        this._safeDisconnectNode(this.sourceNodes[frequencyId]);
+
+        delete this.audioAnalysers[frequencyId];
+        delete this.sourceNodes[frequencyId];
+
         if (this.audioDataArrays[frequencyId]) {
             delete this.audioDataArrays[frequencyId];
         }
+
         if (this.audioElements[frequencyId]) {
             const audioElement = this.audioElements[frequencyId].element;
             if (audioElement) {
@@ -363,40 +392,45 @@ class AudioClient {
             }
             delete this.audioElements[frequencyId];
         }
+
         delete this.lastSignificantAudioTime[frequencyId];
         delete this.secondsSinceLastAudio[frequencyId];
     }
 
+    /**
+     * Update `seconds since last audio` values in the provided store-backed object.
+     * @param {Object} storeSecondsSinceLastAudio
+     */
     updateSecondsSinceLastAudio(storeSecondsSinceLastAudio) {
         if (!storeSecondsSinceLastAudio) {
             console.warn("AudioClient: storeSecondsSinceLastAudio object not provided for update.");
             return;
         }
+
         Object.keys(this.audioElements).forEach(frequencyId => {
             if (this.audioElements[frequencyId]?.element && this.lastSignificantAudioTime[frequencyId]) {
                 const seconds = Math.floor((Date.now() - this.lastSignificantAudioTime[frequencyId]) / 1000);
-                // Update the store's object directly
                 storeSecondsSinceLastAudio[frequencyId] = `${seconds}s`;
             } else if (this.audioElements[frequencyId]?.element && !this.lastSignificantAudioTime[frequencyId]) {
-                // Update the store's object directly
                 storeSecondsSinceLastAudio[frequencyId] = '--s'; 
             }
         });
     }
 
+    /**
+     * Play the Airbus retard callout sound.
+     */
     playRetardSound() {
         if (!this.audioContext) {
             this.initAudioContext();
         }
-        // Check if AudioContext is successfully initialized
         if (!this.audioContext) {
             console.error("AudioContext could not be initialized. Cannot play retard sound.");
             return;
         }
-        // Resume AudioContext if it's suspended (e.g., due to browser autoplay policies)
+
         if (this.audioContext.state === 'suspended') {
             this.audioContext.resume().then(() => {
-                console.log("AudioContext resumed for retard sound.");
                 this._playRetardSoundInternal();
             }).catch(e => {
                 console.error("Error resuming AudioContext for retard sound:", e);
@@ -406,15 +440,74 @@ class AudioClient {
         }
     }
 
+    /**
+     * Internal helper for playing the static retard sound file.
+     */
     _playRetardSoundInternal() {
         const retardSound = new Audio('/sounds/airbus_retard.mp3');
         retardSound.play()
-            .then(() => {
-                console.log("Playing airbus_retard.mp3");
-            })
             .catch(error => {
                 console.error("Error playing airbus_retard.mp3:", error);
             });
+    }
+
+    /**
+     * Build a frequency stream URL and attach the client id.
+     * @param {{stream_port?: number|string, stream_url?: string}} frequency
+     * @returns {string|null}
+     */
+    _buildStreamUrl(frequency) {
+        const streamPath = typeof frequency?.stream_url === 'string' ? frequency.stream_url : '';
+        if (!streamPath) {
+            return null;
+        }
+
+        const streamPort = frequency.stream_port || window.location.port;
+        const base = `${window.location.protocol}//${window.location.hostname}:${streamPort}`;
+
+        let url;
+        try {
+            url = new URL(streamPath, base);
+        } catch {
+            return null;
+        }
+
+        if (url.href.includes('CLIENT_ID')) {
+            return url.href.replace('CLIENT_ID', encodeURIComponent(this.store.clientID));
+        }
+
+        if (!url.searchParams.has('id')) {
+            url.searchParams.set('id', this.store.clientID);
+        }
+
+        return url.toString();
+    }
+
+    /**
+     * Disconnect a Web Audio node safely.
+     * @param {AudioNode|undefined|null} node
+     */
+    _safeDisconnectNode(node) {
+        if (!node) {
+            return;
+        }
+        try {
+            node.disconnect();
+        } catch {
+            // no-op
+        }
+    }
+
+    /**
+     * Normalize frequency id values to string keys.
+     * @param {string|number|undefined|null} frequencyId
+     * @returns {string|null}
+     */
+    _normalizeFrequencyId(frequencyId) {
+        if (frequencyId === undefined || frequencyId === null) {
+            return null;
+        }
+        return String(frequencyId);
     }
 }
 

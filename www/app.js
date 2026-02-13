@@ -32,6 +32,7 @@ const CONFIG = {
 
 // Initialize WebSocket client
 const wsClient = new WebSocketClient(CONFIG.wsUrl);
+window.wsClient = wsClient;
 
 // Declare Audio client - will be initialized in alpine:init
 let audioClient;
@@ -170,6 +171,9 @@ document.addEventListener('alpine:init', () => {
         weatherRefreshInterval: null,
         initialDataLoaded: false,
         connected: null, // null = initial state, true = connected, false = connection lost
+        wsReconnectAttempt: 0,
+        wsNextRetryDelayMs: null,
+        wsConnectionState: 'idle',
         lastUpdate: null,
         settingsCollapsed: true, // Hide settings panel by default
         selectedAircraft: null,
@@ -196,7 +200,6 @@ document.addEventListener('alpine:init', () => {
         transcriptionViewerVisible: {}, // Stores visibility state for each frequency's viewer
         unreadTranscriptions: {}, // Unread count per frequency (only live WS messages while viewer is closed)
         _readDividerId: {}, // ID of the first already-read message when viewer opens with unread
-        isReconnecting: false, // Flag to prevent duplicate reconnection attempts
         frequencyConnectionStatus: {}, // Tracks connection status per frequency (connecting, connected, failed)
 
         // Settings
@@ -2093,9 +2096,9 @@ document.addEventListener('alpine:init', () => {
             }
 
             // Disconnect WebSocket and clear listeners
-            if (window.wsClient) {
-                window.wsClient.clearAllListeners();
-                window.wsClient.disconnect();
+            if (wsClient) {
+                wsClient.clearAllListeners();
+                wsClient.disconnect();
             }
 
             console.log('App cleanup: Complete');
@@ -2539,7 +2542,29 @@ async initAircraftDataSource() {
 },
 
         // Initialize WebSocket connection
-            initWebSocket() {            if (!wsClient) {                console.error("wsClient not available during initWebSocket. This shouldn't happen.");                return;            }            // Always keep reconnect enabled for runtime disconnections            if (wsClient.enableAutoReconnect) {                wsClient.enableAutoReconnect();            }            // Reset reconnect backoff when manually initializing            if (wsClient.resetReconnectAttempts) {                wsClient.resetReconnectAttempts();            }            // Clear all existing listeners from previous initializations            if (wsClient.clearAllListeners) {                wsClient.clearAllListeners();            }
+        initWebSocket() {
+            if (!wsClient) {
+                console.error("wsClient not available during initWebSocket. This shouldn't happen.");
+                return;
+            }
+
+            if (wsClient.enableAutoReconnect) {
+                wsClient.enableAutoReconnect();
+            }
+            if (wsClient.resetReconnectAttempts) {
+                wsClient.resetReconnectAttempts();
+            }
+            if (wsClient.clearAllListeners) {
+                wsClient.clearAllListeners();
+            }
+
+            const updateWsStatus = (status) => {
+                this.wsConnectionState = status?.state || 'idle';
+                this.wsReconnectAttempt = Number.isFinite(status?.reconnectAttempts) ? status.reconnectAttempts : 0;
+                this.wsNextRetryDelayMs = Number.isFinite(status?.nextRetryDelayMs) ? status.nextRetryDelayMs : null;
+            };
+
+            updateWsStatus(wsClient.getConnectionStatus ? wsClient.getConnectionStatus() : null);
 
             // Add event listeners
             wsClient.addEventListener('transcription', (data) => {
@@ -2588,6 +2613,8 @@ async initAircraftDataSource() {
             wsClient.addEventListener('open', () => {
                 console.log('App.js: WebSocket connection now open.');
                 this.connected = true;
+                this.wsReconnectAttempt = 0;
+                this.wsNextRetryDelayMs = null;
                 // Reset the connection lost sound flag when connection is re-established
                 this.connectionLostSoundPlayed = false;
                 
@@ -2612,6 +2639,23 @@ async initAircraftDataSource() {
                 // Note: Reconnection is now handled by WebSocketClient internally
                 // No need to manually initiate reconnection here
             });
+
+            wsClient.addEventListener('state_change', (status) => {
+                updateWsStatus(status);
+
+                if (status?.state === 'reconnecting' || status?.state === 'closed') {
+                    this.connected = false;
+                }
+                if (status?.state === 'connecting' && this.connected === false) {
+                    // keep false while recovering to retain clear UX
+                }
+            });
+
+            wsClient.addEventListener('reconnect_scheduled', (payload) => {
+                this.wsReconnectAttempt = Number.isFinite(payload?.attempt) ? payload.attempt : this.wsReconnectAttempt;
+                this.wsNextRetryDelayMs = Number.isFinite(payload?.delayMs) ? payload.delayMs : this.wsNextRetryDelayMs;
+                this.connected = false;
+            });
             
             wsClient.addEventListener('error', (event) => {
                 console.error('App.js: WebSocket error:', event);
@@ -2623,8 +2667,10 @@ async initAircraftDataSource() {
                 wsClient.connect();
             } else if (wsClient.connection.readyState === WebSocket.CONNECTING) {
                 console.log("App.js: WebSocket is already connecting.");
+                this.connected = null;
             } else if (wsClient.connection.readyState === WebSocket.OPEN) {
                 console.log("App.js: WebSocket is already open.");
+                this.connected = true;
             }
         },
         
