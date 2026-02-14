@@ -584,13 +584,13 @@ func PredictFuturePositions(lat, lon, altBaro, trueHeading, magHeading, speedKno
 		timestamp := now.Add(time.Duration(minutesAhead) * time.Minute)
 
 		predictions[i] = Position{
-			Lat:         newLat,
-			Lon:         newLon,
-			Altitude:    newAltitude,
-			SpeedTrue:   adjustedSpeed,
-			SpeedGS:     adjustedSpeed,
-			TrueHeading: trueHeading, // Assuming constant true heading
-			MagHeading:  magHeading,  // Assuming constant magnetic heading
+			Lat:         NumberPtr(newLat),
+			Lon:         NumberPtr(newLon),
+			Altitude:    NumberPtr(newAltitude),
+			SpeedTrue:   NumberPtr(adjustedSpeed),
+			SpeedGS:     NumberPtr(adjustedSpeed),
+			TrueHeading: NumberPtr(trueHeading), // Assuming constant true heading
+			MagHeading:  NumberPtr(magHeading),  // Assuming constant magnetic heading
 			Timestamp:   timestamp,
 		}
 	}
@@ -686,12 +686,15 @@ func DetectRunwayApproach(lat, lon, heading, altitude float64, runways RunwayDat
 				continue
 			}
 
-			// Calculate runway heading (from opposite threshold to this threshold)
+			// Calculate runway heading — the direction aircraft fly when using this
+			// runway end (from this threshold toward the opposite threshold).
+			// An aircraft approaching runway 05 flies heading ~050°, which matches
+			// the bearing FROM threshold 05 TO threshold 23.
 			var runwayHeading float64
 			oppositeThresholdID := getOppositeThreshold(thresholdID, runwayPair)
 			if oppositeThreshold, exists := thresholds[oppositeThresholdID]; exists {
-				runwayHeading = CalculateBearing(oppositeThreshold.Latitude, oppositeThreshold.Longitude,
-					threshold.Latitude, threshold.Longitude)
+				runwayHeading = CalculateBearing(threshold.Latitude, threshold.Longitude,
+					oppositeThreshold.Latitude, oppositeThreshold.Longitude)
 			} else {
 				// If we can't find opposite threshold, skip this one
 				continue

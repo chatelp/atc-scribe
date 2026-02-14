@@ -340,6 +340,7 @@ func (s *AircraftStorage) getAllAircraftInternal(lastSeenMinutes int, minimal bo
 		// Initialize empty history and future slices (not populated in main aircraft endpoint)
 		a.History = []adsb.PositionMinimal{}
 		a.Future = []adsb.Position{}
+		a.Hindcast = []adsb.Position{}
 
 		// Add to map
 		aircraftMap[a.Hex] = &a
@@ -665,10 +666,21 @@ func (s *AircraftStorage) getPositionHistoryMinimal(hex string, maxPositions int
 	for rows.Next() {
 		var pos adsb.PositionMinimal
 		var timestamp string
+		var lat, lon, alt sql.NullFloat64
 
-		if err := rows.Scan(&pos.Lat, &pos.Lon, &pos.AltBaro, &timestamp); err != nil {
+		if err := rows.Scan(&lat, &lon, &alt, &timestamp); err != nil {
 			s.logger.Error("Error scanning position row", logger.Error(err), logger.String("hex", hex))
 			return nil, err
+		}
+
+		// Skip rows without actual position instead of inventing zero coordinates.
+		if !lat.Valid || !lon.Valid {
+			continue
+		}
+		pos.Lat = lat.Float64
+		pos.Lon = lon.Float64
+		if alt.Valid {
+			pos.AltBaro = alt.Float64
 		}
 
 		t, err := time.Parse(time.RFC3339, timestamp)
@@ -693,7 +705,7 @@ func (s *AircraftStorage) getPositionHistoryMinimal(hex string, maxPositions int
 func (s *AircraftStorage) getPositionHistory(hex string, maxPositions int) ([]adsb.Position, error) {
 	// Use the configured maxPositions parameter
 	rows, err := s.db.Query(`
-		SELECT id, lat, lon, alt_baro, gs, tas, track, timestamp, registration, aircraft_type, source_type
+		SELECT id, lat, lon, alt_baro, gs, tas, track, true_heading, mag_heading, timestamp, registration, aircraft_type, source_type
 		FROM adsb_targets
 		WHERE aircraft_hex = ?
 		ORDER BY timestamp DESC
@@ -710,10 +722,42 @@ func (s *AircraftStorage) getPositionHistory(hex string, maxPositions int) ([]ad
 		var pos adsb.Position
 		var id int
 		var timestamp, registration, aircraftType, sourceType string
+		var lat, lon, altitude sql.NullFloat64
+		var speedGS, speedTrue sql.NullFloat64
+		var track, trueHeading, magHeading sql.NullFloat64
 
-		if err := rows.Scan(&id, &pos.Lat, &pos.Lon, &pos.Altitude, &pos.SpeedGS, &pos.SpeedTrue, &pos.TrueHeading, &timestamp,
+		if err := rows.Scan(&id, &lat, &lon, &altitude, &speedGS, &speedTrue, &track, &trueHeading, &magHeading, &timestamp,
 			&registration, &aircraftType, &sourceType); err != nil {
 			return nil, err
+		}
+
+		if !lat.Valid || !lon.Valid {
+			continue
+		}
+		pos.Lat = nullFloatPtr(lat)
+		pos.Lon = nullFloatPtr(lon)
+		if altitude.Valid {
+			pos.Altitude = nullFloatPtr(altitude)
+		}
+
+		if speedGS.Valid {
+			pos.SpeedGS = nullFloatPtr(speedGS)
+		}
+		if speedTrue.Valid {
+			pos.SpeedTrue = nullFloatPtr(speedTrue)
+		}
+
+		if track.Valid {
+			v := track.Float64
+			pos.Track = &v
+		}
+		if trueHeading.Valid {
+			v := trueHeading.Float64
+			pos.TrueHeading = &v
+		}
+		if magHeading.Valid {
+			v := magHeading.Float64
+			pos.MagHeading = &v
 		}
 
 		// Set the ID field
@@ -780,10 +824,39 @@ func (s *AircraftStorage) GetAllPositionHistory(hex string) ([]adsb.Position, er
 		var pos adsb.Position
 		var id int
 		var timestamp, registration, aircraftType, sourceType string
+		var lat, lon, altitude sql.NullFloat64
+		var speedGS, speedTrue, trueHeading, magHeading, verticalSpeed sql.NullFloat64
 
-		if err := rows.Scan(&id, &pos.Lat, &pos.Lon, &pos.Altitude, &pos.SpeedGS, &pos.SpeedTrue, &pos.TrueHeading, &pos.MagHeading, &pos.VerticalSpeed, &timestamp,
+		if err := rows.Scan(&id, &lat, &lon, &altitude, &speedGS, &speedTrue, &trueHeading, &magHeading, &verticalSpeed, &timestamp,
 			&registration, &aircraftType, &sourceType); err != nil {
 			return nil, err
+		}
+
+		if !lat.Valid || !lon.Valid {
+			continue
+		}
+		pos.Lat = nullFloatPtr(lat)
+		pos.Lon = nullFloatPtr(lon)
+		if altitude.Valid {
+			pos.Altitude = nullFloatPtr(altitude)
+		}
+
+		if speedGS.Valid {
+			pos.SpeedGS = nullFloatPtr(speedGS)
+		}
+		if speedTrue.Valid {
+			pos.SpeedTrue = nullFloatPtr(speedTrue)
+		}
+		if trueHeading.Valid {
+			v := trueHeading.Float64
+			pos.TrueHeading = &v
+		}
+		if magHeading.Valid {
+			v := magHeading.Float64
+			pos.MagHeading = &v
+		}
+		if verticalSpeed.Valid {
+			pos.VerticalSpeed = nullFloatPtr(verticalSpeed)
 		}
 
 		// Set the ID field
@@ -829,7 +902,7 @@ func (s *AircraftStorage) GetPositionHistoryWithLimit(hex string, limit int) ([]
 
 	// Query positions for the aircraft from the last 1 hour, ordered by timestamp descending (newest first) with limit
 	rows, err := s.db.Query(`
-		SELECT id, lat, lon, alt_baro, gs, tas, true_heading, mag_heading, baro_rate, timestamp, registration, aircraft_type, source_type
+		SELECT id, lat, lon, alt_baro, gs, tas, track, true_heading, mag_heading, baro_rate, timestamp, registration, aircraft_type, source_type
 		FROM adsb_targets
 		WHERE aircraft_hex = ? AND timestamp >= ?
 		ORDER BY timestamp DESC
@@ -846,10 +919,45 @@ func (s *AircraftStorage) GetPositionHistoryWithLimit(hex string, limit int) ([]
 		var pos adsb.Position
 		var id int
 		var timestamp, registration, aircraftType, sourceType string
+		var lat, lon, altitude sql.NullFloat64
+		var speedGS, speedTrue, verticalSpeed sql.NullFloat64
+		var track, trueHeading, magHeading sql.NullFloat64
 
-		if err := rows.Scan(&id, &pos.Lat, &pos.Lon, &pos.Altitude, &pos.SpeedGS, &pos.SpeedTrue, &pos.TrueHeading, &pos.MagHeading, &pos.VerticalSpeed, &timestamp,
+		if err := rows.Scan(&id, &lat, &lon, &altitude, &speedGS, &speedTrue, &track, &trueHeading, &magHeading, &verticalSpeed, &timestamp,
 			&registration, &aircraftType, &sourceType); err != nil {
 			return nil, err
+		}
+
+		if !lat.Valid || !lon.Valid {
+			continue
+		}
+		pos.Lat = nullFloatPtr(lat)
+		pos.Lon = nullFloatPtr(lon)
+		if altitude.Valid {
+			pos.Altitude = nullFloatPtr(altitude)
+		}
+
+		if speedGS.Valid {
+			pos.SpeedGS = nullFloatPtr(speedGS)
+		}
+		if speedTrue.Valid {
+			pos.SpeedTrue = nullFloatPtr(speedTrue)
+		}
+
+		if track.Valid {
+			v := track.Float64
+			pos.Track = &v
+		}
+		if trueHeading.Valid {
+			v := trueHeading.Float64
+			pos.TrueHeading = &v
+		}
+		if magHeading.Valid {
+			v := magHeading.Float64
+			pos.MagHeading = &v
+		}
+		if verticalSpeed.Valid {
+			pos.VerticalSpeed = nullFloatPtr(verticalSpeed)
 		}
 
 		// Set the ID field
@@ -923,40 +1031,41 @@ func (s *AircraftStorage) GetByHex(hex string) (*adsb.Aircraft, bool) {
 	}
 
 	// Calculate future positions if we have the necessary data
-	if a.ADSB != nil && a.ADSB.Lat != 0 && a.ADSB.Lon != 0 && a.ADSB.AltBaro != 0 {
+	if a.ADSB != nil && a.ADSB.HasPosition() && a.ADSB.AltBaro.Float64() != 0 {
+		lat, lon, _ := a.ADSB.Position()
 		// Get heading (use true_heading, track, or mag_heading, whichever is available)
-		heading := a.ADSB.TrueHeading
+		heading := adsb.NumberOrZero(a.ADSB.TrueHeading)
 		if heading == 0 {
-			heading = a.ADSB.Track
+			heading = adsb.NumberOrZero(a.ADSB.Track)
 		}
 		if heading == 0 {
-			heading = a.ADSB.MagHeading
+			heading = adsb.NumberOrZero(a.ADSB.MagHeading)
 		}
 
 		// Get speed (use TAS or GS, whichever is available)
-		speed := a.ADSB.TAS
+		speed := adsb.NumberOrZero(a.ADSB.TAS)
 		if speed == 0 {
-			speed = a.ADSB.GS
+			speed = adsb.NumberOrZero(a.ADSB.GS)
 		}
 
 		// Get vertical rate (use baro_rate or geom_rate, whichever is available)
-		verticalRate := a.ADSB.BaroRate
+		verticalRate := adsb.NumberOrZero(a.ADSB.BaroRate)
 		if verticalRate == 0 {
-			verticalRate = a.ADSB.GeomRate
+			verticalRate = adsb.NumberOrZero(a.ADSB.GeomRate)
 		}
 
 		// Only predict if we have valid heading and speed
 		if heading != 0 && speed != 0 {
 			// Calculate future positions
 			// Get magnetic heading for predictions
-			magHeading := a.ADSB.MagHeading
+			magHeading := adsb.NumberOrZero(a.ADSB.MagHeading)
 			if magHeading == 0 {
 				magHeading = heading // fallback to whatever heading we found
 			}
 
 			a.Future = adsb.PredictFuturePositions(
-				a.ADSB.Lat,
-				a.ADSB.Lon,
+				lat,
+				lon,
 				a.ADSB.AltBaro.Float64(),
 				heading,    // true heading
 				magHeading, // magnetic heading
@@ -971,6 +1080,7 @@ func (s *AircraftStorage) GetByHex(hex string) (*adsb.Aircraft, bool) {
 		// Initialize empty future slice
 		a.Future = []adsb.Position{}
 	}
+	a.Hindcast = []adsb.Position{}
 
 	// Populate phase data for this aircraft
 	if err := s.populatePhaseData(&a); err != nil {
@@ -1118,20 +1228,20 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 		`,
 			aircraft.Hex, aircraft.ADSB.Hex, aircraft.ADSB.Type, aircraft.ADSB.Flight,
 			registration, aircraftType, // Registration and AircraftType (populated for external API)
-			aircraft.ADSB.AltBaro, aircraft.ADSB.AltGeom, aircraft.ADSB.GS, aircraft.ADSB.IAS,
-			aircraft.ADSB.TAS, aircraft.ADSB.Mach, aircraft.ADSB.WD, aircraft.ADSB.WS,
-			aircraft.ADSB.OAT, aircraft.ADSB.TAT, aircraft.ADSB.Track, aircraft.ADSB.TrackRate,
-			aircraft.ADSB.Roll, aircraft.ADSB.MagHeading, aircraft.ADSB.TrueHeading,
-			aircraft.ADSB.BaroRate, aircraft.ADSB.GeomRate, aircraft.ADSB.Squawk,
-			"", aircraft.ADSB.Category, aircraft.ADSB.NavQNH,
-			aircraft.ADSB.NavAltitudeMCP, aircraft.ADSB.NavAltitudeFMS, aircraft.ADSB.NavHeading,
-			"", aircraft.ADSB.Lat, aircraft.ADSB.Lon,
-			aircraft.ADSB.NIC, aircraft.ADSB.RC, aircraft.ADSB.SeenPos, aircraft.ADSB.RDst,
-			aircraft.ADSB.RDir, aircraft.ADSB.Version, aircraft.ADSB.NICBaro, aircraft.ADSB.NACP,
-			aircraft.ADSB.NACV, aircraft.ADSB.SIL, aircraft.ADSB.SILType, aircraft.ADSB.GVA,
-			aircraft.ADSB.SDA, aircraft.ADSB.Alert, aircraft.ADSB.SPI,
+			nullableFlexibleFloatValue(aircraft.ADSB.AltBaro), nullableFlexibleFloatValue(aircraft.ADSB.AltGeom), nullableFloatValue(aircraft.ADSB.GS), nullableFloatValue(aircraft.ADSB.IAS),
+			nullableFloatValue(aircraft.ADSB.TAS), nullableFloatValue(aircraft.ADSB.Mach), nullableFloatValue(aircraft.ADSB.WD), nullableFloatValue(aircraft.ADSB.WS),
+			nullableFloatValue(aircraft.ADSB.OAT), nullableFloatValue(aircraft.ADSB.TAT), aircraft.ADSB.Track, nullableFloatValue(aircraft.ADSB.TrackRate),
+			nullableFloatValue(aircraft.ADSB.Roll), aircraft.ADSB.MagHeading, aircraft.ADSB.TrueHeading,
+			nullableFloatValue(aircraft.ADSB.BaroRate), nullableFloatValue(aircraft.ADSB.GeomRate), aircraft.ADSB.Squawk,
+			"", aircraft.ADSB.Category, nullableFloatValue(aircraft.ADSB.NavQNH),
+			nullableFloatValue(aircraft.ADSB.NavAltitudeMCP), nullableFloatValue(aircraft.ADSB.NavAltitudeFMS), nullableFloatValue(aircraft.ADSB.NavHeading),
+			"", nullableFloatValue(aircraft.ADSB.Lat), nullableFloatValue(aircraft.ADSB.Lon),
+			nullableIntValue(aircraft.ADSB.NIC), nullableIntValue(aircraft.ADSB.RC), nullableFloatValue(aircraft.ADSB.SeenPos), nullableFloatValue(aircraft.ADSB.RDst),
+			nullableFloatValue(aircraft.ADSB.RDir), nullableIntValue(aircraft.ADSB.Version), nullableIntValue(aircraft.ADSB.NICBaro), nullableIntValue(aircraft.ADSB.NACP),
+			nullableIntValue(aircraft.ADSB.NACV), nullableIntValue(aircraft.ADSB.SIL), aircraft.ADSB.SILType, nullableIntValue(aircraft.ADSB.GVA),
+			nullableIntValue(aircraft.ADSB.SDA), nullableIntValue(aircraft.ADSB.Alert), nullableIntValue(aircraft.ADSB.SPI),
 			"", "", // MLAT and TISB as strings (we'll store them as empty strings for now)
-			aircraft.ADSB.Messages, aircraft.ADSB.Seen, aircraft.ADSB.RSSI,
+			nullableIntValue(aircraft.ADSB.Messages), nullableFloatValue(aircraft.ADSB.Seen), nullableFloatValue(aircraft.ADSB.RSSI),
 			aircraft.LastSeen.Format(time.RFC3339), string(rawData), sourceType,
 		)
 		if err != nil {
@@ -1275,6 +1385,32 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+func nullableFloatValue(v *float64) interface{} {
+	if v == nil {
+		return nil
+	}
+	return *v
+}
+
+func nullableIntValue(v *int) interface{} {
+	if v == nil {
+		return nil
+	}
+	return *v
+}
+
+func nullableFlexibleFloatValue(v adsb.FlexibleFloat64) interface{} {
+	return v.NullableValue()
+}
+
+func nullFloatPtr(v sql.NullFloat64) *float64 {
+	if !v.Valid {
+		return nil
+	}
+	f := v.Float64
+	return &f
 }
 
 // formatNullableTime formats a nullable time.Time for SQL

@@ -159,20 +159,20 @@ func (s *Service) GenerateADSBData() []adsb.ADSBTarget {
 			Type:         "sim", // Mark as simulated
 			Flight:       aircraft.Flight,
 			AircraftType: aircraft.AircraftType,
-			Lat:          aircraft.CurrentLat,
-			Lon:          aircraft.CurrentLon,
+			Lat:          adsb.NumberPtr(aircraft.CurrentLat),
+			Lon:          adsb.NumberPtr(aircraft.CurrentLon),
 			AltBaro:      adsb.FlexibleFloat64(aircraft.CurrentAltitude),
 			AltGeom:      adsb.FlexibleFloat64(aircraft.CurrentAltitude),
-			TAS:          aircraft.TargetSpeed,
-			GS:           aircraft.TargetSpeed, // Simplified: assume no wind
-			Track:        aircraft.TargetHeading,
-			MagHeading:   aircraft.TargetHeading,
-			TrueHeading:  aircraft.TargetHeading,
-			BaroRate:     aircraft.TargetVerticalRate,
-			GeomRate:     aircraft.TargetVerticalRate,
-			Seen:         0,   // Always current
-			Messages:     100, // Fake message count
-			RSSI:         -20, // Good signal strength
+			TAS:          adsb.NumberPtr(aircraft.TargetSpeed),
+			GS:           adsb.NumberPtr(aircraft.TargetSpeed), // Simplified: assume no wind
+			Track:        adsb.NumberPtr(aircraft.TargetHeading),
+			MagHeading:   adsb.NumberPtr(aircraft.TargetHeading),
+			TrueHeading:  adsb.NumberPtr(aircraft.TargetHeading),
+			BaroRate:     adsb.NumberPtr(aircraft.TargetVerticalRate),
+			GeomRate:     adsb.NumberPtr(aircraft.TargetVerticalRate),
+			Seen:         adsb.NumberPtr(0),   // Always current
+			Messages:     adsb.IntPtr(100),    // Fake message count
+			RSSI:         adsb.NumberPtr(-20), // Good signal strength
 		}
 		targets = append(targets, target)
 	}

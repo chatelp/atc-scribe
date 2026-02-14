@@ -2,6 +2,9 @@ package adsb
 
 import (
 	"encoding/json"
+	"math"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -9,8 +12,28 @@ import (
 // and strings like "ground" (which occurs in ADS-B data when aircraft is on ground)
 type FlexibleFloat64 float64
 
+func NullFlexibleFloat64() FlexibleFloat64 {
+	return FlexibleFloat64(math.NaN())
+}
+
+func (f FlexibleFloat64) IsSet() bool {
+	return !math.IsNaN(float64(f))
+}
+
+func (f FlexibleFloat64) MarshalJSON() ([]byte, error) {
+	if !f.IsSet() {
+		return []byte("null"), nil
+	}
+	return json.Marshal(float64(f))
+}
+
 // UnmarshalJSON implements json.Unmarshaler for FlexibleFloat64
 func (f *FlexibleFloat64) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*f = NullFlexibleFloat64()
+		return nil
+	}
+
 	// Try to unmarshal as float64 first
 	var floatVal float64
 	if err := json.Unmarshal(data, &floatVal); err == nil {
@@ -21,18 +44,42 @@ func (f *FlexibleFloat64) UnmarshalJSON(data []byte) error {
 	// If that fails, try as string (handles "ground" case)
 	var strVal string
 	if err := json.Unmarshal(data, &strVal); err == nil {
-		// "ground" or any other string means altitude is effectively 0
-		*f = 0
+		s := strings.TrimSpace(strVal)
+		if s == "" {
+			*f = NullFlexibleFloat64()
+			return nil
+		}
+		if strings.EqualFold(s, "ground") {
+			*f = 0
+			return nil
+		}
+
+		if parsed, parseErr := strconv.ParseFloat(s, 64); parseErr == nil {
+			*f = FlexibleFloat64(parsed)
+			return nil
+		}
+
+		*f = NullFlexibleFloat64()
 		return nil
 	}
 
-	// If both fail, default to 0
-	*f = 0
+	// If both fail, preserve missing as null-equivalent
+	*f = NullFlexibleFloat64()
 	return nil
 }
 
 // Float64 returns the value as a standard float64
 func (f FlexibleFloat64) Float64() float64 {
+	if !f.IsSet() {
+		return 0
+	}
+	return float64(f)
+}
+
+func (f FlexibleFloat64) NullableValue() interface{} {
+	if !f.IsSet() {
+		return nil
+	}
 	return float64(f)
 }
 
@@ -53,51 +100,84 @@ type ADSBTarget struct {
 	AircraftType   string             `json:"t,omitempty"` // External API specific field (t)
 	AltBaro        FlexibleFloat64    `json:"alt_baro"`    // Can be "ground" string or numeric
 	AltGeom        FlexibleFloat64    `json:"alt_geom"`    // Can be "ground" string or numeric
-	GS             float64            `json:"gs"`
-	IAS            float64            `json:"ias"`
-	TAS            float64            `json:"tas"`
-	Mach           float64            `json:"mach"`
-	WD             float64            `json:"wd"`
-	WS             float64            `json:"ws"`
-	OAT            float64            `json:"oat"`
-	TAT            float64            `json:"tat"`
-	Track          float64            `json:"track"`
-	TrackRate      float64            `json:"track_rate"`
-	Roll           float64            `json:"roll"`
-	MagHeading     float64            `json:"mag_heading"`
-	TrueHeading    float64            `json:"true_heading"`
-	BaroRate       float64            `json:"baro_rate"`
-	GeomRate       float64            `json:"geom_rate"`
+	GS             *float64           `json:"gs"`
+	IAS            *float64           `json:"ias"`
+	TAS            *float64           `json:"tas"`
+	Mach           *float64           `json:"mach"`
+	WD             *float64           `json:"wd"`
+	WS             *float64           `json:"ws"`
+	OAT            *float64           `json:"oat"`
+	TAT            *float64           `json:"tat"`
+	Track          *float64           `json:"track"`
+	TrackRate      *float64           `json:"track_rate"`
+	Roll           *float64           `json:"roll"`
+	MagHeading     *float64           `json:"mag_heading"`
+	TrueHeading    *float64           `json:"true_heading"`
+	BaroRate       *float64           `json:"baro_rate"`
+	GeomRate       *float64           `json:"geom_rate"`
 	Squawk         string             `json:"squawk"`
 	Category       string             `json:"category"`
-	NavQNH         float64            `json:"nav_qnh"`
-	NavAltitudeMCP float64            `json:"nav_altitude_mcp"`
-	NavAltitudeFMS float64            `json:"nav_altitude_fms"`
-	NavHeading     float64            `json:"nav_heading"`
-	Lat            float64            `json:"lat"`
-	Lon            float64            `json:"lon"`
-	NIC            int                `json:"nic"`
-	RC             int                `json:"rc"`
-	SeenPos        float64            `json:"seen_pos"`
-	RDst           float64            `json:"r_dst"`
-	RDir           float64            `json:"r_dir"`
-	Version        int                `json:"version"`
-	NICBaro        int                `json:"nic_baro"`
-	NACP           int                `json:"nac_p"`
-	NACV           int                `json:"nac_v"`
-	SIL            int                `json:"sil"`
+	NavQNH         *float64           `json:"nav_qnh"`
+	NavAltitudeMCP *float64           `json:"nav_altitude_mcp"`
+	NavAltitudeFMS *float64           `json:"nav_altitude_fms"`
+	NavHeading     *float64           `json:"nav_heading"`
+	Lat            *float64           `json:"lat"`
+	Lon            *float64           `json:"lon"`
+	NIC            *int               `json:"nic"`
+	RC             *int               `json:"rc"`
+	SeenPos        *float64           `json:"seen_pos"`
+	RDst           *float64           `json:"r_dst"`
+	RDir           *float64           `json:"r_dir"`
+	Version        *int               `json:"version"`
+	NICBaro        *int               `json:"nic_baro"`
+	NACP           *int               `json:"nac_p"`
+	NACV           *int               `json:"nac_v"`
+	SIL            *int               `json:"sil"`
 	SILType        string             `json:"sil_type"`
-	GVA            int                `json:"gva"`
-	SDA            int                `json:"sda"`
-	Alert          int                `json:"alert"`
-	SPI            int                `json:"spi"`
+	GVA            *int               `json:"gva"`
+	SDA            *int               `json:"sda"`
+	Alert          *int               `json:"alert"`
+	SPI            *int               `json:"spi"`
 	MLAT           []string           `json:"mlat"`
 	TISB           []string           `json:"tisb"`
-	Messages       int                `json:"messages"`
-	Seen           float64            `json:"seen"`
-	RSSI           float64            `json:"rssi"`
+	Messages       *int               `json:"messages"`
+	Seen           *float64           `json:"seen"`
+	RSSI           *float64           `json:"rssi"`
 	ATCDerived     *ATCDerivedMetrics `json:"atc_derived,omitempty"`
 	SourceType     string             `json:"source_type,omitempty"` // Indicates whether data came from "local" or "external" source
+}
+
+func NumberOrZero(v *float64) float64 {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+func NumberPtr(v float64) *float64 {
+	return &v
+}
+
+func IntOrZero(v *int) int {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+func IntPtr(v int) *int {
+	return &v
+}
+
+func (a *ADSBTarget) HasPosition() bool {
+	return a != nil && a.Lat != nil && a.Lon != nil
+}
+
+func (a *ADSBTarget) Position() (float64, float64, bool) {
+	if !a.HasPosition() {
+		return 0, 0, false
+	}
+	return *a.Lat, *a.Lon, true
 }
 
 // ATCDerivedMetrics represents server-side derived operational metrics for ATC usage.
@@ -175,7 +255,8 @@ type Aircraft struct {
 	ADSB               *ADSBTarget         `json:"adsb,omitempty"`
 	BSDB               *BSDBData           `json:"bsdb,omitempty"`                // BaseStation.sqb enrichment data
 	History            []PositionMinimal   `json:"history,omitempty"`             // Minimal historical positions for map trails
-	Future             []Position          `json:"future,omitempty"`              // Predicted future positions (placeholder for now)
+	Future             []Position          `json:"future,omitempty"`              // Predicted future positions
+	Hindcast           []Position          `json:"hindcast,omitempty"`            // Predicted positions before first ADS-B contact
 	Phase              *PhaseData          `json:"phase,omitempty"`               // Phase information with current and history
 	Clearances         []ClearanceData     `json:"clearances,omitempty"`          // Recent clearances for this aircraft
 	IsSimulated        bool                `json:"is_simulated"`                  // Whether this is a simulated aircraft
@@ -203,16 +284,19 @@ type ClearanceData struct {
 // Position represents a historical position of an aircraft
 type Position struct {
 	ID            *int      `json:"id,omitempty"` // ADSB record ID
-	Lat           float64   `json:"lat"`
-	Lon           float64   `json:"lon"`
-	Altitude      float64   `json:"altitude"`
-	SpeedTrue     float64   `json:"speed_true"`
-	SpeedGS       float64   `json:"speed_gs"`
-	TrueHeading   float64   `json:"true_heading"`
-	MagHeading    float64   `json:"mag_heading"`
-	VerticalSpeed float64   `json:"vertical_speed"`
+	Lat           *float64  `json:"lat"`
+	Lon           *float64  `json:"lon"`
+	Altitude      *float64  `json:"altitude"`
+	SpeedTrue     *float64  `json:"speed_true"`
+	SpeedGS       *float64  `json:"speed_gs"`
+	Track         *float64  `json:"track"`
+	TrueHeading   *float64  `json:"true_heading"`
+	MagHeading    *float64  `json:"mag_heading"`
+	VerticalSpeed *float64  `json:"vertical_speed"`
 	Timestamp     time.Time `json:"timestamp"`
-	Distance      *float64  `json:"distance,omitempty"` // Distance in NM from station
+	Distance      *float64  `json:"distance,omitempty"`       // Distance in NM from station
+	SkippedBefore int       `json:"skipped_before,omitempty"` // Number of duplicate positions hidden before this one
+	SkippedAfter  int       `json:"skipped_after,omitempty"`  // Number of duplicate positions hidden after this one (trailing)
 }
 
 // AircraftMap is a map of aircraft keyed by hex ID
@@ -228,14 +312,14 @@ type AircraftSimple struct {
 	RegisteredOwners string   `json:"registered_owners,omitempty"`
 	Airline          string   `json:"airline,omitempty"`
 	Category         string   `json:"category,omitempty"`
-	Lat              float64  `json:"lat,omitempty"`
-	Lon              float64  `json:"lon,omitempty"`
+	Lat              *float64 `json:"lat,omitempty"`
+	Lon              *float64 `json:"lon,omitempty"`
 	AltBaro          float64  `json:"alt_baro"`
-	GroundSpeed      float64  `json:"ground_speed"`
-	TrueAirspeed     float64  `json:"true_speed,omitempty"`
-	Track            float64  `json:"track"`
-	MagHeading       float64  `json:"mag_heading,omitempty"`
-	VerticalRate     float64  `json:"vertical_rate"`
+	GroundSpeed      *float64 `json:"ground_speed"`
+	TrueAirspeed     *float64 `json:"true_speed,omitempty"`
+	Track            *float64 `json:"track"`
+	MagHeading       *float64 `json:"mag_heading"`
+	VerticalRate     *float64 `json:"vertical_rate"`
 	Squawk           string   `json:"squawk,omitempty"`
 	Distance         *float64 `json:"distance,omitempty"`
 	Phase            string   `json:"phase,omitempty"`
@@ -288,6 +372,7 @@ type AircraftTracksResponse struct {
 	Distance     *float64      `json:"distance,omitempty"`      // Distance in NM from station
 	History      []Position    `json:"history"`                 // Historical positions
 	Future       []Position    `json:"future"`                  // Future predicted positions
+	Hindcast     []Position    `json:"hindcast,omitempty"`      // Pre-coverage predicted positions
 	PhaseHistory []PhaseChange `json:"phase_history,omitempty"` // Phase change history (newest first)
 }
 

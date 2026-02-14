@@ -138,6 +138,7 @@ document.addEventListener('alpine:init', () => {
         stationLatitude: null,
         stationLongitude: null,
         stationElevationFeet: null,
+        stationCruiseAltitudeFt: 18000,
         stationAirportCode: null,
         // Station override state
         stationOverride: {
@@ -160,6 +161,8 @@ document.addEventListener('alpine:init', () => {
         weatherLastUpdated: null,
         weatherFetchErrors: [],
         runwayData: null, // Store runway data
+        runwayInUse: null, // Active runway scores from traffic analysis
+        runwayInUseInterval: null, // 60s polling interval
         airportsData: null, // Airport reference data
         heliportsData: null, // Heliport reference data
         navaidsData: null, // Navaid reference data
@@ -592,7 +595,7 @@ document.addEventListener('alpine:init', () => {
                 case 'altitude':
                     return aircraft.adsb ? aircraft.adsb.alt_baro : 0;
                 case 'heading':
-                    return aircraft.adsb ? (aircraft.adsb.mag_heading || 0) : 0;
+                    return this.getHeadingWithType(aircraft).value ?? -1;
                 case 'speed':
                     return aircraft.adsb ? aircraft.adsb.tas : 0;
                 case 'gs':
@@ -1371,6 +1374,7 @@ document.addEventListener('alpine:init', () => {
         aircraftDetailsShowHistoryView: false,
         aircraftDetailsHistoryData: [],
         aircraftDetailsFutureData: [],
+        aircraftDetailsHindcastData: [],
         aircraftDetailsHistoryCount: 0,
         aircraftDetailsHistoryLoading: false,
         aircraftDetailsHistoryRefreshInterval: null,
@@ -1404,6 +1408,7 @@ document.addEventListener('alpine:init', () => {
                 this.aircraftDetailsShowHistoryView = false;
                 this.aircraftDetailsHistoryData = [];
                 this.aircraftDetailsFutureData = [];
+                this.aircraftDetailsHindcastData = [];
                 this.aircraftDetailsHistoryCount = 0;
                 this.aircraftDetailsStopHistoryRefresh();
 
@@ -1452,6 +1457,7 @@ document.addEventListener('alpine:init', () => {
                 // Clear store track data immediately to prevent showing stale data
                 this.aircraftDetailsHistoryData = [];
                 this.aircraftDetailsFutureData = [];
+                this.aircraftDetailsHindcastData = [];
                 
                 // Update current aircraft hex
                 this.aircraftDetailsCurrentAircraftHexForPanel = this.selectedAircraft.hex;
@@ -1535,6 +1541,7 @@ document.addEventListener('alpine:init', () => {
                 if (!response.ok) {
                     this.aircraftDetailsHistoryData = [];
                     this.aircraftDetailsFutureData = [];
+                this.aircraftDetailsHindcastData = [];
                     this.aircraftDetailsHistoryCount = 0;
                     this.aircraftDetailsHistoryLoading = false;
                     return;
@@ -1542,9 +1549,10 @@ document.addEventListener('alpine:init', () => {
 
                 const data = await response.json();
 
-                // Split combined tracks response into history and future
+                // Split combined tracks response into history, future, and hindcast
                 this.aircraftDetailsHistoryData = data.history || [];
                 this.aircraftDetailsFutureData = data.future || [];
+                this.aircraftDetailsHindcastData = data.hindcast || [];
                 this.aircraftDetailsHistoryCount = this.aircraftDetailsHistoryData.length;
 
                 // Populate phase history from the same response (avoids separate API call)
@@ -1569,6 +1577,7 @@ document.addEventListener('alpine:init', () => {
             } catch (error) {
                 this.aircraftDetailsHistoryData = [];
                 this.aircraftDetailsFutureData = [];
+                this.aircraftDetailsHindcastData = [];
                 this.aircraftDetailsHistoryCount = 0;
                 this.phaseHistoryData = [];
             } finally {
@@ -3237,8 +3246,15 @@ async initAircraftDataSource() {
             // Apply BSDB (BaseStation.sqb enrichment) data if provided
             if (delta.bsdb !== undefined) aircraft.bsdb = delta.bsdb;
 
-            // last_seen = now (we just received an update)
-            aircraft.last_seen = new Date().toISOString();
+            // Only update last_seen when the delta contains actual ADS-B sensor data
+            // (not for status-only changes like signal_lost which would reset the timer)
+            const hasAdsbData = delta.lat !== undefined || delta.lon !== undefined ||
+                delta.alt_baro !== undefined || delta.gs !== undefined ||
+                delta.track !== undefined || delta.baro_rate !== undefined ||
+                delta.tas !== undefined || delta.adsb !== undefined;
+            if (hasAdsbData) {
+                aircraft.last_seen = new Date().toISOString();
+            }
         },
 
         handleAircraftRemoved(data) {
@@ -3916,6 +3932,7 @@ async initAircraftDataSource() {
                 this.stationLatitude = data.latitude;
                 this.stationLongitude = data.longitude;
                 this.stationElevationFeet = data.elevation_feet;
+                this.stationCruiseAltitudeFt = Number.isFinite(data.cruise_altitude_ft) ? data.cruise_altitude_ft : 18000;
                 this.stationAirportCode = data.airport_code;
                 
                 // Check if station override is active and restore state
@@ -3953,26 +3970,36 @@ async initAircraftDataSource() {
                 if (data.runways) {
                     this.runwayData = data.runways;
                     console.log('Runway data loaded:', this.runwayData);
-                    
+
                     // Draw runways on the map if mapManager is initialized
                     if (this.mapManager) {
                         this.mapManager.drawRunways(this.runwayData);
                     }
                 }
-                
+
+                // Store runway-in-use scores
+                if (data.runway_in_use) {
+                    this.runwayInUse = data.runway_in_use;
+                }
+
                 console.log('Station data loaded:', data);
-                
+
                 // Center map on station coordinates after loading
                 if (this.mapManager) {
                     this.mapManager.centerOnStation();
                 }
-                
+
                 // Setup refresh interval if not already set (less frequent since station data is static)
                 if (!this.stationRefreshInterval) {
                     this.stationRefreshInterval = setInterval(() => {
                         console.log('Refreshing station data...');
                         this.fetchStationData();
                     }, CONFIG.stationRefreshInterval);
+                }
+
+                // Setup runway-in-use polling (60s) — separate from station refresh
+                if (!this.runwayInUseInterval) {
+                    this.runwayInUseInterval = setInterval(() => this.fetchRunwayInUse(), 60000);
                 }
             } catch (error) {
                 console.error('Error fetching station data:', error);
@@ -3981,6 +4008,15 @@ async initAircraftDataSource() {
                 this.stationLongitude = -79.6248; // Default fallback on error
                 this.stationElevationFeet = 569;    // Default fallback on error
             }
+        },
+
+        async fetchRunwayInUse() {
+            try {
+                const response = await fetch(this.stationApiUrl);
+                if (!response.ok) return;
+                const data = await response.json();
+                this.runwayInUse = data.runway_in_use || null;
+            } catch (e) { /* silent */ }
         },
 
         async fetchReferenceData() {
@@ -4073,6 +4109,13 @@ async initAircraftDataSource() {
         },
         
         // Get the latest METAR data
+        // Extract runway end identifier from "05-23/05" format → "05"
+        formatRunwayEnd(runwayId) {
+            if (!runwayId) return '';
+            const parts = runwayId.split('/');
+            return parts.length === 2 ? parts[1] : runwayId;
+        },
+
         getLatestMetar() {
             if (!this.metar || !this.metar.trend || this.metar.trend.length === 0) {
                 return null;
@@ -4387,6 +4430,7 @@ async initAircraftDataSource() {
                     this.showProximityView = false;
                     this.aircraftDetailsHistoryData = [];
                     this.aircraftDetailsFutureData = [];
+                this.aircraftDetailsHindcastData = [];
                     this.aircraftDetailsHistoryCount = 0;
                     this.phaseHistoryData = [];
                     this.phaseHistoryAircraftHex = null;
@@ -4485,42 +4529,130 @@ async initAircraftDataSource() {
             return value !== undefined && value !== null && Number.isFinite(value);
         },
 
-        // Get heading with fallback priority for direction of travel: track -> mag_heading -> true_heading
+        _isLikelyDefaultZeroHeading(value, adsbLike) {
+            if (!this.hasHeadingValue(value)) return false;
+            if (Math.abs(value) > 0.0001) return false;
+
+            const track = this.hasHeadingValue(adsbLike?.track) ? this.normalizeHeading(adsbLike.track) : null;
+            const trueHeading = this.hasHeadingValue(adsbLike?.true_heading) ? this.normalizeHeading(adsbLike.true_heading) : null;
+            const magHeading = this.hasHeadingValue(adsbLike?.mag_heading) ? this.normalizeHeading(adsbLike.mag_heading) : null;
+
+            const hasNonZeroTrack = track !== null && Math.abs(track) > 0.0001;
+            const hasNonZeroTrue = trueHeading !== null && Math.abs(trueHeading) > 0.0001;
+            const hasNonZeroMag = magHeading !== null && Math.abs(magHeading) > 0.0001;
+
+            return hasNonZeroTrack || hasNonZeroTrue || hasNonZeroMag;
+        },
+
+        _getResolvedHeadingCandidates(adsbLike) {
+            const magHeading = this.hasHeadingValue(adsbLike?.mag_heading)
+                ? this.normalizeHeading(adsbLike.mag_heading)
+                : null;
+            const track = this.hasHeadingValue(adsbLike?.track)
+                ? this.normalizeHeading(adsbLike.track)
+                : null;
+            const trueHeading = this.hasHeadingValue(adsbLike?.true_heading)
+                ? this.normalizeHeading(adsbLike.true_heading)
+                : null;
+
+            const magIsUsable = magHeading !== null && !this._isLikelyDefaultZeroHeading(magHeading, adsbLike);
+            const trueIsUsable = trueHeading !== null && !this._isLikelyDefaultZeroHeading(trueHeading, adsbLike);
+            const trackIsUsable = track !== null;
+
+            return {
+                magHeading,
+                track,
+                trueHeading,
+                magIsUsable,
+                trackIsUsable,
+                trueIsUsable
+            };
+        },
+
+        // Get heading with fallback priority: magnetic -> track -> true
         getHeadingWithFallback(aircraft) {
-            if (!aircraft.adsb) return 0;
-            
-            // Direction-of-travel first (track). Accept 0° as valid (northbound).
-            if (this.hasHeadingValue(aircraft.adsb.track)) {
-                const heading = this.normalizeHeading(aircraft.adsb.track);
-                if (heading !== null) return heading;
-            }
-            if (this.hasHeadingValue(aircraft.adsb.mag_heading)) {
-                const heading = this.normalizeHeading(aircraft.adsb.mag_heading);
-                if (heading !== null) return heading;
-            }
-            if (this.hasHeadingValue(aircraft.adsb.true_heading)) {
-                const heading = this.normalizeHeading(aircraft.adsb.true_heading);
-                if (heading !== null) return heading;
-            }
-            return 0; // Default fallback
+            if (!aircraft?.adsb) return null;
+
+            const candidates = this._getResolvedHeadingCandidates(aircraft.adsb);
+            if (candidates.magIsUsable) return candidates.magHeading;
+            if (candidates.trackIsUsable) return candidates.track;
+            if (candidates.trueIsUsable) return candidates.trueHeading;
+            return null;
+        },
+
+        getHeadingWithTypeFromAdsb(adsbLike) {
+            if (!adsbLike) return { value: null, type: null };
+
+            const candidates = this._getResolvedHeadingCandidates(adsbLike);
+            if (candidates.magIsUsable) return { value: candidates.magHeading, type: 'magnetic' };
+            if (candidates.trackIsUsable) return { value: candidates.track, type: 'track' };
+            if (candidates.trueIsUsable) return { value: candidates.trueHeading, type: 'true' };
+
+            return { value: null, type: null };
         },
 
         getHeadingWithType(aircraft) {
-            if (!aircraft.adsb) return { value: 0, type: null };
-            
-            if (this.hasHeadingValue(aircraft.adsb.track)) {
-                const heading = this.normalizeHeading(aircraft.adsb.track);
-                if (heading !== null) return { value: heading, type: 'track' };
+            if (!aircraft?.adsb) return { value: null, type: null };
+            return this.getHeadingWithTypeFromAdsb(aircraft.adsb);
+        },
+
+        getHeadingDisplayTextFromAdsb(adsbLike) {
+            const heading = this.getHeadingWithTypeFromAdsb(adsbLike);
+            if (heading.value === null) return 'N/A';
+            return `${Math.round(heading.value)}°`;
+        },
+
+        getHeadingDisplayText(aircraft) {
+            const heading = this.getHeadingWithType(aircraft);
+            if (heading.value === null) return 'N/A';
+            return `${Math.round(heading.value)}°`;
+        },
+
+        formatPredictionTime(position) {
+            if (!position || !position.timestamp) return '';
+            const secs = Math.max(0, Math.round((new Date(position.timestamp).getTime() - Date.now()) / 1000));
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            if (s === 0 && m > 0) return `+${m} min`;
+            if (m === 0) return `+${secs}s`;
+            return `+${m}:${String(s).padStart(2, '0')}`;
+        },
+
+        getFutureDataForTable() {
+            // Show every 3rd point (15s intervals from 5s granularity data)
+            return this.aircraftDetailsFutureData.filter((_, i) => (i + 1) % 3 === 0);
+        },
+
+        // Build flat array for history table rendering from server-deduplicated data.
+        // Server provides skipped_before/skipped_after on positions; we convert to
+        // { type: 'row', position, originalIndex, beforeDivider } and { type: 'divider', count } entries.
+        getFilteredHistoryData() {
+            const data = this.aircraftDetailsHistoryData;
+            if (!data || data.length === 0) return [];
+
+            const result = [];
+            for (let i = 0; i < data.length; i++) {
+                const pos = data[i];
+
+                // Divider before this row (skipped duplicates between prev and this)
+                if (pos.skipped_before > 0) {
+                    // Mark the previous row as being before a divider (suppress its border)
+                    if (result.length > 0 && result[result.length - 1].type === 'row') {
+                        result[result.length - 1].beforeDivider = true;
+                    }
+                    result.push({ type: 'divider', count: pos.skipped_before });
+                }
+
+                result.push({ type: 'row', position: pos, originalIndex: i, beforeDivider: false });
+
+                // Trailing divider after last row
+                if (pos.skipped_after > 0) {
+                    result[result.length - 1].beforeDivider = true;
+                    result.push({ type: 'divider', count: pos.skipped_after });
+                }
             }
-            if (this.hasHeadingValue(aircraft.adsb.mag_heading)) {
-                const heading = this.normalizeHeading(aircraft.adsb.mag_heading);
-                if (heading !== null) return { value: heading, type: 'magnetic' };
-            }
-            if (this.hasHeadingValue(aircraft.adsb.true_heading)) {
-                const heading = this.normalizeHeading(aircraft.adsb.true_heading);
-                if (heading !== null) return { value: heading, type: 'true' };
-            }
-            return { value: 0, type: null }; // Default fallback - no suffix when all are zeros
+
+            return result;
         },
 
         getHeadingSuffix(type) {
@@ -4532,7 +4664,7 @@ async initAircraftDataSource() {
                 case 'true':
                     return 'hdg(t)';
                 default:
-                    return 'hdg'; // No suffix when all are zeros
+                    return 'N/A';
             }
         },
 

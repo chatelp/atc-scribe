@@ -11,6 +11,16 @@ type FlexibleField struct {
 	value interface{}
 }
 
+func (f *FlexibleField) HasValue() bool {
+	if f == nil || f.value == nil {
+		return false
+	}
+	if s, ok := f.value.(string); ok {
+		return s != ""
+	}
+	return true
+}
+
 // UnmarshalJSON implements custom JSON unmarshaling for FlexibleField
 func (f *FlexibleField) UnmarshalJSON(data []byte) error {
 	// Try to unmarshal as a number first
@@ -40,50 +50,92 @@ func (f *FlexibleField) UnmarshalJSON(data []byte) error {
 
 // Float64 returns the value as a float64
 func (f *FlexibleField) Float64() float64 {
+	v, ok := f.Float64OK()
+	if !ok {
+		return 0
+	}
+	return v
+}
+
+func (f *FlexibleField) Float64OK() (float64, bool) {
 	switch v := f.value.(type) {
 	case float64:
-		return v
+		return v, true
 	case string:
-		if v == "" || v == "ground" {
-			return 0
+		if v == "" {
+			return 0, false
+		}
+		if v == "ground" {
+			return 0, true
 		}
 		f, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return 0
+			return 0, false
 		}
-		return f
+		return f, true
 	case bool:
 		if v {
-			return 1
+			return 1, true
 		}
-		return 0
+		return 0, true
 	default:
-		return 0
+		return 0, false
 	}
+}
+
+func (f *FlexibleField) Float64Ptr() *float64 {
+	if !f.HasValue() {
+		return nil
+	}
+	v, ok := f.Float64OK()
+	if !ok {
+		return nil
+	}
+	return &v
 }
 
 // Int returns the value as an int
 func (f *FlexibleField) Int() int {
+	v, ok := f.IntOK()
+	if !ok {
+		return 0
+	}
+	return v
+}
+
+func (f *FlexibleField) IntOK() (int, bool) {
+	if !f.HasValue() {
+		return 0, false
+	}
+
 	switch v := f.value.(type) {
 	case float64:
-		return int(v)
+		return int(v), true
 	case string:
 		if v == "" {
-			return 0
+			return 0, false
 		}
 		i, err := strconv.Atoi(v)
 		if err != nil {
-			return 0
+			return 0, false
 		}
-		return i
+		return i, true
 	case bool:
 		if v {
-			return 1
+			return 1, true
 		}
-		return 0
+		return 0, true
 	default:
-		return 0
+		return 0, false
 	}
+}
+
+func (f *FlexibleField) IntPtr() *int {
+	v, ok := f.IntOK()
+	if !ok {
+		return nil
+	}
+	return &v
 }
 
 // String returns the value as a string
@@ -179,48 +231,56 @@ func (e *ExternalADSBTarget) Convert() ADSBTarget {
 	}
 
 	// Convert numeric fields
-	target.AltBaro = FlexibleFloat64(e.AltBaro.Float64())
-	target.AltGeom = FlexibleFloat64(e.AltGeom.Float64())
-	target.GS = e.GS.Float64()
-	target.IAS = e.IAS.Float64()
-	target.TAS = e.TAS.Float64()
-	target.Mach = e.Mach.Float64()
-	target.WD = e.WD.Float64()
-	target.WS = e.WS.Float64()
-	target.OAT = e.OAT.Float64()
-	target.TAT = e.TAT.Float64()
-	target.Track = e.Track.Float64()
-	target.TrackRate = e.TrackRate.Float64()
-	target.Roll = e.Roll.Float64()
-	target.MagHeading = e.MagHeading.Float64()
-	target.TrueHeading = e.TrueHeading.Float64()
-	target.BaroRate = e.BaroRate.Float64()
-	target.GeomRate = e.GeomRate.Float64()
-	target.NavQNH = e.NavQNH.Float64()
-	target.NavAltitudeMCP = e.NavAltitudeMCP.Float64()
-	target.NavAltitudeFMS = e.NavAltitudeFMS.Float64()
-	target.NavHeading = e.NavHeading.Float64()
-	target.Lat = e.Lat.Float64()
-	target.Lon = e.Lon.Float64()
-	target.SeenPos = e.SeenPos.Float64()
-	target.RDst = e.RDst.Float64()
-	target.RDir = e.RDir.Float64()
-	target.RSSI = e.RSSI.Float64()
-	target.Seen = e.Seen.Float64()
+	if v, ok := e.AltBaro.Float64OK(); ok {
+		target.AltBaro = FlexibleFloat64(v)
+	} else {
+		target.AltBaro = NullFlexibleFloat64()
+	}
+	if v, ok := e.AltGeom.Float64OK(); ok {
+		target.AltGeom = FlexibleFloat64(v)
+	} else {
+		target.AltGeom = NullFlexibleFloat64()
+	}
+	target.GS = e.GS.Float64Ptr()
+	target.IAS = e.IAS.Float64Ptr()
+	target.TAS = e.TAS.Float64Ptr()
+	target.Mach = e.Mach.Float64Ptr()
+	target.WD = e.WD.Float64Ptr()
+	target.WS = e.WS.Float64Ptr()
+	target.OAT = e.OAT.Float64Ptr()
+	target.TAT = e.TAT.Float64Ptr()
+	target.Track = e.Track.Float64Ptr()
+	target.TrackRate = e.TrackRate.Float64Ptr()
+	target.Roll = e.Roll.Float64Ptr()
+	target.MagHeading = e.MagHeading.Float64Ptr()
+	target.TrueHeading = e.TrueHeading.Float64Ptr()
+	target.BaroRate = e.BaroRate.Float64Ptr()
+	target.GeomRate = e.GeomRate.Float64Ptr()
+	target.NavQNH = e.NavQNH.Float64Ptr()
+	target.NavAltitudeMCP = e.NavAltitudeMCP.Float64Ptr()
+	target.NavAltitudeFMS = e.NavAltitudeFMS.Float64Ptr()
+	target.NavHeading = e.NavHeading.Float64Ptr()
+	target.Lat = e.Lat.Float64Ptr()
+	target.Lon = e.Lon.Float64Ptr()
+	target.SeenPos = e.SeenPos.Float64Ptr()
+	target.RDst = e.RDst.Float64Ptr()
+	target.RDir = e.RDir.Float64Ptr()
+	target.RSSI = e.RSSI.Float64Ptr()
+	target.Seen = e.Seen.Float64Ptr()
 
 	// Convert integer fields
-	target.NIC = e.NIC.Int()
-	target.RC = e.RC.Int()
-	target.Version = e.Version.Int()
-	target.NICBaro = e.NICBaro.Int()
-	target.NACP = e.NACP.Int()
-	target.NACV = e.NACV.Int()
-	target.SIL = e.SIL.Int()
-	target.GVA = e.GVA.Int()
-	target.SDA = e.SDA.Int()
-	target.Alert = e.Alert.Int()
-	target.SPI = e.SPI.Int()
-	target.Messages = e.Messages.Int()
+	target.NIC = e.NIC.IntPtr()
+	target.RC = e.RC.IntPtr()
+	target.Version = e.Version.IntPtr()
+	target.NICBaro = e.NICBaro.IntPtr()
+	target.NACP = e.NACP.IntPtr()
+	target.NACV = e.NACV.IntPtr()
+	target.SIL = e.SIL.IntPtr()
+	target.GVA = e.GVA.IntPtr()
+	target.SDA = e.SDA.IntPtr()
+	target.Alert = e.Alert.IntPtr()
+	target.SPI = e.SPI.IntPtr()
+	target.Messages = e.Messages.IntPtr()
 
 	return target
 }

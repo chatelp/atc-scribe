@@ -142,6 +142,7 @@ func (tt *TrajectoryTracker) ruleCruise(d *DerivedState) string {
 // ruleApproach detects aircraft on final approach to land.
 //
 // Conditions (ALL must be true):
+//   - Below approach_max_altitude_ft (default 5000 ft)
 //   - Not climbing (descending or level — covers localizer intercept before glideslope)
 //   - Closing on station (distance decreasing)
 //   - Aligned with a runway centerline (within centerline tolerance + max distance)
@@ -152,14 +153,18 @@ func (tt *TrajectoryTracker) ruleCruise(d *DerivedState) string {
 // on the localizer, even before glideslope intercept when it may still be level.
 // Requiring a 30-second established descent trend (IsDescending) would delay APP
 // detection by 30+ seconds after the aircraft turns final — unacceptable for ATC.
-//
-// No hard altitude ceiling is applied. The runway geometry constraints (centerline
-// tolerance of 0.5 NM, max distance of 10 NM, heading alignment) naturally limit
-// approach detection to realistic altitudes. Cruise-altitude aircraft are already
-// claimed by ruleCruise at higher priority.
 func (tt *TrajectoryTracker) ruleApproach(aircraft *Aircraft, d *DerivedState) string {
 	cfg := tt.phasesConfig
 	adsb := aircraft.ADSB
+	lat, lon, hasPosition := adsb.Position()
+	if !hasPosition {
+		return ""
+	}
+
+	// Must be below the approach altitude ceiling
+	if d.AltMean > float64(cfg.ApproachMaxAltitudeFt) {
+		return ""
+	}
 
 	// Must not be climbing — descending or level are both valid approach states.
 	// An aircraft established on the localizer before glideslope intercept is level,
@@ -174,19 +179,35 @@ func (tt *TrajectoryTracker) ruleApproach(aircraft *Aircraft, d *DerivedState) s
 	}
 
 	// Check runway alignment using the latest position
-	runwayInfo := DetectRunwayApproach(adsb.Lat, adsb.Lon, adsb.Track, d.AltMean, tt.runwayData, *cfg)
+	runwayInfo := DetectRunwayApproach(lat, lon, NumberOrZero(adsb.Track), d.AltMean, tt.runwayData, *cfg)
 	if runwayInfo == nil || !runwayInfo.OnApproach {
 		return ""
 	}
 
+	// Filter by active runway — suppress approaches to non-active runways
+	// (e.g. perpendicular cross-runway during a base turn). During startup
+	// grace (no data), IsActiveRunway returns true for all.
+	if tt.runwayTracker != nil && !tt.runwayTracker.IsActiveRunway(runwayInfo.RunwayID) {
+		tt.logger.Debug("Approach rejected (runway not active)",
+			logger.String("hex", aircraft.Hex),
+			logger.String("runway", runwayInfo.RunwayID),
+		)
+		return ""
+	}
+
 	// Verify heading toward airport (bearing difference <= 90°)
-	bearingToStation := CalculateBearing(adsb.Lat, adsb.Lon, tt.stationLat, tt.stationLon)
-	headingDiff := math.Abs(adsb.Track - bearingToStation)
+	bearingToStation := CalculateBearing(lat, lon, tt.stationLat, tt.stationLon)
+	headingDiff := math.Abs(NumberOrZero(adsb.Track) - bearingToStation)
 	if headingDiff > 180 {
 		headingDiff = 360 - headingDiff
 	}
 	if headingDiff > 90 {
 		return ""
+	}
+
+	// Record evidence for runway-in-use detection
+	if tt.runwayTracker != nil {
+		tt.runwayTracker.RecordEvent(runwayInfo.RunwayID, RunwayEventApproach, aircraft.Hex)
 	}
 
 	return "APP"
@@ -197,14 +218,18 @@ func (tt *TrajectoryTracker) ruleApproach(aircraft *Aircraft, d *DerivedState) s
 // side, CLB requires evidence of a recent takeoff plus initial-climb indicators:
 // runway departure heading, acceleration, or close proximity to the airport.
 //
-// Conditions (ALL must be true):
-//   - Climbing (trajectory trend)
-//   - Below cruise altitude
-//   - Recent takeoff from our airport (DB timestamp or proximity heuristic)
-//   - AND at least one initial-climb indicator:
-//     a) On runway departure heading (geometry check)
-//     b) Accelerating and departing from station
-//     c) Still within airport vicinity (within AirportRangeNM)
+// Two paths to CLB:
+//
+// Path A (observed takeoff): Recent T/O record in DB + climbing + any indicator:
+//
+//	a) On runway departure heading
+//	b) Accelerating and departing from station
+//	c) Still within airport vicinity
+//
+// Path B (inferred takeoff): No T/O record, but aircraft appeared airborne
+// climbing on runway heading at low altitude near the airport. With spotty ADS-B
+// coverage, aircraft often first appear at ~1000 ft already climbing on the runway
+// centerline — this is an obvious takeoff that we missed on the ground.
 //
 // Once the aircraft turns off the SID heading, stops accelerating, and leaves the
 // airport area, CLB conditions no longer match and the aircraft transitions to DEP.
@@ -221,30 +246,49 @@ func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, take
 		return ""
 	}
 
-	// Must be a recent takeoff from our airport
-	if !tt.hasRecentTakeoff(aircraft, takeoffTime) {
-		return ""
+	// Check runway departure heading (used by both paths)
+	adsb := aircraft.ADSB
+	var departureInfo *RunwayDepartureInfo
+	if adsb != nil {
+		lat, lon, hasPosition := adsb.Position()
+		if hasPosition {
+			departureInfo = DetectRunwayDeparture(
+				lat, lon, NumberOrZero(adsb.Track),
+				tt.runwayData, tt.stationLat, tt.stationLon, *cfg,
+			)
+		}
 	}
 
-	// (a) On runway departure heading
-	adsb := aircraft.ADSB
-	if adsb != nil {
-		departureInfo := DetectRunwayDeparture(
-			adsb.Lat, adsb.Lon, adsb.Track,
-			tt.runwayData, tt.stationLat, tt.stationLon, *cfg,
-		)
+	// ── Path A: Observed takeoff ──
+	if tt.hasRecentTakeoff(aircraft, takeoffTime) {
+		// (a) On runway departure heading
 		if departureInfo != nil && departureInfo.OnDeparture {
+			if tt.runwayTracker != nil {
+				tt.runwayTracker.RecordEvent(departureInfo.RunwayID, RunwayEventClimb, aircraft.Hex)
+			}
+			return "CLB"
+		}
+
+		// (b) Accelerating and departing from station
+		if d.IsAccelerating && d.DistTrendNMPerSec > 0.001 {
+			return "CLB"
+		}
+
+		// (c) Still within airport vicinity
+		if d.DistToStationNM <= cfg.AirportRangeNM {
 			return "CLB"
 		}
 	}
 
-	// (b) Accelerating and departing from station
-	if d.IsAccelerating && d.DistTrendNMPerSec > 0.001 {
-		return "CLB"
-	}
-
-	// (c) Still within airport vicinity
-	if d.DistToStationNM <= cfg.AirportRangeNM {
+	// ── Path B: Inferred takeoff (appeared airborne, no T/O record) ──
+	// Aircraft climbing on runway departure heading, at low altitude, near the
+	// airport. With spotty ADS-B coverage this is the most common CLB scenario.
+	if departureInfo != nil && departureInfo.OnDeparture &&
+		d.AltMean <= float64(cfg.DepartureAltitudeFt) &&
+		d.DistToStationNM <= cfg.AirportRangeNM {
+		if tt.runwayTracker != nil {
+			tt.runwayTracker.RecordEvent(departureInfo.RunwayID, RunwayEventClimb, aircraft.Hex)
+		}
 		return "CLB"
 	}
 
@@ -325,18 +369,55 @@ func (tt *TrajectoryTracker) singlePointPhase(aircraft *Aircraft) string {
 	if aircraft.OnGround {
 		adsb := aircraft.ADSB
 		cfg := tt.phasesConfig
-		if adsb.GS >= float64(cfg.TaxiingMinSpeedKts) && adsb.GS <= float64(cfg.TaxiingMaxSpeedKts) {
+		groundSpeed := NumberOrZero(adsb.GS)
+		if groundSpeed >= float64(cfg.TaxiingMinSpeedKts) && groundSpeed <= float64(cfg.TaxiingMaxSpeedKts) {
 			return "TAX"
 		}
 		return "NEW"
 	}
 
-	// Airborne with just one data point — use altitude as primary discriminator
-	alt := aircraft.ADSB.AltBaro.Float64()
-	cruiseAlt := float64(tt.phasesConfig.CruiseAltitudeFt)
+	// Airborne with just one data point — use altitude as primary discriminator.
+	//
+	// First observations are often weak Mode S contacts with incomplete data:
+	// Track=0 (no heading), AltBaro=0 (no altitude), Lat/Lon=0 (no position).
+	// We must guard against treating these zero values as real measurements.
+	adsb := aircraft.ADSB
+	alt := adsb.AltBaro.Float64()
+	cfg := tt.phasesConfig
+	cruiseAlt := float64(cfg.CruiseAltitudeFt)
+	hasPosition := adsb.HasPosition()
+	hasTrack := NumberOrZero(adsb.Track) != 0 || NumberOrZero(adsb.MagHeading) != 0 || NumberOrZero(adsb.TrueHeading) != 0
+	hasAltitude := alt > 0
 
-	if alt >= cruiseAlt {
+	if hasAltitude && alt >= cruiseAlt {
 		return "CRZ"
+	}
+
+	// Low altitude, near airport, on runway departure heading → likely CLB.
+	// Requires real position, heading, and altitude data (not Mode S zeros).
+	// When the active runway is known, also accept aircraft on its heading
+	// even without full runway geometry match — very strong signal.
+	if hasPosition && hasTrack && hasAltitude && alt <= float64(cfg.DepartureAltitudeFt) {
+		lat, lon, _ := adsb.Position()
+		track := NumberOrZero(adsb.Track)
+		if track == 0 && NumberOrZero(adsb.MagHeading) != 0 {
+			track = NumberOrZero(adsb.MagHeading)
+		}
+		distToStation := MetersToNM(Haversine(lat, lon, tt.stationLat, tt.stationLon))
+		if distToStation <= cfg.AirportRangeNM {
+			departureInfo := DetectRunwayDeparture(
+				lat, lon, track,
+				tt.runwayData, tt.stationLat, tt.stationLon, *cfg,
+			)
+			if departureInfo != nil && departureInfo.OnDeparture {
+				// Extra confidence: matches the known active runway
+				if tt.runwayTracker != nil && tt.runwayTracker.IsActiveRunway(departureInfo.RunwayID) {
+					return "CLB"
+				}
+				// No active runway data yet — still accept if geometry matches
+				return "CLB"
+			}
+		}
 	}
 
 	// Below cruise, single data point — we can't determine trend, so UNK
@@ -362,6 +443,30 @@ func (tt *TrajectoryTracker) fewPointsAirbornePhase(
 	// Recent takeoff from our airport and climbing = initial climb out
 	if tt.hasRecentTakeoff(aircraft, takeoffTime) && d.VRMean > 0 {
 		return "CLB"
+	}
+
+	// Inferred takeoff: climbing on runway heading, low altitude, near airport.
+	// With spotty ADS-B coverage, aircraft often first appear already airborne.
+	// Use MagHeading as fallback when Track is 0 (common with early Mode S contacts).
+	if d.VRMean > 0 && d.AltMean <= float64(tt.phasesConfig.DepartureAltitudeFt) &&
+		d.DistToStationNM <= tt.phasesConfig.AirportRangeNM && aircraft.ADSB != nil {
+		lat, lon, hasPosition := aircraft.ADSB.Position()
+		if !hasPosition {
+			return "UNK"
+		}
+		track := NumberOrZero(aircraft.ADSB.Track)
+		if track == 0 && NumberOrZero(aircraft.ADSB.MagHeading) != 0 {
+			track = NumberOrZero(aircraft.ADSB.MagHeading)
+		}
+		if track != 0 {
+			departureInfo := DetectRunwayDeparture(
+				lat, lon, track,
+				tt.runwayData, tt.stationLat, tt.stationLon, *tt.phasesConfig,
+			)
+			if departureInfo != nil && departureInfo.OnDeparture {
+				return "CLB"
+			}
+		}
 	}
 
 	// Climbing and moving away from station = general departure

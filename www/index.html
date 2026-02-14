@@ -177,7 +177,7 @@
                                                 <input type="range"
                                                        x-model.number="$store.atc.settings.aircraftAnimation.interpolationFps"
                                                        min="5"
-                                                       max="30"
+                                                       max="60"
                                                        step="5"
                                                        @input="$store.atc.saveSettings()"
                                                        class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
@@ -936,7 +936,7 @@
                                             <!-- Heading cell -->
                                             <div class="p-1.5 text-right w-[55px]">
                                                 <div class="flex flex-col items-end">
-                                                    <span class="text-sm" x-text="Math.round($store.atc.getHeadingWithType(aircraft).value) + '°'"></span>
+                                                    <span class="text-sm" x-text="$store.atc.getHeadingDisplayText(aircraft)"></span>
                                                     <span class="text-[9px] text-gray-400 -mt-0.5" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType(aircraft).type)"></span>
                                                 </div>
                                             </div>
@@ -1040,7 +1040,7 @@
                                 <!-- Heading cell -->
                                 <div class="px-2.5 py-2 text-right w-[55px]">
                                     <div class="flex flex-col items-end">
-                                        <span class="text-sm" x-text="Math.round($store.atc.getHeadingWithType($store.atc.selectedAircraft).value) + '°'"></span>
+                                        <span class="text-sm" x-text="$store.atc.getHeadingDisplayText($store.atc.selectedAircraft)"></span>
                                         <span class="text-[9px] text-gray-400 -mt-0.5" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType($store.atc.selectedAircraft).type)"></span>
                                     </div>
                                 </div>
@@ -1251,10 +1251,10 @@
                                                 </td>
                                             </tr>
                                         </template>
-                                        <template x-for="(position, index) in $store.atc.aircraftDetailsFutureData" :key="'future-'+index">
+                                        <template x-for="(position, index) in $store.atc.getFutureDataForTable()" :key="'future-'+index">
                                             <tr class="hover:bg-hover/50 transition-colors">
                                                 <td class="p-1.5 text-left border-b border-border text-gray-400">
-                                                    <span x-text="'+' + (index + 1) + ' min'"></span>
+                                                    <span x-text="$store.atc.formatPredictionTime(position)"></span>
                                                 </td>
                                                 <td class="p-1.5 text-right border-b border-border text-gray-400">
                                                     <div class="flex items-center justify-end">
@@ -1263,7 +1263,13 @@
                                                            x-show="position.altitude < 0"></i>
                                                     </div>
                                                 </td>
-                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="Math.round(position.mag_heading) + '°'"></td>
+                                                <td class="p-1.5 text-right border-b border-border text-gray-400"
+                                                    :title="$store.atc.getHeadingSuffix($store.atc.getHeadingWithTypeFromAdsb(position).type)">
+                                                    <div class="flex flex-col items-end leading-tight">
+                                                        <span x-text="$store.atc.getHeadingDisplayTextFromAdsb(position)"></span>
+                                                        <span class="text-[9px] text-gray-500" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithTypeFromAdsb(position).type)"></span>
+                                                    </div>
+                                                </td>
                                                 <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="Math.round(position.speed_true)"></td>
                                                 <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="Math.round(position.speed_gs)"></td>
                                                 <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="position.distance !== undefined && position.distance !== null ? position.distance : '-'"></td>
@@ -1278,32 +1284,62 @@
                                                 </td>
                                             </tr>
                                         </template>
-                                        <template x-for="(position, index) in $store.atc.aircraftDetailsHistoryData" :key="'history-'+index">
-                                            <tr class="hover:bg-hover/50 transition-colors"
-                                                @mouseenter="$store.atc.highlightPositionOnMap(position)"
-                                                @mouseleave="$store.atc.clearPositionHighlight()"
-                                                :class="{
-                                                    'border-t-2 border-t-amber-500': $store.atc.hasSignificantTimeGap(position, index),
-                                                    'bg-highlight/20 border-highlight/50': position.id && $store.atc.highlightedAdsbId && position.id == $store.atc.highlightedAdsbId
-                                                }">
-                                                <td class="p-1.5 text-left border-b border-border whitespace-nowrap">
-                                                    <span x-text="$store.atc.formatDate(position.timestamp, true)"></span>
-                                                    <span class="text-text/70 text-[10px] ml-1" x-text="Math.floor((new Date() - new Date(position.timestamp)) / 1000) + 's'"></span>
-                                                    <span x-show="position.lat === 0 && position.lon === 0"
-                                                          title="Mode S — no GPS position"
-                                                          class="text-[8px] text-yellow-600/80 font-medium ml-1">S</span>
-                                                </td>
-                                                <td class="p-1.5 text-right border-b border-border">
-                                                    <div class="flex items-center justify-end">
-                                                        <span x-text="Math.round(position.altitude/100)*100"></span>
-                                                        <i :class="[$store.atc.aircraftDetailsGetAltitudeTrend(position, index), $store.atc.aircraftDetailsGetAltitudeTrendClass(position, index), 'ml-1']"
-                                                           :title="position.altitude > 0 ? Math.round(position.altitude) + ' ft / ' + Math.round(position.altitude * 0.3048) + ' m' : Math.round(position.altitude) + ' ft'"></i>
-                                                    </div>
-                                                </td>
-                                                <td class="p-1.5 text-right border-b border-border" x-text="Math.round(position.mag_heading) + '°'"></td>
-                                                <td class="p-1.5 text-right border-b border-border" x-text="Math.round(position.speed_true)"></td>
-                                                <td class="p-1.5 text-right border-b border-border" x-text="Math.round(position.speed_gs)"></td>
-                                                <td class="p-1.5 text-right border-b border-border" x-text="position.distance !== undefined && position.distance !== null ? position.distance : '-'"></td>
+                                        <template x-for="(item, idx) in $store.atc.getFilteredHistoryData()" :key="'history-'+idx">
+                                            <tr :class="{
+                                                    'select-none': item.type === 'divider',
+                                                    'hover:bg-hover/50 transition-colors': item.type === 'row',
+                                                    'border-t-2 border-t-amber-500': item.type === 'row' && $store.atc.hasSignificantTimeGap(item.position, item.originalIndex),
+                                                    'bg-highlight/20 border-highlight/50': item.type === 'row' && item.position?.id && $store.atc.highlightedAdsbId && item.position.id == $store.atc.highlightedAdsbId
+                                                }"
+                                                @mouseenter="item.type === 'row' && $store.atc.highlightPositionOnMap(item.position)"
+                                                @mouseleave="item.type === 'row' && $store.atc.clearPositionHighlight()">
+                                                <!-- Divider row -->
+                                                <template x-if="item.type === 'divider'">
+                                                    <td colspan="6" class="py-0.5">
+                                                        <div class="flex items-center gap-2 px-1.5">
+                                                            <div class="flex-1 border-t border-gray-600/30"></div>
+                                                            <span class="text-[9px] text-gray-500" x-text="item.count + ' unchanged'"></span>
+                                                            <div class="flex-1 border-t border-gray-600/30"></div>
+                                                        </div>
+                                                    </td>
+                                                </template>
+                                                <!-- Data row -->
+                                                <template x-if="item.type === 'row'">
+                                                    <td class="p-1.5 text-left whitespace-nowrap" :class="{ 'border-b border-border': !item.beforeDivider }">
+                                                        <span x-text="$store.atc.formatDate(item.position.timestamp, true)"></span>
+                                                        <span class="text-text/70 text-[10px] ml-1" x-text="Math.floor((new Date() - new Date(item.position.timestamp)) / 1000) + 's'"></span>
+                                                        <span x-show="item.position.lat === 0 && item.position.lon === 0"
+                                                              title="Mode S — no GPS position"
+                                                              class="text-[8px] text-yellow-600/80 font-medium ml-1">S</span>
+                                                    </td>
+                                                </template>
+                                                <template x-if="item.type === 'row'">
+                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }">
+                                                        <div class="flex items-center justify-end">
+                                                            <span x-text="Math.round(item.position.altitude/100)*100"></span>
+                                                            <i :class="[$store.atc.aircraftDetailsGetAltitudeTrend(item.position, item.originalIndex), $store.atc.aircraftDetailsGetAltitudeTrendClass(item.position, item.originalIndex), 'ml-1']"
+                                                               :title="item.position.altitude > 0 ? Math.round(item.position.altitude) + ' ft / ' + Math.round(item.position.altitude * 0.3048) + ' m' : Math.round(item.position.altitude) + ' ft'"></i>
+                                                        </div>
+                                                    </td>
+                                                </template>
+                                                <template x-if="item.type === 'row'">
+                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }"
+                                                        :title="$store.atc.getHeadingSuffix($store.atc.getHeadingWithTypeFromAdsb(item.position).type)">
+                                                        <div class="flex flex-col items-end leading-tight">
+                                                            <span x-text="$store.atc.getHeadingDisplayTextFromAdsb(item.position)"></span>
+                                                            <span class="text-[9px] text-gray-500" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithTypeFromAdsb(item.position).type)"></span>
+                                                        </div>
+                                                    </td>
+                                                </template>
+                                                <template x-if="item.type === 'row'">
+                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }" x-text="Math.round(item.position.speed_true)"></td>
+                                                </template>
+                                                <template x-if="item.type === 'row'">
+                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }" x-text="Math.round(item.position.speed_gs)"></td>
+                                                </template>
+                                                <template x-if="item.type === 'row'">
+                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }" x-text="item.position.distance !== undefined && item.position.distance !== null ? item.position.distance : '-'"></td>
+                                                </template>
                                             </tr>
                                         </template>
                                     </tbody>
@@ -1847,6 +1883,29 @@
                     </div>
                 </div>
                 
+                <!-- Runway In Use Indicator -->
+                <div class="flex-shrink-0 h-full flex items-center px-4 mr-2 border-l border-r border-border/30">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="flex flex-col items-center justify-center min-w-[36px]">
+                            <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5">RWY</span>
+                            <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 0">
+                                <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
+                                      x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[0].runway_end)"></span>
+                            </template>
+                            <template x-if="!$store.atc.runwayInUse || $store.atc.runwayInUse.length === 0">
+                                <span class="font-mono text-sm text-text/25 leading-none tracking-wider">---</span>
+                            </template>
+                        </div>
+                        <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15">
+                            <div class="flex flex-col items-center justify-center opacity-35 border-l border-border/20 pl-2.5">
+                                <span class="text-[7px] text-text/30 uppercase tracking-[0.2em] leading-none mb-0.5">ALT</span>
+                                <span class="font-mono text-xs text-text/50 leading-none tracking-wider"
+                                      x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[1].runway_end)"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
                 <!-- Right side - Stacked Clocks -->
                 <div class="flex-shrink-0 h-full flex items-center pr-4 pl-2">
                     <div class="font-mono text-xs flex flex-col items-end justify-center space-y-1">

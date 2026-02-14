@@ -175,6 +175,7 @@ type FlightPhasesConfig struct {
 	TaxiingMaxSpeedKts            int     `toml:"taxiing_max_speed_kts"`            // Maximum ground speed for taxiing
 	ApproachCenterlineToleranceNM float64 `toml:"approach_centerline_tolerance_nm"` // Distance from runway centerline
 	ApproachMaxDistanceNM         int     `toml:"approach_max_distance_nm"`         // Maximum distance from runway threshold
+	ApproachMaxAltitudeFt         int     `toml:"approach_max_altitude_ft"`         // Maximum altitude for approach phase detection
 	ApproachHeadingToleranceDeg   float64 `toml:"approach_heading_tolerance_deg"`   // Heading alignment tolerance
 
 	// Timeout configurations - grouped together for clarity
@@ -231,6 +232,15 @@ type FlightPhasesConfig struct {
 	TrajectoryClimbThresholdFPM    float64 `toml:"trajectory_climb_threshold_fpm"`    // Altitude trend above this = climbing (default: 200)
 	TrajectoryLevelBandFt          float64 `toml:"trajectory_level_band_ft"`          // (AltMax-AltMin) within this = level flight (default: 200)
 	TrajectoryTurningRateDeg       float64 `toml:"trajectory_turning_rate_deg"`       // |TrackRate| above this = turning (default: 1.5 deg/sec)
+
+	// Runway-in-use detection
+	// Observes aircraft approach/landing/departure patterns to determine which runway
+	// ends are currently active. Used to suppress false APP on perpendicular runways.
+	RunwayInUseWindowMinutes  int     `toml:"runway_in_use_window_minutes"`  // Rolling evidence window (default: 60)
+	RunwayInUseApproachWeight float64 `toml:"runway_in_use_approach_weight"` // Weight for APP events (default: 2.0)
+	RunwayInUseLandingWeight  float64 `toml:"runway_in_use_landing_weight"`  // Weight for T/D events (default: 3.0)
+	RunwayInUseClimbWeight    float64 `toml:"runway_in_use_climb_weight"`    // Weight for CLB events (default: 2.0)
+	RunwayInUseDecayRate      float64 `toml:"runway_in_use_decay_rate"`      // Per-minute time decay (default: 0.98)
 }
 
 // Load loads the configuration from the specified file path
@@ -558,6 +568,9 @@ func (c *Config) ValidateFlightPhases() error {
 	if c.FlightPhases.SignalLostLandingMaxAltFt == 0 {
 		c.FlightPhases.SignalLostLandingMaxAltFt = 1000.0
 	}
+	if c.FlightPhases.ApproachMaxAltitudeFt == 0 {
+		c.FlightPhases.ApproachMaxAltitudeFt = 5000
+	}
 
 	// Trajectory defaults
 	if c.FlightPhases.TrajectoryBufferDurationSec == 0 {
@@ -583,6 +596,23 @@ func (c *Config) ValidateFlightPhases() error {
 	}
 	if c.FlightPhases.TrajectoryTurningRateDeg == 0 {
 		c.FlightPhases.TrajectoryTurningRateDeg = 1.5
+	}
+
+	// Runway-in-use defaults
+	if c.FlightPhases.RunwayInUseWindowMinutes == 0 {
+		c.FlightPhases.RunwayInUseWindowMinutes = 60
+	}
+	if c.FlightPhases.RunwayInUseApproachWeight == 0 {
+		c.FlightPhases.RunwayInUseApproachWeight = 5.0
+	}
+	if c.FlightPhases.RunwayInUseLandingWeight == 0 {
+		c.FlightPhases.RunwayInUseLandingWeight = 3.0
+	}
+	if c.FlightPhases.RunwayInUseClimbWeight == 0 {
+		c.FlightPhases.RunwayInUseClimbWeight = 1.5
+	}
+	if c.FlightPhases.RunwayInUseDecayRate == 0 {
+		c.FlightPhases.RunwayInUseDecayRate = 0.98
 	}
 
 	// Validate altitude thresholds

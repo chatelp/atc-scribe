@@ -80,10 +80,10 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 	// Compare ADSB data
 	if previous.ADSB != nil && current.ADSB != nil {
 		// Position
-		if previous.ADSB.Lat != current.ADSB.Lat {
+		if !floatPtrEqual(previous.ADSB.Lat, current.ADSB.Lat) {
 			delta["lat"] = current.ADSB.Lat
 		}
-		if previous.ADSB.Lon != current.ADSB.Lon {
+		if !floatPtrEqual(previous.ADSB.Lon, current.ADSB.Lon) {
 			delta["lon"] = current.ADSB.Lon
 		}
 
@@ -98,17 +98,17 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 		}
 
 		// Ground Speed
-		if previous.ADSB.GS != current.ADSB.GS {
+		if !floatPtrEqual(previous.ADSB.GS, current.ADSB.GS) {
 			delta["gs"] = current.ADSB.GS
 		}
 
 		// True Airspeed
-		if previous.ADSB.TAS != current.ADSB.TAS {
+		if !floatPtrEqual(previous.ADSB.TAS, current.ADSB.TAS) {
 			delta["tas"] = current.ADSB.TAS
 		}
 
 		// Barometric Rate
-		if previous.ADSB.BaroRate != current.ADSB.BaroRate {
+		if !floatPtrEqual(previous.ADSB.BaroRate, current.ADSB.BaroRate) {
 			delta["baro_rate"] = current.ADSB.BaroRate
 		}
 

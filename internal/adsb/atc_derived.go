@@ -13,7 +13,9 @@ func computeATCDerivedMetrics(target *ADSBTarget, distanceNm *float64) *ATCDeriv
 
 	derived := &ATCDerivedMetrics{}
 
-	isMoving := target.GS > 25 || target.TAS > 25
+	gs := NumberOrZero(target.GS)
+	tas := NumberOrZero(target.TAS)
+	isMoving := gs > 25 || tas > 25
 
 	track, hasTrack := pickHeadingLikeValue(target.Track, isMoving)
 	referenceHeading, headingSource, hasHeading := pickReferenceHeading(target, isMoving)
@@ -27,26 +29,29 @@ func computeATCDerivedMetrics(target *ADSBTarget, distanceNm *float64) *ATCDeriv
 		derived.TrackHeadingErrorDeg = floatPtr(drift)
 	}
 
-	if hasTrack && target.WD >= 0 && target.WS > 0 {
-		headwind, crosswind := physics.WindComponents(track, target.WD, target.WS)
+	windDir := NumberOrZero(target.WD)
+	windSpeed := NumberOrZero(target.WS)
+	if hasTrack && windDir >= 0 && windSpeed > 0 {
+		headwind, crosswind := physics.WindComponents(track, windDir, windSpeed)
 		derived.HeadTailwindKt = floatPtr(headwind)
 		derived.CrosswindKt = floatPtr(crosswind)
 	}
 
 	verticalRate, hasVerticalRate := pickVerticalRate(target)
-	if hasVerticalRate && target.GS > 1 {
-		fpa := physics.FlightPathAngleDeg(verticalRate, target.GS)
-		gradient := physics.ClimbGradientFtPerNm(verticalRate, target.GS)
+	if hasVerticalRate && gs > 1 {
+		fpa := physics.FlightPathAngleDeg(verticalRate, gs)
+		gradient := physics.ClimbGradientFtPerNm(verticalRate, gs)
 		derived.FlightPathAngleDeg = floatPtr(fpa)
 		derived.ClimbGradientFtNm = floatPtr(gradient)
 	}
 
-	if math.Abs(target.TrackRate) > 0 {
-		derived.TurnRateDegSec = floatPtr(target.TrackRate)
+	trackRate := NumberOrZero(target.TrackRate)
+	if math.Abs(trackRate) > 0 {
+		derived.TurnRateDegSec = floatPtr(trackRate)
 	}
 
-	if distanceNm != nil && *distanceNm >= 0 && target.GS > 30 {
-		etaSec := (*distanceNm / target.GS) * 3600.0
+	if distanceNm != nil && *distanceNm >= 0 && gs > 30 {
+		etaSec := (*distanceNm / gs) * 3600.0
 		derived.ETAStationSec = floatPtr(etaSec)
 	}
 
@@ -77,22 +82,28 @@ func pickReferenceHeading(target *ADSBTarget, moving bool) (float64, string, boo
 	return 0, "", false
 }
 
-func pickHeadingLikeValue(value float64, moving bool) (float64, bool) {
-	if value > 0 && value < 360 {
-		return value, true
+func pickHeadingLikeValue(value *float64, moving bool) (float64, bool) {
+	if value == nil {
+		return 0, false
 	}
-	if value == 0 && moving {
+	v := *value
+	if v > 0 && v < 360 {
+		return v, true
+	}
+	if v == 0 && moving {
 		return 0, true
 	}
 	return 0, false
 }
 
 func pickVerticalRate(target *ADSBTarget) (float64, bool) {
-	if target.BaroRate != 0 {
-		return target.BaroRate, true
+	baroRate := NumberOrZero(target.BaroRate)
+	if baroRate != 0 {
+		return baroRate, true
 	}
-	if target.GeomRate != 0 {
-		return target.GeomRate, true
+	geomRate := NumberOrZero(target.GeomRate)
+	if geomRate != 0 {
+		return geomRate, true
 	}
 	return 0, false
 }

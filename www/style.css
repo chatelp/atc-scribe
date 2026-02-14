@@ -70,15 +70,21 @@
 }
 
 .aircraft-label-inactive {
-    /* @apply opacity-60 border-dashed; */
-    opacity: 0.6;
     @apply border-dashed;
 }
 
 .aircraft-label-signal-lost {
-    /* @apply opacity-40 border-dashed; */
-    opacity: 0.4;
     @apply border-dashed;
+}
+
+/* Age-based stale styling — applied when last ADS-B data is >=60s old */
+.aircraft-label-age-stale {
+    border-color: rgba(255, 255, 255, 0.3) !important;
+    border-style: dashed !important;
+}
+
+.aircraft-label-age-stale .font-bold {
+    color: #e5e5e5 !important; /* neutral white */
 }
 
 /* Trend indicators */
@@ -764,6 +770,40 @@ input[type=range].dual-range-max:focus {
 /* Smooth transitions for interpolated movement */
 .aircraft-icon-container {
     transition: transform 0.1s linear;
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+    overflow: visible;
+}
+
+.aircraft-icon-container img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    display: block;
+    filter: invert(1);
+    transition: filter 0.2s ease;
+}
+
+.aircraft-marker.altitude-band-cruise .aircraft-icon-container img {
+    filter: invert(1);
+}
+
+.aircraft-marker.altitude-band-high .aircraft-icon-container img {
+    filter: invert(89%) sepia(28%) saturate(1450%) hue-rotate(351deg) brightness(102%) contrast(96%);
+}
+
+.aircraft-marker.altitude-band-mid .aircraft-icon-container img {
+    filter: invert(72%) sepia(86%) saturate(2120%) hue-rotate(352deg) brightness(100%) contrast(96%);
+}
+
+.aircraft-marker.altitude-band-low .aircraft-icon-container img {
+    filter: invert(58%) sepia(89%) saturate(3020%) hue-rotate(343deg) brightness(97%) contrast(99%);
+}
+
+.aircraft-marker.altitude-band-very-low .aircraft-icon-container img {
+    filter: invert(41%) sepia(97%) saturate(4550%) hue-rotate(334deg) brightness(94%) contrast(101%);
 }
 
 /* Disable transitions during rapid updates for better performance */

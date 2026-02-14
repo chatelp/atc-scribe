@@ -143,11 +143,13 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 			// Use aircraft hex code
 			refAircraft, err = h.getRefAircraft(refHex)
 			if err == nil && refAircraft != nil && refAircraft.ADSB != nil {
-				refLatitude = refAircraft.ADSB.Lat
-				refLongitude = refAircraft.ADSB.Lon
-				refHeading = refAircraft.ADSB.TrueHeading
+				if lat, lon, ok := refAircraft.ADSB.Position(); ok {
+					refLatitude = lat
+					refLongitude = lon
+				}
+				refHeading = adsb.NumberOrZero(refAircraft.ADSB.TrueHeading)
 				if refHeading == 0 {
-					refHeading = refAircraft.ADSB.Track // Use track if true heading is not available
+					refHeading = adsb.NumberOrZero(refAircraft.ADSB.Track) // Use track if true heading is not available
 				}
 				refAltitude = refAircraft.ADSB.AltBaro.Float64()
 			}
@@ -166,9 +168,10 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 			filtered := make([]*adsb.Aircraft, 0)
 			for _, a := range aircraft {
 				// Skip aircraft with no position data
-				if a.ADSB == nil || (a.ADSB.Lat == 0 && a.ADSB.Lon == 0) {
+				if a.ADSB == nil || !a.ADSB.HasPosition() {
 					continue
 				}
+				lat, lon, _ := a.ADSB.Position()
 
 				// Skip grounded aircraft for proximity queries
 				if a.OnGround {
@@ -186,7 +189,7 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// Calculate distance
-				distMeters := adsb.Haversine(a.ADSB.Lat, a.ADSB.Lon, refLatitude, refLongitude)
+				distMeters := adsb.Haversine(lat, lon, refLatitude, refLongitude)
 				distNM := adsb.MetersToNM(distMeters)
 				distNM = math.Round(distNM*10) / 10 // Round to 1 decimal place
 
@@ -197,8 +200,8 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 					// 2. Distance from reference aircraft (relative distance field)
 
 					// Calculate distance from station for each aircraft
-					if a.ADSB != nil && a.ADSB.Lat != 0 && a.ADSB.Lon != 0 {
-						stationDistMeters := adsb.Haversine(a.ADSB.Lat, a.ADSB.Lon, h.config.Station.Latitude, h.config.Station.Longitude)
+					if a.ADSB != nil && a.ADSB.HasPosition() {
+						stationDistMeters := adsb.Haversine(lat, lon, h.config.Station.Latitude, h.config.Station.Longitude)
 						stationDistNM := adsb.MetersToNM(stationDistMeters)
 						stationDistNM = math.Round(stationDistNM*10) / 10 // Round to 1 decimal place
 						a.Distance = &stationDistNM
@@ -211,7 +214,7 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 					if refAircraft != nil && refHeading > 0 {
 						bearing := adsb.CalculateRelativeBearing(
 							refLatitude, refLongitude, refHeading,
-							a.ADSB.Lat, a.ADSB.Lon)
+							lat, lon)
 						a.RelativeBearing = &bearing
 
 						// Calculate relative altitude
@@ -259,9 +262,10 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 			// Include all aircraft that are not on ground, or grounded aircraft within airport range
 			if !a.OnGround {
 				filtered = append(filtered, a)
-			} else if a.ADSB != nil && a.ADSB.Lat != 0 && a.ADSB.Lon != 0 {
+			} else if a.ADSB != nil && a.ADSB.HasPosition() {
+				lat, lon, _ := a.ADSB.Position()
 				// Calculate distance from station for grounded aircraft
-				distMeters := adsb.Haversine(a.ADSB.Lat, a.ADSB.Lon, h.config.Station.Latitude, h.config.Station.Longitude)
+				distMeters := adsb.Haversine(lat, lon, h.config.Station.Latitude, h.config.Station.Longitude)
 				distNM := adsb.MetersToNM(distMeters)
 				if distNM <= airportRangeNM {
 					filtered = append(filtered, a)
@@ -276,8 +280,9 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		updateZeroValuesFromHistory(a)
 
 		// Calculate distance from station for each aircraft
-		if a.ADSB != nil && a.ADSB.Lat != 0 && a.ADSB.Lon != 0 {
-			distMeters := adsb.Haversine(a.ADSB.Lat, a.ADSB.Lon, h.config.Station.Latitude, h.config.Station.Longitude)
+		if a.ADSB != nil && a.ADSB.HasPosition() {
+			lat, lon, _ := a.ADSB.Position()
+			distMeters := adsb.Haversine(lat, lon, h.config.Station.Latitude, h.config.Station.Longitude)
 			distNM := adsb.MetersToNM(distMeters)
 			distNM = math.Round(distNM*10) / 10 // Round to 1 decimal place
 			a.Distance = &distNM
@@ -341,10 +346,25 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 	if simple {
 		simpleAircraft := make([]*adsb.AircraftSimple, 0, len(aircraft))
 		for _, a := range aircraft {
+			airlineName := strings.TrimSpace(a.Airline)
+			if airlineName == "" && h.refService != nil {
+				flight := strings.TrimSpace(strings.ToUpper(a.Flight))
+				if len(flight) >= 3 {
+					icaoCode := flight[:3]
+					if icaoCode[0] >= 'A' && icaoCode[0] <= 'Z' &&
+						icaoCode[1] >= 'A' && icaoCode[1] <= 'Z' &&
+						icaoCode[2] >= 'A' && icaoCode[2] <= 'Z' {
+						if resolved := strings.TrimSpace(h.refService.LookupAirline(icaoCode)); resolved != "" {
+							airlineName = resolved
+						}
+					}
+				}
+			}
+
 			sa := &adsb.AircraftSimple{
 				Hex:      a.Hex,
 				Callsign: a.Flight,
-				Airline:  a.Airline,
+				Airline:  airlineName,
 				Distance: a.Distance,
 				Status:   a.Status,
 			}
@@ -360,11 +380,26 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 				sa.Lat = a.ADSB.Lat
 				sa.Lon = a.ADSB.Lon
 				sa.AltBaro = math.Round(a.ADSB.AltBaro.Float64()/100) * 100
-				sa.GroundSpeed = math.Round(a.ADSB.GS)
-				sa.TrueAirspeed = math.Round(a.ADSB.TAS)
-				sa.Track = math.Round(a.ADSB.Track)
-				sa.MagHeading = math.Round(a.ADSB.MagHeading)
-				sa.VerticalRate = math.Round(a.ADSB.BaroRate/100) * 100
+				if a.ADSB.GS != nil {
+					v := math.Round(*a.ADSB.GS)
+					sa.GroundSpeed = &v
+				}
+				if a.ADSB.TAS != nil {
+					v := math.Round(*a.ADSB.TAS)
+					sa.TrueAirspeed = &v
+				}
+				if a.ADSB.Track != nil {
+					v := math.Round(*a.ADSB.Track)
+					sa.Track = &v
+				}
+				if a.ADSB.MagHeading != nil {
+					v := math.Round(*a.ADSB.MagHeading)
+					sa.MagHeading = &v
+				}
+				if a.ADSB.BaroRate != nil {
+					v := math.Round(*a.ADSB.BaroRate/100) * 100
+					sa.VerticalRate = &v
+				}
 				sa.Squawk = a.ADSB.Squawk
 				sa.Category = a.ADSB.Category
 				// Use ADSB type if BSDB type not available
@@ -438,8 +473,9 @@ func (h *Handler) GetAircraftByHex(w http.ResponseWriter, r *http.Request) {
 	updateZeroValuesFromHistory(aircraft)
 
 	// Calculate distance from station
-	if aircraft.ADSB != nil && aircraft.ADSB.Lat != 0 && aircraft.ADSB.Lon != 0 {
-		distMeters := haversine(aircraft.ADSB.Lat, aircraft.ADSB.Lon, h.config.Station.Latitude, h.config.Station.Longitude)
+	if aircraft.ADSB != nil && aircraft.ADSB.HasPosition() {
+		lat, lon, _ := aircraft.ADSB.Position()
+		distMeters := haversine(lat, lon, h.config.Station.Latitude, h.config.Station.Longitude)
 		distNM := math.Round(distMeters/1852.0*10) / 10 // Convert meters to nautical miles and round to 1 decimal place
 		aircraft.Distance = &distNM
 	}
@@ -448,6 +484,99 @@ func (h *Handler) GetAircraftByHex(w http.ResponseWriter, r *http.Request) {
 
 	// Write response
 	WriteJSON(w, http.StatusOK, aircraft)
+}
+
+// positionDedupHeading returns the best available heading (mag→track→true priority).
+// Returns -1 if no heading is available.
+func positionDedupHeading(p adsb.Position) float64 {
+	if p.MagHeading != nil {
+		return *p.MagHeading
+	}
+	if p.Track != nil {
+		return *p.Track
+	}
+	if p.TrueHeading != nil {
+		return *p.TrueHeading
+	}
+	return -1
+}
+
+// positionsMatchForDedup returns true if two positions have effectively the same
+// displayed values (altitude rounded to 100ft, heading, TAS, GS) within a
+// tolerance of 1. Distance is exempt.
+func positionsMatchForDedup(a, b adsb.Position) bool {
+	altA := math.Round(adsb.NumberOrZero(a.Altitude)/100) * 100
+	altB := math.Round(adsb.NumberOrZero(b.Altitude)/100) * 100
+	if a.Altitude != nil || b.Altitude != nil {
+		if a.Altitude == nil || b.Altitude == nil {
+			return false
+		}
+	}
+	if math.Abs(altA-altB) > 100 {
+		return false
+	}
+
+	hdgA := positionDedupHeading(a)
+	hdgB := positionDedupHeading(b)
+	if hdgA < 0 && hdgB < 0 {
+		// both missing — match
+	} else if hdgA < 0 || hdgB < 0 {
+		return false
+	} else if math.Abs(math.Round(hdgA)-math.Round(hdgB)) > 1 {
+		return false
+	}
+
+	if (a.SpeedTrue == nil) != (b.SpeedTrue == nil) {
+		return false
+	}
+	if math.Abs(math.Round(adsb.NumberOrZero(a.SpeedTrue))-math.Round(adsb.NumberOrZero(b.SpeedTrue))) > 1 {
+		return false
+	}
+	if (a.SpeedGS == nil) != (b.SpeedGS == nil) {
+		return false
+	}
+	if math.Abs(math.Round(adsb.NumberOrZero(a.SpeedGS))-math.Round(adsb.NumberOrZero(b.SpeedGS))) > 1 {
+		return false
+	}
+
+	return true
+}
+
+// deduplicateHistory removes consecutive positions with effectively identical
+// displayed values (tolerance of 1) and annotates remaining positions with
+// skip counts for the UI to show dividers.
+// SkippedBefore: N duplicate positions were omitted between the previous kept position and this one.
+// SkippedAfter: N trailing duplicate positions were omitted after the last kept position.
+func deduplicateHistory(positions []adsb.Position) []adsb.Position {
+	if len(positions) <= 1 {
+		return positions
+	}
+
+	result := make([]adsb.Position, 0, len(positions))
+	skippedCount := 0
+
+	for i := 0; i < len(positions); i++ {
+		if i > 0 && positionsMatchForDedup(positions[i], result[len(result)-1]) {
+			skippedCount++
+			continue
+		}
+
+		// New distinct row — annotate it with how many were skipped before it
+		pos := positions[i]
+		if skippedCount > 0 {
+			pos.SkippedBefore = skippedCount
+			skippedCount = 0
+		}
+
+		result = append(result, pos)
+	}
+
+	// Trailing duplicates at the end — annotate the last kept position
+	if skippedCount > 0 && len(result) > 0 {
+		result[len(result)-1].SkippedAfter = skippedCount
+	}
+
+	return result
 }
 
 // GetAircraftTracks returns both history and future tracks for an aircraft
@@ -487,18 +616,29 @@ func (h *Handler) GetAircraftTracks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Calculate distance for each historical position
+	filteredHistory := make([]adsb.Position, 0, len(history))
 	for i := range history {
-		if history[i].Lat != 0 && history[i].Lon != 0 {
-			distMeters := haversine(history[i].Lat, history[i].Lon, h.config.Station.Latitude, h.config.Station.Longitude)
-			distNM := math.Round(distMeters/1852.0*10) / 10 // Convert meters to nautical miles and round to 1 decimal place
-			history[i].Distance = &distNM
+		if history[i].Lat == nil || history[i].Lon == nil {
+			continue
 		}
+		if *history[i].Lat == 0 && *history[i].Lon == 0 {
+			continue
+		}
+		distMeters := haversine(*history[i].Lat, *history[i].Lon, h.config.Station.Latitude, h.config.Station.Longitude)
+		distNM := math.Round(distMeters/1852.0*10) / 10 // Convert meters to nautical miles and round to 1 decimal place
+		history[i].Distance = &distNM
+		filteredHistory = append(filteredHistory, history[i])
 	}
+	history = filteredHistory
+
+	// Deduplicate consecutive positions with identical displayed values
+	history = deduplicateHistory(history)
 
 	// Calculate current distance from station
 	var distance *float64
-	if aircraft.ADSB != nil && aircraft.ADSB.Lat != 0 && aircraft.ADSB.Lon != 0 {
-		distMeters := haversine(aircraft.ADSB.Lat, aircraft.ADSB.Lon, h.config.Station.Latitude, h.config.Station.Longitude)
+	if aircraft.ADSB != nil && aircraft.ADSB.HasPosition() {
+		lat, lon, _ := aircraft.ADSB.Position()
+		distMeters := haversine(lat, lon, h.config.Station.Latitude, h.config.Station.Longitude)
 		distNM := math.Round(distMeters/1852.0*10) / 10 // Convert meters to nautical miles and round to 1 decimal place
 		distance = &distNM
 	}
@@ -506,8 +646,8 @@ func (h *Handler) GetAircraftTracks(w http.ResponseWriter, r *http.Request) {
 	// Calculate distance for each future position
 	future := aircraft.Future
 	for i := range future {
-		if future[i].Lat != 0 && future[i].Lon != 0 {
-			distMeters := haversine(future[i].Lat, future[i].Lon, h.config.Station.Latitude, h.config.Station.Longitude)
+		if future[i].Lat != nil && future[i].Lon != nil {
+			distMeters := haversine(*future[i].Lat, *future[i].Lon, h.config.Station.Latitude, h.config.Station.Longitude)
 			distNM := math.Round(distMeters/1852.0*10) / 10 // Convert meters to nautical miles and round to 1 decimal place
 			future[i].Distance = &distNM
 		}
@@ -529,6 +669,7 @@ func (h *Handler) GetAircraftTracks(w http.ResponseWriter, r *http.Request) {
 		Distance:     distance,
 		History:      history,
 		Future:       future,
+		Hindcast:     aircraft.Hindcast,
 		PhaseHistory: phaseHistory,
 	}
 
@@ -542,8 +683,8 @@ func (h *Handler) GetAircraftTracks(w http.ResponseWriter, r *http.Request) {
 		for i, pos := range response.History[:min(3, len(response.History))] {
 			h.logger.Debug("History position",
 				logger.Int("index", i),
-				logger.Float64("mag_heading", pos.MagHeading),
-				logger.Float64("true_heading", pos.TrueHeading),
+				logger.Float64("mag_heading", adsb.NumberOrZero(pos.MagHeading)),
+				logger.Float64("true_heading", adsb.NumberOrZero(pos.TrueHeading)),
 				logger.String("timestamp", pos.Timestamp.Format(time.RFC3339)))
 		}
 	}
@@ -594,12 +735,14 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 	effectiveLat, effectiveLon := h.adsbService.GetEffectiveStationCoords()
 
 	stationCfg := struct {
-		Latitude      float64     `json:"latitude"`
-		Longitude     float64     `json:"longitude"`
-		ElevationFeet int         `json:"elevation_feet"`
-		AirportCode   string      `json:"airport_code"`
-		Runways       interface{} `json:"runways,omitempty"`
-		FetchErrors   []string    `json:"fetch_errors,omitempty"`
+		Latitude         float64            `json:"latitude"`
+		Longitude        float64            `json:"longitude"`
+		ElevationFeet    int                `json:"elevation_feet"`
+		CruiseAltitudeFt int                `json:"cruise_altitude_ft"`
+		AirportCode      string             `json:"airport_code"`
+		Runways          interface{}        `json:"runways,omitempty"`
+		RunwayInUse      []adsb.RunwayScore `json:"runway_in_use,omitempty"`
+		FetchErrors      []string           `json:"fetch_errors,omitempty"`
 		// Weather configuration flags
 		FetchMETAR  bool `json:"fetch_metar"`
 		FetchTAF    bool `json:"fetch_taf"`
@@ -607,14 +750,15 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 		// Station override information
 		OverrideActive bool `json:"override_active"`
 	}{
-		Latitude:       effectiveLat,
-		Longitude:      effectiveLon,
-		ElevationFeet:  h.config.Station.ElevationFeet,
-		AirportCode:    h.config.Station.AirportCode,
-		FetchMETAR:     h.config.Weather.FetchMETAR,
-		FetchTAF:       h.config.Weather.FetchTAF,
-		FetchNOTAMs:    h.config.Weather.FetchNOTAMs,
-		OverrideActive: effectiveLat != h.config.Station.Latitude || effectiveLon != h.config.Station.Longitude,
+		Latitude:         effectiveLat,
+		Longitude:        effectiveLon,
+		ElevationFeet:    h.config.Station.ElevationFeet,
+		CruiseAltitudeFt: h.config.FlightPhases.CruiseAltitudeFt,
+		AirportCode:      h.config.Station.AirportCode,
+		FetchMETAR:       h.config.Weather.FetchMETAR,
+		FetchTAF:         h.config.Weather.FetchTAF,
+		FetchNOTAMs:      h.config.Weather.FetchNOTAMs,
+		OverrideActive:   effectiveLat != h.config.Station.Latitude || effectiveLon != h.config.Station.Longitude,
 	}
 
 	// Track if we have any data fetch failures
@@ -624,6 +768,11 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 	if h.refService != nil {
 		runwayData := h.buildRunwayResponse()
 		stationCfg.Runways = runwayData
+	}
+
+	// Add runway-in-use scores
+	if scores := h.adsbService.GetRunwayInUseScores(3); len(scores) > 0 {
+		stationCfg.RunwayInUse = scores
 	}
 
 	// Add fetch errors to response if any occurred
@@ -1486,10 +1635,11 @@ func (h *Handler) getHexCoordinates(hexCode string) (float64, float64, error) {
 		return 0, 0, fmt.Errorf("aircraft with hex %s not found", hexCode)
 	}
 
-	if aircraft.ADSB == nil || (aircraft.ADSB.Lat == 0 && aircraft.ADSB.Lon == 0) {
+	if aircraft.ADSB == nil || !aircraft.ADSB.HasPosition() {
 		return 0, 0, fmt.Errorf("aircraft with hex %s has no position data", hexCode)
 	}
-	return aircraft.ADSB.Lat, aircraft.ADSB.Lon, nil
+	lat, lon, _ := aircraft.ADSB.Position()
+	return lat, lon, nil
 }
 
 // getRefAircraft gets the reference aircraft by hex code
@@ -1500,7 +1650,7 @@ func (h *Handler) getRefAircraft(hexCode string) (*adsb.Aircraft, error) {
 		return nil, fmt.Errorf("aircraft with hex %s not found", hexCode)
 	}
 
-	if aircraft.ADSB == nil || (aircraft.ADSB.Lat == 0 && aircraft.ADSB.Lon == 0) {
+	if aircraft.ADSB == nil || !aircraft.ADSB.HasPosition() {
 		return nil, fmt.Errorf("aircraft with hex %s has no position data", hexCode)
 	}
 
@@ -1520,11 +1670,11 @@ func (h *Handler) getFlightCoordinates(flight string) (float64, float64, error) 
 				return 0, 0, fmt.Errorf("aircraft with flight %s has no ADSB data", flight)
 			}
 
-			if a.ADSB.Lat == 0 && a.ADSB.Lon == 0 {
+			if !a.ADSB.HasPosition() {
 				return 0, 0, fmt.Errorf("aircraft with flight %s has no position data", flight)
 			}
-
-			return a.ADSB.Lat, a.ADSB.Lon, nil
+			lat, lon, _ := a.ADSB.Position()
+			return lat, lon, nil
 		}
 	}
 	return 0, 0, fmt.Errorf("aircraft with flight %s not found", flight)

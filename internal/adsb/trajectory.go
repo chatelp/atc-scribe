@@ -72,27 +72,27 @@ func TrajectorySnapshotFromADSB(adsb *ADSBTarget, onGround bool, ts time.Time) T
 	if adsb == nil {
 		return TrajectorySnapshot{Timestamp: ts, Valid: false}
 	}
-	hasPosition := adsb.Lat != 0 || adsb.Lon != 0
+	lat, lon, hasPosition := adsb.Position()
 	return TrajectorySnapshot{
 		Timestamp:   ts,
-		Lat:         adsb.Lat,
-		Lon:         adsb.Lon,
+		Lat:         lat,
+		Lon:         lon,
 		AltBaro:     adsb.AltBaro.Float64(),
 		AltGeom:     adsb.AltGeom.Float64(),
-		GS:          adsb.GS,
-		TAS:         adsb.TAS,
-		IAS:         adsb.IAS,
-		Track:       adsb.Track,
-		MagHeading:  adsb.MagHeading,
-		TrueHeading: adsb.TrueHeading,
-		BaroRate:    adsb.BaroRate,
-		GeomRate:    adsb.GeomRate,
-		Roll:        adsb.Roll,
-		TrackRate:   adsb.TrackRate,
+		GS:          NumberOrZero(adsb.GS),
+		TAS:         NumberOrZero(adsb.TAS),
+		IAS:         NumberOrZero(adsb.IAS),
+		Track:       NumberOrZero(adsb.Track),
+		MagHeading:  NumberOrZero(adsb.MagHeading),
+		TrueHeading: NumberOrZero(adsb.TrueHeading),
+		BaroRate:    NumberOrZero(adsb.BaroRate),
+		GeomRate:    NumberOrZero(adsb.GeomRate),
+		Roll:        NumberOrZero(adsb.Roll),
+		TrackRate:   NumberOrZero(adsb.TrackRate),
 		OnGround:    onGround,
-		NavAltMCP:   adsb.NavAltitudeMCP,
-		NavAltFMS:   adsb.NavAltitudeFMS,
-		Seen:        adsb.Seen,
+		NavAltMCP:   NumberOrZero(adsb.NavAltitudeMCP),
+		NavAltFMS:   NumberOrZero(adsb.NavAltitudeFMS),
+		Seen:        NumberOrZero(adsb.Seen),
 		Valid:       hasPosition,
 	}
 }
@@ -120,32 +120,32 @@ type DerivedState struct {
 	AltTrendFPM float64 // OLS regression slope of altitude vs time, converted to fpm
 
 	// Speed statistics (medium window)
-	GSMean             float64 // Mean ground speed (knots)
-	GSMin              float64 // Minimum ground speed (knots)
-	GSMax              float64 // Maximum ground speed (knots)
-	GSTrendKtsPerSec   float64 // OLS regression slope of GS vs time (knots per second)
+	GSMean           float64 // Mean ground speed (knots)
+	GSMin            float64 // Minimum ground speed (knots)
+	GSMax            float64 // Maximum ground speed (knots)
+	GSTrendKtsPerSec float64 // OLS regression slope of GS vs time (knots per second)
 
 	// Vertical rate statistics (medium window)
 	VRMean   float64 // Mean vertical rate (fpm)
 	VRStdDev float64 // Standard deviation of vertical rate
 
 	// Distance and bearing to monitoring station
-	DistToStationNM    float64 // Current distance to station (nautical miles)
-	DistTrendNMPerSec  float64 // OLS regression slope of distance vs time (negative = approaching)
-	BearingToStation   float64 // Current bearing to station (degrees)
+	DistToStationNM   float64 // Current distance to station (nautical miles)
+	DistTrendNMPerSec float64 // OLS regression slope of distance vs time (negative = approaching)
+	BearingToStation  float64 // Current bearing to station (degrees)
 
 	// Data quality indicators
-	ValidPointCount int     // Number of valid snapshots in the analysis window
+	ValidPointCount   int     // Number of valid snapshots in the analysis window
 	WindowDurationSec float64 // Time span from oldest to newest valid snapshot (seconds)
-	DataGapDetected bool    // True if any gap > 2× fetch interval found in the window
+	DataGapDetected   bool    // True if any gap > 2× fetch interval found in the window
 
 	// Boolean flags derived from trends (set by ComputeDerivedState)
-	IsDescending        bool // AltTrendFPM below descent threshold AND VRMean < 0
-	IsClimbing          bool // AltTrendFPM above climb threshold AND VRMean > 0
-	IsLevel             bool // (AltMax - AltMin) within level band over medium window
-	IsDecelerating      bool // GSTrendKtsPerSec below deceleration threshold
-	IsAccelerating      bool // GSTrendKtsPerSec above acceleration threshold
-	IsTurning           bool // |TrackRateDegPerSec| above turning threshold
+	IsDescending         bool // AltTrendFPM below descent threshold AND VRMean < 0
+	IsClimbing           bool // AltTrendFPM above climb threshold AND VRMean > 0
+	IsLevel              bool // (AltMax - AltMin) within level band over medium window
+	IsDecelerating       bool // GSTrendKtsPerSec below deceleration threshold
+	IsAccelerating       bool // GSTrendKtsPerSec above acceleration threshold
+	IsTurning            bool // |TrackRateDegPerSec| above turning threshold
 	IsApproachingStation bool // DistTrendNMPerSec < 0 (closing on station)
 
 	ComputedAt time.Time // When this derived state was last computed
@@ -162,6 +162,7 @@ type AircraftTrajectory struct {
 	WriteIdx     int                  // Next write position
 	Count        int                  // Number of entries stored (up to capacity)
 	Derived      DerivedState         // Latest derived state
+	Prediction   TrajectoryPrediction // Hindcast + forecast predictions
 	DirtyDerived bool                 // True when new snapshots have been added since last compute
 	LastSeen     time.Time            // Tracks staleness for cleanup
 }
@@ -232,12 +233,12 @@ func (at *AircraftTrajectory) SnapshotsInWindow(windowSec float64) []TrajectoryS
 
 // TrajectoryConfig holds tunable parameters for the trajectory system.
 type TrajectoryConfig struct {
-	BufferDurationSec   int     // How many seconds of history to keep (default: 90)
-	BufferCapacity      int     // Max snapshots per aircraft (computed from duration / fetch interval + margin)
-	FetchIntervalSec    int     // ADS-B fetch interval in seconds (from ADSBConfig)
-	MinPointsForAnalysis int    // Minimum valid points before full trajectory analysis (default: 5)
-	StaleTimeoutSec     int     // Remove aircraft not seen for this long (default: 300)
-	CleanupIntervalSec  int     // How often to run the cleanup goroutine (default: 30)
+	BufferDurationSec    int // How many seconds of history to keep (default: 90)
+	BufferCapacity       int // Max snapshots per aircraft (computed from duration / fetch interval + margin)
+	FetchIntervalSec     int // ADS-B fetch interval in seconds (from ADSBConfig)
+	MinPointsForAnalysis int // Minimum valid points before full trajectory analysis (default: 5)
+	StaleTimeoutSec      int // Remove aircraft not seen for this long (default: 300)
+	CleanupIntervalSec   int // How often to run the cleanup goroutine (default: 30)
 
 	// Thresholds for derived boolean flags
 	DescentVRThresholdFPM   float64 // AltTrend below this = descending (default: -200)
@@ -253,16 +254,17 @@ type TrajectoryConfig struct {
 // on the same goroutine, while a background cleanup goroutine periodically purges
 // stale entries under a write lock.
 type TrajectoryTracker struct {
-	mu           sync.RWMutex
-	aircraft     map[string]*AircraftTrajectory
-	config       TrajectoryConfig
-	stationLat   float64
-	stationLon   float64
-	runwayData   RunwayData
-	phasesConfig *config.FlightPhasesConfig
-	logger       *logger.Logger
-	stopCh       chan struct{}
-	wg           sync.WaitGroup
+	mu            sync.RWMutex
+	aircraft      map[string]*AircraftTrajectory
+	config        TrajectoryConfig
+	stationLat    float64
+	stationLon    float64
+	runwayData    RunwayData
+	phasesConfig  *config.FlightPhasesConfig
+	runwayTracker *RunwayInUseTracker
+	logger        *logger.Logger
+	stopCh        chan struct{}
+	wg            sync.WaitGroup
 }
 
 // NewTrajectoryTracker creates and starts the tracker with the given configuration.
@@ -281,8 +283,16 @@ func NewTrajectoryTracker(
 		stationLon:   stationLon,
 		runwayData:   runwayData,
 		phasesConfig: phasesConfig,
-		logger:       log.Named("trajectory"),
-		stopCh:       make(chan struct{}),
+		runwayTracker: NewRunwayInUseTracker(
+			phasesConfig.RunwayInUseWindowMinutes,
+			phasesConfig.RunwayInUseApproachWeight,
+			phasesConfig.RunwayInUseLandingWeight,
+			phasesConfig.RunwayInUseClimbWeight,
+			phasesConfig.RunwayInUseDecayRate,
+			log,
+		),
+		logger: log.Named("trajectory"),
+		stopCh: make(chan struct{}),
 	}
 	tt.wg.Add(1)
 	go tt.cleanupLoop()
@@ -299,6 +309,22 @@ func (tt *TrajectoryTracker) Stop() {
 	close(tt.stopCh)
 	tt.wg.Wait()
 	tt.logger.Info("Trajectory tracker stopped")
+}
+
+// RecordRunwayLanding records a landing event for runway-in-use detection.
+// Called by the service when a T/D is detected near a runway threshold.
+func (tt *TrajectoryTracker) RecordRunwayLanding(runwayID string, hex string) {
+	if tt.runwayTracker != nil {
+		tt.runwayTracker.RecordEvent(runwayID, RunwayEventLanding, hex)
+	}
+}
+
+// GetRunwayScores returns the top N runway-in-use scores for external consumers.
+func (tt *TrajectoryTracker) GetRunwayScores(n int) []RunwayScore {
+	if tt.runwayTracker != nil {
+		return tt.runwayTracker.GetTopScores(n)
+	}
+	return nil
 }
 
 // Ingest adds a new snapshot for the given aircraft. If the aircraft has no
@@ -334,9 +360,39 @@ func (tt *TrajectoryTracker) EnsureDerived(hex string) *DerivedState {
 	}
 	if at.DirtyDerived {
 		tt.computeDerivedState(at)
+		tt.computePredictions(at)
 		at.DirtyDerived = false
 	}
 	return &at.Derived
+}
+
+// computePredictions updates hindcast and forecast for an aircraft.
+// Called after computeDerivedState to keep predictions in sync with derived state.
+func (tt *TrajectoryTracker) computePredictions(at *AircraftTrajectory) {
+	computeHindcast(at, &at.Derived)
+	computeForecast(at, &at.Derived)
+}
+
+// GetHindcast returns hindcast prediction points for an aircraft, or nil.
+func (tt *TrajectoryTracker) GetHindcast(hex string) []PredictionPoint {
+	tt.mu.RLock()
+	at, ok := tt.aircraft[hex]
+	tt.mu.RUnlock()
+	if !ok {
+		return nil
+	}
+	return at.Prediction.Hindcast
+}
+
+// GetForecast returns forecast prediction points for an aircraft, or nil.
+func (tt *TrajectoryTracker) GetForecast(hex string) []PredictionPoint {
+	tt.mu.RLock()
+	at, ok := tt.aircraft[hex]
+	tt.mu.RUnlock()
+	if !ok {
+		return nil
+	}
+	return at.Prediction.Forecast
 }
 
 // ─── Cleanup ──────────────────────────────────────────────────────────────────
@@ -615,6 +671,54 @@ func olsSlopeWithXY(snaps []TrajectorySnapshot, extractXY func(TrajectorySnapsho
 		return 0
 	}
 	return (nf*sumXY - sumX*sumY) / denom
+}
+
+// olsR2 computes the R² (coefficient of determination) for the OLS linear
+// regression of a field against time. Returns 0 if fewer than 3 points or no
+// variance in the data. R² = 1 - SS_res/SS_tot.
+func olsR2(snaps []TrajectorySnapshot, extract func(TrajectorySnapshot) float64) float64 {
+	n := len(snaps)
+	if n < 3 {
+		return 0
+	}
+	t0 := snaps[0].Timestamp
+
+	// Compute OLS coefficients (intercept + slope)
+	var sumT, sumY, sumTY, sumTT float64
+	for _, s := range snaps {
+		t := s.Timestamp.Sub(t0).Seconds()
+		y := extract(s)
+		sumT += t
+		sumY += y
+		sumTY += t * y
+		sumTT += t * t
+	}
+	nf := float64(n)
+	denom := nf*sumTT - sumT*sumT
+	if math.Abs(denom) < 1e-12 {
+		return 0
+	}
+	slope := (nf*sumTY - sumT*sumY) / denom
+	intercept := (sumY - slope*sumT) / nf
+
+	// Compute R² = 1 - SS_res / SS_tot
+	meanY := sumY / nf
+	var ssRes, ssTot float64
+	for _, s := range snaps {
+		t := s.Timestamp.Sub(t0).Seconds()
+		y := extract(s)
+		predicted := intercept + slope*t
+		ssRes += (y - predicted) * (y - predicted)
+		ssTot += (y - meanY) * (y - meanY)
+	}
+	if ssTot < 1e-20 {
+		return 0 // No variance
+	}
+	r2 := 1.0 - ssRes/ssTot
+	if r2 < 0 {
+		r2 = 0
+	}
+	return r2
 }
 
 // circularMean computes the mean of angles (degrees) handling 0°/360° wraparound.

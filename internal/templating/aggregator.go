@@ -143,8 +143,9 @@ func (da *DataAggregator) getAircraftData(maxAircraft int) ([]*adsb.Aircraft, er
 		radius := da.config.Station.AirportRangeNM
 
 		for _, ac := range activeAircraft {
-			if ac.ADSB != nil && ac.ADSB.Lat != 0 && ac.ADSB.Lon != 0 {
-				distance := da.calculateDistance(ac.ADSB.Lat, ac.ADSB.Lon, airport.Coordinates[0], airport.Coordinates[1])
+			if ac.ADSB != nil && ac.ADSB.HasPosition() {
+				lat, lon, _ := ac.ADSB.Position()
+				distance := da.calculateDistance(lat, lon, airport.Coordinates[0], airport.Coordinates[1])
 
 				// Include if within radius OR if airborne (preserve all airborne traffic)
 				if distance <= radius || !ac.OnGround {

@@ -282,6 +282,7 @@ taxiing_max_speed_kts = 50       # Maximum ground speed for taxiing
 # Approach detection parameters
 approach_centerline_tolerance_nm = 0.5        # Distance from runway centerline
 approach_max_distance_nm = 10                 # Maximum distance from runway threshold
+approach_max_altitude_ft = 5000               # Maximum altitude for approach phase detection
 approach_heading_tolerance_deg = 30           # Heading alignment tolerance
 
 # Timeout configurations - grouped together for clarity
@@ -338,6 +339,15 @@ trajectory_descent_threshold_fpm = -200       # Altitude trend below this = desc
 trajectory_climb_threshold_fpm = 200          # Altitude trend above this = climbing (feet/min)
 trajectory_level_band_ft = 200               # Altitude variation within this = level flight (feet)
 trajectory_turning_rate_deg = 1.5            # Track rate above this = turning (degrees/sec)
+
+# Runway-in-use detection
+# Observes aircraft approach/landing/departure patterns to determine which runway
+# ends are currently active. Suppresses false APP on perpendicular/cross runways.
+runway_in_use_window_minutes = 60            # Rolling evidence window (minutes)
+runway_in_use_approach_weight = 2.0          # Weight for APP phase events
+runway_in_use_landing_weight = 3.0           # Weight for T/D events (strongest evidence)
+runway_in_use_climb_weight = 2.0             # Weight for CLB phase events
+runway_in_use_decay_rate = 0.98              # Per-minute exponential time decay (0-1)
 
 #######################################################
 # Weather Data Configuration

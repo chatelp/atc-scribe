@@ -300,6 +300,7 @@ func (s *Service) sendPhaseChangeAlert(aircraft *Aircraft, fromPhase, toPhase st
 // sendPhaseChangeAlertWithEvent sends a phase change alert with event type via WebSocket
 func (s *Service) sendPhaseChangeAlertWithEvent(aircraft *Aircraft, fromPhase, toPhase, eventType string, runwayInfo *RunwayApproachInfo) {
 	if s.wsServer != nil {
+		lat, lon, _ := aircraft.ADSB.Position()
 		alert := PhaseChangeAlert{
 			Type:      "phase_change",
 			Hex:       aircraft.Hex,
@@ -313,8 +314,8 @@ func (s *Service) sendPhaseChangeAlertWithEvent(aircraft *Aircraft, fromPhase, t
 				Lon float64 `json:"lon"`
 				Alt float64 `json:"alt"`
 			}{
-				Lat: aircraft.ADSB.Lat,
-				Lon: aircraft.ADSB.Lon,
+				Lat: lat,
+				Lon: lon,
 				Alt: aircraft.ADSB.AltBaro.Float64(),
 			},
 			RunwayInfo: runwayInfo,
@@ -445,49 +446,52 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 		var prevTAS, prevGS, prevAlt float64
 		if found {
 			if adsbData, ok := existingADSB[a.Hex]; ok && adsbData != nil {
-				prevTAS = adsbData.TAS
-				prevGS = adsbData.GS
+				prevTAS = NumberOrZero(adsbData.TAS)
+				prevGS = NumberOrZero(adsbData.GS)
 				prevAlt = adsbData.AltBaro.Float64()
 			}
 		}
 
 		// Validate and correct sensor data for potential errors
+		currentTAS := NumberOrZero(a.ADSB.TAS)
+		currentGS := NumberOrZero(a.ADSB.GS)
+		lat, lon, _ := a.ADSB.Position()
 		correctedTAS, correctedGS, correctedAlt := ValidateSensorData(
-			a.ADSB.TAS, a.ADSB.GS, a.ADSB.AltBaro.Float64(),
+			currentTAS, currentGS, a.ADSB.AltBaro.Float64(),
 			prevTAS, prevGS, prevAlt,
-			a.ADSB.Lat, a.ADSB.Lon, s.stationLat, s.stationLon,
+			lat, lon, s.stationLat, s.stationLon,
 			s.flightPhasesConfig.AirportRangeNM,
 			&s.flightPhasesConfig,
 		)
 
 		// Apply corrected values back to ADSB data so the entire pipeline
 		// (phase detection, DB storage, change detector) uses consistent corrected data
-		if correctedTAS != a.ADSB.TAS || correctedGS != a.ADSB.GS || correctedAlt != a.ADSB.AltBaro.Float64() {
+		if correctedTAS != currentTAS || correctedGS != currentGS || correctedAlt != a.ADSB.AltBaro.Float64() {
 			if found {
 				s.logger.Debug("Sensor data corrected",
 					logger.String("hex", a.Hex),
 					logger.String("flight", a.Flight),
-					logger.Float64("original_tas", a.ADSB.TAS),
+					logger.Float64("original_tas", currentTAS),
 					logger.Float64("corrected_tas", correctedTAS),
-					logger.Float64("original_gs", a.ADSB.GS),
+					logger.Float64("original_gs", currentGS),
 					logger.Float64("corrected_gs", correctedGS),
 					logger.Float64("original_alt", a.ADSB.AltBaro.Float64()),
 					logger.Float64("corrected_alt", correctedAlt),
 				)
 			}
-			a.ADSB.TAS = correctedTAS
-			a.ADSB.GS = correctedGS
+			a.ADSB.TAS = NumberPtr(correctedTAS)
+			a.ADSB.GS = NumberPtr(correctedGS)
 			a.ADSB.AltBaro = FlexibleFloat64(correctedAlt)
 		}
 
 		// Determine if aircraft is currently flying using corrected values and config
-		currentlyFlying := IsFlying(a.ADSB.TAS, a.ADSB.GS, a.ADSB.AltBaro.Float64(), &s.flightPhasesConfig)
+		currentlyFlying := IsFlying(NumberOrZero(a.ADSB.TAS), NumberOrZero(a.ADSB.GS), a.ADSB.AltBaro.Float64(), &s.flightPhasesConfig)
 
 		// Guard against false on_ground from missing data: Mode S first contacts may
 		// report zero altitude, zero speed, and no position. That's "no data available",
 		// not "on the ground". Defaulting to on_ground here would cause a false T/O
 		// when real data arrives on the next cycle.
-		noUsableData := a.ADSB.AltBaro.Float64() == 0 && a.ADSB.GS == 0 && a.ADSB.TAS == 0
+		noUsableData := a.ADSB.AltBaro.Float64() == 0 && NumberOrZero(a.ADSB.GS) == 0 && NumberOrZero(a.ADSB.TAS) == 0
 		if noUsableData {
 			// No sensor data at all — preserve previous ground state if known,
 			// otherwise assume airborne (safer than triggering false T/O later)
@@ -586,6 +590,18 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 		s.updateSimulationFields(newAircraft)
 		s.enrichWithATCDerivedData(newAircraft)
 
+		// Overlay trajectory-based predictions (computed fresh after phase detection)
+		if s.trajectoryTracker != nil {
+			for _, a := range newAircraft {
+				if forecast := s.trajectoryTracker.GetForecast(a.Hex); len(forecast) > 0 {
+					a.Future = PredictionPointsToPositions(forecast)
+				}
+				if hindcast := s.trajectoryTracker.GetHindcast(a.Hex); len(hindcast) > 0 {
+					a.Hindcast = PredictionPointsToPositions(hindcast)
+				}
+			}
+		}
+
 		changes := s.changeDetector.DetectChanges(newAircraft)
 		if len(changes) > 0 {
 			s.logger.Debug("Detected aircraft changes",
@@ -616,9 +632,9 @@ func (s *Service) updateSimulationFields(aircraft []*Aircraft) {
 			// Update simulation controls if this is a simulated aircraft
 			if a.IsSimulated && a.SimulationControls == nil {
 				a.SimulationControls = &SimulationControls{
-					TargetHeading:      a.ADSB.TrueHeading,
-					TargetSpeed:        a.ADSB.TAS,
-					TargetVerticalRate: a.ADSB.BaroRate,
+					TargetHeading:      NumberOrZero(a.ADSB.TrueHeading),
+					TargetSpeed:        NumberOrZero(a.ADSB.TAS),
+					TargetVerticalRate: NumberOrZero(a.ADSB.BaroRate),
 				}
 			}
 		}
@@ -651,6 +667,14 @@ func (s *Service) SetRunwayData(data RunwayData) {
 // GetRunwayData returns the current runway data
 func (s *Service) GetRunwayData() RunwayData {
 	return s.runwayData
+}
+
+// GetRunwayInUseScores returns the top N runway-in-use probability scores.
+func (s *Service) GetRunwayInUseScores(n int) []RunwayScore {
+	if s.trajectoryTracker != nil {
+		return s.trajectoryTracker.GetRunwayScores(n)
+	}
+	return nil
 }
 
 // enrichWithRefData enriches aircraft data with reference data (aircraft.csv)
@@ -720,6 +744,16 @@ func (s *Service) GetAircraftByHex(hex string) (*Aircraft, bool) {
 		s.updateSimulationFields([]*Aircraft{aircraft})
 		s.enrichWithRefData([]*Aircraft{aircraft})
 		s.enrichWithATCDerivedData([]*Aircraft{aircraft})
+
+		// Overlay trajectory-based predictions (hindcast + forecast)
+		if s.trajectoryTracker != nil {
+			if forecast := s.trajectoryTracker.GetForecast(hex); len(forecast) > 0 {
+				aircraft.Future = PredictionPointsToPositions(forecast)
+			}
+			if hindcast := s.trajectoryTracker.GetHindcast(hex); len(hindcast) > 0 {
+				aircraft.Hindcast = PredictionPointsToPositions(hindcast)
+			}
+		}
 	}
 	return aircraft, found
 }
@@ -914,9 +948,10 @@ func (s *Service) filterByAirportGrounded(aircraft []*Aircraft) []*Aircraft {
 	for _, a := range aircraft {
 		if !a.OnGround {
 			filtered = append(filtered, a)
-		} else if a.ADSB != nil && a.ADSB.Lat != 0 && a.ADSB.Lon != 0 {
+		} else if a.ADSB != nil && a.ADSB.HasPosition() {
+			lat, lon, _ := a.ADSB.Position()
 			// Calculate distance from station and apply filter
-			distMeters := Haversine(a.ADSB.Lat, a.ADSB.Lon, s.stationLat, s.stationLon)
+			distMeters := Haversine(lat, lon, s.stationLat, s.stationLon)
 			distNM := MetersToNM(distMeters)
 			if distNM <= airportRangeNM {
 				filtered = append(filtered, a)
@@ -1041,7 +1076,7 @@ func (s *Service) updateAircraftStatus(activeAircraft map[string]bool) {
 		s.storage.Upsert(aircraft)
 
 		// Only track aircraft with position for signal-lost landing detection
-		hasPosition := aircraft.ADSB != nil && (aircraft.ADSB.Lat != 0 || aircraft.ADSB.Lon != 0)
+		hasPosition := aircraft.ADSB != nil && aircraft.ADSB.HasPosition()
 		if hasPosition {
 			inactiveAircraft = append(inactiveAircraft, aircraft)
 		}
@@ -1126,13 +1161,27 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 				newPhase = "T/D"
 				eventType = "landing"
 
+				// Record landing for runway-in-use detection
+				if s.trajectoryTracker != nil && a.ADSB != nil {
+					lat, lon, ok := a.ADSB.Position()
+					if ok {
+						runwayInfo := DetectRunwayApproach(
+							lat, lon, NumberOrZero(a.ADSB.Track),
+							a.ADSB.AltBaro.Float64(), s.runwayData, s.flightPhasesConfig,
+						)
+						if runwayInfo != nil && runwayInfo.OnApproach {
+							s.trajectoryTracker.RecordRunwayLanding(runwayInfo.RunwayID, a.Hex)
+						}
+					}
+				}
+
 				s.logger.Info("IMMEDIATE LANDING DETECTED",
 					logger.String("hex", a.Hex),
 					logger.String("flight", a.Flight),
 					logger.Bool("was_on_ground", prevOnGround),
 					logger.Bool("now_on_ground", a.OnGround),
 					logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
-					logger.Float64("ground_speed", a.ADSB.GS),
+					logger.Float64("ground_speed", NumberOrZero(a.ADSB.GS)),
 				)
 
 			} else if prevOnGround && !a.OnGround {
@@ -1179,7 +1228,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 					logger.Bool("was_on_ground", prevOnGround),
 					logger.Bool("now_on_ground", a.OnGround),
 					logger.Float64("altitude", a.ADSB.AltBaro.Float64()),
-					logger.Float64("ground_speed", a.ADSB.GS),
+					logger.Float64("ground_speed", NumberOrZero(a.ADSB.GS)),
 				)
 			}
 
@@ -1242,14 +1291,29 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 		}
 
 		// Check proximity to airport
+		lat, lon, hasPosition := aircraft.ADSB.Position()
+		if !hasPosition {
+			continue
+		}
 		distanceFromStation := MetersToNM(Haversine(
-			aircraft.ADSB.Lat, aircraft.ADSB.Lon,
+			lat, lon,
 			s.stationLat, s.stationLon,
 		))
 
 		// If aircraft was close to airport and low altitude when signal lost
 		if distanceFromStation <= s.flightPhasesConfig.AirportRangeNM &&
 			aircraft.ADSB.AltBaro.Float64() < s.flightPhasesConfig.SignalLostLandingMaxAltFt {
+
+			// Record for runway-in-use detection
+			if s.trajectoryTracker != nil {
+				runwayInfo := DetectRunwayApproach(
+					lat, lon, NumberOrZero(aircraft.ADSB.Track),
+					aircraft.ADSB.AltBaro.Float64(), s.runwayData, s.flightPhasesConfig,
+				)
+				if runwayInfo != nil && runwayInfo.OnApproach {
+					s.trajectoryTracker.RecordRunwayLanding(runwayInfo.RunwayID, aircraft.Hex)
+				}
+			}
 
 			// Mark as landed
 			aircraft.OnGround = true
@@ -1354,16 +1418,20 @@ func (s *Service) evaluatePhaseChange(aircraft *Aircraft, latestPhase *PhaseChan
 	// After landing, guide the aircraft through T/D → TAX → NEW gracefully.
 	if latestPhase != nil && latestPhase.Phase == "T/D" {
 		if currentPhase == "NEW" {
+			groundSpeed := 0.0
+			if aircraft.ADSB != nil {
+				groundSpeed = NumberOrZero(aircraft.ADSB.GS)
+			}
 			if aircraft.OnGround && aircraft.ADSB != nil &&
-				aircraft.ADSB.GS >= float64(s.flightPhasesConfig.TaxiingMinSpeedKts) &&
-				aircraft.ADSB.GS <= float64(s.flightPhasesConfig.TaxiingMaxSpeedKts) {
+				groundSpeed >= float64(s.flightPhasesConfig.TaxiingMinSpeedKts) &&
+				groundSpeed <= float64(s.flightPhasesConfig.TaxiingMaxSpeedKts) {
 				currentPhase = "TAX"
 			} else {
 				// Keep T/D visible for the preservation period
 				timeSinceLanding := time.Since(latestPhase.Timestamp).Seconds()
 				if timeSinceLanding < float64(s.flightPhasesConfig.PhasePreservationSeconds) {
 					currentPhase = "T/D"
-				} else if aircraft.ADSB != nil && aircraft.ADSB.GS >= float64(s.flightPhasesConfig.TaxiingMinSpeedKts) {
+				} else if aircraft.ADSB != nil && groundSpeed >= float64(s.flightPhasesConfig.TaxiingMinSpeedKts) {
 					currentPhase = "TAX"
 				} else {
 					currentPhase = "NEW"
@@ -1440,7 +1508,10 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 		}
 
 		// Log the phase change with detailed aircraft data for debugging
-		distanceFromStation := MetersToNM(Haversine(aircraft.ADSB.Lat, aircraft.ADSB.Lon, s.stationLat, s.stationLon))
+		distanceFromStation := 0.0
+		if lat, lon, hasPosition := aircraft.ADSB.Position(); hasPosition {
+			distanceFromStation = MetersToNM(Haversine(lat, lon, s.stationLat, s.stationLon))
+		}
 
 		if previousPhase == "" {
 			s.logger.Info("New aircraft phase detected",
@@ -1448,8 +1519,8 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				logger.String("flight", aircraft.Flight),
 				logger.String("phase", change.Phase),
 				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
-				logger.Float64("ground_speed", aircraft.ADSB.GS),
-				logger.Float64("vertical_rate", aircraft.ADSB.BaroRate),
+				logger.Float64("ground_speed", NumberOrZero(aircraft.ADSB.GS)),
+				logger.Float64("vertical_rate", NumberOrZero(aircraft.ADSB.BaroRate)),
 				logger.Float64("distance_from_station", distanceFromStation),
 				logger.Bool("on_ground", aircraft.OnGround),
 			)
@@ -1459,8 +1530,8 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				logger.String("flight", aircraft.Flight),
 				logger.String("transition", previousPhase+" → "+change.Phase),
 				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
-				logger.Float64("ground_speed", aircraft.ADSB.GS),
-				logger.Float64("vertical_rate", aircraft.ADSB.BaroRate),
+				logger.Float64("ground_speed", NumberOrZero(aircraft.ADSB.GS)),
+				logger.Float64("vertical_rate", NumberOrZero(aircraft.ADSB.BaroRate)),
 				logger.Float64("distance_from_station", distanceFromStation),
 				logger.Bool("on_ground", aircraft.OnGround),
 			)
@@ -1674,9 +1745,9 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 			// For simulated aircraft, extract controls from the raw data type field
 			// The simulation service will have already populated the ADSB data with current values
 			simulationControls = &SimulationControls{
-				TargetHeading:      raw.TrueHeading, // Use current heading as target
-				TargetSpeed:        raw.TAS,         // Use current TAS as target
-				TargetVerticalRate: raw.BaroRate,    // Use current vertical rate as target
+				TargetHeading:      NumberOrZero(raw.TrueHeading), // Use current heading as target
+				TargetSpeed:        NumberOrZero(raw.TAS),         // Use current TAS as target
+				TargetVerticalRate: NumberOrZero(raw.BaroRate),    // Use current vertical rate as target
 			}
 		}
 
@@ -1686,7 +1757,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 			Airline:            airlineName,
 			AirlineCountry:     airlineCountry,
 			Status:             aircraftStatus,
-			LastSeen:           now.Add(-time.Duration(raw.Seen) * time.Second),
+			LastSeen:           now.Add(-time.Duration(NumberOrZero(raw.Seen)) * time.Second),
 			ADSB:               &raw,
 			IsSimulated:        isSimulated,
 			SimulationControls: simulationControls,
@@ -1694,50 +1765,45 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 
 		a.ADSB.ATCDerived = computeATCDerivedMetrics(a.ADSB, a.Distance)
 
-		// Calculate future positions if we have the necessary data
-		if raw.Lat != 0 && raw.Lon != 0 && raw.AltBaro.Float64() != 0 {
-			// Get heading (use true_heading, track, or mag_heading, whichever is available)
-			heading := raw.TrueHeading
-			if heading == 0 {
-				heading = raw.Track
+		// Trajectory-based predictions (hindcast + forecast)
+		if s.trajectoryTracker != nil {
+			// Forecast: trajectory-aware kinematic model (replaces naive PredictFuturePositions)
+			if forecast := s.trajectoryTracker.GetForecast(raw.Hex); len(forecast) > 0 {
+				a.Future = PredictionPointsToPositions(forecast)
 			}
-			if heading == 0 {
-				heading = raw.MagHeading
+			// Hindcast: backward extrapolation before first ADS-B contact
+			if hindcast := s.trajectoryTracker.GetHindcast(raw.Hex); len(hindcast) > 0 {
+				a.Hindcast = PredictionPointsToPositions(hindcast)
 			}
+		}
 
-			// Get speed (use TAS or GS, whichever is available)
-			speed := raw.TAS
+		// Fallback to old prediction if trajectory forecast unavailable
+		if len(a.Future) == 0 && raw.HasPosition() && raw.AltBaro.Float64() != 0 {
+			lat, lon, _ := raw.Position()
+			heading := NumberOrZero(raw.TrueHeading)
+			if heading == 0 {
+				heading = NumberOrZero(raw.Track)
+			}
+			if heading == 0 {
+				heading = NumberOrZero(raw.MagHeading)
+			}
+			speed := NumberOrZero(raw.TAS)
 			if speed == 0 {
-				speed = raw.GS
+				speed = NumberOrZero(raw.GS)
 			}
-
-			// Get vertical rate (use baro_rate or geom_rate, whichever is available)
-			verticalRate := raw.BaroRate
+			verticalRate := NumberOrZero(raw.BaroRate)
 			if verticalRate == 0 {
-				verticalRate = raw.GeomRate
+				verticalRate = NumberOrZero(raw.GeomRate)
 			}
-
-			// Only predict if we have valid heading and speed
 			if heading != 0 && speed != 0 {
-				// Calculate future positions
-				// Get magnetic heading for predictions
-				magHeading := raw.MagHeading
+				magHeading := NumberOrZero(raw.MagHeading)
 				if magHeading == 0 {
-					magHeading = heading // fallback to whatever heading we found
+					magHeading = heading
 				}
-
-				futurePredictions := PredictFuturePositions(
-					raw.Lat,
-					raw.Lon,
-					raw.AltBaro.Float64(),
-					heading,    // true heading
-					magHeading, // magnetic heading
-					speed,
-					verticalRate,
+				a.Future = PredictFuturePositions(
+					lat, lon, raw.AltBaro.Float64(),
+					heading, magHeading, speed, verticalRate,
 				)
-
-				// Add future predictions to the aircraft
-				a.Future = futurePredictions
 			}
 		}
 

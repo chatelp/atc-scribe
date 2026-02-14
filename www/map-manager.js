@@ -68,6 +68,7 @@ class MapManager {
             
             // Initialize layers for tracks
             this.tracksMiniMapLayers = {
+                hindcast: L.layerGroup().addTo(this.tracksMiniMap),
                 historical: L.layerGroup().addTo(this.tracksMiniMap),
                 future: L.layerGroup().addTo(this.tracksMiniMap),
                 current: L.layerGroup().addTo(this.tracksMiniMap)
@@ -93,6 +94,7 @@ class MapManager {
         }
         
         // Clear existing layers
+        this.tracksMiniMapLayers.hindcast.clearLayers();
         this.tracksMiniMapLayers.historical.clearLayers();
         this.tracksMiniMapLayers.future.clearLayers();
         this.tracksMiniMapLayers.current.clearLayers();
@@ -115,20 +117,20 @@ class MapManager {
         
         // Add historical track
         const historyData = store.aircraftDetailsHistoryData || [];
-        if (historyData.length > 0) {
-            const historyPoints = historyData
-                .filter(pos => pos.lat && pos.lon)
-                .map(pos => [pos.lat, pos.lon]);
-            
-            if (historyPoints.length > 1) {
-                L.polyline(historyPoints, {
-                    color: '#888888',
-                    weight: 1,
-                    opacity: 0.5,
-                    dashArray: '3, 3'
-                }).addTo(this.tracksMiniMapLayers.historical);
-            }
-            
+        const historyPoints = historyData
+            .filter(pos => pos.lat && pos.lon)
+            .map(pos => [pos.lat, pos.lon]);
+
+        if (historyPoints.length > 1) {
+            L.polyline(historyPoints, {
+                color: '#888888',
+                weight: 1,
+                opacity: 0.5,
+                dashArray: '3, 3'
+            }).addTo(this.tracksMiniMapLayers.historical);
+        }
+
+        if (historyPoints.length > 0) {
             // Add markers for historical points
             historyPoints.forEach(point => {
                 L.circleMarker(point, {
@@ -141,7 +143,41 @@ class MapManager {
                 }).addTo(this.tracksMiniMapLayers.historical);
             });
         }
-        
+
+        // Add hindcast (predicted pre-coverage path)
+        const hindcastData = store.aircraftDetailsHindcastData || [];
+        if (hindcastData.length > 0) {
+            const hindcastPoints = hindcastData
+                .filter(pos => pos.lat && pos.lon)
+                .map(pos => [pos.lat, pos.lon]);
+
+            // Connect hindcast to first history point for visual continuity
+            if (hindcastPoints.length > 0 && historyPoints.length > 0) {
+                hindcastPoints.push(historyPoints[0]);
+            }
+
+            if (hindcastPoints.length > 1) {
+                L.polyline(hindcastPoints, {
+                    color: '#00BCD4',
+                    weight: 1.5,
+                    opacity: 0.5,
+                    dashArray: '4, 6'
+                }).addTo(this.tracksMiniMapLayers.hindcast);
+            }
+
+            // Add markers for hindcast points (excluding the connection point)
+            hindcastData.filter(pos => pos.lat && pos.lon).forEach(pos => {
+                L.circleMarker([pos.lat, pos.lon], {
+                    radius: 2,
+                    fillColor: '#00BCD4',
+                    color: '#00BCD4',
+                    weight: 1,
+                    opacity: 0.4,
+                    fillOpacity: 0.2
+                }).addTo(this.tracksMiniMapLayers.hindcast);
+            });
+        }
+
         // Add future predictions
         const futureData = store.aircraftDetailsFutureData || [];
         if (futureData.length > 0) {
@@ -177,6 +213,9 @@ class MapManager {
             allPoints.push([aircraft.adsb.lat, aircraft.adsb.lon]);
         }
         historyData.forEach(pos => {
+            if (pos.lat && pos.lon) allPoints.push([pos.lat, pos.lon]);
+        });
+        hindcastData.forEach(pos => {
             if (pos.lat && pos.lon) allPoints.push([pos.lat, pos.lon]);
         });
         futureData.forEach(pos => {
@@ -254,6 +293,9 @@ class MapManager {
         // Trail version tracking for optimized updates
         this.trailVersions = {};
 
+        // Keep longer trail history than current display window so increasing trail length can redraw immediately
+        this._trailRetentionMinutes = 10;
+
         // Trail layer tracking - maps hex to array of layers for O(1) removal
         this.trailLayersByHex = {};
 
@@ -313,17 +355,23 @@ class MapManager {
         this.trailLayersByHex[hex].push(layer);
     }
 
-    // Public method to clear all trails for an aircraft (called on deselection)
-    clearAircraftTrails(hex) {
+    // Public method to clear rendered trails for an aircraft.
+    // By default this only removes map layers and keeps trail history in memory.
+    clearAircraftTrails(hex, options = {}) {
         if (!hex) return;
+        const purgeData = options.purgeData === true;
+
         // Remove trail layers from map (O(1) operation)
         this._removeTrailLayersByHex(hex);
-        // Clear tracking data
+        // Clear layer tracking
         delete this.trailLayersByHex[hex];
-        // Invalidate version cache so trails will be redrawn if aircraft is selected again
+        // Invalidate version cache so trails will be redrawn when needed
         delete this.trailVersions[hex];
-        // Also clear the trail data itself
-        delete this.trails[hex];
+
+        // Optional full data purge (for real aircraft removal / hard cleanup only)
+        if (purgeData) {
+            delete this.trails[hex];
+        }
     }
 
     // Clean up orphaned trail data for aircraft no longer in the store
@@ -515,6 +563,7 @@ class MapManager {
 
         const now = Date.now();
         const staleThreshold = 5000; // Only update labels for aircraft not updated in 5+ seconds
+        const fadeStartThreshold = 10000; // Start opacity fade after 10s
 
         // Batch DOM updates in a single frame
         requestAnimationFrame(() => {
@@ -548,6 +597,11 @@ class MapManager {
                             lastSeenSpan.textContent = newText;
                         }
                     }
+                }
+
+                // Re-evaluate visual state for fading aircraft (opacity + red label)
+                if (timeSinceUpdate >= fadeStartThreshold) {
+                    this.updateVisualState(hex);
                 }
             }
         });
@@ -672,8 +726,12 @@ class MapManager {
 
         // Prune old trail points (only if trail data exists)
         if (this.trails[aircraft.hex]) {
-            const trailLengthMinutes = this.store.settings.trailLength !== undefined ? this.store.settings.trailLength : 2;
-            const cutoffTime = new Date(now.getTime() - (trailLengthMinutes * 60 * 1000));
+            const selectedTrailLength = Number(this.store.settings.trailLength);
+            const retentionMinutes = Math.max(
+                this._trailRetentionMinutes,
+                Number.isFinite(selectedTrailLength) ? selectedTrailLength : 2
+            );
+            const cutoffTime = new Date(now.getTime() - (retentionMinutes * 60 * 1000));
             // PERF: splice-based pruning avoids allocating a new array (filter creates a copy every call)
             const trail = this.trails[aircraft.hex];
             let pruneIdx = 0;
@@ -688,11 +746,12 @@ class MapManager {
 
         const position = [lat, lon];
         const heading = this.store.getHeadingWithFallback(aircraft);
+        const iconClass = this.getAircraftIconClass(aircraft);
 
         if (!this.markers[aircraft.hex]) {
             // --- NEW MARKER ---
             // Build icon + label only when creating a new marker (not on every update)
-            const icon = this.createAircraftIcon(heading);
+            const icon = this.createAircraftIcon(aircraft);
             const callsign = (aircraft.flight || aircraft.hex).trim();
             const altitude = aircraft.adsb ? aircraft.adsb.alt_baro : 0;
             const currentSpeed = aircraft.adsb ? (aircraft.adsb.tas || aircraft.adsb.gs || 0) : 0;
@@ -718,6 +777,7 @@ class MapManager {
                 lastLat: position[0],
                 lastLon: position[1],
                 lastHeading: heading,
+                lastIconClass: iconClass,
                 lastLabelContent: newLabelContent,
                 lastLabelVersion: labelVersion,
                 lastAltitude: altitude,
@@ -727,15 +787,7 @@ class MapManager {
 
             // Apply initial CSS rotation after DOM insertion
             requestAnimationFrame(() => {
-                const markerElement = marker.getElement();
-                if (markerElement) {
-                    const iconContainer = markerElement.querySelector('.aircraft-icon-container');
-                    if (iconContainer) {
-                        iconContainer.style.transform = `rotate(${heading}deg)`;
-                        iconContainer.style.transformOrigin = 'center';
-                        iconContainer.style.transition = 'transform 0.2s ease';
-                    }
-                }
+                this._applyAircraftRotation(marker, heading);
             });
 
             marker.on('mouseover', () => {
@@ -786,17 +838,19 @@ class MapManager {
                 existing.lastLon = position[1];
             }
 
-            // CSS rotation instead of setIcon()
-            const headingChanged = Math.abs((existing.lastHeading || 0) - heading) > 5;
+            // Update icon size when category group changes
+            if (existing.lastIconClass !== iconClass) {
+                existing.aircraft.setIcon(this.createAircraftIcon(aircraft));
+                existing.lastIconClass = iconClass;
+                requestAnimationFrame(() => {
+                    this._applyAircraftRotation(existing.aircraft, heading);
+                });
+            }
+
+            // Keep icon aligned with direction of travel over long sessions
+            const headingChanged = Math.abs(this._minimalAngleDiffDeg(existing.lastHeading || 0, heading)) > 0.5;
             if (headingChanged) {
-                const markerElement = existing.aircraft.getElement();
-                if (markerElement) {
-                    const iconContainer = markerElement.querySelector('.aircraft-icon-container');
-                    if (iconContainer) {
-                        iconContainer.style.transform = `rotate(${heading}deg)`;
-                        iconContainer.style.transformOrigin = 'center';
-                    }
-                }
+                this._applyAircraftRotation(existing.aircraft, heading);
                 existing.lastHeading = heading;
             }
 
@@ -848,34 +902,314 @@ class MapManager {
         return finalLabelClassName;
     }
 
-    // PERFORMANCE FIX: Cache static aircraft icon and use CSS rotation
-    getStaticAircraftIcon() {
-        if (!this._staticAircraftIcon) {
-            this._staticAircraftIcon = this.L.divIcon({
-                html: `<div class="aircraft-icon-container">
-                        <svg width="32" height="32" viewBox="0 0 32 32">
-                            <path d="M16,4 L22,24 L16,20 L10,24 L16,4" fill="#FFFFFF" stroke="#000000" stroke-width="1.5" />
-                        </svg>
-                      </div>`,
-                className: 'aircraft-marker',
-                iconSize: [32, 32],
-                iconAnchor: [16, 16]
-            });
-        }
-        return this._staticAircraftIcon;
+    _normalizeHeading(heading) {
+        const n = Number(heading);
+        if (!Number.isFinite(n)) return 0;
+        return ((n % 360) + 360) % 360;
     }
 
-    createAircraftIcon(heading = 0) {
-        // CRITICAL FIX: Use static icon and CSS rotation instead of SVG regeneration
-        return this.getStaticAircraftIcon();
+    _minimalAngleDiffDeg(a, b) {
+        let d = this._normalizeHeading(a) - this._normalizeHeading(b);
+        while (d > 180) d -= 360;
+        while (d <= -180) d += 360;
+        return d;
+    }
+
+    _applyAircraftRotation(marker, heading) {
+        const markerElement = marker?.getElement?.();
+        if (!markerElement) return;
+
+        const iconContainer = markerElement.querySelector('.aircraft-icon-container');
+        if (!iconContainer) return;
+
+        const normalizedHeading = this._normalizeHeading(heading);
+        const currentTransform = iconContainer.style.transform || '';
+        const translatePart = currentTransform.match(/translate\([^)]+\)/)?.[0] || '';
+
+        iconContainer.style.transform = `${translatePart ? `${translatePart} ` : ''}rotate(${normalizedHeading}deg)`;
+        iconContainer.style.transformOrigin = 'center';
+        if (!iconContainer.style.transition) {
+            iconContainer.style.transition = 'transform 0.2s ease';
+        }
+    }
+
+    getAircraftWakeCategory(aircraft) {
+        const category = (aircraft?.adsb?.category || '').toString().toUpperCase().trim();
+        return category;
+    }
+
+    _normalizeAircraftTypeText(value) {
+        const text = (value || '').toString().toUpperCase();
+        return text
+            .replace(/[\/_.,-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    _compactAircraftTypeText(value) {
+        return this._normalizeAircraftTypeText(value).replace(/[^A-Z0-9]/g, '');
+    }
+
+    _getAircraftTypeCandidates(aircraft) {
+        const rawCandidates = [
+            aircraft?.bsdb?.type,
+            aircraft?.adsb?.type,
+            aircraft?.adsb?.t,
+            aircraft?.type,
+            aircraft?.aircraft_type,
+            aircraft?.model
+        ];
+
+        if (aircraft?.bsdb?.manufacturer && aircraft?.bsdb?.type) {
+            rawCandidates.push(`${aircraft.bsdb.manufacturer} ${aircraft.bsdb.type}`);
+        }
+
+        const unique = new Set();
+        const candidates = [];
+
+        for (const value of rawCandidates) {
+            const normalized = this._normalizeAircraftTypeText(value);
+            if (!normalized || unique.has(normalized)) continue;
+
+            unique.add(normalized);
+            candidates.push({
+                normalized,
+                compact: this._compactAircraftTypeText(normalized)
+            });
+        }
+
+        return candidates;
+    }
+
+    _matchesAircraftTypePattern(candidates, patterns) {
+        return candidates.some(candidate => {
+            return patterns.some(pattern => {
+                if (pattern.normalized && pattern.normalized.test(candidate.normalized)) return true;
+                if (pattern.compact && pattern.compact.test(candidate.compact)) return true;
+                return false;
+            });
+        });
+    }
+
+    _getSpecificAircraftIconClass(aircraft) {
+        const candidates = this._getAircraftTypeCandidates(aircraft);
+        if (!candidates.length) return null;
+
+        const match = (patterns) => this._matchesAircraftTypePattern(candidates, patterns);
+
+        if (match([
+            { normalized: /\bA\s*3\s*8\s*0\b|\bAIRBUS\s+A\s*380\b/, compact: /A380/ }
+        ])) return 'a380';
+
+        if (match([
+            { normalized: /\bA\s*3\s*4\s*0\b|\bAIRBUS\s+A\s*340\b/, compact: /A340/ }
+        ])) return 'a340';
+
+        if (match([
+            { normalized: /\bA\s*3\s*3\s*0\b|\bAIRBUS\s+A\s*330\b/, compact: /A330/ }
+        ])) return 'a330';
+
+        if (match([
+            { normalized: /\bA\s*3\s*(1[89]|2[01])\b|\bAIRBUS\s+A\s*3\s*(1[89]|2[01])\b|\bA20N\b|\bA21N\b/, compact: /A31[89]|A320|A321|A20N|A21N/ }
+        ])) return 'a320';
+
+        if (match([
+            { normalized: /\bB\s*7\s*8\s*7\b|\bBOEING\s+787\b|\b78[89]\b/, compact: /B787|78[89]|78X/ }
+        ])) return 'b787';
+
+        if (match([
+            { normalized: /\bB\s*7\s*7\s*7\b|\bBOEING\s+777\b|\b77[0-9W]\b/, compact: /B777|77[0-9W]/ }
+        ])) return 'b777';
+
+        if (match([
+            { normalized: /\bB\s*7\s*6\s*7\b|\bBOEING\s+767\b|\b76[0-9]\b/, compact: /B767|76[0-9]/ }
+        ])) return 'b767';
+
+        if (match([
+            { normalized: /\bB\s*7\s*4\s*7\b|\bBOEING\s+747\b|\b74[0-9]\b/, compact: /B747|74[0-9]/ }
+        ])) return 'b747';
+
+        if (match([
+            { normalized: /\bB\s*7\s*3\s*7\b|\bBOEING\s+737\b|\b73[0-9]\b/, compact: /B737|73[0-9]/ }
+        ])) return 'b737';
+
+        if (match([
+            { normalized: /\bC\s*1\s*3\s*0\b|\bHERCULES\b/, compact: /C130|HERCULES/ }
+        ])) return 'c130';
+
+        if (match([
+            { normalized: /\bCRJ\b|\bCANADAIR\s+REGIONAL\s+JET\b|\bCL\s*[- ]?65\b/, compact: /CRJ|CL65/ }
+        ])) return 'crjx';
+
+        if (match([
+            { normalized: /\bDH\s*8\s*A\b|\bDHC\s*8\b|\bDASH\s*8\b|\bQ\s*400\b/, compact: /DH8A|DHC8|DASH8|Q400/ }
+        ])) return 'dh8a';
+
+        if (match([
+            { normalized: /\bE\s*1\s*9\s*5\b/, compact: /E195/ }
+        ])) return 'e195';
+
+        if (match([
+            { normalized: /\bERJ\b|\bEMBRAER\s+REGIONAL\s+JET\b|\bE\s*1\s*7\s*[05]\b/, compact: /ERJ|E170|E175/ }
+        ])) return 'erj';
+
+        if (match([
+            { normalized: /\bF\s*1\s*0\s*0\b|\bFOKKER\s*100\b/, compact: /F100|FOKKER100/ }
+        ])) return 'f100';
+
+        if (match([
+            { normalized: /\bFA\s*7\s*X\b|\bFALCON\s*7\s*X\b/, compact: /FA7X|FALCON7X/ }
+        ])) return 'fa7x';
+
+        if (match([
+            { normalized: /\bGLF\s*5\b|\bGULFSTREAM\s*(V|5|G\s*5\s*0\s*0)\b/, compact: /GLF5|GULFSTREAMV|GULFSTREAM5|G500|GV/ }
+        ])) return 'glf5';
+
+        if (match([
+            { normalized: /\bLEAR\s*JET\b|\bLEARJET\b|\bLJ\s*\d{2}\b/, compact: /LEARJET|LJ\d{2}/ }
+        ])) return 'learjet';
+
+        if (match([
+            { normalized: /\bMD\s*1\s*1\b|\bMCDONNELL\s+DOUGLAS\s+11\b/, compact: /MD11/ }
+        ])) return 'md11';
+
+        if (match([
+            { normalized: /\bCESSNA\b|\bC\s*1\s*5\s*2\b|\bC\s*1\s*7\s*2\b|\bC\s*2\s*0\s*8\b/, compact: /CESSNA|C152|C172|C208/ }
+        ])) return 'cessna';
+
+        return null;
+    }
+
+    getAircraftIconClass(aircraft) {
+        const specificTypeClass = this._getSpecificAircraftIconClass(aircraft);
+        if (specificTypeClass) return specificTypeClass;
+
+        const category = this.getAircraftWakeCategory(aircraft);
+
+        if (category === 'A1') return 'a1';
+        if (category === 'A2') return 'a2';
+        if (category === 'A3') return 'a3';
+        if (category === 'A4') return 'a4';
+        if (category === 'A5') return 'a5';
+        if (category === 'A6') return 'a6';
+        if (category === 'A7') return 'a7';
+
+        return 'unknown';
+    }
+
+    _getAircraftIconDimensions(iconClass) {
+        const scale = 0.85;
+        const scaled = (size) => Math.max(12, Math.round(size * scale));
+
+        switch (iconClass) {
+            case 'a1': return { size: scaled(24), stroke: 1.15 };
+            case 'a2': return { size: scaled(28), stroke: 1.2 };
+            case 'a3': return { size: scaled(31), stroke: 1.28 };
+            case 'a4': return { size: scaled(34), stroke: 1.34 };
+            case 'a5': return { size: scaled(36), stroke: 1.38 };
+            case 'a6': return { size: scaled(28), stroke: 1.2 };
+            case 'a7': return { size: scaled(28), stroke: 1.2 };
+            case 'a320':
+            case 'a330':
+            case 'a340':
+            case 'a380':
+            case 'b737':
+            case 'b747':
+            case 'b767':
+            case 'b777':
+            case 'b787':
+            case 'c130':
+            case 'cessna':
+            case 'crjx':
+            case 'dh8a':
+            case 'e195':
+            case 'erj':
+            case 'f100':
+            case 'fa7x':
+            case 'glf5':
+            case 'learjet':
+            case 'md11':
+                return { size: scaled(30), stroke: 1.2 };
+            case 'unknown':
+            default:
+                return { size: scaled(26), stroke: 1.2 };
+        }
+    }
+
+    _getAircraftAssetPath(iconClass) {
+        switch (iconClass) {
+            case 'a1': return 'assets/a1.svg';
+            case 'a2': return 'assets/a2.svg';
+            case 'a3': return 'assets/a3.svg';
+            case 'a4': return 'assets/a4.svg';
+            case 'a5': return 'assets/a5.svg';
+            case 'a6': return 'assets/a6.svg';
+            case 'a7': return 'assets/a7.svg';
+            case 'a320': return 'assets/aircraft/a320.svg';
+            case 'a330': return 'assets/aircraft/a330.svg';
+            case 'a340': return 'assets/aircraft/a340.svg';
+            case 'a380': return 'assets/aircraft/a380.svg';
+            case 'b737': return 'assets/aircraft/b737.svg';
+            case 'b747': return 'assets/aircraft/b747.svg';
+            case 'b767': return 'assets/aircraft/b767.svg';
+            case 'b777': return 'assets/aircraft/b777.svg';
+            case 'b787': return 'assets/aircraft/b787.svg';
+            case 'c130': return 'assets/aircraft/c130.svg';
+            case 'cessna': return 'assets/aircraft/cessna.svg';
+            case 'crjx': return 'assets/aircraft/crjx.svg';
+            case 'dh8a': return 'assets/aircraft/dh8a.svg';
+            case 'e195': return 'assets/aircraft/e195.svg';
+            case 'erj': return 'assets/aircraft/erj.svg';
+            case 'f100': return 'assets/aircraft/f100.svg';
+            case 'fa7x': return 'assets/aircraft/fa7x.svg';
+            case 'glf5': return 'assets/aircraft/glf5.svg';
+            case 'learjet': return 'assets/aircraft/learjet.svg';
+            case 'md11': return 'assets/aircraft/md11.svg';
+            case 'unknown':
+            default:
+                return 'assets/a0.svg';
+        }
+    }
+
+    getAircraftIconForClass(iconClass = 'unknown') {
+        if (!this._aircraftIconsBySize) {
+            this._aircraftIconsBySize = {};
+        }
+
+        const { size } = this._getAircraftIconDimensions(iconClass);
+        const cacheKey = `${iconClass}:${size}`;
+
+        if (this._aircraftIconsBySize[cacheKey]) {
+            return this._aircraftIconsBySize[cacheKey];
+        }
+
+        const half = size / 2;
+        const iconSrc = this._getAircraftAssetPath(iconClass);
+
+        const svg = `<div class="aircraft-icon-container">
+            <img src="${iconSrc}" alt="" aria-hidden="true" width="${size}" height="${size}" style="display:block; width:100%; height:100%; max-width:${size}px; max-height:${size}px; object-fit: contain;" />
+        </div>`;
+
+        this._aircraftIconsBySize[cacheKey] = this.L.divIcon({
+            html: svg,
+            className: 'aircraft-marker',
+            iconSize: [size, size],
+            iconAnchor: [half, half]
+        });
+
+        return this._aircraftIconsBySize[cacheKey];
+    }
+
+    createAircraftIcon(aircraft) {
+        const iconClass = this.getAircraftIconClass(aircraft);
+        return this.getAircraftIconForClass(iconClass);
     }
 
     updateFlightPaths() {
         // Don't clear all layers - only update changed trails
         if (!this.store.settings.showPaths) {
             this.layers.trails.clearLayers();
-            // Also clean up trail data when paths are disabled
-            this.trails = {};
+            // Keep trail history in memory so re-enabling paths restores immediately
             this.trailVersions = {};
             this.trailLayersByHex = {};
             return;
@@ -912,6 +1246,15 @@ class MapManager {
             }
 
             const trail = this.trails[hex];
+            const selectedTrailLength = Number(this.store.settings.trailLength);
+            const trailLengthMinutes = Number.isFinite(selectedTrailLength) ? selectedTrailLength : 2;
+            const trailCutoffTimeMs = Date.now() - (trailLengthMinutes * 60 * 1000);
+            const visibleTrailPointCount = trail
+                ? trail.reduce((count, point) => {
+                    if (!point?.time) return count;
+                    return point.time.getTime() >= trailCutoffTimeMs ? count + 1 : count;
+                }, 0)
+                : 0;
 
             // For selected aircraft, we may have history data even if no real-time trail exists
             // (e.g., stale/signal_lost aircraft that were selected after going inactive)
@@ -926,7 +1269,7 @@ class MapManager {
             // Include history/future data lengths in version key so trails redraw when data arrives
             const historyLen = hasHistoryData ? this.store.aircraftDetailsHistoryData.length : 0;
             const futureLen = hasFutureData ? this.store.aircraftDetailsFutureData.length : 0;
-            const trailVersion = `${trail ? trail.length : 0}_${lastTrailPoint.lat.toFixed(5)}_${lastTrailPoint.lon.toFixed(5)}_${isSelectedAircraft}_${historyLen}_${futureLen}`;
+            const trailVersion = `${trail ? trail.length : 0}_${visibleTrailPointCount}_${trailLengthMinutes}_${lastTrailPoint.lat.toFixed(5)}_${lastTrailPoint.lon.toFixed(5)}_${isSelectedAircraft}_${historyLen}_${futureLen}`;
 
             // Skip update if trail hasn't changed
             if (this.trailVersions[hex] === trailVersion) {
@@ -950,7 +1293,11 @@ class MapManager {
             // Draw real-time trail if we have trail data
             if (trail && trail.length >= 2) {
                 const currentPoints = trail
-                    .filter(point => typeof point.lat === 'number' && typeof point.lon === 'number')
+                    .filter(point => {
+                        if (typeof point.lat !== 'number' || typeof point.lon !== 'number') return false;
+                        if (!point.time) return false;
+                        return point.time.getTime() >= trailCutoffTimeMs;
+                    })
                     .map(point => [point.lat, point.lon]);
                 if (currentPoints.length < 2) return;
 
@@ -1054,20 +1401,31 @@ class MapManager {
             
             if (showFutureTrajectory && aircraftData.adsb && aircraftData.adsb.lat && aircraftData.adsb.lon) {
                 let futureDataPoints = [];
+                let usingServerData = false;
 
                 // Use server-provided future data if available, otherwise generate trajectory
                 if (isSelectedAircraft && this.store.aircraftDetailsFutureData && this.store.aircraftDetailsFutureData.length > 0) {
                     futureDataPoints = this.store.aircraftDetailsFutureData
                         .filter(position => position.lat && position.lon)
                         .map(position => [position.lat, position.lon]);
+                    usingServerData = true;
                 } else if (aircraftData.adsb) {
                     // Fall back to generated trajectory for non-selected or while data is loading
                     futureDataPoints = this.generateFutureTrajectory(aircraftData);
                 }
 
                 if (futureDataPoints.length > 0) {
-                    const currentPosition = [aircraftData.adsb.lat, aircraftData.adsb.lon];
-                    const futurePoints = [currentPosition, ...futureDataPoints];
+                    // For server-provided data, use prediction points directly (they start
+                    // near the aircraft). Prepending the live position causes jank because
+                    // the live position updates every ~1s while predictions refresh every ~5s.
+                    // For client-generated trajectories, prepend current position as anchor.
+                    let futurePoints;
+                    if (usingServerData) {
+                        futurePoints = futureDataPoints;
+                    } else {
+                        const currentPosition = [aircraftData.adsb.lat, aircraftData.adsb.lon];
+                        futurePoints = [currentPosition, ...futureDataPoints];
+                    }
 
                     // Create the future trajectory polyline
                     if (futurePoints.length >= 2) {
@@ -1083,10 +1441,13 @@ class MapManager {
                         this._addTrailLayer(hex, futurePolyline);
                     }
 
-                    // Add minute markers for each future position (selected aircraft only)
+                    // Add time markers for future positions (selected aircraft only)
+                    // Show markers every 15s (every 3rd point at 5s granularity)
                     if (isSelectedAircraft && this.store.aircraftDetailsFutureData && this.store.aircraftDetailsFutureData.length > 0) {
                         this.store.aircraftDetailsFutureData.forEach((position, index) => {
-                            const minutesAhead = index + 1;
+                            if ((index + 1) % 3 !== 0) return;
+
+                            const timeLabel = this.store.formatPredictionTime(position);
                             const alt = position.altitude !== undefined ?
                                 (position.altitude === 0 ? 'GND' : Math.round(position.altitude/100)*100) : '';
 
@@ -1103,7 +1464,7 @@ class MapManager {
                             // Time/altitude label
                             const label = this.L.marker([position.lat, position.lon], {
                                 icon: this.L.divIcon({
-                                    html: `<div style="color:#666;font-size:10px;opacity:0.7;">+${minutesAhead}m ${alt}</div>`,
+                                    html: `<div style="color:#666;font-size:10px;opacity:0.7;">${timeLabel} ${alt}</div>`,
                                     className: 'altitude-label-container',
                                     iconSize: [60, 16], iconAnchor: [-5, 0]
                                 }),
@@ -1130,6 +1491,22 @@ class MapManager {
         return `rgb(${r}, ${g}, ${b})`;
     }
 
+    _getAltitudeColorBand(aircraftData) {
+        const altitude = Number(aircraftData?.adsb?.alt_baro);
+        if (!Number.isFinite(altitude)) return 'cruise';
+
+        const configuredCruise = Number(this.store?.stationCruiseAltitudeFt);
+        const cruiseAltitudeFt = Number.isFinite(configuredCruise) && configuredCruise > 0
+            ? configuredCruise
+            : 18000;
+
+        if (altitude >= cruiseAltitudeFt) return 'cruise';
+        if (altitude > 12500) return 'high';
+        if (altitude >= 3000) return 'mid';
+        if (altitude >= 1000) return 'low';
+        return 'very-low';
+    }
+
     updateVisualState(hex) {
         const aircraftData = this.store.aircraft[hex];
         const markers = this.markers[hex];
@@ -1146,28 +1523,46 @@ class MapManager {
         let targetOpacity = 1.0;
         const isStalePosition = aircraftData.stale_position === true;
 
+        // Calculate time-based opacity: gradual fade from 10s to 60s since last ADS-B data
+        let ageBasedOpacity = 1.0;
+        let isAgeStale = false;   // true when opacity fade starts (>10s)
+        let isAgeLost = false;    // true when fully stale (>=60s) — label style changes
+        if (aircraftData.last_seen) {
+            const ageSeconds = (Date.now() - new Date(aircraftData.last_seen).getTime()) / 1000;
+            if (ageSeconds > 10) {
+                isAgeStale = true;
+                // Linear fade from 1.0 at 10s to 0.4 at 60s
+                const fadeProgress = Math.min(1, (ageSeconds - 10) / 50);
+                ageBasedOpacity = 1.0 - fadeProgress * 0.6;
+            }
+            if (ageSeconds >= 60) {
+                isAgeLost = true;
+            }
+        }
+
         if (isFadedDueToOtherSelection) {
             targetOpacity = this.CONFIG.selectedFadeOpacity;
         } else {
             if (isActuallySelected || isHovered || isInProximity) {
-                targetOpacity = isStalePosition ? 0.6 : 1.0;
+                targetOpacity = isStalePosition ? 0.6 : ageBasedOpacity;
             } else {
                 if (isStalePosition) {
                     targetOpacity = 0.35;
+                } else if (isAgeStale) {
+                    targetOpacity = ageBasedOpacity;
                 } else {
-                    switch (aircraftData.status) {
-                        case 'stale': targetOpacity = 0.7; break;
-                        case 'signal_lost': targetOpacity = 0.5; break;
-                        default: targetOpacity = 1.0;
-                    }
+                    targetOpacity = 1.0;
                 }
             }
         }
 
         // Only apply green highlighting to selected/hovered aircraft that are NOT in proximity
         const isHighlightedForStyle = (isActuallySelected || isHovered) && !isInProximity;
+        const altitudeBand = this._getAltitudeColorBand(aircraftData);
 
-        const visualVersion = `${targetOpacity}_${isInProximity ? 1 : 0}_${isHighlightedForStyle ? 1 : 0}`;
+        // Bucket opacity to 1 decimal place to avoid excessive re-renders from continuous fade
+        const opacityBucket = Math.round(targetOpacity * 10) / 10;
+        const visualVersion = `${opacityBucket}_${isInProximity ? 1 : 0}_${isHighlightedForStyle ? 1 : 0}_${altitudeBand}_${isAgeLost ? 1 : 0}`;
         if (this._visualStateVersionByHex[hex] === visualVersion) {
             this._perfCounters.visualStateSkipped++;
             return;
@@ -1176,7 +1571,27 @@ class MapManager {
         this._perfCounters.visualStateApplied++;
 
         const checkAircraftIcon = (apply = false) => {
-            // Removed hover color changes - aircraft icons maintain their original colors
+            const element = markers.aircraft.getElement();
+            if (!element) return true;
+
+            const allBandClasses = [
+                'altitude-band-cruise',
+                'altitude-band-high',
+                'altitude-band-mid',
+                'altitude-band-low',
+                'altitude-band-very-low'
+            ];
+            const targetClass = `altitude-band-${altitudeBand}`;
+
+            const hasTargetClass = element.classList.contains(targetClass);
+            const hasOtherBandClass = allBandClasses.some(cls => cls !== targetClass && element.classList.contains(cls));
+            const stateMatches = hasTargetClass && !hasOtherBandClass;
+
+            if (stateMatches) return true;
+            if (!apply) return false;
+
+            allBandClasses.forEach(cls => element.classList.remove(cls));
+            element.classList.add(targetClass);
             return true;
         };
         this._updateElementStyle(markers.aircraft.getElement(), {}, {}, checkAircraftIcon);
@@ -1190,6 +1605,7 @@ class MapManager {
             const isProximity = this.proximityHexSet && this.proximityHexSet.has(hex);
             const hasProximityClass = labelDiv.classList.contains('proximity-highlight');
             const hasHoverClass = labelDiv.classList.contains('aircraft-label-table-hover');
+            const hasAgeLostClass = labelDiv.classList.contains('aircraft-label-age-stale');
             const currentBg = labelDiv.style.backgroundColor;
             const currentBorder = labelDiv.style.borderColor;
 
@@ -1202,11 +1618,19 @@ class MapManager {
             // Check if current state matches desired state
             const stateMatches = (hasProximityClass === desiredProximity) &&
                                  (hasHoverClass === desiredHover) &&
+                                 (hasAgeLostClass === isAgeLost) &&
                                  (currentBg === desiredBg) &&
                                  (currentBorder === desiredBorder);
 
             if (stateMatches) return true; // No changes needed
             if (!apply) return false; // Changes needed but not applying yet
+
+            // Apply age-lost class (dashed border + white text) at 60s
+            if (isAgeLost) {
+                labelDiv.classList.add('aircraft-label-age-stale');
+            } else {
+                labelDiv.classList.remove('aircraft-label-age-stale');
+            }
 
             // Apply changes
             if (desiredProximity) {
@@ -1354,15 +1778,7 @@ class MapManager {
                 // CRITICAL FIX: Apply heading rotation when aircraft becomes visible again
                 const heading = this.store.getHeadingWithFallback(aircraft);
                 requestAnimationFrame(() => {
-                    const markerElement = markerInfo.aircraft.getElement();
-                    if (markerElement) {
-                        const iconContainer = markerElement.querySelector('.aircraft-icon-container');
-                        if (iconContainer) {
-                            iconContainer.style.transform = `rotate(${heading}deg)`;
-                            iconContainer.style.transformOrigin = 'center';
-                            iconContainer.style.transition = 'transform 0.2s ease';
-                        }
-                    }
+                    this._applyAircraftRotation(markerInfo.aircraft, heading);
                 });
             } else if (!shouldBeVisibleOnMap && markerIsOnMap) {
                 this.layers.aircraft.removeLayer(markerInfo.aircraft);
@@ -1483,15 +1899,7 @@ class MapManager {
 
             const heading = this.store.getHeadingWithFallback(aircraft);
             requestAnimationFrame(() => {
-                const markerElement = markerInfo.aircraft.getElement();
-                if (markerElement) {
-                    const iconContainer = markerElement.querySelector('.aircraft-icon-container');
-                    if (iconContainer) {
-                        iconContainer.style.transform = `rotate(${heading}deg)`;
-                        iconContainer.style.transformOrigin = 'center';
-                        iconContainer.style.transition = 'transform 0.2s ease';
-                    }
-                }
+                this._applyAircraftRotation(markerInfo.aircraft, heading);
             });
         } else if (!shouldBeVisibleOnMap && markerIsOnMap) {
             this.layers.aircraft.removeLayer(markerInfo.aircraft);

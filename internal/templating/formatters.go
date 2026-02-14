@@ -91,26 +91,26 @@ func formatAirborneAircraft(ac *adsb.Aircraft, airport AirportInfo) string {
 		builder.WriteString("Flight params: ")
 
 		// Use magnetic heading if available (0-360° are all valid), fallback to track
-		if ac.ADSB.MagHeading >= 0 && ac.ADSB.MagHeading <= 360 {
-			builder.WriteString(fmt.Sprintf("HDG: %.0f", ac.ADSB.MagHeading))
-		} else if ac.ADSB.Track != 0 {
-			builder.WriteString(fmt.Sprintf("HDG: %.0f", ac.ADSB.Track))
+		if ac.ADSB.MagHeading != nil && *ac.ADSB.MagHeading >= 0 && *ac.ADSB.MagHeading <= 360 {
+			builder.WriteString(fmt.Sprintf("HDG: %.0f", *ac.ADSB.MagHeading))
+		} else if ac.ADSB.Track != nil && *ac.ADSB.Track != 0 {
+			builder.WriteString(fmt.Sprintf("HDG: %.0f", *ac.ADSB.Track))
 		}
 
-		if ac.ADSB.TAS != 0 {
-			builder.WriteString(fmt.Sprintf(", TAS: %.0f kts", ac.ADSB.TAS))
+		if ac.ADSB.TAS != nil {
+			builder.WriteString(fmt.Sprintf(", TAS: %.0f kts", *ac.ADSB.TAS))
 		}
 
-		if ac.ADSB.GS != 0 {
-			builder.WriteString(fmt.Sprintf(", GS: %.0f kts", ac.ADSB.GS))
+		if ac.ADSB.GS != nil {
+			builder.WriteString(fmt.Sprintf(", GS: %.0f kts", *ac.ADSB.GS))
 		}
 
-		if ac.ADSB.AltBaro != 0 {
-			builder.WriteString(fmt.Sprintf(", alt: %.0f ft", ac.ADSB.AltBaro))
+		if ac.ADSB.AltBaro.Float64() != 0 {
+			builder.WriteString(fmt.Sprintf(", alt: %.0f ft", ac.ADSB.AltBaro.Float64()))
 		}
 
-		if ac.ADSB.BaroRate != 0 {
-			builder.WriteString(fmt.Sprintf(", VS: %.0f fpm", ac.ADSB.BaroRate))
+		if ac.ADSB.BaroRate != nil {
+			builder.WriteString(fmt.Sprintf(", VS: %.0f fpm", *ac.ADSB.BaroRate))
 		}
 
 		// Add squawk code if available
@@ -130,8 +130,9 @@ func formatAirborneAircraft(ac *adsb.Aircraft, airport AirportInfo) string {
 	}
 
 	// Airport position (distance and bearing to airport)
-	if ac.Distance != nil && ac.ADSB != nil && ac.ADSB.Lat != 0 && ac.ADSB.Lon != 0 {
-		bearingToStation := adsb.CalculateBearing(ac.ADSB.Lat, ac.ADSB.Lon, airport.Coordinates[0], airport.Coordinates[1])
+	if ac.Distance != nil && ac.ADSB != nil && ac.ADSB.HasPosition() {
+		lat, lon, _ := ac.ADSB.Position()
+		bearingToStation := adsb.CalculateBearing(lat, lon, airport.Coordinates[0], airport.Coordinates[1])
 		bearingFromStation := bearingToStation + 180
 		if bearingFromStation >= 360 {
 			bearingFromStation -= 360
@@ -191,26 +192,26 @@ func formatGroundAircraft(ac *adsb.Aircraft, airport AirportInfo) string {
 		builder.WriteString("Flight params: ")
 
 		// Use magnetic heading if available (0-360° are all valid), fallback to track
-		if ac.ADSB.MagHeading >= 0 && ac.ADSB.MagHeading <= 360 {
-			builder.WriteString(fmt.Sprintf("HDG: %.0f", ac.ADSB.MagHeading))
-		} else if ac.ADSB.Track != 0 {
-			builder.WriteString(fmt.Sprintf("HDG: %.0f", ac.ADSB.Track))
+		if ac.ADSB.MagHeading != nil && *ac.ADSB.MagHeading >= 0 && *ac.ADSB.MagHeading <= 360 {
+			builder.WriteString(fmt.Sprintf("HDG: %.0f", *ac.ADSB.MagHeading))
+		} else if ac.ADSB.Track != nil && *ac.ADSB.Track != 0 {
+			builder.WriteString(fmt.Sprintf("HDG: %.0f", *ac.ADSB.Track))
 		}
 
-		if ac.ADSB.TAS != 0 {
-			builder.WriteString(fmt.Sprintf(", TAS: %.0f kts", ac.ADSB.TAS))
+		if ac.ADSB.TAS != nil {
+			builder.WriteString(fmt.Sprintf(", TAS: %.0f kts", *ac.ADSB.TAS))
 		}
 
-		if ac.ADSB.GS != 0 {
-			builder.WriteString(fmt.Sprintf(", GS: %.0f kts", ac.ADSB.GS))
+		if ac.ADSB.GS != nil {
+			builder.WriteString(fmt.Sprintf(", GS: %.0f kts", *ac.ADSB.GS))
 		}
 
-		if ac.ADSB.AltBaro != 0 {
-			builder.WriteString(fmt.Sprintf(", alt: %.0f ft", ac.ADSB.AltBaro))
+		if ac.ADSB.AltBaro.Float64() != 0 {
+			builder.WriteString(fmt.Sprintf(", alt: %.0f ft", ac.ADSB.AltBaro.Float64()))
 		}
 
-		if ac.ADSB.BaroRate != 0 {
-			builder.WriteString(fmt.Sprintf(", VS: %.0f fpm", ac.ADSB.BaroRate))
+		if ac.ADSB.BaroRate != nil {
+			builder.WriteString(fmt.Sprintf(", VS: %.0f fpm", *ac.ADSB.BaroRate))
 		}
 
 		// Add squawk code if available
