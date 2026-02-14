@@ -83,6 +83,11 @@ type RunwayInUseTracker struct {
 	// that the last known active runway is shown instead of N/A during
 	// low-traffic periods.
 	everHadData bool
+
+	// All known runway end IDs from runway data, for parallel detection.
+	// When one runway of a parallel pair is active, the other is automatically
+	// included in the active set (e.g. 06L active → 06R also active).
+	knownRunwayEnds []string
 }
 
 const (
@@ -245,6 +250,12 @@ func (rt *RunwayInUseTracker) recompute(now time.Time) {
 				rt.activeSet[s.RunwayEnd] = true
 			}
 		}
+
+		// ── Expand for parallel runways ──
+		// If 06L is active, 06R is automatically included (and vice versa).
+		// This breaks the chicken-and-egg where the second parallel runway
+		// can never get APP events because IsActiveRunway rejects it.
+		rt.expandActiveSetForParallels()
 	}
 	// else: keep previous rt.scores and rt.activeSet intact
 
@@ -284,6 +295,82 @@ func (rt *RunwayInUseTracker) recompute(now time.Time) {
 			)
 		}
 		rt.lastLogTime = now
+	}
+}
+
+// SetRunwayData provides the tracker with all known runway end IDs for parallel
+// runway detection. When one runway of a parallel pair (e.g. 06L) is active,
+// the tracker automatically includes the parallel (06R) in the active set.
+func (rt *RunwayInUseTracker) SetRunwayData(runways RunwayData) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+
+	var ends []string
+	for pairKey, thresholds := range runways.RunwayThresholds {
+		for endID := range thresholds {
+			ends = append(ends, pairKey+"/"+endID)
+		}
+	}
+	rt.knownRunwayEnds = ends
+
+	if len(ends) > 0 {
+		rt.logger.Info("Runway data loaded for parallel detection",
+			logger.Int("runway_ends", len(ends)),
+		)
+	}
+}
+
+// runwayEndIdent extracts the end identifier from a full runway ID.
+// "06L-24R/06L" → "06L", "05-23/05" → "05"
+func runwayEndIdent(runwayID string) string {
+	parts := strings.SplitN(runwayID, "/", 2)
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return runwayID
+}
+
+// runwayBaseNumber strips the L/R/C suffix from a runway end identifier
+// to get the numeric heading. "06L" → "06", "24R" → "24", "33" → "33"
+func runwayBaseNumber(endIdent string) string {
+	if len(endIdent) == 0 {
+		return ""
+	}
+	last := endIdent[len(endIdent)-1]
+	if last == 'L' || last == 'R' || last == 'C' {
+		return endIdent[:len(endIdent)-1]
+	}
+	return endIdent
+}
+
+// expandActiveSetForParallels adds parallel runway ends to the active set.
+// If "06L-24R/06L" is active, this also marks "06R-24L/06R" as active
+// (if it exists in known runway data). This breaks the chicken-and-egg
+// problem where the second parallel runway can never accumulate approach
+// events because IsActiveRunway rejects it.
+func (rt *RunwayInUseTracker) expandActiveSetForParallels() {
+	if len(rt.knownRunwayEnds) == 0 {
+		return
+	}
+
+	// Collect base numbers of all currently active runway ends
+	activeBases := make(map[string]bool)
+	for activeID := range rt.activeSet {
+		base := runwayBaseNumber(runwayEndIdent(activeID))
+		if base != "" {
+			activeBases[base] = true
+		}
+	}
+
+	// Add any known runway end whose base number matches an active base
+	for _, knownID := range rt.knownRunwayEnds {
+		if rt.activeSet[knownID] {
+			continue // already active
+		}
+		base := runwayBaseNumber(runwayEndIdent(knownID))
+		if base != "" && activeBases[base] {
+			rt.activeSet[knownID] = true
+		}
 	}
 }
 

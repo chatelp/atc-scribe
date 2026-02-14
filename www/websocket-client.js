@@ -32,6 +32,7 @@ class WebSocketClient {
             aircraft: [],
             aircraft_added: [],
             aircraft_update: [],
+            aircraft_predicted_state: [],
             aircraft_removed: [],
             aircraft_bulk_response: [],
             status_update: [],
@@ -49,6 +50,20 @@ class WebSocketClient {
         this._boundCloseHandler = null;
         this._boundErrorHandler = null;
         this._boundMessageHandler = null;
+
+        this._messageCounters = {
+            total: 0,
+            parseErrors: 0,
+            byType: {}
+        };
+        this._messageSnapshot = {
+            timestamp: performance.now(),
+            counters: {
+                total: 0,
+                parseErrors: 0,
+                byType: {}
+            }
+        };
     }
 
     /**
@@ -141,11 +156,14 @@ class WebSocketClient {
         this._boundMessageHandler = (event) => {
             try {
                 const message = JSON.parse(event.data);
+                this._recordInboundMessage(message?.type || 'unknown');
 
                 if (message.type === 'aircraft_added') {
                     this._notifyListeners('aircraft_added', message.data);
                 } else if (message.type === 'aircraft_update') {
                     this._notifyListeners('aircraft_update', message.data);
+                } else if (message.type === 'aircraft_predicted_state') {
+                    this._notifyListeners('aircraft_predicted_state', message.data);
                 } else if (message.type === 'aircraft_removed') {
                     this._notifyListeners('aircraft_removed', message.data);
                 } else if (message.type === 'aircraft_bulk_response') {
@@ -172,6 +190,7 @@ class WebSocketClient {
                     this._notifyListeners('frequency_status', message.data);
                 }
             } catch (error) {
+                this._recordParseError();
                 console.error('Error parsing WebSocket message:', error);
             }
         };
@@ -370,6 +389,56 @@ class WebSocketClient {
                 }
             });
         }
+    }
+
+    _recordInboundMessage(type) {
+        this._messageCounters.total += 1;
+        const key = type || 'unknown';
+        this._messageCounters.byType[key] = (this._messageCounters.byType[key] || 0) + 1;
+    }
+
+    _recordParseError() {
+        this._messageCounters.parseErrors += 1;
+    }
+
+    getMessageRateStats() {
+        const now = performance.now();
+        const elapsedSeconds = Math.max(0.001, (now - this._messageSnapshot.timestamp) / 1000);
+
+        const current = this._messageCounters;
+        const previous = this._messageSnapshot.counters;
+
+        const deltaTotal = current.total - (previous.total || 0);
+        const deltaParseErrors = current.parseErrors - (previous.parseErrors || 0);
+
+        const allTypes = new Set([
+            ...Object.keys(current.byType || {}),
+            ...Object.keys(previous.byType || {})
+        ]);
+
+        const byTypePerSec = {};
+        allTypes.forEach((type) => {
+            const currentCount = current.byType[type] || 0;
+            const previousCount = previous.byType[type] || 0;
+            const delta = currentCount - previousCount;
+            byTypePerSec[type] = Number((delta / elapsedSeconds).toFixed(2));
+        });
+
+        this._messageSnapshot = {
+            timestamp: now,
+            counters: {
+                total: current.total,
+                parseErrors: current.parseErrors,
+                byType: { ...current.byType }
+            }
+        };
+
+        return {
+            windowSec: Number(elapsedSeconds.toFixed(1)),
+            totalPerSec: Number((deltaTotal / elapsedSeconds).toFixed(2)),
+            parseErrorsPerSec: Number((deltaParseErrors / elapsedSeconds).toFixed(2)),
+            byTypePerSec
+        };
     }
 }
 

@@ -15,6 +15,7 @@ const (
 	MessageTypeAircraftAdded           = "aircraft_added"
 	MessageTypeAircraftUpdate          = "aircraft_update"
 	MessageTypeAircraftRemoved         = "aircraft_removed"
+	MessageTypeAircraftPredictedState  = "aircraft_predicted_state"
 	MessageTypeAircraftBulkRequest     = "aircraft_bulk_request"     // Client requests bulk data
 	MessageTypeAircraftBulkResponse    = "aircraft_bulk_response"    // Server sends bulk data
 	MessageTypeFilterUpdate            = "filter_update"             // Client sends filter preferences
@@ -64,9 +65,9 @@ type Server struct {
 func NewServer(logger *logger.Logger) *Server {
 	return &Server{
 		clients:    make(map[*Client]bool),
-		register:   make(chan *Client, 32),    // Buffered to prevent goroutine blocking
-		unregister: make(chan *Client, 32),    // Buffered to prevent goroutine blocking
-		broadcast:  make(chan *Message, 512),  // Buffered for high-throughput broadcasting
+		register:   make(chan *Client, 32),   // Buffered to prevent goroutine blocking
+		unregister: make(chan *Client, 32),   // Buffered to prevent goroutine blocking
+		broadcast:  make(chan *Message, 512), // Buffered for high-throughput broadcasting
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -195,12 +196,49 @@ func (s *Server) Broadcast(message *Message) {
 		String("message_type", message.Type),
 		String("client_count", fmt.Sprintf("%d", len(s.clients))))
 
-	// Log the message content for debugging
-	if messageData, err := json.Marshal(message); err == nil {
-		s.logger.Debug("Message content", String("content", string(messageData)))
+	// Aircraft movement updates should be dispatched immediately (no server-side queueing)
+	if message.Type == MessageTypeAircraftAdded || message.Type == MessageTypeAircraftUpdate || message.Type == MessageTypeAircraftRemoved || message.Type == MessageTypeAircraftPredictedState {
+		s.broadcastImmediate(message)
+		return
 	}
 
 	s.broadcast <- message
+}
+
+// broadcastImmediate sends a message directly to all clients without using the broadcast queue.
+func (s *Server) broadcastImmediate(message *Message) {
+	s.mu.RLock()
+	clientsToRemove := make([]*Client, 0)
+	for client := range s.clients {
+		client.mu.Lock()
+		if client.closed {
+			clientsToRemove = append(clientsToRemove, client)
+			client.mu.Unlock()
+			continue
+		}
+		client.mu.Unlock()
+
+		if !client.SendMessage(message) {
+			clientsToRemove = append(clientsToRemove, client)
+		}
+	}
+	s.mu.RUnlock()
+
+	if len(clientsToRemove) > 0 {
+		s.mu.Lock()
+		for _, client := range clientsToRemove {
+			if _, ok := s.clients[client]; ok {
+				delete(s.clients, client)
+				client.mu.Lock()
+				if !client.closed {
+					client.closed = true
+					close(client.send)
+				}
+				client.mu.Unlock()
+			}
+		}
+		s.mu.Unlock()
+	}
 }
 
 // readPump pumps messages from the WebSocket connection to the hub

@@ -355,6 +355,7 @@
                                     <div class="flex items-center justify-between gap-2.5">
                                         <span class="text-sm">WebSocket Updates</span>
                                         <button @click="$store.atc.toggleWebSocketUpdates()"
+                                                title="Toggle WebSocket updates"
                                                 :class="{
                                                     'bg-green-500/20 border-green-500/50 text-green-400': !$store.atc.wsUpdatesPaused,
                                                     'bg-red-500/20 border-red-500/50 text-red-400': $store.atc.wsUpdatesPaused
@@ -365,38 +366,108 @@
                                         </button>
                                     </div>
 
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Prediction Source</span>
+                                        <button @click="$store.atc.togglePredictionMode()"
+                                                title="Toggle prediction source mode"
+                                                :class="{
+                                                    'bg-blue-500/20 border-blue-500/50 text-blue-400': $store.atc.settings.aircraftPredictionMode === 'real_predicted',
+                                                    'bg-amber-500/20 border-amber-500/50 text-amber-400': $store.atc.settings.aircraftPredictionMode === 'real_only'
+                                                }"
+                                                class="px-3 py-1.5 rounded border text-xs font-medium transition-all duration-200 hover:bg-opacity-80 flex items-center gap-1.5">
+                                            <i :class="$store.atc.settings.aircraftPredictionMode === 'real_predicted' ? 'fas fa-wave-square' : 'fas fa-satellite-dish'"></i>
+                                            <span x-text="$store.atc.settings.aircraftPredictionMode === 'real_predicted' ? 'Real + Predicted' : 'Real Only'"></span>
+                                        </button>
+                                    </div>
+
                                     <div x-show="$store.atc.mapPerformanceStats" class="text-xs text-text/70 bg-background/30 border border-border/40 rounded p-2 space-y-1">
                                         <div class="flex items-center justify-between">
-                                            <span>Animation FPS</span>
+                                            <span>Render FPS</span>
                                             <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.animationFps"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Render Frame (ms)</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.animationFrameMs"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Render Targets / Frame</span>
+                                            <span x-text="($store.atc.mapPerformanceStats?.animationAnimatedThisFrame ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.animationVisibleTargets ?? 0)"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Render Marker Updates /s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.animationMarkerUpdatesPerSec"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Map Refresh /s</span>
+                                            <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.refreshPerSec"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Map Refresh Avg (ms)</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.avgRefreshMs"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Map Marker Ops /s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.markerOpsPerSec"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Map Visibility Passes /s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.fullVisibilityPassesPerSec"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Merge Correct /s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.animationCorrectedPerSec"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Predicted /s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.animationPredictedPerSec"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Dropped Frames</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.animationDroppedFrames"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Render Quality</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.animationQuality"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>WebSocket Total /s</span>
+                                            <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.wsRates?.total ?? 0"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>WS aircraft_update /s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.wsRates?.aircraft_update ?? 0"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>WS predicted /s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.wsRates?.aircraft_predicted_state ?? 0"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>WS add/remove /s</span>
+                                            <span x-text="($store.atc.mapPerformanceStats?.wsRates?.aircraft_added ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.wsRates?.aircraft_removed ?? 0)"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>WS phase/transcription /s</span>
+                                            <span x-text="($store.atc.mapPerformanceStats?.wsRates?.phase_change ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.wsRates?.transcription ?? 0)"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>WS Parse Errors /s</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.wsRates?.parse_errors ?? 0"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Tile Cache Controlled</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.tileCache?.controlled ? 'yes' : 'no'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Tile Cache Hit Rate</span>
+                                            <span x-text="($store.atc.mapPerformanceStats?.tileCache?.hitRatePct ?? 0) + '%'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Tile Cache Hits / Misses</span>
+                                            <span x-text="($store.atc.mapPerformanceStats?.tileCache?.hits ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.tileCache?.misses ?? 0)"></span>
                                         </div>
                                         <div class="flex items-center justify-between">
                                             <span>Heap (MB)</span>
                                             <span x-text="$store.atc.mapPerformanceStats?.heapUsedMB !== null ? ($store.atc.mapPerformanceStats.heapUsedMB + ' / ' + $store.atc.mapPerformanceStats.heapLimitMB + ' (' + $store.atc.mapPerformanceStats.heapUsagePct + '%) • Δ ' + (($store.atc.mapPerformanceStats.heapDeltaMB === null || $store.atc.mapPerformanceStats.heapDeltaMB === undefined) ? '-' : (($store.atc.mapPerformanceStats.heapDeltaMB > 0 ? '+' : '') + $store.atc.mapPerformanceStats.heapDeltaMB)) + ' MB') : '-'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Map Refresh/s</span>
-                                            <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.refreshPerSec"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Avg Refresh (ms)</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.avgRefreshMs"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Coalesced (%)</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.coalescedPct"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Marker Ops/s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.markerOpsPerSec"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Visual Skip (%)</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.visualSkipPct"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Trail Ops/s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.trailLayerOpsPerSec"></span>
                                         </div>
                                     </div>
                                     
@@ -1798,21 +1869,41 @@
                 <!-- Runway In Use Indicator -->
                 <div class="flex-shrink-0 h-full flex items-center px-4 mr-2 border-l border-r border-border/30">
                     <div class="flex items-center space-x-2.5">
-                        <div class="flex flex-col items-center justify-center min-w-[36px]">
-                            <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5">RWY</span>
-                            <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 0">
-                                <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
-                                      x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[0].runway_end)"></span>
-                            </template>
-                            <template x-if="!$store.atc.runwayInUse || $store.atc.runwayInUse.length === 0">
+                        <!-- No data -->
+                        <template x-if="!$store.atc.runwayInUse || $store.atc.runwayInUse.length === 0">
+                            <div class="flex flex-col items-center justify-center min-w-[36px]">
+                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5">RWY</span>
                                 <span class="font-mono text-sm text-text/25 leading-none tracking-wider">---</span>
-                            </template>
-                        </div>
-                        <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15">
-                            <div class="flex flex-col items-center justify-center opacity-35 border-l border-border/20 pl-2.5">
-                                <span class="text-[7px] text-text/30 uppercase tracking-[0.2em] leading-none mb-0.5">ALT</span>
-                                <span class="font-mono text-xs text-text/50 leading-none tracking-wider"
-                                      x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[1].runway_end)"></span>
+                            </div>
+                        </template>
+                        <!-- Parallel runways: co-primary display (e.g. "06L / 06R") -->
+                        <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15 && $store.atc.areParallelRunways($store.atc.runwayInUse[0].runway_end, $store.atc.runwayInUse[1].runway_end)">
+                            <div class="flex flex-col items-center justify-center">
+                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5">RWYS</span>
+                                <div class="flex items-baseline gap-1">
+                                    <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
+                                          x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[0].runway_end)"></span>
+                                    <span class="font-mono text-sm text-text/30 leading-none">/</span>
+                                    <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
+                                          x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[1].runway_end)"></span>
+                                </div>
+                            </div>
+                        </template>
+                        <!-- Single runway (or non-parallel secondary) -->
+                        <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 0 && !($store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15 && $store.atc.areParallelRunways($store.atc.runwayInUse[0].runway_end, $store.atc.runwayInUse[1].runway_end))">
+                            <div class="flex items-center space-x-2.5">
+                                <div class="flex flex-col items-center justify-center min-w-[36px]">
+                                    <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5">RWY</span>
+                                    <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
+                                          x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[0].runway_end)"></span>
+                                </div>
+                                <template x-if="$store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15">
+                                    <div class="flex flex-col items-center justify-center opacity-35 border-l border-border/20 pl-2.5">
+                                        <span class="text-[7px] text-text/30 uppercase tracking-[0.2em] leading-none mb-0.5">ALT</span>
+                                        <span class="font-mono text-xs text-text/50 leading-none tracking-wider"
+                                              x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[1].runway_end)"></span>
+                                    </div>
+                                </template>
                             </div>
                         </template>
                     </div>

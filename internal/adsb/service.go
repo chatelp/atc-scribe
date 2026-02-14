@@ -42,6 +42,7 @@ SPECIAL FEATURES:
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -50,6 +51,42 @@ import (
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
 )
+
+const livePredictionBroadcastInterval = 300 * time.Millisecond
+
+func roundTo(value float64, decimals int) float64 {
+	pow := math.Pow(10, float64(decimals))
+	return math.Round(value*pow) / pow
+}
+
+func roundedInterface(value interface{}, decimals int) interface{} {
+	switch v := value.(type) {
+	case float64:
+		return roundTo(v, decimals)
+	case *float64:
+		if v == nil {
+			return nil
+		}
+		return roundTo(*v, decimals)
+	default:
+		return value
+	}
+}
+
+func normalizeRealtimeDelta(delta map[string]interface{}) map[string]interface{} {
+	normalized := make(map[string]interface{}, len(delta))
+	for key, value := range delta {
+		switch key {
+		case "lat", "lon":
+			normalized[key] = roundedInterface(value, 4)
+		case "gs", "tas", "track", "true_heading", "mag_heading":
+			normalized[key] = roundedInterface(value, 1)
+		default:
+			normalized[key] = value
+		}
+	}
+	return normalized
+}
 
 // WebSocketServer defines the interface for a WebSocket server
 type WebSocketServer interface {
@@ -196,8 +233,6 @@ func NewService(
 	// Always enable WebSocket streaming for aircraft updates
 	logger.Info("Initializing WebSocket change detection for aircraft streaming")
 	service.changeDetector = NewChangeDetector(logger)
-	service.broadcastChan = make(chan []AircraftChange, 256) // Buffered to handle burst traffic
-	service.startBroadcastWorker()
 
 	// Set the config for the prediction function
 	predictionConfig := &Config{
@@ -260,16 +295,17 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 	var messageType string
 	switch change.Type {
 	case "added":
-		messageType = "aircraft_added"
+		messageType = websocket.MessageTypeAircraftAdded
 	case "updated":
-		messageType = "aircraft_update"
+		messageType = websocket.MessageTypeAircraftUpdate
 	case "removed":
-		messageType = "aircraft_removed"
+		messageType = websocket.MessageTypeAircraftRemoved
 	}
 
 	data := map[string]interface{}{
-		"type": change.Type,
-		"hex":  change.Hex,
+		"type":        change.Type,
+		"hex":         change.Hex,
+		"observed_at": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 
 	// For "added", send full aircraft object
@@ -279,7 +315,7 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 		data["aircraft"] = change.Aircraft
 	}
 	if change.Delta != nil {
-		data["delta"] = change.Delta
+		data["delta"] = normalizeRealtimeDelta(change.Delta)
 	}
 
 	message := &websocket.Message{
@@ -289,6 +325,54 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 
 	if s.wsServer != nil {
 		s.wsServer.Broadcast(message)
+	}
+}
+
+// predictionBroadcastLoop periodically publishes trajectory-based predicted states
+// so clients can animate smoothly between real ADS-B polls.
+func (s *Service) predictionBroadcastLoop(ctx context.Context) {
+	defer s.wg.Done()
+
+	ticker := time.NewTicker(livePredictionBroadcastInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if s.wsServer == nil || s.trajectoryTracker == nil {
+				continue
+			}
+
+			now := time.Now().UTC()
+			predictions := s.trajectoryTracker.GetLivePredictionsAt(now)
+			for _, p := range predictions {
+				s.wsServer.Broadcast(&websocket.Message{
+					Type: websocket.MessageTypeAircraftPredictedState,
+					Data: map[string]interface{}{
+						"hex":          p.Hex,
+						"predicted":    true,
+						"based_on":     p.BaseObserved.Format(time.RFC3339Nano),
+						"predicted_at": p.Timestamp.Format(time.RFC3339Nano),
+						"delta": map[string]interface{}{
+							"lat":          roundTo(p.Lat, 4),
+							"lon":          roundTo(p.Lon, 4),
+							"alt_baro":     p.Altitude,
+							"gs":           roundTo(p.Speed, 1),
+							"track":        roundTo(p.Heading, 1),
+							"true_heading": roundTo(p.Heading, 1),
+							"mag_heading":  roundTo(p.Heading, 1),
+							"confidence":   roundTo(p.Confidence, 3),
+							"source":       "predicted",
+						},
+					},
+				})
+			}
+
+		case <-s.stopCh:
+			return
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -314,8 +398,8 @@ func (s *Service) sendPhaseChangeAlertWithEvent(aircraft *Aircraft, fromPhase, t
 				Lon float64 `json:"lon"`
 				Alt float64 `json:"alt"`
 			}{
-				Lat: lat,
-				Lon: lon,
+				Lat: roundTo(lat, 4),
+				Lon: roundTo(lon, 4),
 				Alt: aircraft.ADSB.AltBaro.Float64(),
 			},
 			RunwayInfo: runwayInfo,
@@ -356,6 +440,12 @@ func (s *Service) Start(ctx context.Context) error {
 	// Start background fetching
 	s.wg.Add(1)
 	go s.fetchLoop(ctx)
+
+	// Start background prediction streaming (between ADS-B polls)
+	if s.trajectoryTracker != nil && s.wsServer != nil {
+		s.wg.Add(1)
+		go s.predictionBroadcastLoop(ctx)
+	}
 
 	return nil
 }
@@ -569,7 +659,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 	s.setLastFetchTime(time.Now().UTC())
 
 	// Detect and broadcast changes using enriched newAircraft (no DB read)
-	if s.changeDetector != nil && s.broadcastChan != nil {
+	if s.changeDetector != nil {
 		// Enrich newAircraft with phase data from batch + new changes
 		phaseMap := make(map[string]PhaseChange)
 		for hex, phase := range currentPhases {
@@ -613,10 +703,8 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 			s.logger.Debug("Detected aircraft changes",
 				logger.Int("change_count", len(changes)))
 
-			select {
-			case s.broadcastChan <- changes:
-			default:
-				s.logger.Warn("Broadcast channel full, dropping changes")
+			for _, change := range changes {
+				s.broadcastAircraftChange(change)
 			}
 		}
 	}

@@ -754,6 +754,7 @@ class MapManager {
         const position = [lat, lon];
         const heading = this.store.getHeadingWithFallback(aircraft);
         const iconClass = this.getAircraftIconClass(aircraft);
+        const animationOwnsPose = this.store?.settings?.aircraftAnimation?.enabled === true;
 
         if (!this.markers[aircraft.hex]) {
             // --- NEW MARKER ---
@@ -831,16 +832,10 @@ class MapManager {
             // --- UPDATE EXISTING MARKER ---
             const existing = this.markers[aircraft.hex];
 
-            // Only update position if moved more than ~25 meters (0.0002 degrees ≈ 25m)
-            const positionChanged = Math.abs(existing.lastLat - position[0]) > 0.0002 ||
-                                   Math.abs(existing.lastLon - position[1]) > 0.0002;
+            // Apply every real ADS-B position delta immediately to avoid marker "stick then jump"
+            const positionChanged = existing.lastLat !== position[0] || existing.lastLon !== position[1];
 
-            // ANIMATION FIX: Skip direct position updates when animation engine can interpolate
-            const animationEngine = this.store.animationEngine;
-            const animState = animationEngine?.aircraftStates?.get(aircraft.hex);
-            const canAnimate = animationEngine?.isRunning && animState?.hasValidVelocity?.();
-
-            if (positionChanged && !canAnimate) {
+            if (positionChanged && !animationOwnsPose) {
                 existing.aircraft.setLatLng(position);
                 existing.label.setLatLng(position);
             }
@@ -853,15 +848,19 @@ class MapManager {
             if (existing.lastIconClass !== iconClass) {
                 existing.aircraft.setIcon(this.createAircraftIcon(aircraft));
                 existing.lastIconClass = iconClass;
-                requestAnimationFrame(() => {
-                    this._applyAircraftRotation(existing.aircraft, heading);
-                });
+                if (!animationOwnsPose) {
+                    requestAnimationFrame(() => {
+                        this._applyAircraftRotation(existing.aircraft, heading);
+                    });
+                }
             }
 
             // Keep icon aligned with direction of travel over long sessions
             const headingChanged = Math.abs(this._minimalAngleDiffDeg(existing.lastHeading || 0, heading)) > 0.5;
-            if (headingChanged) {
+            if (headingChanged && !animationOwnsPose) {
                 this._applyAircraftRotation(existing.aircraft, heading);
+                existing.lastHeading = heading;
+            } else if (headingChanged) {
                 existing.lastHeading = heading;
             }
 

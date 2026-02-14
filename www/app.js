@@ -34,6 +34,92 @@ const CONFIG = {
 const wsClient = new WebSocketClient(CONFIG.wsUrl);
 window.wsClient = wsClient;
 
+const tileCacheRuntimeStats = {
+    supported: 'serviceWorker' in navigator,
+    controlled: false,
+    cacheName: null,
+    hits: 0,
+    misses: 0,
+    networkFetches: 0,
+    cacheWrites: 0,
+    hitRatePct: 0,
+    lastEventAt: null
+};
+
+function requestTileCacheStatsFromSW() {
+    if (!('serviceWorker' in navigator)) return;
+    if (!navigator.serviceWorker.controller) return;
+    navigator.serviceWorker.controller.postMessage({ type: 'tile-cache-stats-request' });
+}
+
+function attachTileCacheSWListeners() {
+    if (!('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (!event.data || event.data.type !== 'tile-cache-stats') return;
+        const data = event.data.data || {};
+
+        const hits = Number.isFinite(data.hits) ? data.hits : 0;
+        const misses = Number.isFinite(data.misses) ? data.misses : 0;
+        const totalLookups = hits + misses;
+
+        tileCacheRuntimeStats.controlled = !!navigator.serviceWorker.controller;
+        tileCacheRuntimeStats.cacheName = data.cacheName || tileCacheRuntimeStats.cacheName;
+        tileCacheRuntimeStats.hits = hits;
+        tileCacheRuntimeStats.misses = misses;
+        tileCacheRuntimeStats.networkFetches = Number.isFinite(data.networkFetches) ? data.networkFetches : 0;
+        tileCacheRuntimeStats.cacheWrites = Number.isFinite(data.cacheWrites) ? data.cacheWrites : 0;
+        tileCacheRuntimeStats.hitRatePct = totalLookups > 0 ? Number(((hits / totalLookups) * 100).toFixed(1)) : 0;
+        tileCacheRuntimeStats.lastEventAt = Number.isFinite(data.lastEventAt) ? data.lastEventAt : null;
+
+        if (window.Alpine && Alpine.store('atc')) {
+            Alpine.store('atc').tileCacheStats = { ...tileCacheRuntimeStats };
+        }
+    });
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        tileCacheRuntimeStats.controlled = !!navigator.serviceWorker.controller;
+        requestTileCacheStatsFromSW();
+    });
+}
+
+attachTileCacheSWListeners();
+
+async function registerTileCacheServiceWorker() {
+    if (!('serviceWorker' in navigator)) {
+        return;
+    }
+
+    if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        console.warn('Service worker tile cache skipped: insecure context');
+        return;
+    }
+
+    try {
+        const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        console.log('Tile cache service worker registered');
+
+        if (navigator.serviceWorker.controller) {
+            console.log('Tile cache service worker is controlling this page');
+            tileCacheRuntimeStats.controlled = true;
+            requestTileCacheStatsFromSW();
+        } else {
+            console.log('Tile cache service worker installed, will control after next reload');
+            tileCacheRuntimeStats.controlled = false;
+        }
+
+        if (registration.waiting) {
+            console.log('Tile cache service worker update is waiting to activate');
+        }
+    } catch (error) {
+        console.warn('Tile cache service worker registration failed:', error);
+    }
+}
+
+window.addEventListener('load', () => {
+    registerTileCacheServiceWorker();
+});
+
 // Declare Audio client - will be initialized in alpine:init
 let audioClient;
 // Declare Map Manager - will be initialized in alpine:init
@@ -194,6 +280,7 @@ document.addEventListener('alpine:init', () => {
         timeUpdateIntervalId: null, // Store ID for the time update interval
         mapPerfUpdateIntervalId: null, // Interval for map performance stats polling
         mapPerformanceStats: null,
+        tileCacheStats: { ...tileCacheRuntimeStats },
         _previousHeapUsedMB: null,
         userSetVolumes: {}, // Initialize as empty object
         lastSignificantAudioTime: {}, // Stores timestamp for each freqId
@@ -231,7 +318,8 @@ document.addEventListener('alpine:init', () => {
                 interpolationFps: parseInt(localStorage.getItem('aircraftAnimationFps')) || 10,
                 viewportCulling: JSON.parse(localStorage.getItem('aircraftAnimationViewportCulling')) ?? true,
                 adaptivePerformance: JSON.parse(localStorage.getItem('aircraftAnimationAdaptivePerformance')) ?? true
-            }
+            },
+            aircraftPredictionMode: localStorage.getItem('aircraftPredictionMode') || 'real_predicted'
         },
 
         // Add property to track previous settings for change detection
@@ -286,6 +374,7 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('aircraftAnimationFps', this.settings.aircraftAnimation.interpolationFps);
             localStorage.setItem('aircraftAnimationViewportCulling', this.settings.aircraftAnimation.viewportCulling);
             localStorage.setItem('aircraftAnimationAdaptivePerformance', this.settings.aircraftAnimation.adaptivePerformance);
+            localStorage.setItem('aircraftPredictionMode', this.settings.aircraftPredictionMode);
             
             // Update animation engine configuration if it exists
             if (this.animationEngine) {
@@ -2282,6 +2371,13 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        togglePredictionMode() {
+            this.settings.aircraftPredictionMode =
+                this.settings.aircraftPredictionMode === 'real_only' ? 'real_predicted' : 'real_only';
+            this.saveSettings();
+            console.log(`Aircraft prediction mode: ${this.settings.aircraftPredictionMode}`);
+        },
+
         toggleAirports() {
             this.saveSettings();
             if (this.mapManager) {
@@ -2545,10 +2641,55 @@ document.addEventListener('alpine:init', () => {
         // Poll map performance stats from MapManager
         updateMapPerformanceStats() {
             if (!this.mapManager || !this.mapManager.getPerformanceStats) return;
+            requestTileCacheStatsFromSW();
             const mapStats = this.mapManager.getPerformanceStats();
             const animationStats = this.animationEngine ? this.animationEngine.getStats() : null;
+            const wsStats = wsClient && wsClient.getMessageRateStats
+                ? wsClient.getMessageRateStats()
+                : null;
             const measuredFps = animationStats && Number.isFinite(animationStats.measuredFps)
                 ? Number(animationStats.measuredFps.toFixed(1))
+                : 0;
+            const animationFrameMs = animationStats && Number.isFinite(animationStats.averageFrameTime)
+                ? Number(animationStats.averageFrameTime.toFixed(2))
+                : 0;
+            const animationVisibleTargets = animationStats && Number.isFinite(animationStats.visibleTargets)
+                ? animationStats.visibleTargets
+                : 0;
+            const animationAnimatedThisFrame = animationStats && Number.isFinite(animationStats.animatedThisFrame)
+                ? animationStats.animatedThisFrame
+                : 0;
+            const animationPredictedPerSec = animationStats && Number.isFinite(animationStats.predictedPerSec)
+                ? Number(animationStats.predictedPerSec.toFixed(1))
+                : 0;
+            const animationCorrectedPerSec = animationStats && Number.isFinite(animationStats.correctedPerSec)
+                ? Number(animationStats.correctedPerSec.toFixed(1))
+                : 0;
+            const animationMarkerUpdatesPerSec = animationStats && Number.isFinite(animationStats.markerUpdatesPerSec)
+                ? Number(animationStats.markerUpdatesPerSec.toFixed(1))
+                : 0;
+            const animationQuality = animationStats && Number.isFinite(animationStats.qualityLevel)
+                ? Number(animationStats.qualityLevel.toFixed(2))
+                : 0;
+            const animationDroppedFrames = animationStats && Number.isFinite(animationStats.droppedFrames)
+                ? animationStats.droppedFrames
+                : 0;
+
+            const wsByType = wsStats?.byTypePerSec || {};
+            const wsRates = {
+                total: Number.isFinite(wsStats?.totalPerSec) ? wsStats.totalPerSec : 0,
+                aircraft_update: Number.isFinite(wsByType.aircraft_update) ? wsByType.aircraft_update : 0,
+                aircraft_predicted_state: Number.isFinite(wsByType.aircraft_predicted_state) ? wsByType.aircraft_predicted_state : 0,
+                aircraft_added: Number.isFinite(wsByType.aircraft_added) ? wsByType.aircraft_added : 0,
+                aircraft_removed: Number.isFinite(wsByType.aircraft_removed) ? wsByType.aircraft_removed : 0,
+                phase_change: Number.isFinite(wsByType.phase_change) ? wsByType.phase_change : 0,
+                transcription: Number.isFinite(wsByType.transcription) ? wsByType.transcription : 0,
+                frequency_status: Number.isFinite(wsByType.frequency_status) ? wsByType.frequency_status : 0,
+                parse_errors: Number.isFinite(wsStats?.parseErrorsPerSec) ? wsStats.parseErrorsPerSec : 0
+            };
+
+            const fullVisibilityPassesPerSec = Number.isFinite(mapStats?.windowSec) && mapStats.windowSec > 0
+                ? Number((mapStats.fullVisibilityPasses / mapStats.windowSec).toFixed(2))
                 : 0;
 
             const memory = performance && performance.memory ? performance.memory : null;
@@ -2569,10 +2710,22 @@ document.addEventListener('alpine:init', () => {
             this.mapPerformanceStats = {
                 ...mapStats,
                 animationFps: measuredFps,
+                animationFrameMs: animationFrameMs,
+                animationVisibleTargets: animationVisibleTargets,
+                animationAnimatedThisFrame: animationAnimatedThisFrame,
+                animationPredictedPerSec: animationPredictedPerSec,
+                animationCorrectedPerSec: animationCorrectedPerSec,
+                animationMarkerUpdatesPerSec: animationMarkerUpdatesPerSec,
+                animationQuality: animationQuality,
+                animationDroppedFrames: animationDroppedFrames,
                 heapUsedMB: heapUsedMB,
                 heapLimitMB: heapLimitMB,
                 heapUsagePct: heapUsagePct,
-                heapDeltaMB: heapDeltaMB
+                heapDeltaMB: heapDeltaMB,
+                fullVisibilityPassesPerSec: fullVisibilityPassesPerSec,
+                wsWindowSec: Number.isFinite(wsStats?.windowSec) ? wsStats.windowSec : 0,
+                wsRates: wsRates,
+                tileCache: { ...this.tileCacheStats }
             };
         },
 
@@ -2644,6 +2797,10 @@ async initAircraftDataSource() {
             
             wsClient.addEventListener('aircraft_update', (data) => {
                 this.handleAircraftUpdate(data);
+            });
+
+            wsClient.addEventListener('aircraft_predicted_state', (data) => {
+                this.handleAircraftPredictedState(data);
             });
             
             wsClient.addEventListener('aircraft_removed', (data) => {
@@ -3067,6 +3224,24 @@ async initAircraftDataSource() {
             }
         },
 
+        requestInitialAircraftDataThrottled(reason = 'resync', hex = '') {
+            const now = Date.now();
+            if (!this._lastUnknownAircraftResyncAt) {
+                this._lastUnknownAircraftResyncAt = 0;
+            }
+            if (!this._unknownAircraftResyncCooldownMs) {
+                this._unknownAircraftResyncCooldownMs = 5000;
+            }
+
+            if ((now - this._lastUnknownAircraftResyncAt) < this._unknownAircraftResyncCooldownMs) {
+                return;
+            }
+
+            this._lastUnknownAircraftResyncAt = now;
+            console.warn(`Requesting bulk aircraft resync (${reason})`, hex || '');
+            this.requestInitialAircraftData();
+        },
+
         // Handle bulk aircraft data response (initial load on WebSocket connect)
         handleBulkAircraftData(data) {
             console.log(`Received bulk aircraft data: ${data.count} aircraft`);
@@ -3120,6 +3295,8 @@ async initAircraftDataSource() {
         pendingMapUpdates: new Set(),
         mapUpdateThrottleId: null,
         cacheInvalidationPending: false,
+        _lastUnknownAircraftResyncAt: 0,
+        _unknownAircraftResyncCooldownMs: 5000,
         
         // Filtering throttling state to prevent main thread blocking
         _filteringScheduled: false,
@@ -3132,6 +3309,14 @@ async initAircraftDataSource() {
             }
 
             if (data.aircraft) {
+                const observedAtMs = Date.parse(data.observed_at || '');
+                const realObservedAt = Number.isFinite(observedAtMs) ? observedAtMs : Date.now();
+                data.aircraft._lastRealObservedAt = realObservedAt;
+                data.aircraft.last_seen = new Date(realObservedAt).toISOString();
+                if (data.aircraft.adsb) {
+                    data.aircraft.adsb.source = 'real';
+                }
+
                 // Update last update timestamp
                 this.lastUpdate = new Date();
                 this.lastUpdateSeconds = 0;
@@ -3163,6 +3348,9 @@ async initAircraftDataSource() {
 
             const hex = data.hex;
             let existing = this.aircraft[hex];
+            const observedAtMs = Date.parse(data.observed_at || '');
+            const realObservedAt = Number.isFinite(observedAtMs) ? observedAtMs : Date.now();
+            const realObservedAtIso = new Date(realObservedAt).toISOString();
 
             // Update last update timestamp
             this.lastUpdate = new Date();
@@ -3170,11 +3358,21 @@ async initAircraftDataSource() {
 
             // Handle delta update (new efficient format)
             if (data.delta) {
-                // If aircraft doesn't exist in store yet, create a minimal entry
-                // (this can happen if aircraft was added while filtered out in older code)
+                // If aircraft doesn't exist locally, avoid creating sparse placeholders.
+                // Request a bulk sync so details panel fields stay complete.
                 if (!existing) {
-                    existing = { hex: hex };
-                    this.aircraft[hex] = existing;
+                    this.requestInitialAircraftDataThrottled('delta_without_local_aircraft', hex);
+                    return;
+                }
+
+                existing._lastRealObservedAt = realObservedAt;
+                if (existing.adsb) {
+                    existing.adsb.source = 'real';
+                }
+
+                // Heal previously sparse entries (delta streams may not include all metadata fields).
+                if (!existing.created_at) {
+                    this.requestInitialAircraftDataThrottled('sparse_local_aircraft', hex);
                 }
 
                 // Check if this update contains filter-relevant changes BEFORE applying
@@ -3184,7 +3382,7 @@ async initAircraftDataSource() {
                     data.delta.on_ground !== undefined ||
                     data.delta.flight !== undefined;
 
-                this.applyDelta(existing, data.delta);
+                this.applyDelta(existing, data.delta, realObservedAtIso);
                 this.calculateAircraftDistance(existing);
 
                 // Update animation engine with delta
@@ -3208,6 +3406,12 @@ async initAircraftDataSource() {
             }
             // Fallback: full aircraft object (backward compatibility)
             else if (data.aircraft) {
+                data.aircraft._lastRealObservedAt = realObservedAt;
+                data.aircraft.last_seen = realObservedAtIso;
+                if (data.aircraft.adsb) {
+                    data.aircraft.adsb.source = 'real';
+                }
+
                 // ALWAYS store aircraft data - filtering is done at display level
                 this.aircraft[data.aircraft.hex] = data.aircraft;
                 this.calculateAircraftDistance(data.aircraft);
@@ -3229,9 +3433,65 @@ async initAircraftDataSource() {
             }
         },
 
+        handleAircraftPredictedState(data) {
+            if (this.wsUpdatesPaused || !data || !data.hex || !data.delta) {
+                return;
+            }
+
+            if (this.settings.aircraftPredictionMode === 'real_only') {
+                return;
+            }
+
+            const aircraft = this.aircraft[data.hex];
+            if (!aircraft || aircraft.status === 'signal_lost') {
+                return;
+            }
+
+            const preservedLastSeen = aircraft.last_seen;
+            const preservedRealObservedAt = aircraft._lastRealObservedAt;
+
+            if (!aircraft.adsb) {
+                aircraft.adsb = {};
+            }
+
+            const basedOnMs = Date.parse(data.based_on || '');
+            const latestRealObservedAt = Number.isFinite(aircraft._lastRealObservedAt) ? aircraft._lastRealObservedAt : null;
+
+            // Real ADS-B updates always win over predicted updates.
+            if (Number.isFinite(basedOnMs) && Number.isFinite(latestRealObservedAt) && basedOnMs < latestRealObservedAt) {
+                return;
+            }
+
+            const delta = data.delta;
+            if (delta.lat !== undefined) aircraft.adsb.lat = delta.lat;
+            if (delta.lon !== undefined) aircraft.adsb.lon = delta.lon;
+            if (delta.alt_baro !== undefined) aircraft.adsb.alt_baro = delta.alt_baro;
+            if (delta.gs !== undefined) aircraft.adsb.gs = delta.gs;
+            if (delta.track !== undefined) aircraft.adsb.track = delta.track;
+            if (delta.true_heading !== undefined) aircraft.adsb.true_heading = delta.true_heading;
+            if (delta.mag_heading !== undefined) aircraft.adsb.mag_heading = delta.mag_heading;
+            aircraft.adsb.source = 'predicted';
+
+            aircraft._lastPredictedObservedAt = Number.isFinite(basedOnMs) ? basedOnMs : Date.now();
+
+            // Predicted updates must never advance real timing fields.
+            aircraft.last_seen = preservedLastSeen;
+            aircraft._lastRealObservedAt = preservedRealObservedAt;
+
+            this.calculateAircraftDistance(aircraft);
+
+            if (this.animationEngine) {
+                this.animationEngine.updateAircraft(aircraft);
+            }
+
+            if (!this.settings.aircraftAnimation?.enabled) {
+                this.queueMapUpdate(data.hex);
+            }
+        },
+
         // Apply delta updates to an existing aircraft object
         // PERFORMANCE: Only set values that have actually changed to minimize Alpine reactivity triggers
-        applyDelta(aircraft, delta) {
+        applyDelta(aircraft, delta, realObservedAtIso = null) {
             // Initialize adsb object if needed
             if (!aircraft.adsb) aircraft.adsb = {};
 
@@ -3261,6 +3521,7 @@ async initAircraftDataSource() {
             if (delta.baro_rate !== undefined && aircraft.adsb.baro_rate !== delta.baro_rate) aircraft.adsb.baro_rate = delta.baro_rate;
             if (delta.mag_heading !== undefined && aircraft.adsb.mag_heading !== delta.mag_heading) aircraft.adsb.mag_heading = delta.mag_heading;
             if (delta.true_heading !== undefined && aircraft.adsb.true_heading !== delta.true_heading) aircraft.adsb.true_heading = delta.true_heading;
+            if (delta.source !== undefined && aircraft.adsb.source !== delta.source) aircraft.adsb.source = delta.source;
             if (delta.atc_derived !== undefined && aircraft.adsb.atc_derived !== delta.atc_derived) aircraft.adsb.atc_derived = delta.atc_derived;
 
             // Apply full adsb object if provided — preserve last known position if new object has no GPS
@@ -3296,7 +3557,7 @@ async initAircraftDataSource() {
                 delta.track !== undefined || delta.baro_rate !== undefined ||
                 delta.tas !== undefined || delta.adsb !== undefined;
             if (hasAdsbData) {
-                aircraft.last_seen = new Date().toISOString();
+                aircraft.last_seen = realObservedAtIso || new Date().toISOString();
             }
         },
 
@@ -3358,13 +3619,8 @@ async initAircraftDataSource() {
 
             this.pendingMapUpdates.add(hex);
 
-            // Throttle: 100ms - fast enough for real-time feel, batches multiple updates
-            if (!this.mapUpdateThrottleId) {
-                this.mapUpdateThrottleId = setTimeout(() => {
-                    this.processPendingMapUpdates();
-                    this.mapUpdateThrottleId = null;
-                }, 100);
-            }
+            // Apply immediately on each websocket update to avoid perceived buffering/jumps
+            this.processPendingMapUpdates();
         },
 
 
@@ -4151,12 +4407,22 @@ async initAircraftDataSource() {
             }
         },
         
-        // Get the latest METAR data
         // Extract runway end identifier from "05-23/05" format → "05"
         formatRunwayEnd(runwayId) {
             if (!runwayId) return '';
             const parts = runwayId.split('/');
             return parts.length === 2 ? parts[1] : runwayId;
+        },
+
+        // Check if two runway IDs represent parallel runways (same base number, different L/R/C).
+        // "06L-24R/06L" and "06R-24L/06R" → both base "06" → parallel
+        areParallelRunways(rwy1, rwy2) {
+            const end1 = this.formatRunwayEnd(rwy1);
+            const end2 = this.formatRunwayEnd(rwy2);
+            if (!end1 || !end2 || end1 === end2) return false;
+            const base1 = end1.replace(/[LRC]$/, '');
+            const base2 = end2.replace(/[LRC]$/, '');
+            return base1 === base2;
         },
 
         getLatestMetar() {

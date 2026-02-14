@@ -220,19 +220,18 @@ func (tt *TrajectoryTracker) ruleApproach(aircraft *Aircraft, d *DerivedState) s
 //
 // Two paths to CLB:
 //
-// Path A (observed takeoff): Recent T/O record in DB + climbing + any indicator:
-//
-//	a) On runway departure heading
-//	b) Accelerating and departing from station
-//	c) Still within airport vicinity
+// Path A (observed takeoff): Recent T/O record in DB + climbing + on runway
+// heading + below approach ceiling + not yet turning off the SID.
 //
 // Path B (inferred takeoff): No T/O record, but aircraft appeared airborne
 // climbing on runway heading at low altitude near the airport. With spotty ADS-B
 // coverage, aircraft often first appear at ~1000 ft already climbing on the runway
 // centerline — this is an obvious takeoff that we missed on the ground.
 //
-// Once the aircraft turns off the SID heading, stops accelerating, and leaves the
-// airport area, CLB conditions no longer match and the aircraft transitions to DEP.
+// CLB ends when any of these occur:
+//   - Aircraft turns off the runway heading (SID turn → DEP)
+//   - Aircraft climbs above the approach altitude ceiling (typically 5000 ft)
+//   - Aircraft leaves the airport area
 func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, takeoffTime *time.Time) string {
 	cfg := tt.phasesConfig
 
@@ -243,6 +242,21 @@ func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, take
 
 	// Must be below cruise altitude
 	if d.AltMean >= float64(cfg.CruiseAltitudeFt) {
+		return ""
+	}
+
+	// CLB is the initial climb-out from the runway — a short phase that lasts
+	// until the first SID turn or until the aircraft passes through the approach
+	// altitude ceiling. Above that altitude, the aircraft is well past initial
+	// climb and belongs in DEP.
+	if d.AltMean > float64(cfg.ApproachMaxAltitudeFt) {
+		return ""
+	}
+
+	// Once the aircraft starts turning, the initial climb-out is over.
+	// SID turns happen quickly after takeoff — this is a strong signal
+	// that CLB should transition to DEP.
+	if d.IsTurning {
 		return ""
 	}
 
@@ -269,12 +283,7 @@ func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, take
 			return "CLB"
 		}
 
-		// (b) Accelerating and departing from station
-		if d.IsAccelerating && d.DistTrendNMPerSec > 0.001 {
-			return "CLB"
-		}
-
-		// (c) Still within airport vicinity
+		// (b) Still within airport vicinity at low altitude — not yet on SID
 		if d.DistToStationNM <= cfg.AirportRangeNM {
 			return "CLB"
 		}
