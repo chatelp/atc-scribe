@@ -479,9 +479,15 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 					logger.Float64("corrected_alt", correctedAlt),
 				)
 			}
-			a.ADSB.TAS = NumberPtr(correctedTAS)
-			a.ADSB.GS = NumberPtr(correctedGS)
-			a.ADSB.AltBaro = FlexibleFloat64(correctedAlt)
+			if correctedTAS != currentTAS {
+				a.ADSB.TAS = NumberPtr(correctedTAS)
+			}
+			if correctedGS != currentGS {
+				a.ADSB.GS = NumberPtr(correctedGS)
+			}
+			if correctedAlt != a.ADSB.AltBaro.Float64() {
+				a.ADSB.AltBaro = FlexibleFloat64(correctedAlt)
+			}
 		}
 
 		// Determine if aircraft is currently flying using corrected values and config

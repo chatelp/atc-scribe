@@ -666,14 +666,19 @@ class MapManager {
 
     // Generate simple future trajectory for active aircraft based on current vector
     generateFutureTrajectory(aircraft) {
-        if (!aircraft.adsb || !aircraft.adsb.lat || !aircraft.adsb.lon || !aircraft.adsb.gs || aircraft.adsb.gs < 5) {
+        const currentLat = aircraft?.adsb?.lat;
+        const currentLon = aircraft?.adsb?.lon;
+        const groundSpeed = aircraft?.adsb?.gs;
+        const track = aircraft?.adsb?.track;
+
+        const hasValidPosition = typeof currentLat === 'number' && Number.isFinite(currentLat)
+            && typeof currentLon === 'number' && Number.isFinite(currentLon);
+        const hasValidSpeed = typeof groundSpeed === 'number' && Number.isFinite(groundSpeed) && groundSpeed >= 5;
+        const hasValidTrack = typeof track === 'number' && Number.isFinite(track);
+
+        if (!hasValidPosition || !hasValidSpeed || !hasValidTrack) {
             return [];
         }
-
-        const currentLat = aircraft.adsb.lat;
-        const currentLon = aircraft.adsb.lon;
-        const groundSpeed = aircraft.adsb.gs; // knots
-        const track = aircraft.adsb.track || 0; // degrees
 
         // Convert ground speed from knots to degrees per minute (approximate)
         const speedDegreesPerMinute = (groundSpeed * 0.000277778) / 60; // knots to degrees/minute
@@ -718,7 +723,9 @@ class MapManager {
             this.trails[aircraft.hex].push({
                 lat: lat,
                 lon: lon,
-                alt_baro: aircraft.adsb?.alt_baro || 0,
+                alt_baro: (typeof aircraft.adsb?.alt_baro === 'number' && Number.isFinite(aircraft.adsb.alt_baro))
+                    ? aircraft.adsb.alt_baro
+                    : null,
                 time: now,
                 isHistorical: false
             });
@@ -753,13 +760,17 @@ class MapManager {
             // Build icon + label only when creating a new marker (not on every update)
             const icon = this.createAircraftIcon(aircraft);
             const callsign = (aircraft.flight || aircraft.hex).trim();
-            const altitude = aircraft.adsb ? aircraft.adsb.alt_baro : 0;
-            const currentSpeed = aircraft.adsb ? (aircraft.adsb.tas || aircraft.adsb.gs || 0) : 0;
+            const altitude = (aircraft.adsb && typeof aircraft.adsb.alt_baro === 'number') ? aircraft.adsb.alt_baro : null;
+            const currentSpeed = (aircraft.adsb && typeof aircraft.adsb.tas === 'number')
+                ? aircraft.adsb.tas
+                : ((aircraft.adsb && typeof aircraft.adsb.gs === 'number') ? aircraft.adsb.gs : null);
             const currentPhase = this.getCurrentPhase(aircraft);
             const currentStatus = aircraft.status || 'active';
             const currentTrend = this.getVerticalTrend(aircraft);
             const isStale = aircraft.stale_position ? '1' : '0';
-            const labelVersion = `${callsign}_${Math.round(altitude/100)}_${Math.round(currentSpeed/10)}_${currentPhase}_${currentStatus}_${currentTrend}_${isStale}`;
+            const altitudeKey = altitude === null ? 'na' : Math.round(altitude / 100);
+            const speedKey = currentSpeed === null ? 'na' : Math.round(currentSpeed / 10);
+            const labelVersion = `${callsign}_${altitudeKey}_${speedKey}_${currentPhase}_${currentStatus}_${currentTrend}_${isStale}`;
             const newLabelContent = this.store.createLabelContent(aircraft, callsign, altitude, currentTrend);
             const labelContentIcon = this.L.divIcon({
                 html: newLabelContent,
@@ -856,14 +867,18 @@ class MapManager {
 
             // PERF: Compute label version FIRST — only build DOM label if data actually changed.
             // This avoids createLabelContent() + L.divIcon() allocation on ~90-95% of updates.
-            const currentAltitude = aircraft.adsb ? aircraft.adsb.alt_baro : 0;
-            const currentSpeed = aircraft.adsb ? (aircraft.adsb.tas || aircraft.adsb.gs || 0) : 0;
+            const currentAltitude = (aircraft.adsb && typeof aircraft.adsb.alt_baro === 'number') ? aircraft.adsb.alt_baro : null;
+            const currentSpeed = (aircraft.adsb && typeof aircraft.adsb.tas === 'number')
+                ? aircraft.adsb.tas
+                : ((aircraft.adsb && typeof aircraft.adsb.gs === 'number') ? aircraft.adsb.gs : null);
             const currentPhase = this.getCurrentPhase(aircraft);
             const currentStatus = aircraft.status || 'active';
             const currentCallsign = (aircraft.flight || aircraft.hex).trim();
             const currentTrend = this.getVerticalTrend(aircraft);
             const isStale = aircraft.stale_position ? '1' : '0';
-            const labelVersion = `${currentCallsign}_${Math.round(currentAltitude/100)}_${Math.round(currentSpeed/10)}_${currentPhase}_${currentStatus}_${currentTrend}_${isStale}`;
+            const altitudeKey = currentAltitude === null ? 'na' : Math.round(currentAltitude / 100);
+            const speedKey = currentSpeed === null ? 'na' : Math.round(currentSpeed / 10);
+            const labelVersion = `${currentCallsign}_${altitudeKey}_${speedKey}_${currentPhase}_${currentStatus}_${currentTrend}_${isStale}`;
 
             if (existing.lastLabelVersion !== labelVersion) {
                 const newLabelContent = this.store.createLabelContent(aircraft, currentCallsign, currentAltitude, currentTrend);
@@ -885,7 +900,8 @@ class MapManager {
     }
 
     getVerticalTrend(aircraft) {
-        const verticalRate = aircraft.adsb ? aircraft.adsb.baro_rate : 0;
+        const verticalRate = aircraft.adsb ? aircraft.adsb.baro_rate : null;
+        if (typeof verticalRate !== 'number') return 'level';
         if (verticalRate > 100) return 'climbing';
         if (verticalRate < -100) return 'descending';
         return 'level';

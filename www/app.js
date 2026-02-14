@@ -593,15 +593,21 @@ document.addEventListener('alpine:init', () => {
                 case 'phase':
                     return this.getCurrentPhase(aircraft);
                 case 'altitude':
-                    return aircraft.adsb ? aircraft.adsb.alt_baro : 0;
+                    return (typeof aircraft.adsb?.alt_baro === 'number' && Number.isFinite(aircraft.adsb.alt_baro))
+                        ? aircraft.adsb.alt_baro
+                        : Number.NEGATIVE_INFINITY;
                 case 'heading':
                     return this.getHeadingWithType(aircraft).value ?? -1;
                 case 'speed':
-                    return aircraft.adsb ? aircraft.adsb.tas : 0;
+                    return (typeof aircraft.adsb?.tas === 'number' && Number.isFinite(aircraft.adsb.tas))
+                        ? aircraft.adsb.tas
+                        : Number.NEGATIVE_INFINITY;
                 case 'gs':
-                    return aircraft.adsb ? aircraft.adsb.gs : 0;
+                    return (typeof aircraft.adsb?.gs === 'number' && Number.isFinite(aircraft.adsb.gs))
+                        ? aircraft.adsb.gs
+                        : Number.NEGATIVE_INFINITY;
                 case 'distance':
-                    return aircraft.distance || 999999; // Sort undefined distances to the end
+                    return aircraft.distance ?? 999999; // Sort undefined distances to the end
                 default:
                     return '';
             }
@@ -623,14 +629,20 @@ document.addEventListener('alpine:init', () => {
         createLabelContent(aircraft, callsign, altitude, verticalTrend) {
             const altitudeColorClass = 'text-white';
             // Use alt_baro consistently across all components (same as details panel and flight strip)
-            const altitudeDisplay = aircraft.adsb && aircraft.adsb.alt_baro !== undefined ?
-                `${Math.round(aircraft.adsb.alt_baro/100)*100}` : '0';
+            const hasAlt = aircraft.adsb && typeof aircraft.adsb.alt_baro === 'number' && Number.isFinite(aircraft.adsb.alt_baro);
+            const altitudeDisplay = hasAlt
+                ? `${Math.round(aircraft.adsb.alt_baro / 100) * 100}`
+                : '-';
             
-            // Speed logic: TAS if available, GS if TAS is 0 or null
-            const tasValue = aircraft.adsb && aircraft.adsb.tas ? Math.round(aircraft.adsb.tas) : null;
-            const gsValue = aircraft.adsb && aircraft.adsb.gs ? Math.round(aircraft.adsb.gs) : null;
-            const speedValue = tasValue || gsValue || 0;
-            const speedLabel = tasValue ? 'TAS' : 'GS';
+            // Speed logic: prefer TAS when present, otherwise GS, otherwise '-'.
+            const tasValue = aircraft.adsb && typeof aircraft.adsb.tas === 'number' && Number.isFinite(aircraft.adsb.tas)
+                ? Math.round(aircraft.adsb.tas)
+                : null;
+            const gsValue = aircraft.adsb && typeof aircraft.adsb.gs === 'number' && Number.isFinite(aircraft.adsb.gs)
+                ? Math.round(aircraft.adsb.gs)
+                : null;
+            const speedValue = tasValue !== null ? tasValue : (gsValue !== null ? gsValue : '-');
+            const speedLabel = tasValue !== null ? 'TAS' : (gsValue !== null ? 'GS' : 'SPD');
 
             const statusColorClass = this.getStatusColor(aircraft);
             let lastSeenText = '';
@@ -678,7 +690,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             // Create airline and type display on same line
-            const aircraftType = aircraft.adsb?.t || 'N/A';
+            const aircraftType = aircraft.adsb?.t || '-';
             const airlineTypeDisplay = aircraft.airline ? `${aircraft.airline} (${aircraftType})` : aircraftType;
 
             const borderClass = aircraft.stale_position
@@ -737,6 +749,20 @@ document.addEventListener('alpine:init', () => {
             return 'fas fa-arrows-alt-h'; // Level
         },
 
+        getAltitudeUnitLabel(aircraft) {
+            const altitude = aircraft?.adsb?.alt_baro;
+            if (typeof altitude !== 'number' || !Number.isFinite(altitude)) return '';
+
+            const baroRate = aircraft?.adsb?.baro_rate;
+            if (typeof baroRate === 'number' && Number.isFinite(baroRate)) {
+                const roundedRate = Math.round(baroRate);
+                if (roundedRate > 100) return `+${roundedRate} ft`;
+                if (roundedRate < -100) return `${roundedRate} ft`;
+            }
+
+            return 'ft';
+        },
+
         getATCDerivedMetrics(aircraft) {
             const adsbData = aircraft?.adsb || {};
             const serverDerived = adsbData.atc_derived || null;
@@ -759,9 +785,9 @@ document.addEventListener('alpine:init', () => {
             const trackRate = num(adsbData.track_rate);
 
             const headingSource = serverDerived?.heading_source
-                || (trueHeading !== null ? 'TRUE' : (magHeading !== null ? 'MAG' : (track !== null ? 'TRACK' : 'N/A')));
+                || (trueHeading !== null ? 'TRUE' : (magHeading !== null ? 'MAG' : (track !== null ? 'TRACK' : '-')));
 
-            let trackHeadingError = 'N/A';
+            let trackHeadingError = '-';
             if (num(serverDerived?.track_heading_error_deg) !== null) {
                 const drift = num(serverDerived.track_heading_error_deg);
                 trackHeadingError = `${drift >= 0 ? '+' : ''}${drift.toFixed(1)}°`;
@@ -773,8 +799,8 @@ document.addEventListener('alpine:init', () => {
                 }
             }
 
-            let headTailWind = 'N/A';
-            let crossWind = 'N/A';
+            let headTailWind = '-';
+            let crossWind = '-';
             if (num(serverDerived?.head_tailwind_kt) !== null && num(serverDerived?.crosswind_kt) !== null) {
                 const headwind = num(serverDerived.head_tailwind_kt);
                 const crosswindVal = num(serverDerived.crosswind_kt);
@@ -792,7 +818,7 @@ document.addEventListener('alpine:init', () => {
                 crossWind = `${cwLabel} ${Math.abs(crosswindVal).toFixed(1)} kt`;
             }
 
-            let flightPathAngle = 'N/A';
+            let flightPathAngle = '-';
             if (num(serverDerived?.flight_path_angle_deg) !== null) {
                 const fpa = num(serverDerived.flight_path_angle_deg);
                 flightPathAngle = `${fpa >= 0 ? '+' : ''}${fpa.toFixed(2)}°`;
@@ -802,7 +828,7 @@ document.addEventListener('alpine:init', () => {
                 flightPathAngle = `${fpa >= 0 ? '+' : ''}${fpa.toFixed(2)}°`;
             }
 
-            let climbGradient = 'N/A';
+            let climbGradient = '-';
             if (num(serverDerived?.climb_gradient_ft_nm) !== null) {
                 const gradient = num(serverDerived.climb_gradient_ft_nm);
                 climbGradient = `${gradient >= 0 ? '+' : ''}${gradient.toFixed(0)} ft/NM`;
@@ -811,7 +837,7 @@ document.addEventListener('alpine:init', () => {
                 climbGradient = `${gradient >= 0 ? '+' : ''}${gradient.toFixed(0)} ft/NM`;
             }
 
-            let etaToStation = 'N/A';
+            let etaToStation = '-';
             if (num(serverDerived?.eta_station_sec) !== null) {
                 const totalSec = Math.max(0, Math.round(num(serverDerived.eta_station_sec)));
                 const whole = Math.floor(totalSec / 60);
@@ -828,7 +854,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             const turnRateSource = num(serverDerived?.turn_rate_deg_sec) ?? trackRate;
-            const turnRateText = turnRateSource !== null ? `${turnRateSource >= 0 ? '+' : ''}${turnRateSource.toFixed(2)}°/s` : 'N/A';
+            const turnRateText = turnRateSource !== null ? `${turnRateSource >= 0 ? '+' : ''}${turnRateSource.toFixed(2)}°/s` : '-';
 
             return {
                 headingSource,
@@ -850,7 +876,7 @@ document.addEventListener('alpine:init', () => {
             const adsbData = aircraft.adsb || {};
             
             // Calculate seconds since last seen
-            let lastSeenText = 'N/A';
+            let lastSeenText = '-';
             let lastSeenSeconds = '';
             if (aircraft.last_seen) {
                 const secondsAgo = Math.floor((new Date() - new Date(aircraft.last_seen)) / 1000);
@@ -859,7 +885,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             // Calculate first seen text with seconds ago
-            let firstSeenText = 'N/A';
+            let firstSeenText = '-';
             let firstSeenSeconds = '';
             if (aircraft.created_at) {
                 const secondsAgo = Math.floor((new Date() - new Date(aircraft.created_at)) / 1000);
@@ -868,7 +894,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             // Calculate takeoff time text with seconds ago
-            let takeoffTimeText = 'N/A';
+            let takeoffTimeText = '-';
             let takeoffSeconds = '';
             if (aircraft.DateTookoff || aircraft.date_tookoff) {
                 const takeoffTime = aircraft.DateTookoff || aircraft.date_tookoff;
@@ -878,7 +904,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             // Calculate landing time text with seconds ago
-            let landingTimeText = 'N/A';
+            let landingTimeText = '-';
             let landingSeconds = '';
             if (aircraft.DateLanded || aircraft.date_landed) {
                 const landingTime = aircraft.DateLanded || aircraft.date_landed;
@@ -891,22 +917,22 @@ document.addEventListener('alpine:init', () => {
             const bsdbData = aircraft.bsdb || {};
 
             // Prefer BSDB data over ADSB data for type and registration
-            const aircraftType = bsdbData.type || adsbData.t || 'N/A';
-            const aircraftReg = bsdbData.registration || adsbData.r || 'N/A';
-            const aircraftOperator = bsdbData.registered_owners || 'N/A';
+            const aircraftType = bsdbData.type || adsbData.t || '-';
+            const aircraftReg = bsdbData.registration || adsbData.r || '-';
+            const aircraftOperator = bsdbData.registered_owners || '-';
             const derived = this.getATCDerivedMetrics(aircraft);
 
             const fields = [
                 ['Basic Info', [
-                    ['Callsign', aircraft.flight?.trim() || 'N/A'],
-                    ['Airline', aircraft.airline || 'N/A'],
+                    ['Callsign', aircraft.flight?.trim() || '-'],
+                    ['Airline', aircraft.airline || '-'],
                     ['Operator', aircraftOperator],
-                    ['Country', aircraft.airline_country || 'N/A'],
+                    ['Country', aircraft.airline_country || '-'],
                     ['Hex', aircraft.hex],
                     ['Type', aircraftType],
                     ['Registration', aircraftReg],
-                    ['Category', adsbData.category || 'N/A'],
-                    ['Squawk', adsbData.squawk || 'N/A'],
+                    ['Category', adsbData.category || '-'],
+                    ['Squawk', adsbData.squawk || '-'],
                     ['First Seen', firstSeenText, firstSeenSeconds],
                     ['Last Seen', lastSeenText, lastSeenSeconds]
                 ]],
@@ -917,34 +943,34 @@ document.addEventListener('alpine:init', () => {
                     ['Landing Time', landingTimeText, landingSeconds]
                 ]],
                 ['Position', [
-                    ['Latitude', adsbData.lat?.toFixed(6) || 'N/A'],
-                    ['Longitude', adsbData.lon?.toFixed(6) || 'N/A'],
-                    ['Distance (NM)', aircraft.distance || 'N/A'],
-                    ['Altitude (Baro)', `${adsbData.alt_baro ?? 'N/A'} ft`],
-                    ['Altitude (Geom)', `${adsbData.alt_geom ?? 'N/A'} ft`],
-                    ['Vertical Rate', `${adsbData.baro_rate ?? 0} ft/min`]
+                    ['Latitude', adsbData.lat?.toFixed(6) || '-'],
+                    ['Longitude', adsbData.lon?.toFixed(6) || '-'],
+                    ['Distance (NM)', aircraft.distance ?? '-'],
+                    ['Altitude (Baro)', `${adsbData.alt_baro ?? '-'} ft`],
+                    ['Altitude (Geom)', `${adsbData.alt_geom ?? '-'} ft`],
+                    ['Vertical Rate', `${adsbData.baro_rate ?? '-'} ft/min`]
                 ]],
                 ['Speed & Direction', [
-                    ['Ground Speed', `${adsbData.gs ?? 'N/A'} kts`],
-                    ['True Airspeed', `${adsbData.tas ?? 'N/A'} kts`],
-                    ['IAS', `${adsbData.ias ?? 'N/A'} kts`],
-                    ['TAS', `${adsbData.tas ?? 'N/A'} kts`],
-                    ['Mach', adsbData.mach ?? 'N/A'],
-                    ['Track', `${adsbData.track ?? 'N/A'}°`],
-                    ['Mag Heading', `${adsbData.mag_heading ?? 'N/A'}°`],
-                    ['True Heading', `${adsbData.true_heading ?? 'N/A'}°`]
+                    ['Ground Speed', `${adsbData.gs ?? '-'} kts`],
+                    ['True Airspeed', `${adsbData.tas ?? '-'} kts`],
+                    ['IAS', `${adsbData.ias ?? '-'} kts`],
+                    ['TAS', `${adsbData.tas ?? '-'} kts`],
+                    ['Mach', adsbData.mach ?? '-'],
+                    ['Track', `${adsbData.track ?? '-'}°`],
+                    ['Mag Heading', `${adsbData.mag_heading ?? '-'}°`],
+                    ['True Heading', `${adsbData.true_heading ?? '-'}°`]
                 ]],
                 ['Navigation', [
-                    ['Nav QNH', `${adsbData.nav_qnh ?? 'N/A'} hPa`],
-                    ['Nav Altitude MCP', `${adsbData.nav_altitude_mcp ?? 'N/A'} ft`],
-                    ['Nav Altitude FMS', `${adsbData.nav_altitude_fms ?? 'N/A'} ft`],
-                    ['Nav Heading', `${adsbData.nav_heading ?? 'N/A'}°`]
+                    ['Nav QNH', `${adsbData.nav_qnh ?? '-'} hPa`],
+                    ['Nav Altitude MCP', `${adsbData.nav_altitude_mcp ?? '-'} ft`],
+                    ['Nav Altitude FMS', `${adsbData.nav_altitude_fms ?? '-'} ft`],
+                    ['Nav Heading', `${adsbData.nav_heading ?? '-'}°`]
                 ]],
                 ['Weather', [
-                    ['Wind Direction', `${adsbData.wd ?? 'N/A'}°`],
-                    ['Wind Speed', `${adsbData.ws ?? 'N/A'} kts`],
-                    ['OAT', `${adsbData.oat ?? 'N/A'}°C`],
-                    ['TAT', `${adsbData.tat ?? 'N/A'}°C`]
+                    ['Wind Direction', `${adsbData.wd ?? '-'}°`],
+                    ['Wind Speed', `${adsbData.ws ?? '-'} kts`],
+                    ['OAT', `${adsbData.oat ?? '-'}°C`],
+                    ['TAT', `${adsbData.tat ?? '-'}°C`]
                 ]],
                 ['ATC Derived', [
                     ['Heading Source', derived.headingSource],
@@ -957,19 +983,19 @@ document.addEventListener('alpine:init', () => {
                     ['ETA to Station', derived.etaToStation]
                 ]],
                 ['ADSB Info', [
-                    ['Version', adsbData.version ?? 'N/A'],
-                    ['NIC', adsbData.nic ?? 'N/A'],
-                    ['NACp', adsbData.nac_p ?? 'N/A'],
-                    ['NACv', adsbData.nac_v ?? 'N/A'],
-                    ['SIL', adsbData.sil ?? 'N/A'],
-                    ['SIL Type', adsbData.sil_type || 'N/A'],
-                    ['GVA', adsbData.gva ?? 'N/A'],
-                    ['SDA', adsbData.sda ?? 'N/A']
+                    ['Version', adsbData.version ?? '-'],
+                    ['NIC', adsbData.nic ?? '-'],
+                    ['NACp', adsbData.nac_p ?? '-'],
+                    ['NACv', adsbData.nac_v ?? '-'],
+                    ['SIL', adsbData.sil ?? '-'],
+                    ['SIL Type', adsbData.sil_type || '-'],
+                    ['GVA', adsbData.gva ?? '-'],
+                    ['SDA', adsbData.sda ?? '-']
                 ]],
                 ['Signal', [
-                    ['Messages', adsbData.messages ?? 'N/A'],
-                    ['Seen', `${adsbData.seen ?? 'N/A'}s`], 
-                    ['RSSI', `${adsbData.rssi ?? 'N/A'} dBm`]
+                    ['Messages', adsbData.messages ?? '-'],
+                    ['Seen', `${adsbData.seen ?? '-'}s`], 
+                    ['RSSI', `${adsbData.rssi ?? '-'} dBm`]
                 ]]
             ];
 
@@ -1826,7 +1852,7 @@ document.addEventListener('alpine:init', () => {
 
         // Highlight a specific position on the map when hovering over history row
         highlightPositionOnMap(position) {
-            if (!position || !position.lat || !position.lon || !this.mapManager) return;
+            if (!position || typeof position.lat !== 'number' || typeof position.lon !== 'number' || !this.mapManager) return;
             
             // Create a temporary marker for the highlighted position
             this.mapManager.showPositionHighlight(position.lat, position.lon, {
@@ -1880,6 +1906,7 @@ document.addEventListener('alpine:init', () => {
             // Check if we're using the new PositionMinimal format or the old Position format
             const currentAlt = position.alt_baro !== undefined ? position.alt_baro : position.altitude;
             const nextAlt = nextPosition.alt_baro !== undefined ? nextPosition.alt_baro : nextPosition.altitude;
+            if (typeof currentAlt !== 'number' || typeof nextAlt !== 'number') return 'fas fa-arrows-alt-h';
             
             const altDiff = currentAlt - nextAlt;
             if (altDiff > 100) return 'fas fa-arrow-up';
@@ -1897,11 +1924,27 @@ document.addEventListener('alpine:init', () => {
             // Check if we're using the new PositionMinimal format or the old Position format
             const currentAlt = position.alt_baro !== undefined ? position.alt_baro : position.altitude;
             const nextAlt = nextPosition.alt_baro !== undefined ? nextPosition.alt_baro : nextPosition.altitude;
+            if (typeof currentAlt !== 'number' || typeof nextAlt !== 'number') return isFuture ? 'text-highlight/70' : 'text-text';
             
             const altDiff = currentAlt - nextAlt;
             if (altDiff > 100) return isFuture ? 'text-green-400' : 'text-highlight';
             if (altDiff < -100) return isFuture ? 'text-red-400' : 'text-danger';
             return isFuture ? 'text-highlight/70' : 'text-text';
+        },
+
+        formatTrackAltitude(value) {
+            if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+            return Math.round(value / 100) * 100;
+        },
+
+        formatTrackSpeed(value) {
+            if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+            return Math.round(value);
+        },
+
+        formatTrackDistance(value) {
+            if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+            return value;
         },
 
         // Check if there's a significant time gap (>10 minutes) between this position and the previous one
@@ -2182,7 +2225,7 @@ document.addEventListener('alpine:init', () => {
         
         // Format a date based on user preference (local or UTC)
         formatDate(dateString, timeOnly = false) {
-            if (!dateString) return 'N/A';
+            if (!dateString) return '-';
             
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return 'Invalid Date';
@@ -4598,13 +4641,13 @@ async initAircraftDataSource() {
 
         getHeadingDisplayTextFromAdsb(adsbLike) {
             const heading = this.getHeadingWithTypeFromAdsb(adsbLike);
-            if (heading.value === null) return 'N/A';
+            if (heading.value === null) return '-';
             return `${Math.round(heading.value)}°`;
         },
 
         getHeadingDisplayText(aircraft) {
             const heading = this.getHeadingWithType(aircraft);
-            if (heading.value === null) return 'N/A';
+            if (heading.value === null) return '-';
             return `${Math.round(heading.value)}°`;
         },
 
@@ -4664,7 +4707,7 @@ async initAircraftDataSource() {
                 case 'true':
                     return 'hdg(t)';
                 default:
-                    return 'N/A';
+                    return '-';
             }
         },
 

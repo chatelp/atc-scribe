@@ -372,7 +372,7 @@
                                         </div>
                                         <div class="flex items-center justify-between">
                                             <span>Heap (MB)</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.heapUsedMB !== null ? ($store.atc.mapPerformanceStats.heapUsedMB + ' / ' + $store.atc.mapPerformanceStats.heapLimitMB + ' (' + $store.atc.mapPerformanceStats.heapUsagePct + '%) • Δ ' + (($store.atc.mapPerformanceStats.heapDeltaMB === null || $store.atc.mapPerformanceStats.heapDeltaMB === undefined) ? 'n/a' : (($store.atc.mapPerformanceStats.heapDeltaMB > 0 ? '+' : '') + $store.atc.mapPerformanceStats.heapDeltaMB)) + ' MB') : 'n/a'"></span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.heapUsedMB !== null ? ($store.atc.mapPerformanceStats.heapUsedMB + ' / ' + $store.atc.mapPerformanceStats.heapLimitMB + ' (' + $store.atc.mapPerformanceStats.heapUsagePct + '%) • Δ ' + (($store.atc.mapPerformanceStats.heapDeltaMB === null || $store.atc.mapPerformanceStats.heapDeltaMB === undefined) ? '-' : (($store.atc.mapPerformanceStats.heapDeltaMB > 0 ? '+' : '') + $store.atc.mapPerformanceStats.heapDeltaMB)) + ' MB') : '-'"></span>
                                         </div>
                                         <div class="flex items-center justify-between">
                                             <span>Map Refresh/s</span>
@@ -531,16 +531,16 @@
                                         <div class="space-y-2">
                                             <div class="flex justify-between">
                                                 <span class="text-text/70">Airport Code:</span>
-                                                <span class="font-mono font-bold" x-text="$store.atc.stationAirportCode || 'N/A'"></span>
+                                                <span class="font-mono font-bold" x-text="$store.atc.stationAirportCode || '-'"></span>
                                             </div>
                                             <div class="flex justify-between">
                                                 <span class="text-text/70">Coordinates:</span>
                                                 <span class="font-mono" x-text="$store.atc.stationLatitude && $store.atc.stationLongitude ?
-                                                    $store.atc.stationLatitude.toFixed(4) + ', ' + $store.atc.stationLongitude.toFixed(4) : 'N/A'"></span>
+                                                    $store.atc.stationLatitude.toFixed(4) + ', ' + $store.atc.stationLongitude.toFixed(4) : '-'"></span>
                                             </div>
                                             <div class="flex justify-between">
                                                 <span class="text-text/70">Elevation:</span>
-                                                <span class="font-mono" x-text="$store.atc.stationElevationFeet ? $store.atc.stationElevationFeet + ' ft' : 'N/A'"></span>
+                                                <span class="font-mono" x-text="$store.atc.stationElevationFeet ? $store.atc.stationElevationFeet + ' ft' : '-'"></span>
                                             </div>
                                         </div>
                                     </div>
@@ -587,8 +587,8 @@
             <!-- Right Sidebar -->
             <aside class="w-120 min-w-120 bg-panel border-l border-border flex flex-col overflow-hidden z-50">
                 <!-- Aircraft List - Only shown when no aircraft is selected -->
-                <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col p-4 bg-panel">
-                    <div class="mb-2.5">
+                <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col p-3 bg-panel">
+                    <div class="mb-3">
                         <div class="flex justify-between items-center mb-1.5 relative pb-1">
                             <h3 class="text-highlight text-base m-0">Tracked Targets</h3>
                             <!-- Subtle green underline -->
@@ -597,7 +597,7 @@
                     </div>
 
                     <!-- Search and Altitude Filter Row -->
-                    <div class="flex mb-2.5 gap-2">
+                    <div class="flex mb-3 gap-2">
                         <!-- Search Box (50%) -->
                         <div class="relative flex-1">
                             <input type="text"
@@ -634,7 +634,7 @@
                     </div>
 
                     <!-- Status Filter Buttons -->
-                    <div class="flex mb-2.5 gap-1.5">
+                    <div class="flex mb-3 gap-1.5">
                         <!-- Air and Ground buttons side by side with equal width -->
                         <div class="flex gap-1.5 flex-1">
                             <button @click="$store.atc.toggleAirAircraft()"
@@ -659,7 +659,7 @@
                     </div>
 
                     <!-- Flight Phase Filter Buttons -->
-                    <div class="mb-2.5">
+                    <div class="mb-3">
                         <div class="grid grid-cols-10 gap-1.5">
                             <button @click="$store.atc.togglePhaseFilter('NEW')"
                                     :class="{
@@ -756,95 +756,7 @@
                     
                     <!-- Aircraft Table - Wrapped in scrollable container -->
                     <div class="overflow-y-auto overflow-x-auto flex-1 min-h-0 pr-0">
-                        <table class="w-full table-fixed mt-2.5 text-xs">
-                        <thead>
-                            <tr>
-                                <th @click="$store.atc.toggleSort('phase')"
-                                    class="p-1.5 text-center text-highlight font-normal uppercase tracking-wider text-[10px] w-[70px] cursor-pointer hover:bg-hover/30 group transition-colors">
-                                    <div class="flex items-center justify-center gap-1">
-                                        Phase
-                                        <i class="fas transition-opacity"
-                                           :class="{
-                                               'fa-sort-up': $store.atc.sortColumn === 'phase' && $store.atc.sortDirection === 'asc',
-                                               'fa-sort-down': $store.atc.sortColumn === 'phase' && $store.atc.sortDirection === 'desc',
-                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'phase'
-                                           }"></i>
-                                    </div>
-                                </th>
-                                <th @click="$store.atc.toggleSort('callsign')"
-                                    class="p-1.5 text-left text-highlight font-normal uppercase tracking-wider text-[10px] w-[80px] cursor-pointer hover:bg-hover/30 group transition-colors">
-                                    <div class="flex items-center gap-1">
-                                        Callsign
-                                        <i class="fas transition-opacity"
-                                           :class="{
-                                               'fa-sort-up': $store.atc.sortColumn === 'callsign' && $store.atc.sortDirection === 'asc',
-                                               'fa-sort-down': $store.atc.sortColumn === 'callsign' && $store.atc.sortDirection === 'desc',
-                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'callsign'
-                                           }"></i>
-                                    </div>
-                                </th>
-                                <th @click="$store.atc.toggleSort('altitude')"
-                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[65px] cursor-pointer hover:bg-hover/30 group transition-colors">
-                                    <div class="flex items-center justify-end gap-1">
-                                        <i class="fas fa-layer-group w-3"></i> Alt
-                                        <i class="fas transition-opacity"
-                                           :class="{
-                                               'fa-sort-up': $store.atc.sortColumn === 'altitude' && $store.atc.sortDirection === 'asc',
-                                               'fa-sort-down': $store.atc.sortColumn === 'altitude' && $store.atc.sortDirection === 'desc',
-                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'altitude'
-                                           }"></i>
-                                    </div>
-                                </th>
-                                <th @click="$store.atc.toggleSort('heading')"
-                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[55px] cursor-pointer hover:bg-hover/30 group transition-colors">
-                                    <div class="flex items-center justify-end gap-1">
-                                        <i class="fas fa-compass w-3"></i> Hdg
-                                        <i class="fas transition-opacity"
-                                           :class="{
-                                               'fa-sort-up': $store.atc.sortColumn === 'heading' && $store.atc.sortDirection === 'asc',
-                                               'fa-sort-down': $store.atc.sortColumn === 'heading' && $store.atc.sortDirection === 'desc',
-                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'heading'
-                                           }"></i>
-                                    </div>
-                                </th>
-                                <th @click="$store.atc.toggleSort('speed')"
-                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[55px] cursor-pointer hover:bg-hover/30 group transition-colors">
-                                    <div class="flex items-center justify-end gap-1">
-                                        <i class="fas fa-tachometer-alt w-3"></i> TAS
-                                        <i class="fas transition-opacity"
-                                           :class="{
-                                               'fa-sort-up': $store.atc.sortColumn === 'speed' && $store.atc.sortDirection === 'asc',
-                                               'fa-sort-down': $store.atc.sortColumn === 'speed' && $store.atc.sortDirection === 'desc',
-                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'speed'
-                                           }"></i>
-                                    </div>
-                                </th>
-                                <th @click="$store.atc.toggleSort('gs')"
-                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[55px] cursor-pointer hover:bg-hover/30 group transition-colors">
-                                    <div class="flex items-center justify-end gap-1">
-                                        <i class="fas fa-wind w-3"></i> GS
-                                        <i class="fas transition-opacity"
-                                           :class="{
-                                               'fa-sort-up': $store.atc.sortColumn === 'gs' && $store.atc.sortDirection === 'asc',
-                                               'fa-sort-down': $store.atc.sortColumn === 'gs' && $store.atc.sortDirection === 'desc',
-                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'gs'
-                                           }"></i>
-                                    </div>
-                                </th>
-                                <th @click="$store.atc.toggleSort('distance')"
-                                    class="p-1.5 text-right text-highlight font-normal uppercase tracking-wider text-[10px] w-[55px] cursor-pointer hover:bg-hover/30 group transition-colors">
-                                    <div class="flex items-center justify-end gap-1">
-                                        <i class="fas fa-route w-3"></i> NM
-                                        <i class="fas transition-opacity"
-                                           :class="{
-                                               'fa-sort-up': $store.atc.sortColumn === 'distance' && $store.atc.sortDirection === 'asc',
-                                               'fa-sort-down': $store.atc.sortColumn === 'distance' && $store.atc.sortDirection === 'desc',
-                                               'fa-sort opacity-0 group-hover:opacity-50': $store.atc.sortColumn !== 'distance'
-                                           }"></i>
-                                    </div>
-                                </th>
-                            </tr>
-                        </thead>
+                        <table class="w-full table-fixed mt-0 text-xs">
                         <tbody>
                             <template x-for="(aircraft, index) in $store.atc.filteredAircraft" :key="aircraft.hex">
                                 <tr @click="$store.atc.selectedAircraft = aircraft; if ($store.atc.mapManager) { $store.atc.mapManager.updateVisualState(aircraft.hex, true); $store.atc.mapManager.centerOnAircraft(aircraft); }"
@@ -863,7 +775,7 @@
                                         </div>
                                         
                                         <!-- PERFORMANCE: Use CSS hover instead of Alpine hoveredAircraft state to prevent full table re-renders -->
-                                        <div class="flex items-stretch rounded-lg overflow-hidden border transition-all duration-0 bg-black/30 mt-1 group-hover:border-gray-400/30 group-hover:bg-gray-500/10"
+                                        <div class="flex items-stretch rounded-lg overflow-hidden border transition-all duration-0 bg-black/30 mt-0.5 group-hover:border-gray-400/30 group-hover:bg-gray-500/10"
                                              :class="{
                                                 'border-gray-400/50 bg-gray-500/20': $store.atc.selectedAircraft?.hex === aircraft.hex,
                                                 'border-border': !($store.atc.selectedAircraft?.hex === aircraft.hex) && !($store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex)),
@@ -912,7 +824,7 @@
                                                         <span class="text-[9px] text-gray-500" x-text="aircraft.adsb?.category || ''"></span>
                                                         <span class="text-[8px] text-gray-400"
                                                               :title="aircraft.bsdb?.icao_type_code || aircraft.bsdb?.manufacturer || aircraft.bsdb?.type || aircraft.adsb?.aircraft_type || 'Unknown'"
-                                                              x-text="(aircraft.bsdb?.icao_type_code || aircraft.bsdb?.manufacturer || aircraft.bsdb?.type || aircraft.adsb?.aircraft_type || 'N/A').substring(0, 10)">
+                                                              x-text="(aircraft.bsdb?.icao_type_code || aircraft.bsdb?.manufacturer || aircraft.bsdb?.type || aircraft.adsb?.aircraft_type || '-').substring(0, 10)">
                                                         </span>
                                                     </div>
                                                 </div>
@@ -922,11 +834,11 @@
                                             <div class="p-1.5 text-right w-[65px]">
                                                 <div class="flex flex-col items-end">
                                                     <div class="flex items-center justify-end">
-                                                        <span class="text-sm" x-text="(Math.round((aircraft.adsb ? aircraft.adsb.alt_baro : 0)/100)*100).toLocaleString()"></span>
+                                                        <span class="text-sm" x-text="$store.atc.formatTrackAltitude(aircraft.adsb?.alt_baro)"></span>
                                                         <i :class="[$store.atc.getAltitudeTrendIcon(aircraft), $store.atc.getAltitudeTrendClasses(aircraft), 'ml-1']"
-                                                           :title="aircraft.adsb && aircraft.adsb.baro_rate !== undefined ? Math.round(aircraft.adsb.baro_rate) + ' ft/min' : 'N/A'"></i>
+                                                           :title="aircraft.adsb && aircraft.adsb.baro_rate !== undefined ? Math.round(aircraft.adsb.baro_rate) + ' ft/min' : '-'"></i>
                                                     </div>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5">ft</span>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5 whitespace-nowrap" x-show="typeof aircraft.adsb?.alt_baro === 'number'" x-text="$store.atc.getAltitudeUnitLabel(aircraft)"></span>
                                                 </div>
                                             </div>
                                             
@@ -947,7 +859,7 @@
                                             <!-- TAS cell -->
                                             <div class="p-1.5 text-right w-[55px]">
                                                 <div class="flex flex-col items-end">
-                                                    <span class="text-sm" x-text="Math.round(aircraft.adsb ? aircraft.adsb.tas : 0)"></span>
+                                                    <span class="text-sm" x-text="$store.atc.formatTrackSpeed(aircraft.adsb?.tas)"></span>
                                                     <span class="text-[9px] text-gray-400 -mt-0.5">tas</span>
                                                 </div>
                                             </div>
@@ -958,7 +870,7 @@
                                             <!-- GS cell -->
                                             <div class="p-1.5 text-right w-[55px]">
                                                 <div class="flex flex-col items-end">
-                                                    <span class="text-sm" x-text="Math.round(aircraft.adsb ? aircraft.adsb.gs : 0)"></span>
+                                                    <span class="text-sm" x-text="$store.atc.formatTrackSpeed(aircraft.adsb?.gs)"></span>
                                                     <span class="text-[9px] text-gray-400 -mt-0.5">gs</span>
                                                 </div>
                                             </div>
@@ -985,7 +897,7 @@
                 
                 <!-- Aircraft Details - Takes full height when shown -->
                 <template x-if="$store.atc.selectedAircraft">
-                    <div class="flex-1 min-h-0 p-4 overflow-y-auto bg-panel">
+                    <div class="flex-1 min-h-0 p-3 overflow-y-auto bg-panel">
                         <!-- Flight Strip at the top -->
                         <div class="mb-3">
                             <!-- Flight Strip at the top -->
@@ -1026,11 +938,11 @@
                                 <div class="px-2.5 py-2 text-right w-[65px]">
                                     <div class="flex flex-col items-end">
                                         <div class="flex items-center justify-end">
-                                            <span class="text-sm" x-text="(Math.round(($store.atc.selectedAircraft.adsb ? $store.atc.selectedAircraft.adsb.alt_baro : 0)/100)*100).toLocaleString()"></span>
+                                            <span class="text-sm" x-text="$store.atc.formatTrackAltitude($store.atc.selectedAircraft.adsb?.alt_baro)"></span>
                                             <i :class="[$store.atc.getAltitudeTrendIcon($store.atc.selectedAircraft), $store.atc.getAltitudeTrendClasses($store.atc.selectedAircraft), 'ml-1']"
-                                               :title="$store.atc.selectedAircraft.adsb && $store.atc.selectedAircraft.adsb.baro_rate !== undefined ? Math.round($store.atc.selectedAircraft.adsb.baro_rate) + ' ft/min' : 'N/A'"></i>
+                                                              :title="$store.atc.selectedAircraft.adsb && $store.atc.selectedAircraft.adsb.baro_rate !== undefined ? Math.round($store.atc.selectedAircraft.adsb.baro_rate) + ' ft/min' : '-'"></i>
                                         </div>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5">ft</span>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5 whitespace-nowrap" x-show="typeof $store.atc.selectedAircraft.adsb?.alt_baro === 'number'" x-text="$store.atc.getAltitudeUnitLabel($store.atc.selectedAircraft)"></span>
                                     </div>
                                 </div>
                                 
@@ -1051,7 +963,7 @@
                                 <!-- TAS cell -->
                                 <div class="px-2.5 py-2 text-right w-[55px]">
                                     <div class="flex flex-col items-end">
-                                        <span class="text-sm" x-text="Math.round($store.atc.selectedAircraft.adsb ? $store.atc.selectedAircraft.adsb.tas : 0)"></span>
+                                        <span class="text-sm" x-text="$store.atc.formatTrackSpeed($store.atc.selectedAircraft.adsb?.tas)"></span>
                                         <span class="text-[9px] text-gray-400 -mt-0.5">tas</span>
                                     </div>
                                 </div>
@@ -1062,7 +974,7 @@
                                 <!-- GS cell -->
                                 <div class="px-2.5 py-2 text-right w-[55px]">
                                     <div class="flex flex-col items-end">
-                                        <span class="text-sm" x-text="Math.round($store.atc.selectedAircraft.adsb ? $store.atc.selectedAircraft.adsb.gs : 0)"></span>
+                                        <span class="text-sm" x-text="$store.atc.formatTrackSpeed($store.atc.selectedAircraft.adsb?.gs)"></span>
                                         <span class="text-[9px] text-gray-400 -mt-0.5">gs</span>
                                     </div>
                                 </div>
@@ -1258,9 +1170,9 @@
                                                 </td>
                                                 <td class="p-1.5 text-right border-b border-border text-gray-400">
                                                     <div class="flex items-center justify-end">
-                                                        <span x-text="Math.round(position.altitude/100)*100"></span>
+                                                        <span x-text="$store.atc.formatTrackAltitude(position.altitude)"></span>
                                                         <i class="fas fa-exclamation-triangle text-yellow-500 ml-1"
-                                                           x-show="position.altitude < 0"></i>
+                                                           x-show="typeof position.altitude === 'number' && position.altitude < 0"></i>
                                                     </div>
                                                 </td>
                                                 <td class="p-1.5 text-right border-b border-border text-gray-400"
@@ -1270,9 +1182,9 @@
                                                         <span class="text-[9px] text-gray-500" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithTypeFromAdsb(position).type)"></span>
                                                     </div>
                                                 </td>
-                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="Math.round(position.speed_true)"></td>
-                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="Math.round(position.speed_gs)"></td>
-                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="position.distance !== undefined && position.distance !== null ? position.distance : '-'"></td>
+                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="$store.atc.formatTrackSpeed(position.speed_true)"></td>
+                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="$store.atc.formatTrackSpeed(position.speed_gs)"></td>
+                                                <td class="p-1.5 text-right border-b border-border text-gray-400" x-text="$store.atc.formatTrackDistance(position.distance)"></td>
                                             </tr>
                                         </template>
                                         
@@ -1308,7 +1220,7 @@
                                                     <td class="p-1.5 text-left whitespace-nowrap" :class="{ 'border-b border-border': !item.beforeDivider }">
                                                         <span x-text="$store.atc.formatDate(item.position.timestamp, true)"></span>
                                                         <span class="text-text/70 text-[10px] ml-1" x-text="Math.floor((new Date() - new Date(item.position.timestamp)) / 1000) + 's'"></span>
-                                                        <span x-show="item.position.lat === 0 && item.position.lon === 0"
+                                                        <span x-show="typeof item.position.lat === 'number' && typeof item.position.lon === 'number' && item.position.lat === 0 && item.position.lon === 0"
                                                               title="Mode S — no GPS position"
                                                               class="text-[8px] text-yellow-600/80 font-medium ml-1">S</span>
                                                     </td>
@@ -1316,9 +1228,9 @@
                                                 <template x-if="item.type === 'row'">
                                                     <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }">
                                                         <div class="flex items-center justify-end">
-                                                            <span x-text="Math.round(item.position.altitude/100)*100"></span>
+                                                            <span x-text="$store.atc.formatTrackAltitude(item.position.altitude)"></span>
                                                             <i :class="[$store.atc.aircraftDetailsGetAltitudeTrend(item.position, item.originalIndex), $store.atc.aircraftDetailsGetAltitudeTrendClass(item.position, item.originalIndex), 'ml-1']"
-                                                               :title="item.position.altitude > 0 ? Math.round(item.position.altitude) + ' ft / ' + Math.round(item.position.altitude * 0.3048) + ' m' : Math.round(item.position.altitude) + ' ft'"></i>
+                                                                   :title="typeof item.position.altitude === 'number' ? (item.position.altitude > 0 ? Math.round(item.position.altitude) + ' ft / ' + Math.round(item.position.altitude * 0.3048) + ' m' : Math.round(item.position.altitude) + ' ft') : '-'"></i>
                                                         </div>
                                                     </td>
                                                 </template>
@@ -1332,13 +1244,13 @@
                                                     </td>
                                                 </template>
                                                 <template x-if="item.type === 'row'">
-                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }" x-text="Math.round(item.position.speed_true)"></td>
+                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }" x-text="$store.atc.formatTrackSpeed(item.position.speed_true)"></td>
                                                 </template>
                                                 <template x-if="item.type === 'row'">
-                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }" x-text="Math.round(item.position.speed_gs)"></td>
+                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }" x-text="$store.atc.formatTrackSpeed(item.position.speed_gs)"></td>
                                                 </template>
                                                 <template x-if="item.type === 'row'">
-                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }" x-text="item.position.distance !== undefined && item.position.distance !== null ? item.position.distance : '-'"></td>
+                                                    <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }" x-text="$store.atc.formatTrackDistance(item.position.distance)"></td>
                                                 </template>
                                             </tr>
                                         </template>
@@ -1398,7 +1310,7 @@
                                                           @click="$store.atc.navigateToTracksWithHighlight(phase.adsb_id)"
                                                           class="cursor-pointer text-highlight hover:text-highlight/80 underline transition-colors"
                                                           x-text="phase.adsb_id"></span>
-                                                    <span x-show="!phase.adsb_id" class="text-text/50">N/A</span>
+                                                    <span x-show="!phase.adsb_id" class="text-text/50">-</span>
                                                 </td>
                                             </tr>
                                         </template>
@@ -1440,7 +1352,7 @@
                                                           x-text="clearance.type"></span>
                                                 </td>
                                                 <td class="p-1.5 text-left border-b border-border font-mono">
-                                                    <span x-text="clearance.runway || 'N/A'"></span>
+                                                    <span x-text="clearance.runway || '-'"></span>
                                                 </td>
                                                 <td class="p-1.5 text-left border-b border-border">
                                                     <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"

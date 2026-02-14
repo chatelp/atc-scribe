@@ -547,8 +547,9 @@ func positionsMatchForDedup(a, b adsb.Position) bool {
 // skip counts for the UI to show dividers.
 // SkippedBefore: N duplicate positions were omitted between the previous kept position and this one.
 // SkippedAfter: N trailing duplicate positions were omitted after the last kept position.
+// For small datasets (<60 positions), all positions are returned without grouping.
 func deduplicateHistory(positions []adsb.Position) []adsb.Position {
-	if len(positions) <= 1 {
+	if len(positions) < 60 {
 		return positions
 	}
 
