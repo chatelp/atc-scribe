@@ -3297,6 +3297,8 @@ async initAircraftDataSource() {
         cacheInvalidationPending: false,
         _lastUnknownAircraftResyncAt: 0,
         _unknownAircraftResyncCooldownMs: 5000,
+        _predictedMinApplyIntervalMs: 1000,
+        _predictedMinConfidence: 0.65,
         
         // Filtering throttling state to prevent main thread blocking
         _filteringScheduled: false,
@@ -3447,6 +3449,11 @@ async initAircraftDataSource() {
                 return;
             }
 
+            const confidence = Number(data.delta.confidence);
+            if (Number.isFinite(confidence) && confidence < this._predictedMinConfidence) {
+                return;
+            }
+
             const preservedLastSeen = aircraft.last_seen;
             const preservedRealObservedAt = aircraft._lastRealObservedAt;
 
@@ -3455,10 +3462,22 @@ async initAircraftDataSource() {
             }
 
             const basedOnMs = Date.parse(data.based_on || '');
+            const predictedAtMs = Date.parse(data.predicted_at || '');
             const latestRealObservedAt = Number.isFinite(aircraft._lastRealObservedAt) ? aircraft._lastRealObservedAt : null;
 
             // Real ADS-B updates always win over predicted updates.
             if (Number.isFinite(basedOnMs) && Number.isFinite(latestRealObservedAt) && basedOnMs < latestRealObservedAt) {
+                return;
+            }
+
+            const predictionTs = Number.isFinite(predictedAtMs)
+                ? predictedAtMs
+                : (Number.isFinite(basedOnMs) ? basedOnMs : Date.now());
+            const lastAppliedPredictionTs = Number.isFinite(aircraft._lastPredictedAppliedAt)
+                ? aircraft._lastPredictedAppliedAt
+                : null;
+            if (Number.isFinite(lastAppliedPredictionTs) &&
+                (predictionTs - lastAppliedPredictionTs) < this._predictedMinApplyIntervalMs) {
                 return;
             }
 
@@ -3473,6 +3492,7 @@ async initAircraftDataSource() {
             aircraft.adsb.source = 'predicted';
 
             aircraft._lastPredictedObservedAt = Number.isFinite(basedOnMs) ? basedOnMs : Date.now();
+            aircraft._lastPredictedAppliedAt = predictionTs;
 
             // Predicted updates must never advance real timing fields.
             aircraft.last_seen = preservedLastSeen;

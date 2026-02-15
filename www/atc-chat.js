@@ -112,7 +112,7 @@ class ATCChat {
         
         // Check if ATC Chat is enabled
         try {
-            const response = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/v1/config`);
+            const response = await fetch(`/api/v1/config`);
             if (!response.ok) {
                 console.log('[ATC-Chat] Config not available, status:', response.status);
                 // Still try to create the button even if config fails
@@ -161,6 +161,15 @@ class ATCChat {
         let spacePressed = false;
         
         document.addEventListener('keydown', (event) => {
+            const isInInputField = event.target.tagName === 'INPUT' ||
+                event.target.tagName === 'TEXTAREA' ||
+                event.target.tagName === 'SELECT' ||
+                event.target.isContentEditable;
+
+            if (isInInputField) {
+                return;
+            }
+
             if (event.code === 'Space' && !event.repeat && this.isConnected && !spacePressed) {
                 event.preventDefault();
                 spacePressed = true;
@@ -170,6 +179,15 @@ class ATCChat {
         });
 
         document.addEventListener('keyup', (event) => {
+            const isInInputField = event.target.tagName === 'INPUT' ||
+                event.target.tagName === 'TEXTAREA' ||
+                event.target.tagName === 'SELECT' ||
+                event.target.isContentEditable;
+
+            if (isInInputField) {
+                return;
+            }
+
             if (event.code === 'Space' && spacePressed) {
                 event.preventDefault();
                 spacePressed = false;
@@ -252,7 +270,7 @@ class ATCChat {
             
             // Create session
             console.log('[ATC-Chat] Creating session...');
-            const response = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/v1/atc-chat/session`, {
+            const response = await fetch(`/api/v1/atc-chat/session`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -407,7 +425,7 @@ class ATCChat {
     async connectWebSocket() {
         return new Promise((resolve, reject) => {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.hostname}:8000/api/v1/atc-chat/ws/${this.sessionId}`;
+            const wsUrl = `${protocol}//${window.location.host}/api/v1/atc-chat/ws/${this.sessionId}`;
             
             // Set timeout first, before creating WebSocket
             const timeout = setTimeout(() => {
@@ -573,14 +591,15 @@ class ATCChat {
         if (!this.isConnected || this.pushToTalkActive) return;
 
         this.pushToTalkActive = true;
-        
-        // Update context with fresh airspace data when PTT is pressed
-        this.showStatusIndicator('push-to-talk', 'Updating context...');
-        await this.updateSessionContext();
-        
-        // Start listening after context is updated
+
+        // Start listening immediately to avoid losing speech while context refresh is in flight.
         this.showStatusIndicator('push-to-talk', 'Listening...');
         this.startRecording();
+
+        // Refresh context asynchronously; don't block PTT recording.
+        this.updateSessionContext().catch((error) => {
+            console.error('[ATC-Chat] Async context update failed during PTT:', error);
+        });
     }
 
     async stopPushToTalk() {
@@ -1073,7 +1092,7 @@ document.addEventListener('alpine:init', () => {
             
             async checkAvailability() {
                 try {
-                    const response = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/v1/config`);
+                    const response = await fetch(`/api/v1/config`);
                     if (response.ok) {
                         const config = await response.json();
                         this.isAvailable = config.atc_chat?.enabled || false;

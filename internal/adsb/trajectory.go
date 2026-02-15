@@ -36,6 +36,8 @@ import (
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
+const maxLivePredictionAge = 60 * time.Second
+
 // ─── Trajectory Snapshot ──────────────────────────────────────────────────────
 
 // TrajectorySnapshot is a single ADS-B observation stored in the ring buffer.
@@ -426,6 +428,9 @@ func (tt *TrajectoryTracker) GetLivePredictionsAt(t time.Time) []LivePrediction 
 		if latest == nil || !latest.Valid {
 			continue
 		}
+		if t.Sub(latest.Timestamp) > maxLivePredictionAge {
+			continue
+		}
 
 		forecast := at.Prediction.Forecast
 		if len(forecast) == 0 {
@@ -525,6 +530,10 @@ func interpolateLivePredictionFromForecast(latest *TrajectorySnapshot, forecast 
 	}
 
 	last := forecast[len(forecast)-1]
+	if atTime.After(last.Timestamp) {
+		return LivePrediction{}, false
+	}
+
 	return LivePrediction{
 		Lat:        last.Lat,
 		Lon:        last.Lon,

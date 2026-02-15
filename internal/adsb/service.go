@@ -52,7 +52,10 @@ import (
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
-const livePredictionBroadcastInterval = 300 * time.Millisecond
+const (
+	livePredictionBroadcastInterval = 1 * time.Second
+	minPredictionConfidence       = 0.65
+)
 
 func roundTo(value float64, decimals int) float64 {
 	pow := math.Pow(10, float64(decimals))
@@ -346,6 +349,10 @@ func (s *Service) predictionBroadcastLoop(ctx context.Context) {
 			now := time.Now().UTC()
 			predictions := s.trajectoryTracker.GetLivePredictionsAt(now)
 			for _, p := range predictions {
+				if p.Confidence < minPredictionConfidence {
+					continue
+				}
+
 				s.wsServer.Broadcast(&websocket.Message{
 					Type: websocket.MessageTypeAircraftPredictedState,
 					Data: map[string]interface{}{
