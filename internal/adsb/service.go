@@ -54,7 +54,7 @@ import (
 
 const (
 	livePredictionBroadcastInterval = 1 * time.Second
-	minPredictionConfidence       = 0.65
+	minPredictionConfidence         = 0.65
 )
 
 func roundTo(value float64, decimals int) float64 {

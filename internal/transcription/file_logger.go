@@ -62,9 +62,9 @@ func (fl *FileLogger) LogServiceStarted(frequencyID string) error {
 		return nil
 	}
 
-	now := time.Now().UTC()
+	now := time.Now().Local()
 	timeStr := now.Format("15:04:05")
-	header := fmt.Sprintf("[%s UTC] TRANSCRIPTION SERVICE STARTED\n================================\n", timeStr)
+	header := fmt.Sprintf("[%s] TRANSCRIPTION SERVICE STARTED\n================================\n", timeStr)
 
 	// Write to both raw and processed logs
 	if err := fl.writeHeader("raw", frequencyID, now, header); err != nil {
@@ -105,7 +105,8 @@ func (fl *FileLogger) writeHeader(subDir, frequencyID string, timestamp time.Tim
 	defer fl.mu.Unlock()
 
 	// Generate filename based on date and frequency ID
-	dateStr := timestamp.Format("2006-01-02")
+	localTimestamp := timestamp.Local()
+	dateStr := localTimestamp.Format("2006-01-02")
 	filename := fmt.Sprintf("%s_%s.log", dateStr, frequencyID)
 	filePath := filepath.Join(fl.baseDir, subDir, filename)
 
@@ -144,7 +145,8 @@ func (fl *FileLogger) writeLog(subDir, frequencyID string, timestamp time.Time, 
 	defer fl.mu.Unlock()
 
 	// Generate filename based on date and frequency ID
-	dateStr := timestamp.Format("2006-01-02")
+	localTimestamp := timestamp.Local()
+	dateStr := localTimestamp.Format("2006-01-02")
 	filename := fmt.Sprintf("%s_%s.log", dateStr, frequencyID)
 	filePath := filepath.Join(fl.baseDir, subDir, filename)
 
@@ -162,9 +164,9 @@ func (fl *FileLogger) writeLog(subDir, frequencyID string, timestamp time.Time, 
 		fl.files[cacheKey] = file
 	}
 
-	// Format the log entry with timestamp (UTC)
-	timeStr := timestamp.UTC().Format("15:04:05")
-	logEntry := fmt.Sprintf("[%s UTC] %s\n", timeStr, text)
+	// Format the log entry with local machine timestamp
+	timeStr := localTimestamp.Format("15:04:05")
+	logEntry := fmt.Sprintf("[%s] %s\n", timeStr, text)
 
 	// Write to file
 	if _, err := file.WriteString(logEntry); err != nil {
