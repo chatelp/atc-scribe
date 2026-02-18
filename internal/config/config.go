@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 )
@@ -39,21 +40,24 @@ type ServerConfig struct {
 // ADSBConfig contains ADS-B aircraft tracking data source configuration
 type ADSBConfig struct {
 	// Source selection
-	SourceType string `toml:"source_type"` // Data source type: "local" (e.g., dump1090) or "external" (e.g., ADS-B Exchange API)
+	SourceType string `toml:"source_type"` // Data source type: "external_api", "tar1090", "readsb_api", or "readsb_file"
 
-	// Legacy field - deprecated, use LocalSourceURL instead
-	SourceURL string `toml:"source_url"` // DEPRECATED: Legacy URL field for backward compatibility
-
-	// Local source settings (used when source_type = "local")
-	LocalSourceURL string `toml:"local_source_url"` // URL for local ADS-B source (e.g., http://192.0.2.10/tar1090/data/aircraft.json)
-
-	// External API source settings (used when source_type = "external")
+	// External API source settings (used when source_type = "external_api")
 	ExternalSourceURL string `toml:"external_source_url"` // URL template for external API with format placeholders for lat, lon, and distance
 	APIHost           string `toml:"api_host"`            // API host header value (e.g., for RapidAPI)
 	APIKey            string `toml:"api_key"`             // API key for authentication with external service
 	SearchRadiusNM    int    `toml:"search_radius_nm"`    // Search radius in nautical miles for external API queries
 
-	// Common settings for both source types
+	// Tar1090 source settings (used when source_type = "tar1090")
+	Tar1090BaseURL string `toml:"tar1090_base_url"` // Base URL where aircraft.json, receiver.json, stats.json are served
+
+	// readsb API settings (used when source_type = "readsb_api")
+	ReadsbAPIURL string `toml:"readsb_api_url"` // Full readsb API URL (e.g., http://host:30152/?all)
+
+	// readsb file settings (used when source_type = "readsb_file")
+	ReadsbDataDir string `toml:"readsb_data_dir"` // Optional override directory for readsb runtime files (auto-detected when empty)
+
+	// Common settings
 	FetchIntervalSecs     int `toml:"fetch_interval_seconds"`      // How often to fetch new aircraft data (in seconds)
 	SignalLostTimeoutSecs int `toml:"signal_lost_timeout_seconds"` // Time after which aircraft is marked as signal_lost (in seconds, default: 60)
 }
@@ -253,8 +257,16 @@ func Load(path string) (*Config, error) {
 	}
 
 	// Read the config file
-	if _, err := toml.DecodeFile(path, &config); err != nil {
+	meta, err := toml.DecodeFile(path, &config)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode config file: %w", err)
+	}
+
+	// Strict ADS-B schema: reject unknown keys under [adsb]
+	for _, key := range meta.Undecoded() {
+		if len(key) > 0 && key[0] == "adsb" {
+			return nil, fmt.Errorf("unknown [adsb] configuration key: %s", key.String())
+		}
 	}
 
 	return &config, nil
@@ -262,6 +274,12 @@ func Load(path string) (*Config, error) {
 
 // LoadWithFallback loads the configuration by checking multiple locations in order of preference
 func LoadWithFallback(preferredPath string) (*Config, error) {
+	config, _, err := LoadWithFallbackAndPath(preferredPath)
+	return config, err
+}
+
+// LoadWithFallbackAndPath loads configuration and returns the resolved config file path.
+func LoadWithFallbackAndPath(preferredPath string) (*Config, string, error) {
 	// List of paths to check in order of preference
 	searchPaths := []string{
 		preferredPath,         // User-specified path (if provided)
@@ -288,12 +306,18 @@ func LoadWithFallback(preferredPath string) (*Config, error) {
 				lastErr = fmt.Errorf("failed to load config from %s: %w", path, err)
 				continue
 			}
-			return config, nil
+
+			resolvedPath := path
+			if absPath, absErr := filepath.Abs(path); absErr == nil {
+				resolvedPath = absPath
+			}
+
+			return config, resolvedPath, nil
 		}
 		lastErr = fmt.Errorf("config file not found: %s", path)
 	}
 
-	return nil, fmt.Errorf("config file not found in any of the expected locations: %v. Last error: %w", uniquePaths, lastErr)
+	return nil, "", fmt.Errorf("config file not found in any of the expected locations: %v. Last error: %w", uniquePaths, lastErr)
 }
 
 // Validate validates the configuration
@@ -337,36 +361,35 @@ func (c *Config) Validate() error {
 
 	// Validate ADSB config
 	if c.ADSB.SourceType == "" {
-		c.ADSB.SourceType = "local" // Default to local if not specified
+		return fmt.Errorf("adsb.source_type is required (must be one of: external_api, tar1090, readsb_api, readsb_file)")
 	}
 
-	if c.ADSB.SourceType != "local" && c.ADSB.SourceType != "external" {
-		return fmt.Errorf("invalid ADSB source type: %s (must be 'local' or 'external')", c.ADSB.SourceType)
-	}
-
-	// Handle legacy configuration
-	if c.ADSB.SourceType == "local" && c.ADSB.LocalSourceURL == "" && c.ADSB.SourceURL != "" {
-		c.ADSB.LocalSourceURL = c.ADSB.SourceURL
-	}
-
-	// Validate source URL based on source type
-	if c.ADSB.SourceType == "local" && c.ADSB.LocalSourceURL == "" {
-		return fmt.Errorf("local_source_url is required when source_type is local")
-	}
-
-	if c.ADSB.SourceType == "external" {
+	switch c.ADSB.SourceType {
+	case "external_api":
 		if c.ADSB.ExternalSourceURL == "" {
-			return fmt.Errorf("external_source_url is required when source_type is external")
+			return fmt.Errorf("external_source_url is required when source_type is external_api")
 		}
 		if c.ADSB.APIHost == "" {
-			return fmt.Errorf("api_host is required when source_type is external")
+			return fmt.Errorf("api_host is required when source_type is external_api")
 		}
 		if c.ADSB.APIKey == "" {
-			return fmt.Errorf("api_key is required when source_type is external")
+			return fmt.Errorf("api_key is required when source_type is external_api")
 		}
 		if c.ADSB.SearchRadiusNM <= 0 {
-			return fmt.Errorf("search_radius_nm must be positive when source_type is external")
+			return fmt.Errorf("search_radius_nm must be positive when source_type is external_api")
 		}
+	case "tar1090":
+		if c.ADSB.Tar1090BaseURL == "" {
+			return fmt.Errorf("tar1090_base_url is required when source_type is tar1090")
+		}
+	case "readsb_api":
+		if c.ADSB.ReadsbAPIURL == "" {
+			return fmt.Errorf("readsb_api_url is required when source_type is readsb_api")
+		}
+	case "readsb_file":
+		// No mandatory fields. Auto-detection uses standard filesystem paths when readsb_data_dir is empty.
+	default:
+		return fmt.Errorf("invalid ADSB source type: %s (must be one of: external_api, tar1090, readsb_api, readsb_file)", c.ADSB.SourceType)
 	}
 
 	if c.ADSB.FetchIntervalSecs <= 0 {

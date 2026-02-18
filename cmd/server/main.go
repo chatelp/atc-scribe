@@ -24,6 +24,8 @@ import (
 	"github.com/yegors/co-atc/internal/weather"
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // refAdapter wraps reference.Service to implement adsb.ReferenceService interface
@@ -60,7 +62,7 @@ func main() {
 	flag.Parse()
 
 	// Load configuration with fallback logic
-	cfg, err := config.LoadWithFallback(*configPath)
+	cfg, resolvedConfigPath, err := config.LoadWithFallbackAndPath(*configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
 		os.Exit(1)
@@ -85,22 +87,26 @@ func main() {
 
 	log.Info("Starting Co-ATC server",
 		logger.String("version", "0.1.0"),
-		logger.String("config_path", *configPath),
+		logger.String("config_path", resolvedConfigPath),
 	)
 
 	// Create ADS-B components
 	adsbClient := adsb.NewClient(
-		cfg.ADSB.SourceType,
-		cfg.ADSB.LocalSourceURL,
-		cfg.ADSB.ExternalSourceURL,
-		cfg.ADSB.APIHost,
-		cfg.ADSB.APIKey,
+		cfg.ADSB,
 		cfg.Station.Latitude,
 		cfg.Station.Longitude,
-		float64(cfg.ADSB.SearchRadiusNM),
 		time.Duration(cfg.Server.ReadTimeoutSecs)*time.Second,
 		log,
 	)
+
+	probeCtx, probeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := adsbClient.ValidateSource(probeCtx); err != nil {
+		probeCancel()
+		fatalLog := log.WithOptions(zap.AddStacktrace(zapcore.PanicLevel))
+		fatalLog.Fatal("ADS-B source validation failed", logger.Error(err), logger.String("source_type", cfg.ADSB.SourceType))
+	}
+	probeCancel()
+	log.Info("ADS-B source validation succeeded", logger.String("source_type", cfg.ADSB.SourceType))
 	// Processor has been moved into the service
 
 	// Create SQLite storage

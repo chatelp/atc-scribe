@@ -227,7 +227,7 @@ func (e *ExternalADSBTarget) Convert() ADSBTarget {
 		SILType:      e.SILType,
 		MLAT:         e.MLAT,
 		TISB:         e.TISB,
-		SourceType:   "external", // Mark as coming from external source
+		SourceType:   SourceTypeExternalAPI, // Mark as coming from external source
 	}
 
 	// Convert numeric fields

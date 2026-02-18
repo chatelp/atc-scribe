@@ -488,9 +488,9 @@ func (s *Service) Start(ctx context.Context) error {
 	if err := s.fetchAndProcess(ctx); err != nil {
 		s.logger.Error("Failed to fetch initial ADS-B data", logger.Error(err))
 		s.setFetchStatus(false)
-	} else {
-		s.setFetchStatus(true)
+		return fmt.Errorf("failed initial ADS-B fetch: %w", err)
 	}
+	s.setFetchStatus(true)
 
 	// Start background fetching
 	s.wg.Add(1)
@@ -1135,6 +1135,24 @@ func (s *Service) GetStatus() (time.Time, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.lastFetchTime, s.lastFetchStatus
+}
+
+// GetSourceStatus returns ADS-B source health and metadata snapshot.
+func (s *Service) GetSourceStatus() SourceStatus {
+	if s.client == nil {
+		return SourceStatus{
+			Status: "error",
+			Aircraft: SourceChannelStatus{
+				Available: false,
+				LastError: "ADS-B client not initialized",
+				Data:      nil,
+			},
+			Receiver: SourceChannelStatus{Available: false, Data: nil},
+			Stats:    SourceChannelStatus{Available: false, Data: nil},
+		}
+	}
+
+	return s.client.GetSourceStatus()
 }
 
 // setLastFetchTime sets the last fetch time

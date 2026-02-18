@@ -6,230 +6,465 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
+	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
-// Import the external.go file which contains the ExternalAPIResponse struct
+var defaultReadsbDirs = []string{
+	"/run/readsb",
+	"/var/run/readsb",
+	"/run/dump1090-fa",
+	"/run/dump1090-mutability",
+}
 
-// Client is responsible for fetching ADS-B data from the source
+// Client is responsible for fetching ADS-B data from the configured source.
 type Client struct {
-	httpClient        *http.Client
-	sourceType        string
-	localSourceURL    string
+	httpClient *http.Client
+	logger     *logger.Logger
+
+	sourceType string
+
 	externalSourceURL string
 	apiHost           string
 	apiKey            string
 	stationLat        float64
 	stationLon        float64
 	searchRadiusNM    float64
-	logger            *logger.Logger
+
+	tar1090BaseURL string
+	readsbAPIURL   string
+	readsbDataDir  string
+
+	mu                sync.RWMutex
+	readsbResolvedDir string
+	sourceStatus      SourceStatus
 }
 
-// NewClient creates a new ADS-B client
+// NewClient creates a new ADS-B client.
 func NewClient(
-	sourceType string,
-	localSourceURL string,
-	externalSourceURL string,
-	apiHost string,
-	apiKey string,
+	adsbCfg config.ADSBConfig,
 	stationLat float64,
 	stationLon float64,
-	searchRadiusNM float64,
 	timeout time.Duration,
 	logger *logger.Logger,
 ) *Client {
-	return &Client{
-		sourceType:        sourceType,
-		localSourceURL:    localSourceURL,
-		externalSourceURL: externalSourceURL,
-		apiHost:           apiHost,
-		apiKey:            apiKey,
+	client := &Client{
+		sourceType:        adsbCfg.SourceType,
+		externalSourceURL: adsbCfg.ExternalSourceURL,
+		apiHost:           adsbCfg.APIHost,
+		apiKey:            adsbCfg.APIKey,
 		stationLat:        stationLat,
 		stationLon:        stationLon,
-		searchRadiusNM:    searchRadiusNM,
+		searchRadiusNM:    float64(adsbCfg.SearchRadiusNM),
+		tar1090BaseURL:    adsbCfg.Tar1090BaseURL,
+		readsbAPIURL:      adsbCfg.ReadsbAPIURL,
+		readsbDataDir:     adsbCfg.ReadsbDataDir,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
 		logger: logger.Named("adsb-cli"),
 	}
+
+	now := time.Now().UTC()
+	client.sourceStatus = SourceStatus{
+		SourceType: adsbCfg.SourceType,
+		Mode:       adsbCfg.SourceType,
+		Status:     "initializing",
+		Aircraft: SourceChannelStatus{
+			Available: false,
+			Data:      nil,
+		},
+		Receiver: SourceChannelStatus{
+			Available: false,
+			Data:      nil,
+		},
+		Stats: SourceChannelStatus{
+			Available: false,
+			Data:      nil,
+		},
+		UpdatedAt: &now,
+	}
+
+	return client
 }
 
-// FetchData fetches ADS-B data from the configured source
+// ValidateSource performs a startup probe and returns error if source is unreachable or invalid.
+func (c *Client) ValidateSource(ctx context.Context) error {
+	_, err := c.fetchBySource(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// FetchData fetches ADS-B data from the configured source.
 func (c *Client) FetchData(ctx context.Context) (*RawAircraftData, error) {
-	if c.sourceType == "local" {
-		return c.fetchLocalData(ctx)
-	} else if c.sourceType == "external" {
-		return c.fetchExternalData(ctx)
-	}
-	return nil, fmt.Errorf("unknown source type: %s", c.sourceType)
-}
-
-// fetchLocalData fetches data from the local source
-func (c *Client) fetchLocalData(ctx context.Context) (*RawAircraftData, error) {
-	// Create a new request with context
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.localSourceURL, nil)
+	data, err := c.fetchBySource(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		c.setAircraftError(err)
+		return nil, err
 	}
-
-	// Set headers
-	req.Header.Set("Accept", "application/json")
-
-	// Execute the request
-	c.logger.Debug("Fetching local ADS-B data",
-		logger.String("url", c.localSourceURL),
-	)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// Parse JSON
-	var data RawAircraftData
-	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
-	}
-
-	// Mark all aircraft as coming from local source
-	for i := range data.Aircraft {
-		data.Aircraft[i].SourceType = "local"
-	}
-
-	c.logger.Debug("Successfully fetched local ADS-B data",
-		logger.Int("aircraft_count", len(data.Aircraft)),
-		logger.Int("message_count", data.Messages),
-	)
-
-	return &data, nil
-}
-
-// fetchExternalData fetches data from the external API
-func (c *Client) fetchExternalData(ctx context.Context) (*RawAircraftData, error) {
-	// Format URL with station coordinates and search radius
-	url := fmt.Sprintf(c.externalSourceURL, c.stationLat, c.stationLon, c.searchRadiusNM)
-
-	// Create request with authentication headers
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		c.logger.Error("Failed to create request", logger.Error(err), logger.String("url", url))
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Add required headers
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("x-rapidapi-host", c.apiHost)
-	req.Header.Set("x-rapidapi-key", c.apiKey)
-
-	// Execute the request
-	c.logger.Debug("Fetching external ADS-B data",
-		logger.String("url", url),
-		logger.String("host", c.apiHost),
-		logger.String("key_prefix", c.apiKey[:5]+"..."), // Log only prefix of API key for security
-	)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		c.logger.Error("Failed to execute request", logger.Error(err), logger.String("url", url))
-		return nil, fmt.Errorf("failed to execute request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		c.logger.Error("Unexpected status code",
-			logger.Int("status_code", resp.StatusCode),
-			logger.String("url", url))
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		c.logger.Error("Failed to read response body", logger.Error(err))
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// Log a sample of the response for debugging
-	bodyPreview := string(body)
-	if len(bodyPreview) > 200 {
-		bodyPreview = bodyPreview[:200] + "..."
-	}
-	c.logger.Debug("Response body preview", logger.String("body", bodyPreview))
-
-	// First try to parse as external API format
-	var externalData ExternalAPIResponse
-	if err := json.Unmarshal(body, &externalData); err != nil {
-		c.logger.Error("Failed to parse as external API format", logger.Error(err))
-
-		// If that fails, try the standard format
-		var data RawAircraftData
-		if err2 := json.Unmarshal(body, &data); err2 != nil {
-			c.logger.Error("Failed to parse as standard format", logger.Error(err2))
-			return nil, fmt.Errorf("failed to parse JSON: %w (external format) and %w (standard format)", err, err2)
-		}
-
-		c.logger.Debug("Parsed as standard format",
-			logger.Int("aircraft_count", len(data.Aircraft)))
-		return &data, nil
-	}
-
-	c.logger.Debug("Parsed as external API format",
-		logger.Int("aircraft_count", len(externalData.AC)))
-
-	// Convert external API format to our standard format
-	// Convert each ExternalADSBTarget to ADSBTarget
-	aircraft := make([]ADSBTarget, 0, len(externalData.AC))
-	for i, extTarget := range externalData.AC {
-		// Log a sample of the conversion for debugging
-		if i == 0 {
-			c.logger.Debug("Sample aircraft conversion",
-				logger.String("hex", extTarget.Hex),
-				logger.String("flight", extTarget.Flight),
-				logger.String("alt_baro_type", fmt.Sprintf("%T", extTarget.AltBaro.value)),
-				logger.Float64("alt_baro_converted", extTarget.AltBaro.Float64()),
-				logger.String("lat_type", fmt.Sprintf("%T", extTarget.Lat.value)),
-				logger.Float64("lat_converted", extTarget.Lat.Float64()),
-			)
-		}
-		aircraft = append(aircraft, extTarget.Convert())
-	}
-
-	data := &RawAircraftData{
-		Now:      float64(time.Now().Unix()), // Use current time if not provided, convert to float64
-		Messages: externalData.Messages,
-		Aircraft: aircraft,
-	}
-
-	// Ensure Aircraft array is not nil
-	if data.Aircraft == nil {
-		data.Aircraft = []ADSBTarget{} // Initialize with empty array if nil
-		c.logger.Warn("External API returned nil aircraft array, initializing empty array")
-	}
-
-	c.logger.Debug("Successfully fetched external ADS-B data",
-		logger.Int("aircraft_count", len(data.Aircraft)),
-		logger.String("source", "external API"),
-	)
 
 	return data, nil
 }
 
-// UpdateStationCoords updates the station coordinates used for external API calls
+// GetSourceStatus returns the latest source status snapshot.
+func (c *Client) GetSourceStatus() SourceStatus {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	status := c.sourceStatus
+	status.Receiver.Data = cloneAny(status.Receiver.Data)
+	status.Stats.Data = cloneAny(status.Stats.Data)
+	return status
+}
+
+func (c *Client) fetchBySource(ctx context.Context) (*RawAircraftData, error) {
+	switch c.sourceType {
+	case SourceTypeExternalAPI:
+		return c.fetchExternalData(ctx)
+	case SourceTypeTar1090:
+		return c.fetchTar1090Data(ctx)
+	case SourceTypeReadsbAPI:
+		return c.fetchReadsbAPIData(ctx)
+	case SourceTypeReadsbFile:
+		return c.fetchReadsbFileData()
+	default:
+		return nil, fmt.Errorf("unknown source type: %s", c.sourceType)
+	}
+}
+
+func (c *Client) fetchTar1090Data(ctx context.Context) (*RawAircraftData, error) {
+	base := normalizeBaseURL(c.tar1090BaseURL)
+	aircraftURL := base + "aircraft.json"
+	receiverURL := base + "receiver.json"
+	statsURL := base + "stats.json"
+
+	data, err := c.fetchStandardAircraftURL(ctx, aircraftURL, SourceTypeTar1090)
+	if err != nil {
+		return nil, err
+	}
+
+	receiverData, err := c.fetchJSONObjectURL(ctx, receiverURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tar1090 receiver.json: %w", err)
+	}
+
+	statsData, err := c.fetchJSONObjectURL(ctx, statsURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tar1090 stats.json: %w", err)
+	}
+
+	c.setSuccessStatus(data, receiverData, statsData)
+	return data, nil
+}
+
+func (c *Client) fetchReadsbAPIData(ctx context.Context) (*RawAircraftData, error) {
+	data, err := c.fetchStandardAircraftURL(ctx, c.readsbAPIURL, SourceTypeReadsbAPI)
+	if err != nil {
+		return nil, err
+	}
+
+	c.setSuccessStatus(data, nil, nil)
+	return data, nil
+}
+
+func (c *Client) fetchReadsbFileData() (*RawAircraftData, error) {
+	dir, err := c.resolveReadsbDir()
+	if err != nil {
+		return nil, err
+	}
+
+	aircraftPath := filepath.Join(dir, "aircraft.json")
+	receiverPath := filepath.Join(dir, "receiver.json")
+	statsPath := filepath.Join(dir, "stats.json")
+
+	aircraftBody, err := os.ReadFile(aircraftPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read readsb aircraft.json from %s: %w", aircraftPath, err)
+	}
+
+	var data RawAircraftData
+	if err := json.Unmarshal(aircraftBody, &data); err != nil {
+		return nil, fmt.Errorf("failed to parse readsb aircraft.json from %s: %w", aircraftPath, err)
+	}
+	for i := range data.Aircraft {
+		data.Aircraft[i].SourceType = SourceTypeReadsbFile
+	}
+
+	receiverBody, err := os.ReadFile(receiverPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read readsb receiver.json from %s: %w", receiverPath, err)
+	}
+	receiverData, err := parseJSONObject(receiverBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse readsb receiver.json from %s: %w", receiverPath, err)
+	}
+
+	statsBody, err := os.ReadFile(statsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read readsb stats.json from %s: %w", statsPath, err)
+	}
+	statsData, err := parseJSONObject(statsBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse readsb stats.json from %s: %w", statsPath, err)
+	}
+
+	c.setSuccessStatus(&data, receiverData, statsData)
+	return &data, nil
+}
+
+func (c *Client) fetchStandardAircraftURL(ctx context.Context, sourceURL string, sourceType string) (*RawAircraftData, error) {
+	body, err := c.fetchURL(ctx, sourceURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch aircraft JSON from %s: %w", sourceURL, err)
+	}
+
+	var data RawAircraftData
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, fmt.Errorf("failed to parse aircraft JSON from %s: %w", sourceURL, err)
+	}
+
+	for i := range data.Aircraft {
+		data.Aircraft[i].SourceType = sourceType
+	}
+
+	return &data, nil
+}
+
+func (c *Client) fetchExternalData(ctx context.Context) (*RawAircraftData, error) {
+	requestURL := fmt.Sprintf(c.externalSourceURL, c.stationLat, c.stationLon, c.searchRadiusNM)
+	headers := map[string]string{
+		"Accept":          "application/json",
+		"x-rapidapi-host": c.apiHost,
+		"x-rapidapi-key":  c.apiKey,
+	}
+
+	body, err := c.fetchURL(ctx, requestURL, headers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch external API data from %s: %w", requestURL, err)
+	}
+
+	var externalData ExternalAPIResponse
+	if err := json.Unmarshal(body, &externalData); err != nil {
+		var data RawAircraftData
+		if err2 := json.Unmarshal(body, &data); err2 != nil {
+			return nil, fmt.Errorf("failed to parse external API JSON from %s: %w", requestURL, err)
+		}
+		for i := range data.Aircraft {
+			data.Aircraft[i].SourceType = SourceTypeExternalAPI
+		}
+		c.setSuccessStatus(&data, nil, nil)
+		return &data, nil
+	}
+
+	aircraft := make([]ADSBTarget, 0, len(externalData.AC))
+	for _, extTarget := range externalData.AC {
+		aircraft = append(aircraft, extTarget.Convert())
+	}
+
+	data := &RawAircraftData{
+		Now:      float64(time.Now().Unix()),
+		Messages: externalData.Messages,
+		Aircraft: aircraft,
+	}
+	if data.Aircraft == nil {
+		data.Aircraft = []ADSBTarget{}
+	}
+
+	c.setSuccessStatus(data, nil, nil)
+	return data, nil
+}
+
+func (c *Client) fetchJSONObjectURL(ctx context.Context, sourceURL string) (map[string]interface{}, error) {
+	body, err := c.fetchURL(ctx, sourceURL, map[string]string{"Accept": "application/json"})
+	if err != nil {
+		return nil, err
+	}
+	return parseJSONObject(body)
+}
+
+func (c *Client) fetchURL(ctx context.Context, sourceURL string, headers map[string]string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for key, value := range headers {
+		if value != "" {
+			req.Header.Set(key, value)
+		}
+	}
+	if req.Header.Get("Accept") == "" {
+		req.Header.Set("Accept", "application/json")
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
+}
+
+func (c *Client) resolveReadsbDir() (string, error) {
+	c.mu.RLock()
+	cached := c.readsbResolvedDir
+	c.mu.RUnlock()
+	if cached != "" {
+		if hasReadsbFiles(cached) {
+			return cached, nil
+		}
+	}
+
+	candidates := make([]string, 0, len(defaultReadsbDirs)+1)
+	if strings.TrimSpace(c.readsbDataDir) != "" {
+		candidates = append(candidates, strings.TrimSpace(c.readsbDataDir))
+	}
+	candidates = append(candidates, defaultReadsbDirs...)
+
+	for _, candidate := range candidates {
+		if hasReadsbFiles(candidate) {
+			c.mu.Lock()
+			c.readsbResolvedDir = candidate
+			c.mu.Unlock()
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("readsb_file mode could not auto-detect required files (aircraft.json, receiver.json, stats.json)")
+}
+
+func hasReadsbFiles(dir string) bool {
+	required := []string{"aircraft.json", "receiver.json", "stats.json"}
+	for _, fileName := range required {
+		filePath := filepath.Join(dir, fileName)
+		if info, err := os.Stat(filePath); err != nil || info.IsDir() {
+			return false
+		}
+	}
+	return true
+}
+
+func parseJSONObject(body []byte) (map[string]interface{}, error) {
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
+	if data == nil {
+		return nil, fmt.Errorf("JSON payload is not an object")
+	}
+	return data, nil
+}
+
+func normalizeBaseURL(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		if strings.HasSuffix(trimmed, "/") {
+			return trimmed
+		}
+		return trimmed + "/"
+	}
+
+	parsed.Path = path.Clean(parsed.Path)
+	if !strings.HasSuffix(parsed.Path, "/") {
+		parsed.Path += "/"
+	}
+	return parsed.String()
+}
+
+func cloneAny(value any) any {
+	if value == nil {
+		return nil
+	}
+	blob, err := json.Marshal(value)
+	if err != nil {
+		return value
+	}
+	var cloned any
+	if err := json.Unmarshal(blob, &cloned); err != nil {
+		return value
+	}
+	return cloned
+}
+
+func (c *Client) setSuccessStatus(data *RawAircraftData, receiverData map[string]interface{}, statsData map[string]interface{}) {
+	now := time.Now().UTC()
+	status := SourceStatus{
+		SourceType: c.sourceType,
+		Mode:       c.sourceType,
+		Status:     "ok",
+		Aircraft: SourceChannelStatus{
+			Available:     true,
+			LastSuccessAt: &now,
+			Data: map[string]interface{}{
+				"messages":       data.Messages,
+				"aircraft_count": len(data.Aircraft),
+			},
+		},
+		Receiver: SourceChannelStatus{
+			Available: false,
+			Data:      nil,
+		},
+		Stats: SourceChannelStatus{
+			Available: false,
+			Data:      nil,
+		},
+		UpdatedAt: &now,
+	}
+
+	if c.sourceType == SourceTypeTar1090 || c.sourceType == SourceTypeReadsbFile {
+		status.Receiver.Available = receiverData != nil
+		status.Receiver.LastSuccessAt = &now
+		status.Receiver.Data = cloneAny(receiverData)
+		status.Stats.Available = statsData != nil
+		status.Stats.LastSuccessAt = &now
+		status.Stats.Data = cloneAny(statsData)
+	}
+
+	c.mu.Lock()
+	c.sourceStatus = status
+	c.mu.Unlock()
+}
+
+func (c *Client) setAircraftError(err error) {
+	now := time.Now().UTC()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	status := c.sourceStatus
+	status.SourceType = c.sourceType
+	status.Mode = c.sourceType
+	status.Status = "error"
+	status.Aircraft.Available = false
+	status.Aircraft.LastError = err.Error()
+	status.UpdatedAt = &now
+	c.sourceStatus = status
+}
+
+// UpdateStationCoords updates the station coordinates used for external API calls.
 func (c *Client) UpdateStationCoords(lat, lon float64) {
 	c.stationLat = lat
 	c.stationLon = lon

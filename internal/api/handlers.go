@@ -796,6 +796,12 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, publicConfig)
 }
 
+// GetADSBSourceStatus returns ADS-B source mode, health, and optional receiver/stats payloads.
+func (h *Handler) GetADSBSourceStatus(w http.ResponseWriter, r *http.Request) {
+	status := h.adsbService.GetSourceStatus()
+	WriteJSON(w, http.StatusOK, status)
+}
+
 // GetStationConfig returns the station configuration (latitude, longitude, elevation)
 func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 	// Get effective coordinates (override if set, otherwise config)
@@ -1760,7 +1766,7 @@ func WriteJSON(w http.ResponseWriter, status int, data interface{}) {
 func updateZeroValuesFromHistory(aircraft *adsb.Aircraft) {
 	// This function is no longer needed since we're using ADSB data directly
 	// We keep it as a no-op for backward compatibility
-	return
+	_ = aircraft
 }
 
 // haversine is a wrapper around adsb.Haversine for backward compatibility

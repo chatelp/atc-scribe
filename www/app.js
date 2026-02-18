@@ -248,6 +248,7 @@ document.addEventListener('alpine:init', () => {
         originalTranscriptions: {}, // Store original transcriptions before filtering
         stationApiUrl: `${API_BASE_URL}/station`, // API URL for station data
         wxApiUrl: `${API_BASE_URL}/wx`, // API URL for weather data
+        adsbSourceApiUrl: `${API_BASE_URL}/adsb/source`,
         stationLatitude: null,
         stationLongitude: null,
         stationElevationFeet: null,
@@ -285,6 +286,16 @@ document.addEventListener('alpine:init', () => {
         notamDetailsVisible: false,
         stationRefreshInterval: null,
         weatherRefreshInterval: null,
+        adsbSourceRefreshInterval: null,
+        adsbSourceInfo: {
+            source_type: null,
+            mode: null,
+            status: 'unknown',
+            aircraft: { available: false, last_success_at: null, last_error: '', data: null },
+            receiver: { available: false, last_success_at: null, last_error: '', data: null },
+            stats: { available: false, last_success_at: null, last_error: '', data: null },
+            updated_at: null,
+        },
         initialDataLoaded: false,
         connected: null, // null = initial state, true = connected, false = connection lost
         wsReconnectAttempt: 0,
@@ -2237,6 +2248,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 await this.fetchStationData();
                 await this.fetchWeatherData();
+                await this.fetchADSBSourceStatus();
                 // Initialize map using MapManager
                 if (this.mapManager && !this.mapManager.map) {
                     this.mapManager.initMap();
@@ -2392,6 +2404,7 @@ document.addEventListener('alpine:init', () => {
                 'mapPerfUpdateIntervalId',
                 'stationRefreshInterval',
                 'weatherRefreshInterval',
+                'adsbSourceRefreshInterval',
                 'aircraftDetailsHistoryRefreshInterval',
                 'proximityRefreshInterval',
                 'phaseHistoryRefreshInterval'
@@ -4652,6 +4665,94 @@ async initAircraftDataSource() {
                 this.stationLongitude = -79.6248; // Default fallback on error
                 this.stationElevationFeet = 569;    // Default fallback on error
             }
+        },
+
+        async fetchADSBSourceStatus() {
+            try {
+                const response = await fetch(this.adsbSourceApiUrl);
+                if (!response.ok) {
+                    console.error(`HTTP error fetching ADS-B source status! Status: ${response.status}`);
+                    return;
+                }
+
+                const data = await response.json();
+                this.adsbSourceInfo = {
+                    source_type: data.source_type || null,
+                    mode: data.mode || null,
+                    status: data.status || 'unknown',
+                    aircraft: data.aircraft || { available: false, data: null },
+                    receiver: data.receiver || { available: false, data: null },
+                    stats: data.stats || { available: false, data: null },
+                    updated_at: data.updated_at || null,
+                };
+
+                if (!this.adsbSourceRefreshInterval) {
+                    this.adsbSourceRefreshInterval = setInterval(() => {
+                        this.fetchADSBSourceStatus();
+                    }, 5000);
+                }
+            } catch (error) {
+                console.error('Error fetching ADS-B source status:', error);
+            }
+        },
+
+        getAdsbReceiverSummary() {
+            const receiver = this.adsbSourceInfo?.receiver?.data;
+            if (!receiver || typeof receiver !== 'object') {
+                return null;
+            }
+
+            const fullVersion = typeof receiver.version === 'string' ? receiver.version : null;
+            const version = fullVersion ? fullVersion.split(' git:')[0] : null;
+
+            return {
+                version,
+                refreshMs: Number.isFinite(receiver.refresh) ? receiver.refresh : null,
+                historySeconds: Number.isFinite(receiver.history) ? receiver.history : null,
+                readsb: receiver.readsb === true,
+                zstd: receiver.zstd === true,
+                binCraft: receiver.binCraft === true,
+            };
+        },
+
+        getAdsbStatsSummary() {
+            const stats = this.adsbSourceInfo?.stats?.data;
+            if (!stats || typeof stats !== 'object') {
+                return null;
+            }
+
+            const period = stats.last1min || stats.last5min || stats.last15min || null;
+            const local = period?.local || null;
+            const tracks = period?.tracks || null;
+
+            const messagesPerMin = Number.isFinite(period?.messages) ? period.messages : null;
+            const positionsPerMin = Number.isFinite(period?.position_count_total) ? period.position_count_total : null;
+            const tracksAll = Number.isFinite(tracks?.all) ? tracks.all : null;
+            const signalDb = Number.isFinite(local?.signal) ? local.signal : null;
+            const noiseDb = Number.isFinite(local?.noise) ? local.noise : null;
+
+            return {
+                aircraftWithPos: Number.isFinite(stats.aircraft_with_pos) ? stats.aircraft_with_pos : null,
+                aircraftWithoutPos: Number.isFinite(stats.aircraft_without_pos) ? stats.aircraft_without_pos : null,
+                gainDb: Number.isFinite(stats.gain_db) ? stats.gain_db : null,
+                estimatedPpm: Number.isFinite(stats.estimated_ppm) ? stats.estimated_ppm : null,
+                messagesPerMin,
+                positionsPerMin,
+                tracksAll,
+                signalDb,
+                noiseDb,
+                snrDb: Number.isFinite(signalDb) && Number.isFinite(noiseDb)
+                    ? Number((signalDb - noiseDb).toFixed(1))
+                    : null,
+            };
+        },
+
+        formatSignedNumber(value, decimals = 1) {
+            if (!Number.isFinite(value)) return '—';
+            const abs = Math.abs(value).toFixed(decimals);
+            if (value > 0) return `+${abs}`;
+            if (value < 0) return `-${abs}`;
+            return Number(abs).toFixed(decimals);
         },
 
         async fetchRunwayInUse() {

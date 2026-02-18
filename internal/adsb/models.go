@@ -144,7 +144,7 @@ type ADSBTarget struct {
 	Seen           *float64           `json:"seen"`
 	RSSI           *float64           `json:"rssi"`
 	ATCDerived     *ATCDerivedMetrics `json:"atc_derived,omitempty"`
-	SourceType     string             `json:"source_type,omitempty"` // Indicates whether data came from "local" or "external" source
+	SourceType     string             `json:"source_type,omitempty"` // Indicates source mode (external_api, tar1090, readsb_api, readsb_file)
 }
 
 func NumberOrZero(v *float64) float64 {

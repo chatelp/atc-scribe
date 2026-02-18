@@ -158,6 +158,105 @@
                                     </div>
                                     </div>
                             </section>
+
+                            <!-- ADS-B Source -->
+                            <section class="mb-5">
+                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">ADS-B Source</h3>
+                                <div class="grid gap-2.5 text-xs">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-sm">Mode</span>
+                                        <span class="font-mono text-text/80" x-text="$store.atc.adsbSourceInfo?.source_type || '—'"></span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-sm">Status</span>
+                                        <span class="font-mono"
+                                              :class="$store.atc.adsbSourceInfo?.status === 'ok' ? 'text-highlight' : 'text-danger'"
+                                              x-text="$store.atc.adsbSourceInfo?.status || 'unknown'"></span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-sm">Aircraft Feed</span>
+                                        <span class="font-mono"
+                                              :class="$store.atc.adsbSourceInfo?.aircraft?.available ? 'text-highlight' : 'text-text/60'"
+                                              x-text="$store.atc.adsbSourceInfo?.aircraft?.available ? 'available' : 'unavailable'"></span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-sm">Receiver</span>
+                                        <span class="font-mono"
+                                              :class="$store.atc.adsbSourceInfo?.receiver?.available ? 'text-highlight' : 'text-text/60'"
+                                              x-text="$store.atc.adsbSourceInfo?.receiver?.available ? 'available' : 'n/a'"></span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-sm">Stats</span>
+                                        <span class="font-mono"
+                                              :class="$store.atc.adsbSourceInfo?.stats?.available ? 'text-highlight' : 'text-text/60'"
+                                              x-text="$store.atc.adsbSourceInfo?.stats?.available ? 'available' : 'n/a'"></span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-sm">Updated</span>
+                                        <span class="font-mono text-text/80" x-text="$store.atc.adsbSourceInfo?.updated_at ? new Date($store.atc.adsbSourceInfo.updated_at).toLocaleTimeString() : '—'"></span>
+                                    </div>
+
+                                    <template x-if="$store.atc.adsbSourceInfo?.aircraft?.last_error">
+                                        <div class="text-danger break-all" x-text="$store.atc.adsbSourceInfo.aircraft.last_error"></div>
+                                    </template>
+
+                                    <div x-show="$store.atc.adsbSourceInfo?.receiver?.available" class="bg-background/30 border border-border/40 rounded p-2 space-y-1">
+                                        <div class="text-text/70">Receiver</div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Version</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbReceiverSummary()?.version || '—'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Refresh</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbReceiverSummary()?.refreshMs !== null ? ($store.atc.getAdsbReceiverSummary()?.refreshMs + ' ms') : '—'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>History</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbReceiverSummary()?.historySeconds !== null ? ($store.atc.getAdsbReceiverSummary()?.historySeconds + ' s') : '—'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Features</span>
+                                            <span class="text-text/80 font-mono" x-text="[
+                                                $store.atc.getAdsbReceiverSummary()?.readsb ? 'readsb' : null,
+                                                $store.atc.getAdsbReceiverSummary()?.zstd ? 'zstd' : null,
+                                                $store.atc.getAdsbReceiverSummary()?.binCraft ? 'binCraft' : null
+                                            ].filter(Boolean).join(' · ') || '—'"></span>
+                                        </div>
+                                    </div>
+
+                                    <div x-show="$store.atc.adsbSourceInfo?.stats?.available" class="bg-background/30 border border-border/40 rounded p-2 space-y-1">
+                                        <div class="text-text/70">Decoder Stats</div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Aircraft (pos/no-pos)</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.aircraftWithPos !== null ? (($store.atc.getAdsbStatsSummary()?.aircraftWithPos || 0) + ' / ' + ($store.atc.getAdsbStatsSummary()?.aircraftWithoutPos || 0)) : '—'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Messages / min</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.messagesPerMin ?? '—'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Positions / min</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.positionsPerMin ?? '—'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Tracks</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.tracksAll ?? '—'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Signal / Noise</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.signalDb !== null ? ($store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.signalDb, 1) + ' / ' + $store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.noiseDb, 1) + ' dBFS') : '—'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>SNR</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.snrDb !== null ? ($store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.snrDb, 1) + ' dB') : '—'"></span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span>Gain / PPM</span>
+                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.gainDb !== null ? ($store.atc.getAdsbStatsSummary()?.gainDb.toFixed(1) + ' dB · ' + $store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.estimatedPpm, 1) + ' ppm') : '—'"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
                             
                             <!-- Debug Settings -->
                             <section class="mb-5">

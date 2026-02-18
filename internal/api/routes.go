@@ -74,6 +74,7 @@ func (r *Router) Routes() http.Handler {
 
 		// Configuration
 		router.Get("/config", r.handler.GetConfig)
+		router.Get("/adsb/source", r.handler.GetADSBSourceStatus)
 
 		// Station Configuration
 		router.Get("/station", r.handler.GetStationConfig)    // New route for station config

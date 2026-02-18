@@ -288,6 +288,46 @@ Returns the public configuration settings.
 }
 ```
 
+### GET /api/v1/adsb/source
+
+Returns ADS-B source mode health and source metadata for Settings UI.
+
+**Response Format:**
+```json
+{
+  "source_type": "tar1090",
+  "mode": "tar1090",
+  "status": "ok",
+  "aircraft": {
+    "available": true,
+    "last_success_at": "2026-02-18T22:00:00Z",
+    "last_error": "",
+    "data": {
+      "messages": 123456,
+      "aircraft_count": 67
+    }
+  },
+  "receiver": {
+    "available": true,
+    "last_success_at": "2026-02-18T22:00:00Z",
+    "last_error": "",
+    "data": {}
+  },
+  "stats": {
+    "available": true,
+    "last_success_at": "2026-02-18T22:00:00Z",
+    "last_error": "",
+    "data": {}
+  },
+  "updated_at": "2026-02-18T22:00:00Z"
+}
+```
+
+**Mode behavior:**
+- `external_api`: `receiver` and `stats` are unavailable (`available=false`, `data=null`)
+- `readsb_api`: `receiver` and `stats` are unavailable (`available=false`, `data=null`)
+- `tar1090` and `readsb_file`: `receiver` and `stats` include raw JSON payloads from source files
+
 ### GET /api/v1/station
 
 Returns the station's configured location and weather data.

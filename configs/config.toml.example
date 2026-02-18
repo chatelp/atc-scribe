@@ -33,26 +33,33 @@ static_files_dir = "www"
 #######################################################
 [adsb]
 # Data source type:
-# - "local": Use a local ADS-B receiver (e.g., dump1090)
-# - "external": Use an external API service (e.g., ADS-B Exchange)
-source_type = "local"
+# - "external_api": external ADS-B API (aircraft only)
+# - "tar1090": tar1090 base URL exposing aircraft.json, receiver.json, stats.json
+# - "readsb_api": readsb net API endpoint (aircraft only, e.g. ?all)
+# - "readsb_file": local readsb files auto-detected from standard runtime dirs
+source_type = "tar1090"
 
-# Local source configuration (used when source_type = "local")
-# URL to the aircraft.json file from your local ADS-B receiver (tar1090)
-local_source_url = "http://192.168.1.166/tar1090/data/aircraft.json"
-
-# External source configuration (used when source_type = "external")
-# URL template with format placeholders for latitude, longitude, and distance
+# External API configuration (required when source_type = "external_api")
+# URL template with format placeholders for latitude, longitude, and distance (NM)
 external_source_url = "https://adsbexchange-com1.p.rapidapi.com/v2/lat/%f/lon/%f/dist/%.0f/"
-
-# API authentication for external source
 api_host = "adsbexchange-com1.p.rapidapi.com"
 api_key = ""  # Replace with your actual API key
-
 # Search radius in nautical miles around the station coordinates
 search_radius_nm = 50
 
-# Common configuration for both source types
+# Tar1090 configuration (required when source_type = "tar1090")
+# Base URL where aircraft.json, receiver.json, and stats.json are served
+tar1090_base_url = "http://192.168.1.166/tar1090/data/"
+
+# readsb API configuration (required when source_type = "readsb_api")
+# Example: http://192.168.1.60:30152/?all
+readsb_api_url = ""
+
+# readsb file configuration (optional when source_type = "readsb_file")
+# Leave empty to auto-detect from /run/readsb, /var/run/readsb, /run/dump1090-fa, /run/dump1090-mutability
+readsb_data_dir = ""
+
+# Common ADS-B polling configuration
 fetch_interval_seconds = 1      # How often to fetch new aircraft data
 signal_lost_timeout_seconds = 60 # How long to wait before considering a signal lost
 
