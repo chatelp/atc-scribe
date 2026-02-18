@@ -71,6 +71,9 @@ func (s *ClearanceStorage) initDB() error {
 
 // StoreClearance stores a clearance record
 func (s *ClearanceStorage) StoreClearance(record *ClearanceRecord) (int64, error) {
+	lockSQLiteWrite()
+	defer unlockSQLiteWrite()
+
 	// Insert record
 	result, err := s.db.Exec(
 		`INSERT INTO clearances 
@@ -156,6 +159,9 @@ func (s *ClearanceStorage) GetClearancesByType(clearanceType string, limit int) 
 
 // UpdateClearanceStatus updates the status of a clearance (for Phase 2 compliance monitoring)
 func (s *ClearanceStorage) UpdateClearanceStatus(id int64, status string) error {
+	lockSQLiteWrite()
+	defer unlockSQLiteWrite()
+
 	// Update record
 	_, err := s.db.Exec(
 		`UPDATE clearances

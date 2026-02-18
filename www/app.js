@@ -301,6 +301,7 @@ document.addEventListener('alpine:init', () => {
         zuluTime: new Date().toUTCString().match(/(\d{2}:\d{2}:\d{2})/)[0] + 'Z', // Initial Zulu Time
         showLocalDates: localStorage.getItem('showLocalDates') === 'true' || false, // Default to UTC (false)
         hoveredAircraft: null,
+        sidebarTab: localStorage.getItem('sidebarAircraftTab') || 'active',
         sortColumn: 'callsign',
         sortDirection: 'asc',
         lastUpdateSeconds: 0, // For footer status
@@ -406,7 +407,12 @@ document.addEventListener('alpine:init', () => {
             maxAltitude: parseInt(localStorage.getItem('maxAltitude')) || 60000,
             trailLength: parseInt(localStorage.getItem('trailLength')) || 2,
             tracksLimit: parseInt(localStorage.getItem('tracksLimit')) || 1000,
-            lastSeenMinutes: parseInt(localStorage.getItem('lastSeenMinutes')) || 10, // Default to 10 minutes for aircraft disappearance
+            lastSeenMinutes: (() => {
+                const allowed = ['1', '2', '5', '10', '20'];
+                const value = (localStorage.getItem('lastSeenMinutes') || '10').trim();
+                return allowed.includes(value) ? value : '10';
+            })(), // Compact retention presets for sidebar control
+            listSort: localStorage.getItem('listSort') || localStorage.getItem('activeListSort') || localStorage.getItem('lostListSort') || 'callsign_az',
             statusFilters: JSON.parse(localStorage.getItem('statusFilters')) || { active: true, stale: true, signal_lost: true },
             showAirAircraft: JSON.parse(localStorage.getItem('showAirAircraft')) ?? true,
             showGroundAircraft: JSON.parse(localStorage.getItem('showGroundAircraft')) ?? true,
@@ -458,6 +464,7 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('trailLength', this.settings.trailLength);
             localStorage.setItem('tracksLimit', this.settings.tracksLimit);
             localStorage.setItem('lastSeenMinutes', this.settings.lastSeenMinutes);
+            localStorage.setItem('listSort', this.settings.listSort);
             localStorage.setItem('statusFilters', JSON.stringify(this.settings.statusFilters));
             localStorage.setItem('showAirAircraft', this.settings.showAirAircraft);
             localStorage.setItem('showGroundAircraft', this.settings.showGroundAircraft);
@@ -559,6 +566,37 @@ document.addEventListener('alpine:init', () => {
             return Object.keys(this.aircraft).length;
         },
 
+        isSignalLostForSidebar(aircraft) {
+            if (!aircraft) return false;
+
+            // Strict source of truth: classification is time-based from last ADS-B poll.
+            const secondsSince = this.getSecondsSinceLastSeen(aircraft);
+            return Number.isFinite(secondsSince) && secondsSince >= 60;
+        },
+
+        get activeAircraftCount() {
+            this.currentTime;
+            return this.filteredAircraft.filter((aircraft) => !this.isSignalLostForSidebar(aircraft)).length;
+        },
+
+        get lostAircraftCount() {
+            this.currentTime;
+            return this.filteredAircraft.filter((aircraft) => this.isSignalLostForSidebar(aircraft)).length;
+        },
+
+        get visibleSidebarAircraft() {
+            this.currentTime;
+            if (this.sidebarTab === 'lost') {
+                return this.filteredAircraft.filter((aircraft) => this.isSignalLostForSidebar(aircraft));
+            }
+            return this.filteredAircraft.filter((aircraft) => !this.isSignalLostForSidebar(aircraft));
+        },
+
+        setSidebarTab(tab) {
+            this.sidebarTab = tab === 'lost' ? 'lost' : 'active';
+            localStorage.setItem('sidebarAircraftTab', this.sidebarTab);
+        },
+
         getStatusColor(aircraft) {
             if (!aircraft || !aircraft.status) return 'bg-highlight'; // Default green
             
@@ -590,29 +628,13 @@ document.addEventListener('alpine:init', () => {
             if (!this._filteredAircraftCache) {
                 this._filteredAircraftCache = [];
             }
-            
-            const now = Date.now();
-            
-            // Only recalculate every 500ms to prevent constant recomputation during WebSocket updates
-            if (this._lastFilterTime && (now - this._lastFilterTime) < 500 && this._lastFilterHash) {
-                return this._filteredAircraftCache;
-            }
-            
+
             // If no filtering has been done yet, do it immediately (synchronously for first load)
             if (!this._lastFilterHash) {
                 this._performFiltering();
                 return this._filteredAircraftCache;
             }
-            
-            // Schedule async filtering to prevent main thread blocking
-            if (!this._filteringScheduled) {
-                this._filteringScheduled = true;
-                setTimeout(() => {
-                    this._performFiltering();
-                    this._filteringScheduled = false;
-                }, 0);
-            }
-            
+ 
             // Return stable array reference
             return this._filteredAircraftCache;
         },
@@ -621,7 +643,7 @@ document.addEventListener('alpine:init', () => {
         _performFiltering() {
             // Create lightweight hash of current filter state (include ALL filter settings)
             const phaseFilterHash = this.settings.phaseFilters ? Object.entries(this.settings.phaseFilters).map(([k, v]) => `${k}:${v}`).join(',') : '';
-            const filterHash = `${this.searchTerm}|${this.settings.showGroundAircraft}|${this.settings.showAirAircraft}|${this.settings.minAltitude}|${this.settings.maxAltitude}|${this.settings.lastSeenMinutes}|${phaseFilterHash}|${Object.keys(this.aircraft).length}|${this.selectedAircraft?.hex}|${this.sortColumn}|${this.sortDirection}`;
+            const filterHash = `${this.searchTerm}|${this.settings.showGroundAircraft}|${this.settings.showAirAircraft}|${this.settings.minAltitude}|${this.settings.maxAltitude}|${this.settings.lastSeenMinutes}|${this.settings.listSort}|${phaseFilterHash}|${Object.keys(this.aircraft).length}|${this.selectedAircraft?.hex}|${this.sortColumn}|${this.sortDirection}`;
 
             // Return cached result if nothing changed (but always filter if no cache exists)
             if (this._lastFilterHash === filterHash && this._filteredAircraftCache) {
@@ -630,7 +652,8 @@ document.addEventListener('alpine:init', () => {
 
             const searchLower = this.searchTerm.toLowerCase();
             const now = new Date();
-            const lastSeenCutoff = new Date(now.getTime() - (this.settings.lastSeenMinutes * 60 * 1000));
+            const lastSeenMinutes = Number(this.settings.lastSeenMinutes) || 10;
+            const lastSeenCutoff = new Date(now.getTime() - (lastSeenMinutes * 60 * 1000));
 
             const filtered = Object.values(this.aircraft).filter(aircraft => {
                 // Filter by last seen time - hide aircraft not seen recently
@@ -682,26 +705,8 @@ document.addEventListener('alpine:init', () => {
                 return true;
             });
 
-            // Sort the aircraft with status priority: active first, then signal_lost
-            const sorted = filtered.sort((a, b) => {
-                // Primary sort: Status priority (active first, signal_lost second)
-                const aStatus = a.status === 'signal_lost' ? 1 : 0;
-                const bStatus = b.status === 'signal_lost' ? 1 : 0;
-                
-                if (aStatus !== bStatus) {
-                    return aStatus - bStatus; // Active (0) comes before signal_lost (1)
-                }
-                
-                // Secondary sort: User-selected column
-                const aValue = this.getSortValue(a, this.sortColumn);
-                const bValue = this.getSortValue(b, this.sortColumn);
-                
-                const direction = this.sortDirection === 'asc' ? 1 : -1;
-                
-                if (aValue < bValue) return -1 * direction;
-                if (aValue > bValue) return 1 * direction;
-                return 0;
-            });
+            const sortKey = this.settings.listSort || 'callsign_az';
+            const sorted = filtered.sort((a, b) => this.compareAircraftForSidebar(a, b, sortKey));
             
             // CRITICAL FIX: Update array in-place to maintain stable reference and prevent full table re-render
             this._updateFilteredAircraftInPlace(sorted);
@@ -789,6 +794,7 @@ document.addEventListener('alpine:init', () => {
 
         getSortValue(aircraft, column) {
             switch (column) {
+                case 'callsign_az':
                 case 'callsign':
                     return (aircraft.flight || aircraft.hex).toLowerCase();
                 case 'phase':
@@ -809,21 +815,31 @@ document.addEventListener('alpine:init', () => {
                         : Number.NEGATIVE_INFINITY;
                 case 'distance':
                     return aircraft.distance ?? 999999; // Sort undefined distances to the end
+                case 'last_seen': {
+                    if (!aircraft.last_seen) return Number.NEGATIVE_INFINITY;
+                    const ts = new Date(aircraft.last_seen).getTime();
+                    return Number.isFinite(ts) ? ts : Number.NEGATIVE_INFINITY;
+                }
                 default:
                     return '';
             }
         },
 
-        // Helper function to check if we should show signal lost divider before this aircraft
-        shouldShowSignalLostDivider(aircraft, index) {
-            if (aircraft.status !== 'signal_lost') return false;
-            
-            // Show divider if this is the first signal_lost aircraft
-            if (index === 0) return true;
-            
-            // Show divider if the previous aircraft was not signal_lost
-            const previousAircraft = this.filteredAircraft[index - 1];
-            return previousAircraft && previousAircraft.status !== 'signal_lost';
+        compareAircraftForSidebar(a, b, column) {
+            const aValue = this.getSortValue(a, column);
+            const bValue = this.getSortValue(b, column);
+
+            const ascendingColumns = new Set(['distance', 'callsign_az', 'callsign']);
+            const direction = ascendingColumns.has(column) ? 1 : -1;
+
+            if (aValue < bValue) return -1 * direction;
+            if (aValue > bValue) return 1 * direction;
+
+            const aCallsign = (a.flight || a.hex || '').toLowerCase();
+            const bCallsign = (b.flight || b.hex || '').toLowerCase();
+            if (aCallsign < bCallsign) return -1;
+            if (aCallsign > bCallsign) return 1;
+            return 0;
         },
 
         // RESTORING createLabelContent
@@ -1511,9 +1527,36 @@ document.addEventListener('alpine:init', () => {
         // Get seconds since last seen for an aircraft
         getSecondsSinceLastSeen(aircraft) {
             if (!aircraft.last_seen) return 'Unknown';
+
+            // Reactive dependency so Alpine reevaluates this value every second
+            // when the app clock updates.
+            this.currentTime;
+
             const lastSeen = new Date(aircraft.last_seen);
             const now = new Date();
             return Math.floor((now - lastSeen) / 1000);
+        },
+
+        shouldShowLastSeenBadge(aircraft) {
+            const secondsSince = this.getSecondsSinceLastSeen(aircraft);
+            return Number.isFinite(secondsSince) && secondsSince >= 5;
+        },
+
+        formatLastSeenAgo(aircraft) {
+            if (!aircraft?.last_seen) return '—';
+
+            const secondsAgo = Math.max(0, Math.floor((Date.now() - new Date(aircraft.last_seen).getTime()) / 1000));
+            if (!Number.isFinite(secondsAgo)) return '—';
+            if (secondsAgo < 60) return `${secondsAgo}s`;
+
+            const minutesAgo = Math.floor(secondsAgo / 60);
+            if (minutesAgo < 60) return `${minutesAgo}m`;
+
+            const hoursAgo = Math.floor(minutesAgo / 60);
+            if (hoursAgo < 24) return `${hoursAgo}h`;
+
+            const daysAgo = Math.floor(hoursAgo / 24);
+            return `${daysAgo}d`;
         },
 
         // Highlight search matches with red underline
@@ -3464,6 +3507,13 @@ async initAircraftDataSource() {
             const aircraft = this.aircraft[data.hex];
             if (!aircraft) return;
 
+            if (data.new_status === 'signal_lost') {
+                const secondsSince = this.getSecondsSinceLastSeen(aircraft);
+                if (!Number.isFinite(secondsSince) || secondsSince < 60) {
+                    return;
+                }
+            }
+
             // Update status
             aircraft.status = data.new_status;
 
@@ -3484,7 +3534,7 @@ async initAircraftDataSource() {
             // All other filtering is done client-side
             if (wsClient) {
                 wsClient.requestBulkAircraftData({
-                    last_seen_minutes: this.settings.lastSeenMinutes
+                    last_seen_minutes: Number(this.settings.lastSeenMinutes) || 10
                 });
             }
         },
@@ -3579,9 +3629,14 @@ async initAircraftDataSource() {
 
             if (data.aircraft) {
                 const observedAtMs = Date.parse(data.observed_at || '');
-                const realObservedAt = Number.isFinite(observedAtMs) ? observedAtMs : Date.now();
-                data.aircraft._lastRealObservedAt = realObservedAt;
-                data.aircraft.last_seen = new Date(realObservedAt).toISOString();
+                const payloadLastSeenMs = Date.parse(data.aircraft.last_seen || '');
+                const realObservedAt = Number.isFinite(observedAtMs)
+                    ? observedAtMs
+                    : (Number.isFinite(payloadLastSeenMs) ? payloadLastSeenMs : null);
+                if (Number.isFinite(realObservedAt)) {
+                    data.aircraft._lastRealObservedAt = realObservedAt;
+                    data.aircraft.last_seen = new Date(realObservedAt).toISOString();
+                }
                 if (data.aircraft.adsb) {
                     data.aircraft.adsb.source = 'real';
                 }
@@ -3618,8 +3673,10 @@ async initAircraftDataSource() {
             const hex = data.hex;
             let existing = this.aircraft[hex];
             const observedAtMs = Date.parse(data.observed_at || '');
-            const realObservedAt = Number.isFinite(observedAtMs) ? observedAtMs : Date.now();
-            const realObservedAtIso = new Date(realObservedAt).toISOString();
+            const realObservedAt = Number.isFinite(observedAtMs) ? observedAtMs : null;
+            const realObservedAtIso = Number.isFinite(realObservedAt)
+                ? new Date(realObservedAt).toISOString()
+                : null;
 
             // Update last update timestamp
             this.lastUpdate = new Date();
@@ -3634,7 +3691,9 @@ async initAircraftDataSource() {
                     return;
                 }
 
-                existing._lastRealObservedAt = realObservedAt;
+                if (Number.isFinite(realObservedAt)) {
+                    existing._lastRealObservedAt = realObservedAt;
+                }
                 if (existing.adsb) {
                     existing.adsb.source = 'real';
                 }
@@ -3675,8 +3734,14 @@ async initAircraftDataSource() {
             }
             // Fallback: full aircraft object (backward compatibility)
             else if (data.aircraft) {
-                data.aircraft._lastRealObservedAt = realObservedAt;
-                data.aircraft.last_seen = realObservedAtIso;
+                const payloadLastSeenMs = Date.parse(data.aircraft.last_seen || '');
+                const effectiveObservedAt = Number.isFinite(realObservedAt)
+                    ? realObservedAt
+                    : (Number.isFinite(payloadLastSeenMs) ? payloadLastSeenMs : null);
+                if (Number.isFinite(effectiveObservedAt)) {
+                    data.aircraft._lastRealObservedAt = effectiveObservedAt;
+                    data.aircraft.last_seen = new Date(effectiveObservedAt).toISOString();
+                }
                 if (data.aircraft.adsb) {
                     data.aircraft.adsb.source = 'real';
                 }
@@ -3837,8 +3902,8 @@ async initAircraftDataSource() {
                 delta.alt_baro !== undefined || delta.gs !== undefined ||
                 delta.track !== undefined || delta.baro_rate !== undefined ||
                 delta.tas !== undefined || delta.adsb !== undefined;
-            if (hasAdsbData) {
-                aircraft.last_seen = realObservedAtIso || new Date().toISOString();
+            if (hasAdsbData && realObservedAtIso) {
+                aircraft.last_seen = realObservedAtIso;
             }
         },
 
@@ -3850,12 +3915,9 @@ async initAircraftDataSource() {
 
             const aircraft = this.aircraft[data.hex];
             if (aircraft) {
-                // Don't delete from the store — mark as signal_lost and let the
-                // lastSeenMinutes filter handle eventual cleanup. This keeps
-                // signal-lost aircraft visible in the sidebar list.
-                if (aircraft.status !== 'signal_lost') {
-                    aircraft.status = 'signal_lost';
-                }
+                // Don't delete from the store. A "removed" stream event means the target
+                // is absent from the current poll, not necessarily past signal-lost timeout.
+                // Signal-lost classification is derived strictly from last_seen age.
 
                 // Remove from map and animation (no marker/trail for non-broadcasting aircraft)
                 if (this.mapManager) {
@@ -3873,7 +3935,7 @@ async initAircraftDataSource() {
         // Purge aircraft from the store whose last_seen exceeds the lastSeenMinutes setting.
         // This mirrors the server-side filter used on bulk load, keeping client and server in sync.
         _purgeStaleAircraft() {
-            const cutoff = Date.now() - (this.settings.lastSeenMinutes * 60 * 1000);
+            const cutoff = Date.now() - ((Number(this.settings.lastSeenMinutes) || 10) * 60 * 1000);
             let purged = 0;
             for (const hex of Object.keys(this.aircraft)) {
                 const ac = this.aircraft[hex];
@@ -3938,13 +4000,14 @@ async initAircraftDataSource() {
             if (!this.cacheInvalidationPending) {
                 this.cacheInvalidationPending = true;
                 
-                // AGGRESSIVE: Increase delay from 50ms to 1000ms to batch many more changes
+                // Keep sidebar and map state responsive while still batching bursts.
                 setTimeout(() => {
                     // Don't null the cache, just invalidate the hash to trigger re-filtering
                     // This maintains the stable array reference to prevent full table re-renders
                     this._lastFilterHash = null;
+                    this._performFiltering();
                     this.cacheInvalidationPending = false;
-                }, 1000); // Increased from 50ms to 1000ms
+                }, 120);
             }
         },
 

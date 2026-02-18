@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/yegors/co-atc/internal/adsb"
@@ -23,7 +22,6 @@ type AircraftRecord struct {
 // AircraftStorage is a SQLite-based storage for aircraft data
 type AircraftStorage struct {
 	db                *sql.DB
-	writeMu           sync.Mutex // Serializes all write operations (SQLite supports concurrent readers but only one writer)
 	logger            *logger.Logger
 	maxPositionsInAPI int
 }
@@ -44,7 +42,7 @@ func NewAircraftStorage(dbPath string, maxPositionsInAPI int, log *logger.Logger
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Allow multiple concurrent readers; writes are serialized via writeMu
+	// Allow multiple concurrent readers; writes are serialized by package-level sqliteWriteMu
 	db.SetMaxOpenConns(4)
 	db.SetMaxIdleConns(4)
 
@@ -1108,35 +1106,56 @@ func (s *AircraftStorage) GetByHex(hex string) (*adsb.Aircraft, bool) {
 
 // Upsert updates or inserts an aircraft
 func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
+	lockSQLiteWrite()
+	defer unlockSQLiteWrite()
 
+	const maxBusyRetries = 3
+	for attempt := 0; attempt <= maxBusyRetries; attempt++ {
+		err := s.upsertOnce(aircraft)
+		if err == nil {
+			return
+		}
+
+		if !isSQLiteBusyError(err) || attempt == maxBusyRetries {
+			s.logger.Error("Failed to upsert aircraft",
+				logger.Error(err),
+				logger.String("hex", aircraft.Hex),
+				logger.Int("attempt", attempt+1))
+			return
+		}
+
+		backoff := time.Duration((attempt + 1) * 100) * time.Millisecond
+		s.logger.Warn("SQLite busy during aircraft upsert, retrying",
+			logger.String("hex", aircraft.Hex),
+			logger.Int("attempt", attempt+1),
+			logger.Int("backoff_ms", int(backoff/time.Millisecond)))
+		time.Sleep(backoff)
+	}
+}
+
+func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 	// Ensure all timestamps are in UTC
 	aircraft.LastSeen = aircraft.LastSeen.UTC()
 
 	// Begin transaction
 	tx, err := s.db.Begin()
 	if err != nil {
-		s.logger.Error("Failed to begin transaction", logger.Error(err), logger.String("hex", aircraft.Hex))
-		return
+		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() {
-		if err != nil {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				s.logger.Error("Failed to rollback transaction", logger.Error(rollbackErr))
-			} else {
-				s.logger.Error("Transaction rolled back", logger.Error(err))
-			}
+		if err == nil {
+			return
+		}
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			s.logger.Error("Failed to rollback transaction", logger.Error(rollbackErr), logger.String("hex", aircraft.Hex))
 		}
 	}()
 
-	// Check if aircraft already exists and get current status
+	// Check if aircraft already exists
 	var exists bool
-	var currentStatus string
-	err = tx.QueryRow("SELECT 1, status FROM aircraft WHERE hex = ?", aircraft.Hex).Scan(&exists, &currentStatus)
+	err = tx.QueryRow("SELECT 1 FROM aircraft WHERE hex = ?", aircraft.Hex).Scan(&exists)
 	if err != nil && err != sql.ErrNoRows {
-		s.logger.Error("Failed to check if aircraft exists", logger.Error(err), logger.String("hex", aircraft.Hex))
-		return
+		return fmt.Errorf("check if aircraft exists: %w", err)
 	}
 
 	// Set status to active for new data
@@ -1159,8 +1178,7 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 			now, now,
 		)
 		if err != nil {
-			s.logger.Error("Failed to insert aircraft", logger.Error(err), logger.String("hex", aircraft.Hex))
-			return
+			return fmt.Errorf("insert aircraft: %w", err)
 		}
 	} else {
 		// Update existing aircraft with UTC timestamp for updated_at
@@ -1174,8 +1192,7 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 			boolToInt(aircraft.OnGround), now, aircraft.Hex,
 		)
 		if err != nil {
-			s.logger.Error("Failed to update aircraft", logger.Error(err), logger.String("hex", aircraft.Hex))
-			return
+			return fmt.Errorf("update aircraft: %w", err)
 		}
 	}
 
@@ -1183,8 +1200,7 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 		// Convert ADSB data to JSON
 		rawData, err := json.Marshal(aircraft.ADSB)
 		if err != nil {
-			s.logger.Error("Failed to marshal ADSB data", logger.Error(err), logger.String("hex", aircraft.Hex))
-			return
+			return fmt.Errorf("marshal ADSB data: %w", err)
 		}
 
 		// Get source type and registration/aircraft type directly from the ADSB data
@@ -1192,25 +1208,16 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 		registration := ""
 		aircraftType := ""
 
-		if aircraft.ADSB != nil {
-			// Use the fields directly from the ADSBTarget struct
-			if aircraft.ADSB.SourceType != "" {
-				sourceType = aircraft.ADSB.SourceType
-			}
+		if aircraft.ADSB.SourceType != "" {
+			sourceType = aircraft.ADSB.SourceType
+		}
 
-			if aircraft.ADSB.Registration != "" {
-				registration = aircraft.ADSB.Registration
-			}
+		if aircraft.ADSB.Registration != "" {
+			registration = aircraft.ADSB.Registration
+		}
 
-			if aircraft.ADSB.AircraftType != "" {
-				aircraftType = aircraft.ADSB.AircraftType
-			}
-
-			//s.logger.Debug("ADSB data source info",
-			//	logger.String("hex", aircraft.Hex),
-			//	logger.String("source_type", sourceType),
-			//	logger.String("registration", registration),
-			//	logger.String("aircraft_type", aircraftType))
+		if aircraft.ADSB.AircraftType != "" {
+			aircraftType = aircraft.ADSB.AircraftType
 		}
 
 		// Insert the ADSB target (OR IGNORE handles dedup via UNIQUE constraint)
@@ -1227,7 +1234,7 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 			)
 		`,
 			aircraft.Hex, aircraft.ADSB.Hex, aircraft.ADSB.Type, aircraft.ADSB.Flight,
-			registration, aircraftType, // Registration and AircraftType (populated for external API)
+			registration, aircraftType,
 			nullableFlexibleFloatValue(aircraft.ADSB.AltBaro), nullableFlexibleFloatValue(aircraft.ADSB.AltGeom), nullableFloatValue(aircraft.ADSB.GS), nullableFloatValue(aircraft.ADSB.IAS),
 			nullableFloatValue(aircraft.ADSB.TAS), nullableFloatValue(aircraft.ADSB.Mach), nullableFloatValue(aircraft.ADSB.WD), nullableFloatValue(aircraft.ADSB.WS),
 			nullableFloatValue(aircraft.ADSB.OAT), nullableFloatValue(aircraft.ADSB.TAT), aircraft.ADSB.Track, nullableFloatValue(aircraft.ADSB.TrackRate),
@@ -1240,20 +1247,20 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 			nullableFloatValue(aircraft.ADSB.RDir), nullableIntValue(aircraft.ADSB.Version), nullableIntValue(aircraft.ADSB.NICBaro), nullableIntValue(aircraft.ADSB.NACP),
 			nullableIntValue(aircraft.ADSB.NACV), nullableIntValue(aircraft.ADSB.SIL), aircraft.ADSB.SILType, nullableIntValue(aircraft.ADSB.GVA),
 			nullableIntValue(aircraft.ADSB.SDA), nullableIntValue(aircraft.ADSB.Alert), nullableIntValue(aircraft.ADSB.SPI),
-			"", "", // MLAT and TISB as strings (we'll store them as empty strings for now)
+			"", "",
 			nullableIntValue(aircraft.ADSB.Messages), nullableFloatValue(aircraft.ADSB.Seen), nullableFloatValue(aircraft.ADSB.RSSI),
 			aircraft.LastSeen.Format(time.RFC3339), string(rawData), sourceType,
 		)
 		if err != nil {
-			s.logger.Error("Failed to insert ADSB target", logger.Error(err), logger.String("hex", aircraft.Hex))
-			return
+			return fmt.Errorf("insert ADSB target: %w", err)
 		}
 	}
 
-	// Commit transaction
-	if commitErr := tx.Commit(); commitErr != nil {
-		s.logger.Error("Failed to commit transaction", logger.Error(commitErr), logger.String("hex", aircraft.Hex))
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
 	}
+
+	return nil
 }
 
 // Count returns the number of aircraft in the database
@@ -1484,8 +1491,8 @@ func (s *AircraftStorage) GetActiveAircraft() ([]*AircraftRecord, error) {
 
 // InsertPhaseChange inserts a new phase change record
 func (s *AircraftStorage) InsertPhaseChange(hex, flight, phase string, timestamp time.Time, adsbId *int) error {
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
+	lockSQLiteWrite()
+	defer unlockSQLiteWrite()
 
 	_, err := s.db.Exec(`
 		INSERT INTO phase_changes (hex, flight, phase, timestamp, adsb_id)
@@ -1845,8 +1852,8 @@ func (s *AircraftStorage) InsertPhaseChangesBatch(changes []adsb.PhaseChangeInse
 		return nil
 	}
 
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
+	lockSQLiteWrite()
+	defer unlockSQLiteWrite()
 
 	// Begin transaction
 	tx, err := s.db.Begin()

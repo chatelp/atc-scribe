@@ -94,6 +94,9 @@ func (s *TranscriptionStorage) initDB() error {
 
 // StoreTranscription stores a transcription record
 func (s *TranscriptionStorage) StoreTranscription(record *TranscriptionRecord) (int64, error) {
+	lockSQLiteWrite()
+	defer unlockSQLiteWrite()
+
 	// Insert record
 	result, err := s.db.Exec(
 		`INSERT INTO transcriptions 
@@ -488,6 +491,9 @@ func (s *TranscriptionStorage) GetUnprocessedTranscriptions(batchSize int) ([]*T
 
 // UpdateProcessedTranscription updates a transcription with processed content
 func (s *TranscriptionStorage) UpdateProcessedTranscription(id int64, contentProcessed string, speakerType string, callsign string) error {
+	lockSQLiteWrite()
+	defer unlockSQLiteWrite()
+
 	// Update record
 	_, err := s.db.Exec(
 		`UPDATE transcriptions

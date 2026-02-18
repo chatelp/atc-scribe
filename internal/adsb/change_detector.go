@@ -43,9 +43,10 @@ func (cd *ChangeDetector) DetectChanges(currentAircraft []*Aircraft) []AircraftC
 			delta := cd.computeDelta(previous, current)
 			if len(delta) > 0 {
 				changes = append(changes, AircraftChange{
-					Type:  "updated",
-					Hex:   hex,
-					Delta: delta,
+					Type:     "updated",
+					Aircraft: current,
+					Hex:      hex,
+					Delta:    delta,
 				})
 			}
 		} else {
@@ -164,7 +165,7 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 		delta["bsdb"] = current.BSDB
 	}
 
-	// last_seen is set client-side to current time when receiving any update
+	// last_seen is sourced from ADS-B observations (server-side LastSeen).
 
 	return delta
 }

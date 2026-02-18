@@ -26,8 +26,25 @@
         const callsign = (aircraft.flight || aircraft.hex || '').toLowerCase();
         const type = (aircraft.adsb?.type || '').toLowerCase();
         const category = (aircraft.adsb?.category || '').toLowerCase();
+        const typeCode = (aircraft.type_code || '').toLowerCase();
+        const manufacturer = (aircraft.manufacturer || '').toLowerCase();
 
-        return callsign.includes(searchLower) || type.includes(searchLower) || category.includes(searchLower);
+        const bsdbType = (
+            aircraft.bsdb &&
+            aircraft.bsdb.type_desc &&
+            typeof aircraft.bsdb.type_desc === 'string'
+                ? aircraft.bsdb.type_desc
+                : ''
+        ).toLowerCase();
+
+        return (
+            callsign.includes(searchLower) ||
+            type.includes(searchLower) ||
+            category.includes(searchLower) ||
+            typeCode.includes(searchLower) ||
+            manufacturer.includes(searchLower) ||
+            bsdbType.includes(searchLower)
+        );
     }
 
     function isVisibleByGroundState(aircraft, settings) {

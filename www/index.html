@@ -148,37 +148,15 @@
                                             <span class="w-12 text-right text-sm" x-text="$store.atc.settings.tracksLimit"></span>
                                         </div>
                                     </div>
-                                    </div>
-                            </section>
-                            
-                            <!-- Last Seen Filter Section -->
-                            <section class="mb-5">
-                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Aircraft Retention</h3>
-                                <div class="grid gap-2.5">
-                                    <!-- Last Seen Filter Slider -->
+
                                     <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Last Seen (min)</span>
-                                        <div class="flex items-center flex-1 min-w-0">
-                                            <input type="range"
-                                                   x-model.number="$store.atc.settings.lastSeenMinutes"
-                                                   min="1"
-                                                   max="60"
-                                                   step="1"
-                                                   @input.debounce.500ms="$store.atc.requestNewAircraftData()"
-                                                   class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
-                                            <span class="w-9 text-right text-sm" x-text="$store.atc.settings.lastSeenMinutes"></span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Exclude Other Airports Grounded Toggle -->
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Hide Remote Ground Traffic</span>
+                                        <span class="text-sm">Hide Remote Ground Aircraft</span>
                                         <label class="switch">
                                             <input type="checkbox" x-model="$store.atc.settings.excludeOtherAirportsGrounded" @change="$store.atc.requestNewAircraftData()">
                                             <span class="slider"></span>
                                         </label>
                                     </div>
-                                </div>
+                                    </div>
                             </section>
                             
                             <!-- Debug Settings -->
@@ -933,39 +911,80 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- Sidebar Tabs and List Controls -->
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                        <div class="inline-flex rounded-md border border-border/70 overflow-hidden">
+                            <button @click="$store.atc.setSidebarTab('active')"
+                                    :class="$store.atc.sidebarTab === 'active' ? 'bg-highlight/15 text-highlight' : 'text-text/70 hover:text-text hover:bg-hover/40'"
+                                    class="px-2.5 py-1 text-[10px] font-medium transition-colors cursor-pointer">
+                                Active (<span x-text="$store.atc.activeAircraftCount"></span>)
+                            </button>
+                            <button @click="$store.atc.setSidebarTab('lost')"
+                                    :class="$store.atc.sidebarTab === 'lost' ? 'bg-gray-500/15 text-gray-300' : 'text-text/70 hover:text-text hover:bg-hover/40'"
+                                    class="px-2.5 py-1 text-[10px] font-medium border-l border-border/70 transition-colors cursor-pointer">
+                                Signal Lost (<span x-text="$store.atc.lostAircraftCount"></span>)
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-1 text-[9px] text-gray-500 shrink-0" @click.stop @mousedown.stop>
+                            <template x-if="$store.atc.sidebarTab === 'lost'">
+                                <div class="flex items-center gap-1">
+                                    <span class="whitespace-nowrap">Retention</span>
+                                    <select x-model="$store.atc.settings.lastSeenMinutes"
+                                            @change="$store.atc.saveSettings(); $store.atc.requestNewAircraftData()"
+                                            title="Signal lost retention window"
+                                            class="w-12 px-1 py-0.5 bg-background border border-border/70 rounded text-[9px] text-text/80">
+                                        <option value="1">1m</option>
+                                        <option value="2">2m</option>
+                                        <option value="5">5m</option>
+                                        <option value="10">10m</option>
+                                        <option value="20">20m</option>
+                                    </select>
+                                </div>
+                            </template>
+
+                            <span class="whitespace-nowrap">Sort</span>
+                            <select x-model="$store.atc.settings.listSort"
+                                    @change="$store.atc.saveSettings(); $store.atc.applyFilters()"
+                                    title="Sort sidebar aircraft"
+                                    class="w-20 px-1 py-0.5 bg-background border border-border/70 rounded text-[9px] text-text/80">
+                                <option value="callsign_az">CS A-Z</option>
+                                <option value="distance">Distance</option>
+                                <option value="altitude">Altitude</option>
+                                <option value="gs">GS</option>
+                                <option value="last_seen">Last Seen</option>
+                            </select>
+                        </div>
+                    </div>
                     
                     <!-- Aircraft Table - Wrapped in scrollable container -->
                     <div class="overflow-y-auto overflow-x-auto flex-1 min-h-0 pr-0">
                         <table class="w-full table-fixed mt-0 text-xs">
                         <tbody>
-                            <template x-for="(aircraft, index) in $store.atc.filteredAircraft" :key="aircraft.hex">
+                            <template x-for="aircraft in $store.atc.visibleSidebarAircraft" :key="aircraft.hex">
                                 <tr @click="$store.atc.selectedAircraft = aircraft; if ($store.atc.mapManager) { $store.atc.mapManager.updateVisualState(aircraft.hex, true); $store.atc.mapManager.centerOnAircraft(aircraft); }"
                                     @mouseover="$store.atc.hoveredAircraft = aircraft; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
                                     @mouseout="$store.atc.hoveredAircraft = null; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
                                     class="group cursor-pointer aircraft-row"
-                                    :class="{ 'signal-lost': aircraft.status === 'signal_lost' }"
+                                    :class="{ 'signal-lost': $store.atc.isSignalLostForSidebar(aircraft) }"
                                     :data-aircraft-hex="aircraft.hex">
                                     <!-- Flight strip container -->
                                     <td colspan="7">
-                                        <!-- Active Divider (first item) -->
-                                        <div x-show="index === 0" class="flex items-center justify-center py-1.5 mb-1">
-                                            <div class="flex-1 h-px bg-gray-600/50"></div>
-                                            <span class="px-3 text-[10px] text-gray-500 font-medium uppercase tracking-wider">Active — <span x-text="$store.atc.filteredAircraft.filter(a => a.status !== 'signal_lost').length"></span></span>
-                                            <div class="flex-1 h-px bg-gray-600/50"></div>
-                                        </div>
-                                        <!-- Signal Lost Divider (conditional) -->
-                                        <div x-show="$store.atc.shouldShowSignalLostDivider(aircraft, index)" class="flex items-center justify-center py-1.5 mb-1 mt-1">
-                                            <div class="flex-1 h-px bg-gray-600/50"></div>
-                                            <span class="px-3 text-[10px] text-gray-500 font-medium uppercase tracking-wider">Signal Lost — <span x-text="$store.atc.filteredAircraft.filter(a => a.status === 'signal_lost').length"></span></span>
-                                            <div class="flex-1 h-px bg-gray-600/50"></div>
-                                        </div>
-                                        
                                         <!-- PERFORMANCE: Use CSS hover instead of Alpine hoveredAircraft state to prevent full table re-renders -->
-                                        <div class="flight-strip flex items-stretch rounded-md overflow-hidden border transition-all duration-0 mt-0.5"
+                                        <div class="flight-strip relative flex items-stretch rounded-md overflow-hidden border transition-all duration-0 mt-0.5"
                                              :class="{
                                                 'flight-strip-active': $store.atc.selectedAircraft?.hex === aircraft.hex,
                                                 'flight-strip-on-map': $store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex) && !($store.atc.selectedAircraft?.hex === aircraft.hex)
                                              }">
+                                            <template x-if="$store.atc.shouldShowLastSeenBadge(aircraft)">
+                                                <div class="pointer-events-none absolute bottom-1 left-1 z-20">
+                                                    <div class="px-2 py-0.5 rounded-md bg-black/45 border border-slate-300/15 text-[10px] tracking-wide uppercase text-slate-100/90 shadow-sm backdrop-blur-[1px]">
+                                                        <span x-text="'-' + $store.atc.getSecondsSinceLastSeen(aircraft) + 's'" class="font-bold"></span>
+                                                    </div>
+                                                </div>
+                                            </template>
+
                                             <!-- Phase cell -->
                                             <div class="p-1.5 text-center w-[70px] flex items-center justify-center">
                                                 <span x-show="aircraft.phase && aircraft.phase.current && aircraft.phase.current.length > 0"
@@ -994,9 +1013,9 @@
                                                     <span x-html="$store.atc.highlightSearchMatch(aircraft.flight || aircraft.hex)"
                                                           :title="aircraft.last_seen ? 'Last seen: ' + $store.atc.getSecondsSinceLastSeen(aircraft) + 's ago' : 'Unknown'"
                                                           :class="{
-                                                              'text-highlight': !aircraft.on_ground && aircraft.status !== 'signal_lost',
-                                                              'text-white': aircraft.on_ground && aircraft.status !== 'signal_lost',
-                                                              'text-gray-400': aircraft.status === 'signal_lost'
+                                                              'text-highlight': !aircraft.on_ground && !$store.atc.isSignalLostForSidebar(aircraft),
+                                                              'text-white': aircraft.on_ground && !$store.atc.isSignalLostForSidebar(aircraft),
+                                                              'text-gray-400': $store.atc.isSignalLostForSidebar(aircraft)
                                                           }"
                                                           class="text-sm"></span>
                                                     <div class="flex items-center gap-1 -mt-1">

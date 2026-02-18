@@ -351,8 +351,13 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 	data := map[string]interface{}{
 		"type":        change.Type,
 		"hex":         change.Hex,
-		"observed_at": time.Now().UTC().Format(time.RFC3339Nano),
 	}
+
+	observedAt := time.Now().UTC()
+	if change.Aircraft != nil && !change.Aircraft.LastSeen.IsZero() {
+		observedAt = change.Aircraft.LastSeen.UTC()
+	}
+	data["observed_at"] = observedAt.Format(time.RFC3339Nano)
 
 	// For "added", send full aircraft object
 	// For "updated", send only the delta (changed fields)
