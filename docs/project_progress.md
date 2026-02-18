@@ -22,7 +22,7 @@ AI-Enhanced Airspace Monitoring System - Think of it as the Tesla of air traffic
 **Making it look good**
 
 ### Web Interface
-- ✅ **Interactive Map** - Leaflet.js with OpenStreetMap, smooth as butter
+- ✅ **Interactive Map** - OpenLayers with OpenStreetMap/CARTO basemaps, smooth as butter
 - ✅ **Real-time Aircraft Visualization** - See planes move in real-time
 - ✅ **Aircraft Details Panel** - All the info you need, none of the crap you don't
 - ✅ **Historical Track Display** - Where planes have been, where they're going
@@ -144,7 +144,7 @@ AI-Enhanced Airspace Monitoring System - Think of it as the Tesla of air traffic
 
 ### System Specifications
 - **Backend**: Go with SQLite database
-- **Frontend**: Vanilla JavaScript with Leaflet maps
+- **Frontend**: Vanilla JavaScript with OpenLayers maps
 - **AI Services**: OpenAI Whisper + GPT-4 + Realtime API
 - **Audio Processing**: FFmpeg with multi-stream support
 - **Real-time**: WebSocket communications

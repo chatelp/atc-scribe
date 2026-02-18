@@ -1,3 +1,23 @@
+/**
+ * Module: app
+ * Why it exists:
+ * - Main frontend runtime entry point for Co-ATC.
+ * - Wires Alpine store state, API/WebSocket clients, map manager integration,
+ *   audio/transcription flows, and operator-facing UI behaviors.
+ *
+ * Key responsibilities:
+ * - Define runtime configuration and environment-derived endpoints.
+ * - Initialize shared clients/services and attach browser lifecycle handlers.
+ * - Orchestrate realtime aircraft updates, map rendering, and sidebar/detail views.
+ *
+ * Quirks / contracts:
+ * - Assumes same-host API/WebSocket deployment by default (LAN/local first).
+ * - Contains deliberate fallbacks for non-secure contexts used in local operations,
+ *   including UUID generation and service-worker behavior constraints.
+ * - Large by design today: this file remains the integration nexus while map-
+ *   specific logic is progressively moved into dedicated modules.
+ */
+
 // UUID generation with fallback for non-secure contexts (e.g., HTTP on LAN)
 function generateUUID() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -17,6 +37,13 @@ const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:$
 // Configuration
 const CONFIG = {
     // defaultCenter: [43.6777, -79.6248], // Will be fetched from API
+    mapEngine: 'openlayers',
+    mapAircraftWebGL: false,
+    mapOverlays: null,
+    aviationChartOverlayUrl: '',
+    weatherRadarWmsUrl: '',
+    weatherRadarWmsParams: {},
+    airspaceOverlayGeoJsonUrl: '',
     defaultZoom: 10,
     dataUrl: `${API_BASE_URL}/aircraft`,
     wsUrl: `ws://${window.location.hostname}:${window.location.port}/api/v1/ws`, // WebSocket URL
@@ -127,7 +154,7 @@ let mapManager;
 // Declare Animation Engine - will be initialized in alpine:init
 let animationEngine;
 
-// Leaflet map instance and layers
+// Map instance and layers
 let isAppInitialized = false; // Flag to ensure init() runs only once
 
 // Alpine.js data store
@@ -279,7 +306,37 @@ document.addEventListener('alpine:init', () => {
         lastUpdateSeconds: 0, // For footer status
         timeUpdateIntervalId: null, // Store ID for the time update interval
         mapPerfUpdateIntervalId: null, // Interval for map performance stats polling
-        mapPerformanceStats: null,
+        mapPerformanceStats: {
+            heapUsedMB: null,
+            heapLimitMB: null,
+            heapUsagePct: null,
+            heapDeltaMB: null,
+            animationFps: 0,
+            animationFrameMs: 0,
+            animationAnimatedThisFrame: 0,
+            animationVisibleTargets: 0,
+            animationMarkerUpdatesPerSec: 0,
+            refreshPerSec: 0,
+            avgRefreshMs: 0,
+            markerOpsPerSec: 0,
+            fullVisibilityPassesPerSec: 0,
+            animationCorrectedPerSec: 0,
+            animationPredictedPerSec: 0,
+            animationDroppedFrames: 0,
+            animationQuality: 0,
+            wsRates: {
+                total: 0,
+                aircraft_update: 0,
+                aircraft_predicted_state: 0,
+                aircraft_added: 0,
+                aircraft_removed: 0,
+                phase_change: 0,
+                transcription: 0,
+                frequency_status: 0,
+                parse_errors: 0
+            },
+            tileCache: { ...tileCacheRuntimeStats }
+        },
         tileCacheStats: { ...tileCacheRuntimeStats },
         _previousHeapUsedMB: null,
         userSetVolumes: {}, // Initialize as empty object
@@ -294,6 +351,10 @@ document.addEventListener('alpine:init', () => {
 
         // Settings
         settings: {
+            mapStyle: (() => {
+                const savedStyle = localStorage.getItem('mapStyle') || 'vfr-sectional';
+                return savedStyle === 'terminal' ? 'vfr-sectional' : savedStyle;
+            })(),
             showLabels: JSON.parse(localStorage.getItem('showLabels')) ?? true,
             showPaths: JSON.parse(localStorage.getItem('showPaths')) ?? true,
             showRings: JSON.parse(localStorage.getItem('showRings')) ?? true,
@@ -301,6 +362,46 @@ document.addEventListener('alpine:init', () => {
             showHeliports: JSON.parse(localStorage.getItem('showHeliports')) ?? true,
             showNavaids: JSON.parse(localStorage.getItem('showNavaids')) ?? true,
             showAllRunways: JSON.parse(localStorage.getItem('showAllRunways')) ?? true,
+            showAirspaceBoundaries: JSON.parse(localStorage.getItem('showAirspaceBoundaries')) ?? false,
+            airspaceOpacity: (() => {
+                const value = parseFloat(localStorage.getItem('airspaceOpacity'));
+                return Number.isFinite(value) ? value : 0.5;
+            })(),
+            ringsOpacity: (() => {
+                const value = parseFloat(localStorage.getItem('ringsOpacity'));
+                return Number.isFinite(value) ? value : 1;
+            })(),
+            airportsOpacity: (() => {
+                const value = parseFloat(localStorage.getItem('airportsOpacity'));
+                return Number.isFinite(value) ? value : 1;
+            })(),
+            heliportsOpacity: (() => {
+                const value = parseFloat(localStorage.getItem('heliportsOpacity'));
+                return Number.isFinite(value) ? value : 1;
+            })(),
+            navaidsOpacity: (() => {
+                const value = parseFloat(localStorage.getItem('navaidsOpacity'));
+                return Number.isFinite(value) ? value : 1;
+            })(),
+            allRunwaysOpacity: (() => {
+                const value = parseFloat(localStorage.getItem('allRunwaysOpacity'));
+                return Number.isFinite(value) ? value : 1;
+            })(),
+            showNexrad: JSON.parse(localStorage.getItem('showNexrad') ?? localStorage.getItem('showWeatherRadar')) ?? false,
+            nexradOpacity: (() => {
+                const value = parseFloat(localStorage.getItem('nexradOpacity'));
+                return Number.isFinite(value) ? value : 0.55;
+            })(),
+            showNoaaInfrared: JSON.parse(localStorage.getItem('showNoaaInfrared')) ?? false,
+            noaaInfraredOpacity: (() => {
+                const value = parseFloat(localStorage.getItem('noaaInfraredOpacity'));
+                return Number.isFinite(value) ? value : 0.55;
+            })(),
+            showNoaaRadar: JSON.parse(localStorage.getItem('showNoaaRadar')) ?? false,
+            noaaRadarOpacity: (() => {
+                const value = parseFloat(localStorage.getItem('noaaRadarOpacity'));
+                return Number.isFinite(value) ? value : 0.55;
+            })(),
             minAltitude: parseInt(localStorage.getItem('minAltitude')) || 0,
             maxAltitude: parseInt(localStorage.getItem('maxAltitude')) || 60000,
             trailLength: parseInt(localStorage.getItem('trailLength')) || 2,
@@ -315,11 +416,9 @@ document.addEventListener('alpine:init', () => {
             // Aircraft animation settings
             aircraftAnimation: {
                 enabled: JSON.parse(localStorage.getItem('aircraftAnimationEnabled')) ?? true,
-                interpolationFps: parseInt(localStorage.getItem('aircraftAnimationFps')) || 10,
-                viewportCulling: JSON.parse(localStorage.getItem('aircraftAnimationViewportCulling')) ?? true,
-                adaptivePerformance: JSON.parse(localStorage.getItem('aircraftAnimationAdaptivePerformance')) ?? true
+                interpolationFps: parseInt(localStorage.getItem('aircraftAnimationFps')) || 30,
+                viewportCulling: JSON.parse(localStorage.getItem('aircraftAnimationViewportCulling')) ?? true
             },
-            aircraftPredictionMode: localStorage.getItem('aircraftPredictionMode') || 'real_predicted'
         },
 
         // Add property to track previous settings for change detection
@@ -350,6 +449,7 @@ document.addEventListener('alpine:init', () => {
             const previousSettings = { ...this.previousSettings };
             
             // Save to localStorage
+            localStorage.setItem('mapStyle', this.settings.mapStyle);
             localStorage.setItem('showLabels', this.settings.showLabels);
             localStorage.setItem('showPaths', this.settings.showPaths);
             localStorage.setItem('showRings', this.settings.showRings);
@@ -368,13 +468,25 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('showHeliports', this.settings.showHeliports);
             localStorage.setItem('showNavaids', this.settings.showNavaids);
             localStorage.setItem('showAllRunways', this.settings.showAllRunways);
+            localStorage.setItem('showAirspaceBoundaries', this.settings.showAirspaceBoundaries);
+            localStorage.setItem('airspaceOpacity', this.settings.airspaceOpacity);
+            localStorage.setItem('ringsOpacity', this.settings.ringsOpacity);
+            localStorage.setItem('airportsOpacity', this.settings.airportsOpacity);
+            localStorage.setItem('heliportsOpacity', this.settings.heliportsOpacity);
+            localStorage.setItem('navaidsOpacity', this.settings.navaidsOpacity);
+            localStorage.setItem('allRunwaysOpacity', this.settings.allRunwaysOpacity);
+            localStorage.setItem('showNexrad', this.settings.showNexrad);
+            localStorage.setItem('nexradOpacity', this.settings.nexradOpacity);
+            localStorage.setItem('showNoaaInfrared', this.settings.showNoaaInfrared);
+            localStorage.setItem('noaaInfraredOpacity', this.settings.noaaInfraredOpacity);
+            localStorage.setItem('showNoaaRadar', this.settings.showNoaaRadar);
+            localStorage.setItem('noaaRadarOpacity', this.settings.noaaRadarOpacity);
+            localStorage.setItem('showWeatherRadar', this.settings.showNexrad);
 
             // Save aircraft animation settings
             localStorage.setItem('aircraftAnimationEnabled', this.settings.aircraftAnimation.enabled);
             localStorage.setItem('aircraftAnimationFps', this.settings.aircraftAnimation.interpolationFps);
             localStorage.setItem('aircraftAnimationViewportCulling', this.settings.aircraftAnimation.viewportCulling);
-            localStorage.setItem('aircraftAnimationAdaptivePerformance', this.settings.aircraftAnimation.adaptivePerformance);
-            localStorage.setItem('aircraftPredictionMode', this.settings.aircraftPredictionMode);
             
             // Update animation engine configuration if it exists
             if (this.animationEngine) {
@@ -1978,6 +2090,10 @@ document.addEventListener('alpine:init', () => {
         },
         
         aircraftDetailsGetAltitudeTrend(position, index, isFuture = false) {
+            if (!position || typeof position !== 'object') {
+                return 'fas fa-arrows-alt-h';
+            }
+
             // Use vertical_speed if available (from new tracks API)
             if (position.vertical_speed !== undefined && position.vertical_speed !== null) {
                 if (position.vertical_speed > 100) return 'fas fa-arrow-up';
@@ -2004,6 +2120,10 @@ document.addEventListener('alpine:init', () => {
         },
 
         aircraftDetailsGetAltitudeTrendClass(position, index, isFuture = false) {
+            if (!position || typeof position !== 'object') {
+                return isFuture ? 'text-highlight/70' : 'text-text';
+            }
+
             const dataArray = isFuture ? this.aircraftDetailsFutureData : this.aircraftDetailsHistoryData;
             
             if (!dataArray || index === dataArray.length - 1) return isFuture ? 'text-highlight/70' : 'text-text';
@@ -2077,6 +2197,9 @@ document.addEventListener('alpine:init', () => {
                 // Initialize map using MapManager
                 if (this.mapManager && !this.mapManager.map) {
                     this.mapManager.initMap();
+
+                    // Apply persisted map style/overlay visibility after overlay registry is initialized
+                    this.applyMapDisplaySettings();
                     
                     // Draw range rings after map is initialized
                     this.updateStationRings();
@@ -2144,10 +2267,22 @@ document.addEventListener('alpine:init', () => {
                 let previousHoveredHex = null;
                 Alpine.effect(() => {
                     const currentHoveredAircraft = Alpine.store('atc').hoveredAircraft;
+                    const previousStrip = previousHoveredHex
+                        ? document.querySelector(`tr[data-aircraft-hex="${previousHoveredHex}"] .flight-strip`)
+                        : null;
+                    if (previousStrip) {
+                        previousStrip.classList.remove('flight-card-map-hover');
+                    }
+
                     if (previousHoveredHex && (!currentHoveredAircraft || previousHoveredHex !== currentHoveredAircraft.hex)) {
                         if (this.mapManager) this.mapManager.updateVisualState(previousHoveredHex, true);
                     }
+
                     if (currentHoveredAircraft) {
+                        const currentStrip = document.querySelector(`tr[data-aircraft-hex="${currentHoveredAircraft.hex}"] .flight-strip`);
+                        if (currentStrip) {
+                            currentStrip.classList.add('flight-card-map-hover');
+                        }
                         if (this.mapManager) this.mapManager.updateVisualState(currentHoveredAircraft.hex, true);
                         previousHoveredHex = currentHoveredAircraft.hex;
                     } else {
@@ -2258,8 +2393,8 @@ document.addEventListener('alpine:init', () => {
                 currentAircraftHexes.add(aircraft.hex);
                 newAircraftData[aircraft.hex] = aircraft;
 
-                if (this.mapManager) {
-                    this.mapManager._ensureLeafletObjects(aircraft);
+                if (this.mapManager && this.mapManager.ensureMapObjects) {
+                    this.mapManager.ensureMapObjects(aircraft);
                 }
             });
             
@@ -2358,6 +2493,16 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        setMapStyle() {
+            if (this.settings.mapStyle === 'terminal') {
+                this.settings.mapStyle = 'vfr-sectional';
+            }
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setMapStyle === 'function') {
+                this.mapManager.setMapStyle(this.settings.mapStyle);
+            }
+        },
+
         toggleAnimation() {
             this.saveSettings();
             if (this.animationEngine) {
@@ -2369,13 +2514,6 @@ document.addEventListener('alpine:init', () => {
                     console.log('Aircraft animation disabled');
                 }
             }
-        },
-
-        togglePredictionMode() {
-            this.settings.aircraftPredictionMode =
-                this.settings.aircraftPredictionMode === 'real_only' ? 'real_predicted' : 'real_only';
-            this.saveSettings();
-            console.log(`Aircraft prediction mode: ${this.settings.aircraftPredictionMode}`);
         },
 
         toggleAirports() {
@@ -2403,6 +2541,128 @@ document.addEventListener('alpine:init', () => {
             this.saveSettings();
             if (this.mapManager) {
                 this.mapManager.toggleLayerVisibility('allRunways', this.settings.showAllRunways);
+            }
+        },
+
+        toggleAirspaceBoundaries() {
+            this.saveSettings();
+            if (this.mapManager) {
+                this.mapManager.toggleLayerVisibility('airspace-polygons', this.settings.showAirspaceBoundaries);
+            }
+        },
+
+        toggleNexrad() {
+            this.saveSettings();
+            if (this.mapManager) {
+                this.mapManager.toggleLayerVisibility('nexrad-radar', this.settings.showNexrad);
+            }
+        },
+
+        toggleNoaaInfrared() {
+            this.saveSettings();
+            if (this.mapManager) {
+                this.mapManager.toggleLayerVisibility('noaa-infrared', this.settings.showNoaaInfrared);
+            }
+        },
+
+        toggleNoaaRadar() {
+            this.saveSettings();
+            if (this.mapManager) {
+                this.mapManager.toggleLayerVisibility('noaa-radar', this.settings.showNoaaRadar);
+            }
+        },
+
+        setNexradOpacity() {
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setOverlayOpacity === 'function') {
+                this.mapManager.setOverlayOpacity('nexrad-radar', this.settings.nexradOpacity);
+            }
+        },
+
+        setNoaaInfraredOpacity() {
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setOverlayOpacity === 'function') {
+                this.mapManager.setOverlayOpacity('noaa-infrared', this.settings.noaaInfraredOpacity);
+            }
+        },
+
+        setNoaaRadarOpacity() {
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setOverlayOpacity === 'function') {
+                this.mapManager.setOverlayOpacity('noaa-radar', this.settings.noaaRadarOpacity);
+            }
+        },
+
+        setAirspaceOpacity() {
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
+                this.mapManager.setLayerOpacity('airspace-polygons', this.settings.airspaceOpacity);
+            }
+        },
+
+        setRingsOpacity() {
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
+                this.mapManager.setLayerOpacity('rangeRings', this.settings.ringsOpacity);
+            }
+        },
+
+        setAirportsOpacity() {
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
+                this.mapManager.setLayerOpacity('airports', this.settings.airportsOpacity);
+            }
+        },
+
+        setHeliportsOpacity() {
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
+                this.mapManager.setLayerOpacity('heliports', this.settings.heliportsOpacity);
+            }
+        },
+
+        setNavaidsOpacity() {
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
+                this.mapManager.setLayerOpacity('navaids', this.settings.navaidsOpacity);
+            }
+        },
+
+        setAllRunwaysOpacity() {
+            this.saveSettings();
+            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
+                this.mapManager.setLayerOpacity('allRunways', this.settings.allRunwaysOpacity);
+            }
+        },
+
+        applyMapDisplaySettings() {
+            if (!this.mapManager) return;
+
+            if (typeof this.mapManager.setMapStyle === 'function') {
+                this.mapManager.setMapStyle(this.settings.mapStyle);
+            }
+
+            this.mapManager.toggleLayerVisibility('airspace-polygons', this.settings.showAirspaceBoundaries);
+            this.mapManager.toggleLayerVisibility('nexrad-radar', this.settings.showNexrad);
+            this.mapManager.toggleLayerVisibility('noaa-infrared', this.settings.showNoaaInfrared);
+            this.mapManager.toggleLayerVisibility('noaa-radar', this.settings.showNoaaRadar);
+            this.mapManager.toggleLayerVisibility('rangeRings', this.settings.showRings);
+            this.mapManager.toggleLayerVisibility('airports', this.settings.showAirports);
+            this.mapManager.toggleLayerVisibility('heliports', this.settings.showHeliports);
+            this.mapManager.toggleLayerVisibility('navaids', this.settings.showNavaids);
+            this.mapManager.toggleLayerVisibility('allRunways', this.settings.showAllRunways);
+            if (typeof this.mapManager.setOverlayOpacity === 'function') {
+                this.mapManager.setOverlayOpacity('nexrad-radar', this.settings.nexradOpacity);
+                this.mapManager.setOverlayOpacity('noaa-infrared', this.settings.noaaInfraredOpacity);
+                this.mapManager.setOverlayOpacity('noaa-radar', this.settings.noaaRadarOpacity);
+            }
+            if (typeof this.mapManager.setLayerOpacity === 'function') {
+                this.mapManager.setLayerOpacity('airspace-polygons', this.settings.airspaceOpacity);
+                this.mapManager.setLayerOpacity('rangeRings', this.settings.ringsOpacity);
+                this.mapManager.setLayerOpacity('airports', this.settings.airportsOpacity);
+                this.mapManager.setLayerOpacity('heliports', this.settings.heliportsOpacity);
+                this.mapManager.setLayerOpacity('navaids', this.settings.navaidsOpacity);
+                this.mapManager.setLayerOpacity('allRunways', this.settings.allRunwaysOpacity);
             }
         },
 
@@ -2647,33 +2907,34 @@ document.addEventListener('alpine:init', () => {
             const wsStats = wsClient && wsClient.getMessageRateStats
                 ? wsClient.getMessageRateStats()
                 : null;
+            const smoothingEnabled = !!this.settings?.aircraftAnimation?.enabled;
             const measuredFps = animationStats && Number.isFinite(animationStats.measuredFps)
                 ? Number(animationStats.measuredFps.toFixed(1))
                 : 0;
-            const animationFrameMs = animationStats && Number.isFinite(animationStats.averageFrameTime)
+            const animationFrameMs = smoothingEnabled && animationStats && Number.isFinite(animationStats.averageFrameTime)
                 ? Number(animationStats.averageFrameTime.toFixed(2))
-                : 0;
-            const animationVisibleTargets = animationStats && Number.isFinite(animationStats.visibleTargets)
+                : null;
+            const animationVisibleTargets = smoothingEnabled && animationStats && Number.isFinite(animationStats.visibleTargets)
                 ? animationStats.visibleTargets
-                : 0;
-            const animationAnimatedThisFrame = animationStats && Number.isFinite(animationStats.animatedThisFrame)
+                : null;
+            const animationAnimatedThisFrame = smoothingEnabled && animationStats && Number.isFinite(animationStats.animatedThisFrame)
                 ? animationStats.animatedThisFrame
-                : 0;
-            const animationPredictedPerSec = animationStats && Number.isFinite(animationStats.predictedPerSec)
+                : null;
+            const animationPredictedPerSec = smoothingEnabled && animationStats && Number.isFinite(animationStats.predictedPerSec)
                 ? Number(animationStats.predictedPerSec.toFixed(1))
-                : 0;
-            const animationCorrectedPerSec = animationStats && Number.isFinite(animationStats.correctedPerSec)
+                : null;
+            const animationCorrectedPerSec = smoothingEnabled && animationStats && Number.isFinite(animationStats.correctedPerSec)
                 ? Number(animationStats.correctedPerSec.toFixed(1))
-                : 0;
-            const animationMarkerUpdatesPerSec = animationStats && Number.isFinite(animationStats.markerUpdatesPerSec)
+                : null;
+            const animationMarkerUpdatesPerSec = smoothingEnabled && animationStats && Number.isFinite(animationStats.markerUpdatesPerSec)
                 ? Number(animationStats.markerUpdatesPerSec.toFixed(1))
-                : 0;
-            const animationQuality = animationStats && Number.isFinite(animationStats.qualityLevel)
+                : null;
+            const animationQuality = smoothingEnabled && animationStats && Number.isFinite(animationStats.qualityLevel)
                 ? Number(animationStats.qualityLevel.toFixed(2))
-                : 0;
-            const animationDroppedFrames = animationStats && Number.isFinite(animationStats.droppedFrames)
+                : null;
+            const animationDroppedFrames = smoothingEnabled && animationStats && Number.isFinite(animationStats.droppedFrames)
                 ? animationStats.droppedFrames
-                : 0;
+                : null;
 
             const wsByType = wsStats?.byTypePerSec || {};
             const wsRates = {
@@ -2687,6 +2948,9 @@ document.addEventListener('alpine:init', () => {
                 frequency_status: Number.isFinite(wsByType.frequency_status) ? wsByType.frequency_status : 0,
                 parse_errors: Number.isFinite(wsStats?.parseErrorsPerSec) ? wsStats.parseErrorsPerSec : 0
             };
+
+            const effectiveUpdateRate = Number((wsRates.aircraft_update + wsRates.aircraft_predicted_state).toFixed(1));
+            const displayRenderRate = smoothingEnabled ? measuredFps : effectiveUpdateRate;
 
             const fullVisibilityPassesPerSec = Number.isFinite(mapStats?.windowSec) && mapStats.windowSec > 0
                 ? Number((mapStats.fullVisibilityPasses / mapStats.windowSec).toFixed(2))
@@ -2709,7 +2973,8 @@ document.addEventListener('alpine:init', () => {
 
             this.mapPerformanceStats = {
                 ...mapStats,
-                animationFps: measuredFps,
+                smoothingEnabled: smoothingEnabled,
+                animationFps: displayRenderRate,
                 animationFrameMs: animationFrameMs,
                 animationVisibleTargets: animationVisibleTargets,
                 animationAnimatedThisFrame: animationAnimatedThisFrame,
@@ -3278,7 +3543,9 @@ async initAircraftDataSource() {
                 
                 // Update all aircraft markers
                 for (const aircraft of Object.values(this.aircraft)) {
-                    this.mapManager._ensureLeafletObjects(aircraft);
+                    if (this.mapManager.ensureMapObjects) {
+                        this.mapManager.ensureMapObjects(aircraft);
+                    }
                 }
                 
                 // Refresh view and apply filters
@@ -3440,10 +3707,6 @@ async initAircraftDataSource() {
                 return;
             }
 
-            if (this.settings.aircraftPredictionMode === 'real_only') {
-                return;
-            }
-
             const aircraft = this.aircraft[data.hex];
             if (!aircraft || aircraft.status === 'signal_lost') {
                 return;
@@ -3504,9 +3767,7 @@ async initAircraftDataSource() {
                 this.animationEngine.updateAircraft(aircraft);
             }
 
-            if (!this.settings.aircraftAnimation?.enabled) {
-                this.queueMapUpdate(data.hex);
-            }
+            this.queueMapUpdate(data.hex);
         },
 
         // Apply delta updates to an existing aircraft object
@@ -3793,8 +4054,8 @@ async initAircraftDataSource() {
                     this.mapManager.updateVisualState(foundAircraft.hex, true);
                     
                     // Center map on the aircraft if it has coordinates
-                    if (foundAircraft.adsb && foundAircraft.adsb.lat && foundAircraft.adsb.lon && this.mapManager.map) {
-                        this.mapManager.map.setView([foundAircraft.adsb.lat, foundAircraft.adsb.lon], this.mapManager.map.getZoom());
+                    if (foundAircraft.adsb && foundAircraft.adsb.lat && foundAircraft.adsb.lon && this.mapManager.centerOnAircraft) {
+                        this.mapManager.centerOnAircraft(foundAircraft);
                     }
                 }
             } else {
@@ -3847,8 +4108,8 @@ async initAircraftDataSource() {
                     this.mapManager.updateVisualState(foundAircraft.hex, true);
                     
                     // Center map on the aircraft if it has coordinates
-                    if (foundAircraft.adsb && foundAircraft.adsb.lat && foundAircraft.adsb.lon && this.mapManager.map) {
-                        this.mapManager.map.setView([foundAircraft.adsb.lat, foundAircraft.adsb.lon], this.mapManager.map.getZoom());
+                    if (foundAircraft.adsb && foundAircraft.adsb.lat && foundAircraft.adsb.lon && this.mapManager.centerOnAircraft) {
+                        this.mapManager.centerOnAircraft(foundAircraft);
                     }
                 }
             } else {
@@ -4277,6 +4538,7 @@ async initAircraftDataSource() {
                     // Update station rings to use the new coordinates from API
                     if (this.mapManager && this.mapManager.map) {
                         this.updateStationRings();
+                        this.applyMapDisplaySettings();
                     }
                 }
                 
@@ -5039,9 +5301,11 @@ async initAircraftDataSource() {
     // Initialize audioClient AFTER the store is defined
     audioClient = new AudioClient(Alpine.store('atc'));
     
-    // Initialize MapManager AFTER store and L/CONFIG are available
-    // L (Leaflet) and CONFIG are globally available here
-    mapManager = new MapManager(Alpine.store('atc'), L, CONFIG);
+    // Initialize OpenLayers map manager only
+    if (!window.OpenLayersMapManager || typeof window.OpenLayersMapManager.createOpenLayersMapManager !== 'function') {
+        throw new Error('OpenLayersMapManager is unavailable; OpenLayers runtime bootstrap failed');
+    }
+    mapManager = window.OpenLayersMapManager.createOpenLayersMapManager(Alpine.store('atc'), CONFIG);
     Alpine.store('atc').mapManager = mapManager; // Make mapManager accessible in the store
 
     // Initialize Aircraft Animation Engine

@@ -580,6 +580,68 @@ func deduplicateHistory(positions []adsb.Position) []adsb.Position {
 	return result
 }
 
+func roundFloat(value float64, decimals int) float64 {
+	pow := math.Pow(10, float64(decimals))
+	return math.Round(value*pow) / pow
+}
+
+func roundedFloatPtr(value *float64, decimals int) *float64 {
+	if value == nil {
+		return nil
+	}
+	rounded := roundFloat(*value, decimals)
+	return &rounded
+}
+
+func deriveVerticalSpeedAt(positions []adsb.Position, index int) (*float64, bool) {
+	if index < 0 || index >= len(positions) || positions[index].Altitude == nil {
+		return nil, false
+	}
+	current := positions[index]
+	neighborIndexes := []int{index - 1, index + 1}
+	for _, neighborIndex := range neighborIndexes {
+		if neighborIndex < 0 || neighborIndex >= len(positions) {
+			continue
+		}
+		neighbor := positions[neighborIndex]
+		if neighbor.Altitude == nil {
+			continue
+		}
+		deltaMinutes := current.Timestamp.Sub(neighbor.Timestamp).Minutes()
+		if math.Abs(deltaMinutes) < 1e-6 {
+			continue
+		}
+		verticalSpeed := (*current.Altitude - *neighbor.Altitude) / deltaMinutes
+		return &verticalSpeed, true
+	}
+	return nil, false
+}
+
+func normalizeTrackPositions(positions []adsb.Position) []adsb.Position {
+	normalized := make([]adsb.Position, len(positions))
+	copy(normalized, positions)
+
+	for i := range normalized {
+		if normalized[i].VerticalSpeed == nil {
+			if derivedVerticalSpeed, ok := deriveVerticalSpeedAt(normalized, i); ok {
+				normalized[i].VerticalSpeed = derivedVerticalSpeed
+			}
+		}
+
+		normalized[i].Lat = roundedFloatPtr(normalized[i].Lat, 6)
+		normalized[i].Lon = roundedFloatPtr(normalized[i].Lon, 6)
+		normalized[i].Altitude = roundedFloatPtr(normalized[i].Altitude, 0)
+		normalized[i].SpeedTrue = roundedFloatPtr(normalized[i].SpeedTrue, 0)
+		normalized[i].SpeedGS = roundedFloatPtr(normalized[i].SpeedGS, 0)
+		normalized[i].Track = roundedFloatPtr(normalized[i].Track, 0)
+		normalized[i].TrueHeading = roundedFloatPtr(normalized[i].TrueHeading, 0)
+		normalized[i].MagHeading = roundedFloatPtr(normalized[i].MagHeading, 0)
+		normalized[i].VerticalSpeed = roundedFloatPtr(normalized[i].VerticalSpeed, 0)
+	}
+
+	return normalized
+}
+
 // GetAircraftTracks returns both history and future tracks for an aircraft
 func (h *Handler) GetAircraftTracks(w http.ResponseWriter, r *http.Request) {
 	// Get hex ID from URL
@@ -634,6 +696,7 @@ func (h *Handler) GetAircraftTracks(w http.ResponseWriter, r *http.Request) {
 
 	// Deduplicate consecutive positions with identical displayed values
 	history = deduplicateHistory(history)
+	history = normalizeTrackPositions(history)
 
 	// Calculate current distance from station
 	var distance *float64
@@ -653,6 +716,9 @@ func (h *Handler) GetAircraftTracks(w http.ResponseWriter, r *http.Request) {
 			future[i].Distance = &distNM
 		}
 	}
+	future = normalizeTrackPositions(future)
+
+	hindcast := normalizeTrackPositions(aircraft.Hindcast)
 
 	// Fetch phase history
 	phaseHistory, err := h.adsbService.GetPhaseHistory(hex)
@@ -670,7 +736,7 @@ func (h *Handler) GetAircraftTracks(w http.ResponseWriter, r *http.Request) {
 		Distance:     distance,
 		History:      history,
 		Future:       future,
-		Hindcast:     aircraft.Hindcast,
+		Hindcast:     hindcast,
 		PhaseHistory: phaseHistory,
 	}
 

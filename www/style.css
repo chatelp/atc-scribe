@@ -1,5 +1,63 @@
 /* Use tailwindcss for all styling - only use custom styles for things that tailwind doesn't support */
 
+/* Flight strip inset styling */
+.flight-strip {
+    background-color: rgba(0, 0, 0, 0.45);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
+    border-color: rgba(0, 0, 0, 0.5) !important;
+    color: #c0ccbf;
+}
+
+.flight-strip:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.flight-strip.flight-strip-active {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.flight-strip.flight-strip-on-map {
+    border-color: rgba(76, 175, 80, 0.18) !important;
+}
+
+.flight-strip.flight-strip-detail {
+    border-color: rgba(76, 175, 80, 0.18) !important;
+}
+
+.signal-lost .flight-strip {
+    color: #b0b0b0;
+}
+
+.flight-strip-divider {
+    background: linear-gradient(180deg, transparent 20%, rgba(255, 255, 255, 0.05) 50%, transparent 80%);
+}
+
+/* Filter controls */
+.filter-input {
+    background-color: rgba(0, 0, 0, 0.35) !important;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    border-color: rgba(0, 0, 0, 0.4) !important;
+}
+
+.filter-input:focus {
+    border-color: rgba(76, 175, 80, 0.3) !important;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+}
+
+.filter-btn-active {
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.filter-btn-inactive {
+    background-color: rgba(0, 0, 0, 0.2) !important;
+    border-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.filter-btn-inactive:hover {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
 /* Aircraft table row animations */
 .aircraft-row {
     transition: opacity 0.3s ease, transform 0.3s ease, border-color 0s ease, background-color 0s ease;
@@ -28,21 +86,21 @@
 
 /* Flight card hover effect triggered from map */
 .flight-card-map-hover {
-    background-color: rgba(76, 175, 80, 0.1) !important;
-    border-color: rgba(76, 175, 80, 0.3) !important;
-    box-shadow: 0 0 8px rgba(76, 175, 80, 0.2) !important;
+    background-color: rgba(76, 175, 80, 0.06) !important;
+    border-color: rgba(76, 175, 80, 0.25) !important;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Leaflet map customization */
-.leaflet-container {
+/* Map viewport customization */
+.ol-viewport {
     @apply bg-black z-[1];
 }
 
-.leaflet-control-attribution {
+.ol-attribution {
     @apply bg-black/70 text-[9px] text-gray-500;
 }
 
-.leaflet-control-zoom a {
+.ol-zoom button {
     @apply bg-panel text-text border-border;
 }
 
@@ -318,16 +376,6 @@ input[type=range].dual-range-max:focus {
     @apply p-0 m-0 border-0;
 }
 
-.history-tooltip .leaflet-tooltip-content {
-    @apply p-0 m-0;
-}
-
-.leaflet-tooltip.history-tooltip {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-}
-
 .history-tooltip-content {
     @apply bg-black/80 backdrop-blur-sm p-1.5 rounded shadow-md border border-gray-700/50 text-xs;
     min-width: 80px;
@@ -345,10 +393,9 @@ input[type=range].dual-range-max:focus {
     overflow: visible !important;
 }
 
-/* Prevent Leaflet panes from clipping labels */
-.leaflet-pane,
-.leaflet-marker-pane,
-.leaflet-overlay-pane {
+/* Prevent map panes from clipping labels */
+.ol-overlaycontainer,
+.ol-overlaycontainer-stopevent {
     overflow: visible !important;
 }
 
@@ -365,19 +412,6 @@ input[type=range].dual-range-max:focus {
     box-shadow: 0 0 10px rgba(235, 140, 0, 0.2) !important;
     z-index: 1500 !important; /* Ensure highlighted labels are on top */
     animation: subtle-pulse 2s infinite !important; /* Subtle pulsing animation */
-}
-
-/* Ensure all aircraft labels appear on top of history markers */
-.leaflet-marker-pane {
-    z-index: 650 !important;
-}
-
-.leaflet-tooltip-pane {
-    z-index: 400 !important; /* Keep tooltips below markers */
-}
-
-.leaflet-shadow-pane {
-    z-index: 350 !important; /* Keep history markers below */
 }
 
 /* Custom style for history tooltips to ensure they stay below aircraft labels */
@@ -567,20 +601,6 @@ input[type=range].dual-range-max:focus {
     white-space: nowrap;
 }
 
-/* Reference data popup styling */
-.ref-popup-container .leaflet-popup-content-wrapper {
-    background: rgba(17, 24, 39, 0.95);
-    color: #e5e7eb;
-    border: 1px solid rgba(75, 85, 99, 0.6);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-}
-
-.ref-popup-container .leaflet-popup-tip {
-    background: rgba(17, 24, 39, 0.95);
-    border: 1px solid rgba(75, 85, 99, 0.6);
-}
-
 .ref-popup-title {
     font-size: 13px;
     font-weight: 600;
@@ -635,6 +655,37 @@ input[type=range].dual-range-max:focus {
     color: #34d399;
     font-family: monospace;
     text-align: right;
+}
+
+.ol-ref-popup {
+    position: relative;
+    max-width: 340px;
+    min-width: 220px;
+    background: rgba(17, 24, 39, 0.95);
+    color: #e5e7eb;
+    border: 1px solid rgba(75, 85, 99, 0.6);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    padding: 10px 10px 8px 10px;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    z-index: 1200;
+}
+
+.ref-popup-close {
+    position: absolute;
+    right: 6px;
+    top: 4px;
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    font-size: 12px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.ref-popup-close:hover {
+    color: #f3f4f6;
 }
 
 /* Proximity circle animation */
@@ -749,21 +800,20 @@ input[type=range].dual-range-max:focus {
    ========================================== */
 
 /* GPU-accelerated transforms for smooth aircraft movement */
-.leaflet-marker-icon,
-.leaflet-marker-pane .aircraft-marker,
-.leaflet-marker-pane .aircraft-icon-container {
+.aircraft-marker,
+.aircraft-icon-container {
     will-change: transform;
     transform: translateZ(0); /* Force GPU acceleration */
     backface-visibility: hidden; /* Prevents flicker during transforms */
 }
 
 /* Aircraft labels need visible overflow to prevent clipping */
-.leaflet-marker-icon {
+.aircraft-marker {
     overflow: visible !important;
 }
 
 /* Aircraft label children - ensure visible overflow */
-.leaflet-marker-icon > div {
+.aircraft-marker > div {
     overflow: visible !important;
 }
 
@@ -813,6 +863,6 @@ input[type=range].dual-range-max:focus {
 }
 
 /* Canvas pane optimization */
-.leaflet-overlay-pane canvas {
+.ol-layer canvas {
     image-rendering: optimizeSpeed;
 }

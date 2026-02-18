@@ -35,6 +35,7 @@ Thumbs.db
 *.log
 
 /data/
+/temp/
 
 /configs/config.toml
 config.toml

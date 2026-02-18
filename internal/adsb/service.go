@@ -81,14 +81,57 @@ func normalizeRealtimeDelta(delta map[string]interface{}) map[string]interface{}
 	for key, value := range delta {
 		switch key {
 		case "lat", "lon":
-			normalized[key] = roundedInterface(value, 4)
-		case "gs", "tas", "track", "true_heading", "mag_heading":
-			normalized[key] = roundedInterface(value, 1)
+			normalized[key] = roundedInterface(value, 6)
+		case "alt_baro", "alt_geom", "gs", "tas", "ias", "track", "true_heading", "mag_heading", "baro_rate", "geom_rate", "vertical_speed", "vertical_rate":
+			normalized[key] = roundedInterface(value, 0)
 		default:
 			normalized[key] = value
 		}
 	}
 	return normalized
+}
+
+func roundPtr(value *float64, decimals int) *float64 {
+	if value == nil {
+		return nil
+	}
+	rounded := roundTo(*value, decimals)
+	return &rounded
+}
+
+func normalizeRealtimeAircraft(aircraft *Aircraft) *Aircraft {
+	if aircraft == nil {
+		return nil
+	}
+
+	clone := *aircraft
+	if aircraft.ADSB == nil {
+		return &clone
+	}
+
+	adsbCopy := *aircraft.ADSB
+	if adsbCopy.AltBaro.IsSet() {
+		adsbCopy.AltBaro = FlexibleFloat64(roundTo(adsbCopy.AltBaro.Float64(), 0))
+	}
+	if adsbCopy.AltGeom.IsSet() {
+		adsbCopy.AltGeom = FlexibleFloat64(roundTo(adsbCopy.AltGeom.Float64(), 0))
+	}
+	adsbCopy.Lat = roundPtr(adsbCopy.Lat, 6)
+	adsbCopy.Lon = roundPtr(adsbCopy.Lon, 6)
+	adsbCopy.GS = roundPtr(adsbCopy.GS, 0)
+	adsbCopy.IAS = roundPtr(adsbCopy.IAS, 0)
+	adsbCopy.TAS = roundPtr(adsbCopy.TAS, 0)
+	adsbCopy.Track = roundPtr(adsbCopy.Track, 0)
+	adsbCopy.MagHeading = roundPtr(adsbCopy.MagHeading, 0)
+	adsbCopy.TrueHeading = roundPtr(adsbCopy.TrueHeading, 0)
+	adsbCopy.BaroRate = roundPtr(adsbCopy.BaroRate, 0)
+	adsbCopy.GeomRate = roundPtr(adsbCopy.GeomRate, 0)
+	adsbCopy.NavHeading = roundPtr(adsbCopy.NavHeading, 0)
+	adsbCopy.NavAltitudeMCP = roundPtr(adsbCopy.NavAltitudeMCP, 0)
+	adsbCopy.NavAltitudeFMS = roundPtr(adsbCopy.NavAltitudeFMS, 0)
+
+	clone.ADSB = &adsbCopy
+	return &clone
 }
 
 // WebSocketServer defines the interface for a WebSocket server
@@ -315,7 +358,7 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 	// For "updated", send only the delta (changed fields)
 	// For "removed", just send hex
 	if change.Aircraft != nil {
-		data["aircraft"] = change.Aircraft
+		data["aircraft"] = normalizeRealtimeAircraft(change.Aircraft)
 	}
 	if change.Delta != nil {
 		data["delta"] = normalizeRealtimeDelta(change.Delta)
@@ -361,13 +404,13 @@ func (s *Service) predictionBroadcastLoop(ctx context.Context) {
 						"based_on":     p.BaseObserved.Format(time.RFC3339Nano),
 						"predicted_at": p.Timestamp.Format(time.RFC3339Nano),
 						"delta": map[string]interface{}{
-							"lat":          roundTo(p.Lat, 4),
-							"lon":          roundTo(p.Lon, 4),
-							"alt_baro":     p.Altitude,
-							"gs":           roundTo(p.Speed, 1),
-							"track":        roundTo(p.Heading, 1),
-							"true_heading": roundTo(p.Heading, 1),
-							"mag_heading":  roundTo(p.Heading, 1),
+							"lat":          roundTo(p.Lat, 6),
+							"lon":          roundTo(p.Lon, 6),
+							"alt_baro":     roundTo(p.Altitude, 0),
+							"gs":           roundTo(p.Speed, 0),
+							"track":        roundTo(p.Heading, 0),
+							"true_heading": roundTo(p.Heading, 0),
+							"mag_heading":  roundTo(p.Heading, 0),
 							"confidence":   roundTo(p.Confidence, 3),
 							"source":       "predicted",
 						},
@@ -405,8 +448,8 @@ func (s *Service) sendPhaseChangeAlertWithEvent(aircraft *Aircraft, fromPhase, t
 				Lon float64 `json:"lon"`
 				Alt float64 `json:"alt"`
 			}{
-				Lat: roundTo(lat, 4),
-				Lon: roundTo(lon, 4),
+				Lat: roundTo(lat, 6),
+				Lon: roundTo(lon, 6),
 				Alt: aircraft.ADSB.AltBaro.Float64(),
 			},
 			RunwayInfo: runwayInfo,

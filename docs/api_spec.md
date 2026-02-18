@@ -202,6 +202,11 @@ Same as individual aircraft object in the `/aircraft` endpoint.
 
 Retrieves both position history and future predictions for a specific aircraft.
 
+**Numeric Precision Policy (applies to `history`, `future`, and `hindcast`):**
+- GPS coordinates (`lat`, `lon`): 6 decimal places
+- Motion/attitude fields (`altitude`, `speed_gs`, `speed_true`, `track`, `true_heading`, `mag_heading`, `vertical_speed`): whole numbers
+- `vertical_speed` is populated from stored data when available, with fallback derivation from adjacent altitude/time points when missing
+
 **Query Parameters:**
 - `limit` (optional): Maximum number of historical positions to return (default: 1000, range: 100-3600)
 
@@ -440,6 +445,7 @@ WebSocket endpoint for real-time aircraft updates and transcriptions.
 **Message Types:**
 - `aircraft_added`: New aircraft detected
 - `aircraft_update`: Aircraft data updated
+- `aircraft_predicted_state`: Interpolated/predicted aircraft state for smooth client-side motion
 - `aircraft_removed`: Aircraft no longer tracked
 - `aircraft_bulk_request`: Client requests bulk aircraft data
 - `aircraft_bulk_response`: Server sends bulk aircraft data
@@ -476,6 +482,14 @@ WebSocket endpoint for real-time aircraft updates and transcriptions.
   }
 }
 ```
+
+**WebSocket Aircraft Numeric Precision Policy:**
+- `aircraft_added` full payload (`data.aircraft.adsb`):
+  - `lat`, `lon` → 6 decimal places
+  - `alt_baro`, `alt_geom`, `gs`, `tas`, `ias`, `track`, `true_heading`, `mag_heading`, `baro_rate`, `geom_rate` → whole numbers
+- `aircraft_update` and `aircraft_predicted_state` deltas (`data.delta`):
+  - `lat`, `lon` → 6 decimal places
+  - `alt_baro`, `alt_geom`, `gs`, `tas`, `ias`, `track`, `true_heading`, `mag_heading`, `baro_rate`, `geom_rate`, `vertical_speed`, `vertical_rate` → whole numbers
 
 ## ATC Chat Endpoints
 

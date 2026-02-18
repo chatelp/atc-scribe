@@ -8,10 +8,8 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossorigin=""/>
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.6.1/ol.css">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -49,24 +47,36 @@
     <link rel="stylesheet" href="style.css">
     <link rel="preload" href="/sounds/airbus_retard.mp3" as="audio">
     
-    <!-- Leaflet JavaScript -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
+    <!-- 1) Runtime libraries (must load before map modules) -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"></script>
             
-    <!-- Alpine.js -->
+    <!-- 2) UI framework (store/app bindings) -->
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
-    <!-- WebSocket Client -->
+    <!-- 3) Shared app clients -->
     <script src="websocket-client.js"></script>
-    
-    <!-- Audio Client -->
     <script src="audio-client.js"></script>
 
-    <!-- Map Manager -->
-    <script src="map-manager.js"></script>
-    
-    <!-- Aircraft Animation Engine -->
+    <!-- 4) Map foundation (core primitives and perf metrics) -->
+    <script src="map/core/layer-registry.js"></script>
+    <script src="map/core/event-bus.js"></script>
+    <script src="map/core/visibility-rules.js"></script>
+    <script src="map/core/map-engine.js"></script>
+    <script src="map/perf/telemetry.js"></script>
+
+    <!-- 5) Map feature modules (user interactions and contextual overlays) -->
+    <script src="map/features/interactions-feature.js"></script>
+    <script src="map/features/proximity-feature.js"></script>
+    <script src="map/features/minimap-feature.js"></script>
+
+    <!-- 6) Map renderers (facades first, concrete aircraft renderer second) -->
+    <script src="map/renderers/rendering-facades.js"></script>
+    <script src="map/renderers/aircraft-webgl.js"></script>
+
+    <!-- 7) Map orchestrator (depends on all map modules above) -->
+    <script src="map/openlayers-map-manager.js"></script>
+
+    <!-- 8) Aircraft motion smoothing layer (depends on manager) -->
     <script src="aircraft-animation.js"></script>
 </head>
 <body class="bg-background text-text m-0 p-0 font-mono overflow-hidden h-screen flex flex-col" x-data>
@@ -94,104 +104,26 @@
                             <!-- Display Settings -->
                             <section class="mb-5">
                                 <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Display</h3>
-                                <div class="grid gap-2.5">
+                                <div class="grid gap-3">
                                     <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Aircraft Labels</span>
+                                        <span class="text-sm">Smoothing Between Updates</span>
                                         <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.showLabels" @change="$store.atc.toggleLabels()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Aircraft Tracks</span>
-                                        <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.showPaths" @change="$store.atc.togglePaths()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                    
-                                    <!-- New Trail Length Slider -->
-                                    <div class="flex items-center justify-between gap-2.5 pt-1.5">
-                                        <span class="text-sm">Track Length (min)</span>
-                                        <div class="flex items-center flex-1 min-w-0">
-                                            <input type="range" 
-                                                   x-model.number="$store.atc.settings.trailLength" 
-                                                   min="1" 
-                                                   max="10" 
-                                                   step="1"
-                                                   @input="$store.atc.applyFilters()" 
-                                                   class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
-                                            <span class="w-9 text-right text-sm" x-text="$store.atc.settings.trailLength"></span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Distance Rings</span>
-                                        <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.showRings" @change="$store.atc.toggleRings()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Airports</span>
-                                        <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.showAirports" @change="$store.atc.toggleAirports()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Heliports</span>
-                                        <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.showHeliports" @change="$store.atc.toggleHeliports()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Navaids</span>
-                                        <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.showNavaids" @change="$store.atc.toggleNavaids()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">All Runways</span>
-                                        <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.showAllRunways" @change="$store.atc.toggleAllRunways()">
+                                            <input type="checkbox" x-model="$store.atc.settings.aircraftAnimation.enabled" @change="$store.atc.toggleAnimation()">
                                             <span class="slider"></span>
                                         </label>
                                     </div>
 
-                                    <!-- Aircraft Animation Settings -->
-                                    <div class="border-t border-border pt-2.5 mt-2.5">
-                                        <div class="flex items-center justify-between gap-2.5 mb-2">
-                                            <span class="text-sm">Smooth Animation</span>
-                                            <label class="switch">
-                                                <input type="checkbox" x-model="$store.atc.settings.aircraftAnimation.enabled" @change="$store.atc.toggleAnimation()">
-                                                <span class="slider"></span>
-                                            </label>
-                                        </div>
-                                        
-                                        <!-- Animation FPS Slider -->
-                                        <div class="flex items-center justify-between gap-2.5 pt-1.5" x-show="$store.atc.settings.aircraftAnimation.enabled">
-                                            <span class="text-sm">Animation Quality (FPS)</span>
-                                            <div class="flex items-center flex-1 min-w-0">
-                                                <input type="range"
-                                                       x-model.number="$store.atc.settings.aircraftAnimation.interpolationFps"
-                                                       min="5"
-                                                       max="60"
-                                                       step="5"
-                                                       @input="$store.atc.saveSettings()"
-                                                       class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
-                                                <span class="w-9 text-right text-sm" x-text="$store.atc.settings.aircraftAnimation.interpolationFps"></span>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Performance Options -->
-                                        <div class="flex items-center justify-between gap-2.5 pt-1.5" x-show="$store.atc.settings.aircraftAnimation.enabled">
-                                            <span class="text-sm text-xs">Adaptive Performance</span>
-                                            <label class="switch">
-                                                <input type="checkbox" x-model="$store.atc.settings.aircraftAnimation.adaptivePerformance" @change="$store.atc.saveSettings()">
-                                                <span class="slider"></span>
-                                            </label>
+                                    <div class="flex items-center justify-between gap-2.5" x-show="$store.atc.settings.aircraftAnimation.enabled">
+                                        <span class="text-sm">Target FPS</span>
+                                        <div class="flex items-center flex-1 min-w-0">
+                                            <input type="range"
+                                                   x-model.number="$store.atc.settings.aircraftAnimation.interpolationFps"
+                                                   min="10"
+                                                   max="60"
+                                                   step="5"
+                                                   @input="$store.atc.saveSettings()"
+                                                   class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
+                                            <span class="w-9 text-right text-sm" x-text="$store.atc.settings.aircraftAnimation.interpolationFps"></span>
                                         </div>
                                     </div>
                                 </div>
@@ -217,104 +149,6 @@
                                         </div>
                                     </div>
                                     </div>
-                            </section>
-                            
-                            <!-- Station Override Settings -->
-                            <section class="mb-5">
-                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Station Override</h3>
-                                <div class="grid gap-2.5">
-                                    <!-- Current Position Display -->
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Current Position</span>
-                                        <div class="text-xs text-text/70 font-mono">
-                                            <span x-text="($store.atc.stationOverride.active ? $store.atc.stationOverride.latitude : $store.atc.stationLatitude)?.toFixed(4) || 'Loading...'"></span>,
-                                            <span x-text="($store.atc.stationOverride.active ? $store.atc.stationOverride.longitude : $store.atc.stationLongitude)?.toFixed(4) || 'Loading...'"></span>
-                                            <span x-show="$store.atc.stationOverride.active" class="text-orange-400 ml-1">(Override)</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- GPS Coordinate Inputs -->
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <label class="text-xs text-text/70 block mb-1">Latitude</label>
-                                            <input type="number"
-                                                   x-model="$store.atc.stationOverride.latitude"
-                                                   step="0.000001"
-                                                   placeholder="43.6777"
-                                                   class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
-                                        </div>
-                                        <div>
-                                            <label class="text-xs text-text/70 block mb-1">Longitude</label>
-                                            <input type="number"
-                                                   x-model="$store.atc.stationOverride.longitude"
-                                                   step="0.000001"
-                                                   placeholder="-79.6248"
-                                                   class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Action Buttons -->
-                                    <div class="flex gap-1">
-                                        <button @click="$store.atc.setStationFromMap()"
-                                                title="Click map to set coordinates"
-                                                :class="$store.atc.stationOverride.mapClickMode ? 'bg-orange-600/70 text-white' : 'bg-slate-700/50 hover:bg-slate-600/70 text-slate-300 hover:text-white'"
-                                                class="flex items-center justify-center w-8 h-8 rounded transition-all border border-slate-600/50 hover:border-slate-500">
-                                            <i class="fas fa-crosshairs text-xs"></i>
-                                        </button>
-                                        <button @click="$store.atc.useGeolocation()"
-                                                title="Use device location"
-                                                class="flex items-center justify-center w-8 h-8 bg-blue-700/50 hover:bg-blue-600/70 text-blue-300 hover:text-white rounded transition-all border border-blue-600/50 hover:border-blue-500">
-                                            <i class="fas fa-location-arrow text-xs"></i>
-                                        </button>
-                                        <button @click="$store.atc.applyStationOverride()"
-                                                class="flex-1 px-3 py-1.5 bg-emerald-700/50 hover:bg-emerald-600/70 text-emerald-300 hover:text-white rounded transition-all border border-emerald-600/50 hover:border-emerald-500 font-medium text-xs">
-                                            Apply
-                                        </button>
-                                        <button x-show="$store.atc.stationOverride.active"
-                                                @click="$store.atc.clearStationOverride()"
-                                                title="Clear override"
-                                                class="flex items-center justify-center w-8 h-8 bg-red-700/50 hover:bg-red-600/70 text-red-300 hover:text-white rounded transition-all border border-red-600/50 hover:border-red-500">
-                                            <i class="fas fa-times text-xs"></i>
-                                        </button>
-                                    </div>
-                                    
-                                    <!-- Auto-Update Toggle -->
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Auto-update from GPS</span>
-                                        <label class="switch">
-                                            <input type="checkbox"
-                                                   x-model="$store.atc.stationOverride.autoUpdate"
-                                                   @change="$store.atc.toggleGeolocationAutoUpdate()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                    
-                                    <!-- Update Interval -->
-                                    <div x-show="$store.atc.stationOverride.autoUpdate" class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Update interval</span>
-                                        <select x-model="$store.atc.stationOverride.updateInterval"
-                                                @change="$store.atc.updateGeolocationInterval()"
-                                                class="px-2 py-1 text-xs bg-background border border-border rounded text-text">
-                                            <option value="30">30s</option>
-                                            <option value="60">1m</option>
-                                            <option value="120">2m</option>
-                                            <option value="300">5m</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <!-- Status Messages -->
-                                    <div x-show="$store.atc.stationOverride.mapClickMode"
-                                         class="text-xs text-orange-400 bg-orange-900/20 border border-orange-700/50 rounded px-2 py-1.5">
-                                        <i class="fas fa-crosshairs mr-1"></i>
-                                        Click on the map to set station location
-                                    </div>
-                                    
-                                    <div x-show="$store.atc.stationOverride.autoUpdate && $store.atc.stationOverride.geolocationStatus"
-                                         class="text-xs text-blue-400 bg-blue-900/20 border border-blue-700/50 rounded px-2 py-1.5">
-                                        <i class="fas fa-satellite-dish mr-1"></i>
-                                        <span x-text="$store.atc.stationOverride.geolocationStatus"></span>
-                                    </div>
-                                </div>
                             </section>
                             
                             <!-- Last Seen Filter Section -->
@@ -351,51 +185,36 @@
                             <section class="mb-5">
                                 <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Debug Settings</h3>
                                 <div class="grid gap-2.5">
-                                    <!-- WebSocket Updates Pause/Play Button -->
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">WebSocket Updates</span>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-sm whitespace-nowrap">WebSocket</span>
                                         <button @click="$store.atc.toggleWebSocketUpdates()"
                                                 title="Toggle WebSocket updates"
                                                 :class="{
                                                     'bg-green-500/20 border-green-500/50 text-green-400': !$store.atc.wsUpdatesPaused,
                                                     'bg-red-500/20 border-red-500/50 text-red-400': $store.atc.wsUpdatesPaused
                                                 }"
-                                                class="px-3 py-1.5 rounded border text-xs font-medium transition-all duration-200 hover:bg-opacity-80 flex items-center gap-1.5">
-                                            <i :class="$store.atc.wsUpdatesPaused ? 'fas fa-play' : 'fas fa-pause'"></i>
+                                                class="px-2.5 py-1 rounded border text-[11px] font-medium transition-all duration-200 flex items-center gap-1.5 cursor-pointer">
+                                            <i :class="$store.atc.wsUpdatesPaused ? 'fas fa-play' : 'fas fa-pause'" class="text-[9px]"></i>
                                             <span x-text="$store.atc.wsUpdatesPaused ? 'Resume' : 'Pause'"></span>
-                                        </button>
-                                    </div>
-
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Prediction Source</span>
-                                        <button @click="$store.atc.togglePredictionMode()"
-                                                title="Toggle prediction source mode"
-                                                :class="{
-                                                    'bg-blue-500/20 border-blue-500/50 text-blue-400': $store.atc.settings.aircraftPredictionMode === 'real_predicted',
-                                                    'bg-amber-500/20 border-amber-500/50 text-amber-400': $store.atc.settings.aircraftPredictionMode === 'real_only'
-                                                }"
-                                                class="px-3 py-1.5 rounded border text-xs font-medium transition-all duration-200 hover:bg-opacity-80 flex items-center gap-1.5">
-                                            <i :class="$store.atc.settings.aircraftPredictionMode === 'real_predicted' ? 'fas fa-wave-square' : 'fas fa-satellite-dish'"></i>
-                                            <span x-text="$store.atc.settings.aircraftPredictionMode === 'real_predicted' ? 'Real + Predicted' : 'Real Only'"></span>
                                         </button>
                                     </div>
 
                                     <div x-show="$store.atc.mapPerformanceStats" class="text-xs text-text/70 bg-background/30 border border-border/40 rounded p-2 space-y-1">
                                         <div class="flex items-center justify-between">
-                                            <span>Render FPS</span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? 'Render FPS' : 'Update Rate (/s)'"></span>
                                             <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.animationFps"></span>
                                         </div>
                                         <div class="flex items-center justify-between">
                                             <span>Render Frame (ms)</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.animationFrameMs"></span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? $store.atc.mapPerformanceStats?.animationFrameMs : '-'"></span>
                                         </div>
                                         <div class="flex items-center justify-between">
                                             <span>Render Targets / Frame</span>
-                                            <span x-text="($store.atc.mapPerformanceStats?.animationAnimatedThisFrame ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.animationVisibleTargets ?? 0)"></span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? (($store.atc.mapPerformanceStats?.animationAnimatedThisFrame ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.animationVisibleTargets ?? 0)) : '-'"></span>
                                         </div>
                                         <div class="flex items-center justify-between">
                                             <span>Render Marker Updates /s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.animationMarkerUpdatesPerSec"></span>
+                                            <span x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? $store.atc.mapPerformanceStats?.animationMarkerUpdatesPerSec : '-'"></span>
                                         </div>
                                         <div class="flex items-center justify-between">
                                             <span>Map Refresh /s</span>
@@ -475,6 +294,118 @@
                                 </div>
                             </section>
                             
+                            <!-- Station Position -->
+                            <section class="mb-5">
+                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Station</h3>
+                                <div class="grid gap-2.5">
+                                    <!-- GPS Coordinates (always visible) -->
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Position</span>
+                                        <div class="text-xs text-text/70 font-mono">
+                                            <span x-text="($store.atc.stationOverride.active ? $store.atc.stationOverride.latitude : $store.atc.stationLatitude)?.toFixed(6) || '—'"></span>,
+                                            <span x-text="($store.atc.stationOverride.active ? $store.atc.stationOverride.longitude : $store.atc.stationLongitude)?.toFixed(6) || '—'"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Override checkbox -->
+                                    <div class="flex items-center justify-between gap-2.5">
+                                        <span class="text-sm">Override</span>
+                                        <label class="switch">
+                                            <input type="checkbox"
+                                                   :checked="$store.atc.stationOverride.active"
+                                                   @change="if ($store.atc.stationOverride.active) { $store.atc.clearStationOverride(); } else { $store.atc.stationOverride._showPanel = true; }"
+                                                   x-init="$store.atc.stationOverride._showPanel = $store.atc.stationOverride.active">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <!-- Override options (collapsed when not active) -->
+                                    <div x-show="$store.atc.stationOverride.active || $store.atc.stationOverride._showPanel" class="grid gap-2.5">
+                                        <!-- GPS Coordinate Inputs -->
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label class="text-xs text-text/70 block mb-1">Latitude</label>
+                                                <input type="number"
+                                                       x-model="$store.atc.stationOverride.latitude"
+                                                       step="0.000001"
+                                                       placeholder="43.6777"
+                                                       class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                                            </div>
+                                            <div>
+                                                <label class="text-xs text-text/70 block mb-1">Longitude</label>
+                                                <input type="number"
+                                                       x-model="$store.atc.stationOverride.longitude"
+                                                       step="0.000001"
+                                                       placeholder="-79.6248"
+                                                       class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                                            </div>
+                                        </div>
+
+                                        <!-- Action Buttons -->
+                                        <div class="flex gap-1">
+                                            <button @click="$store.atc.setStationFromMap()"
+                                                    title="Click map to set coordinates"
+                                                    :class="$store.atc.stationOverride.mapClickMode ? 'bg-orange-600/70 text-white' : 'bg-slate-700/50 hover:bg-slate-600/70 text-slate-300 hover:text-white'"
+                                                    class="flex items-center justify-center w-8 h-8 rounded transition-all border border-slate-600/50 hover:border-slate-500">
+                                                <i class="fas fa-crosshairs text-xs"></i>
+                                            </button>
+                                            <button @click="$store.atc.useGeolocation()"
+                                                    title="Use device location"
+                                                    class="flex items-center justify-center w-8 h-8 bg-blue-700/50 hover:bg-blue-600/70 text-blue-300 hover:text-white rounded transition-all border border-blue-600/50 hover:border-blue-500">
+                                                <i class="fas fa-location-arrow text-xs"></i>
+                                            </button>
+                                            <button @click="$store.atc.applyStationOverride()"
+                                                    class="flex-1 px-3 py-1.5 bg-emerald-700/50 hover:bg-emerald-600/70 text-emerald-300 hover:text-white rounded transition-all border border-emerald-600/50 hover:border-emerald-500 font-medium text-xs">
+                                                Apply
+                                            </button>
+                                            <button x-show="$store.atc.stationOverride.active"
+                                                    @click="$store.atc.clearStationOverride()"
+                                                    title="Clear override"
+                                                    class="flex items-center justify-center w-8 h-8 bg-red-700/50 hover:bg-red-600/70 text-red-300 hover:text-white rounded transition-all border border-red-600/50 hover:border-red-500">
+                                                <i class="fas fa-times text-xs"></i>
+                                            </button>
+                                        </div>
+
+                                        <!-- Auto-Update Toggle -->
+                                        <div class="flex items-center justify-between gap-2.5">
+                                            <span class="text-sm">Auto-update from GPS</span>
+                                            <label class="switch">
+                                                <input type="checkbox"
+                                                       x-model="$store.atc.stationOverride.autoUpdate"
+                                                       @change="$store.atc.toggleGeolocationAutoUpdate()">
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+
+                                        <!-- Update Interval -->
+                                        <div x-show="$store.atc.stationOverride.autoUpdate" class="flex items-center justify-between gap-2.5">
+                                            <span class="text-sm">Update interval</span>
+                                            <select x-model="$store.atc.stationOverride.updateInterval"
+                                                    @change="$store.atc.updateGeolocationInterval()"
+                                                    class="px-2 py-1 text-xs bg-background border border-border rounded text-text">
+                                                <option value="30">30s</option>
+                                                <option value="60">1m</option>
+                                                <option value="120">2m</option>
+                                                <option value="300">5m</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Status Messages -->
+                                        <div x-show="$store.atc.stationOverride.mapClickMode"
+                                             class="text-xs text-orange-400 bg-orange-900/20 border border-orange-700/50 rounded px-2 py-1.5">
+                                            <i class="fas fa-crosshairs mr-1"></i>
+                                            Click on the map to set station location
+                                        </div>
+
+                                        <div x-show="$store.atc.stationOverride.autoUpdate && $store.atc.stationOverride.geolocationStatus"
+                                             class="text-xs text-blue-400 bg-blue-900/20 border border-blue-700/50 rounded px-2 py-1.5">
+                                            <i class="fas fa-satellite-dish mr-1"></i>
+                                            <span x-text="$store.atc.stationOverride.geolocationStatus"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
                             <!-- Simulated Aircraft Settings -->
                             <section class="mb-5">
                                 <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Simulated Aircraft</h3>
@@ -552,6 +483,184 @@
                         </div>
                         
                         <div id="map" class="h-full w-full bg-black"></div>
+
+                        <div x-data="{ open: false }" class="absolute bottom-4 right-4 z-[10001]">
+                            <button @click="open = !open"
+                                    @keydown.escape.window="open = false"
+                                    type="button"
+                                    title="Map controls"
+                                    class="filter-input text-xs px-3 py-1.5 rounded border border-border bg-panel/85 text-text min-w-[180px] flex items-center justify-between backdrop-blur-sm hover:border-highlight/60 transition-colors shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+                                <span class="uppercase tracking-wide text-text/80">Map Controls</span>
+                                <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+                            </button>
+
+                            <div x-show="open"
+                                 @click.outside="open = false"
+                                 x-transition.origin.bottom.right
+                                                                     class="absolute bottom-full right-0 mb-2 w-[340px] max-w-[calc(100vw-1rem)] max-h-[65vh] overflow-y-auto overflow-x-hidden bg-panel/95 border border-border rounded-md shadow-[0_8px_20px_rgba(0,0,0,0.45)] p-3 space-y-3">
+                                <div>
+                                    <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Map Style</div>
+                                    <div class="grid grid-cols-2 gap-1.5">
+                                        <button type="button" @click="$store.atc.settings.mapStyle='vfr-sectional'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='vfr-sectional' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">VFR Sectional</button>
+                                        <button type="button" @click="$store.atc.settings.mapStyle='ifr-low'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='ifr-low' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IFR Low</button>
+                                        <button type="button" @click="$store.atc.settings.mapStyle='ifr-high'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='ifr-high' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IFR High</button>
+                                        <button type="button" @click="$store.atc.settings.mapStyle='dark'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">Dark</button>
+                                        <button type="button" @click="$store.atc.settings.mapStyle='light'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='light' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">Light</button>
+                                        <button type="button" @click="$store.atc.settings.mapStyle='osm'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='osm' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">OpenStreetMap</button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Aircraft</div>
+                                    <div class="space-y-1.5">
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showLabels" @change="$store.atc.toggleLabels()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">Labels</span>
+                                        </div>
+
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showPaths" @change="$store.atc.togglePaths()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">Tracks</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showPaths">
+                                                <input type="range"
+                                                       x-model.number="$store.atc.settings.trailLength"
+                                                       min="1"
+                                                       max="10"
+                                                       step="1"
+                                                       @input="$store.atc.applyFilters()"
+                                                       class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs whitespace-nowrap" x-text="$store.atc.settings.trailLength + 'min'"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Layers</div>
+                                    <div class="space-y-1.5">
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showRings" @change="$store.atc.toggleRings()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">Distance Rings</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showRings">
+                                                <input type="range" x-model.number="$store.atc.settings.ringsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setRingsOpacity()" class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.ringsOpacity * 100) + '%'" ></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showAirspaceBoundaries" @change="$store.atc.toggleAirspaceBoundaries()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">Airspace</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAirspaceBoundaries">
+                                                <input type="range" x-model.number="$store.atc.settings.airspaceOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAirspaceOpacity()" class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.airspaceOpacity * 100) + '%'" ></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showNexrad" @change="$store.atc.toggleNexrad()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">NEXRAD</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showNexrad">
+                                                <input type="range" x-model.number="$store.atc.settings.nexradOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setNexradOpacity()" class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.nexradOpacity * 100) + '%'" ></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showNoaaInfrared" @change="$store.atc.toggleNoaaInfrared()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">NOAA Infrared</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showNoaaInfrared">
+                                                <input type="range" x-model.number="$store.atc.settings.noaaInfraredOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setNoaaInfraredOpacity()" class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.noaaInfraredOpacity * 100) + '%'" ></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showNoaaRadar" @change="$store.atc.toggleNoaaRadar()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">NOAA Radar</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showNoaaRadar">
+                                                <input type="range" x-model.number="$store.atc.settings.noaaRadarOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setNoaaRadarOpacity()" class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.noaaRadarOpacity * 100) + '%'" ></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showAirports" @change="$store.atc.toggleAirports()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">Airports</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAirports">
+                                                <input type="range" x-model.number="$store.atc.settings.airportsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAirportsOpacity()" class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.airportsOpacity * 100) + '%'" ></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showHeliports" @change="$store.atc.toggleHeliports()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">Heliports</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showHeliports">
+                                                <input type="range" x-model.number="$store.atc.settings.heliportsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setHeliportsOpacity()" class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.heliportsOpacity * 100) + '%'" ></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showNavaids" @change="$store.atc.toggleNavaids()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">Navaids</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showNavaids">
+                                                <input type="range" x-model.number="$store.atc.settings.navaidsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setNavaidsOpacity()" class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.navaidsOpacity * 100) + '%'" ></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showAllRunways" @change="$store.atc.toggleAllRunways()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">Other Runways</span>
+                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAllRunways">
+                                                <input type="range" x-model.number="$store.atc.settings.allRunwaysOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAllRunwaysOpacity()" class="flex-1 h-1 bg-background rounded">
+                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.allRunwaysOpacity * 100) + '%'" ></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Connection Lost Overlay - Only show after initialization and when connection is lost -->
@@ -668,11 +777,11 @@
                     </div>
 
                     <!-- Search and Altitude Filter Row -->
-                    <div class="flex mb-3 gap-2">
+                    <div class="flex mb-2 gap-2">
                         <!-- Search Box (50%) -->
                         <div class="relative flex-1">
                             <input type="text"
-                                   class="w-full p-1.5 pr-8 bg-background border border-border text-text rounded text-sm transition-all duration-200 focus:border-highlight/50 focus:shadow-[0_0_5px_rgba(76,175,80,0.1)] focus:outline-none"
+                                   class="filter-input w-full p-1.5 pr-8 border border-border text-text rounded-md text-sm transition-all duration-200 focus:outline-none"
                                    placeholder="Search callsign, category"
                                    x-model="$store.atc.searchTerm"
                                    @input.debounce.300ms="$store.atc.applyFilters()"
@@ -693,132 +802,132 @@
                                    placeholder="0"
                                    min="0"
                                    max="60000"
-                                   class="flex-1 p-1.5 bg-background border border-border text-text rounded text-sm transition-all duration-200 focus:border-highlight/50 focus:shadow-[0_0_5px_rgba(76,175,80,0.1)] focus:outline-none">
+                                   class="filter-input flex-1 p-1.5 border border-border text-text rounded-md text-sm transition-all duration-200 focus:outline-none">
                             <input type="number"
                                    x-model.number="$store.atc.settings.maxAltitude"
                                    @input.debounce.300ms="$store.atc.applyFilters()"
                                    placeholder="60000"
                                    min="0"
                                    max="60000"
-                                   class="flex-1 p-1.5 bg-background border border-border text-text rounded text-sm transition-all duration-200 focus:border-highlight/50 focus:shadow-[0_0_5px_rgba(76,175,80,0.1)] focus:outline-none">
+                                   class="filter-input flex-1 p-1.5 border border-border text-text rounded-md text-sm transition-all duration-200 focus:outline-none">
                         </div>
                     </div>
 
                     <!-- Status Filter Buttons -->
-                    <div class="flex mb-3 gap-1.5">
+                    <div class="flex mb-2 gap-1.5">
                         <!-- Air and Ground buttons side by side with equal width -->
                         <div class="flex gap-1.5 flex-1">
                             <button @click="$store.atc.toggleAirAircraft()"
                                     :class="{
-                                        'bg-highlight/20 border-highlight/50 text-highlight': $store.atc.settings.showAirAircraft,
-                                        'bg-panel hover:bg-hover border-border text-text/70': !$store.atc.settings.showAirAircraft
+                                        'filter-btn-active bg-highlight/15 border-highlight/40 text-highlight': $store.atc.settings.showAirAircraft,
+                                        'filter-btn-inactive text-text/50': !$store.atc.settings.showAirAircraft
                                     }"
-                                    class="flex-1 px-2 py-1.5 border rounded text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
-                                <span class="w-2 h-2 rounded-full bg-highlight flex-shrink-0"></span>
+                                    class="flex-1 px-2 py-1.5 border rounded-md text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
+                                <span class="w-1.5 h-1.5 rounded-full bg-highlight flex-shrink-0"></span>
                                 <span class="whitespace-nowrap"><strong>A</strong>ir (<span x-text="$store.atc.counts.air_active"></span>/<span x-text="$store.atc.counts.air_total"></span>)</span>
                             </button>
                             <button @click="$store.atc.toggleGroundAircraft()"
                                     :class="{
-                                        'bg-gray-400/20 border-gray-400/50 text-gray-400': $store.atc.settings.showGroundAircraft,
-                                        'bg-panel hover:bg-hover border-border text-text/70': !$store.atc.settings.showGroundAircraft
+                                        'filter-btn-active bg-gray-400/15 border-gray-400/40 text-gray-400': $store.atc.settings.showGroundAircraft,
+                                        'filter-btn-inactive text-text/50': !$store.atc.settings.showGroundAircraft
                                     }"
-                                    class="flex-1 px-2 py-1.5 border rounded text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
-                                <span class="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0"></span>
+                                    class="flex-1 px-2 py-1.5 border rounded-md text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
+                                <span class="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0"></span>
                                 <span class="whitespace-nowrap"><strong>G</strong>round (<span x-text="$store.atc.counts.ground_active"></span>/<span x-text="$store.atc.counts.ground_total"></span>)</span>
                             </button>
                         </div>
                     </div>
 
                     <!-- Flight Phase Filter Buttons -->
-                    <div class="mb-3">
-                        <div class="grid grid-cols-10 gap-1.5">
+                    <div class="mb-2">
+                        <div class="grid grid-cols-10 gap-1">
                             <button @click="$store.atc.togglePhaseFilter('NEW')"
                                     :class="{
-                                        'bg-gray-500/20 border-gray-500/50 text-gray-400': $store.atc.settings.phaseFilters?.NEW !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.NEW === false
+                                        'filter-btn-active bg-gray-500/15 border-gray-500/40 text-gray-400': $store.atc.settings.phaseFilters?.NEW !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.NEW === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">1</span>
                                 <span class="whitespace-nowrap">NEW</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('TAX')"
                                     :class="{
-                                        'bg-purple-500/20 border-purple-500/50 text-purple-400': $store.atc.settings.phaseFilters?.TAX !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.TAX === false
+                                        'filter-btn-active bg-purple-500/15 border-purple-500/40 text-purple-400': $store.atc.settings.phaseFilters?.TAX !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.TAX === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">2</span>
                                 <span class="whitespace-nowrap">TAX</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('T/O')"
                                     :class="{
-                                        'bg-orange-500/20 border-orange-500/50 text-orange-400': $store.atc.settings.phaseFilters?.['T/O'] !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.['T/O'] === false
+                                        'filter-btn-active bg-orange-500/15 border-orange-500/40 text-orange-400': $store.atc.settings.phaseFilters?.['T/O'] !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.['T/O'] === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">3</span>
                                 <span class="whitespace-nowrap">T/O</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('CLB')"
                                     :class="{
-                                        'bg-lime-500/20 border-lime-500/50 text-lime-400': $store.atc.settings.phaseFilters?.CLB !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.CLB === false
+                                        'filter-btn-active bg-lime-500/15 border-lime-500/40 text-lime-400': $store.atc.settings.phaseFilters?.CLB !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.CLB === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">4</span>
                                 <span class="whitespace-nowrap">CLB</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('DEP')"
                                     :class="{
-                                        'bg-green-500/20 border-green-500/50 text-green-400': $store.atc.settings.phaseFilters?.DEP !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.DEP === false
+                                        'filter-btn-active bg-green-500/15 border-green-500/40 text-green-400': $store.atc.settings.phaseFilters?.DEP !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.DEP === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">5</span>
                                 <span class="whitespace-nowrap">DEP</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('CRZ')"
                                     :class="{
-                                        'bg-blue-500/20 border-blue-500/50 text-blue-400': $store.atc.settings.phaseFilters?.CRZ !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.CRZ === false
+                                        'filter-btn-active bg-blue-500/15 border-blue-500/40 text-blue-400': $store.atc.settings.phaseFilters?.CRZ !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.CRZ === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">6</span>
                                 <span class="whitespace-nowrap">CRZ</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('ARR')"
                                     :class="{
-                                        'bg-pink-400/15 border-pink-400/40 text-pink-300': $store.atc.settings.phaseFilters?.ARR !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.ARR === false
+                                        'filter-btn-active bg-pink-400/10 border-pink-400/35 text-pink-300': $store.atc.settings.phaseFilters?.ARR !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.ARR === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">7</span>
                                 <span class="whitespace-nowrap">ARR</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('APP')"
                                     :class="{
-                                        'bg-yellow-500/20 border-yellow-500/50 text-yellow-400': $store.atc.settings.phaseFilters?.APP !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.APP === false
+                                        'filter-btn-active bg-yellow-500/15 border-yellow-500/40 text-yellow-400': $store.atc.settings.phaseFilters?.APP !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.APP === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">8</span>
                                 <span class="whitespace-nowrap">APP</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('T/D')"
                                     :class="{
-                                        'bg-teal-500/20 border-teal-500/50 text-teal-400': $store.atc.settings.phaseFilters?.['T/D'] !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.['T/D'] === false
+                                        'filter-btn-active bg-teal-500/15 border-teal-500/40 text-teal-400': $store.atc.settings.phaseFilters?.['T/D'] !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.['T/D'] === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">9</span>
                                 <span class="whitespace-nowrap">T/D</span>
                             </button>
                             <button @click="$store.atc.togglePhaseFilter('UNK')"
                                     :class="{
-                                        'bg-slate-500/15 border-slate-500/40 text-slate-400': $store.atc.settings.phaseFilters?.UNK !== false,
-                                        'bg-panel hover:bg-hover border-border text-text/70': $store.atc.settings.phaseFilters?.UNK === false
+                                        'filter-btn-active bg-slate-500/10 border-slate-500/35 text-slate-400': $store.atc.settings.phaseFilters?.UNK !== false,
+                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.UNK === false
                                     }"
-                                    class="px-0.5 py-1 border rounded text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
+                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">0</span>
                                 <span class="whitespace-nowrap">UNK</span>
                             </button>
@@ -838,19 +947,24 @@
                                     :data-aircraft-hex="aircraft.hex">
                                     <!-- Flight strip container -->
                                     <td colspan="7">
+                                        <!-- Active Divider (first item) -->
+                                        <div x-show="index === 0" class="flex items-center justify-center py-1.5 mb-1">
+                                            <div class="flex-1 h-px bg-gray-600/50"></div>
+                                            <span class="px-3 text-[10px] text-gray-500 font-medium uppercase tracking-wider">Active — <span x-text="$store.atc.filteredAircraft.filter(a => a.status !== 'signal_lost').length"></span></span>
+                                            <div class="flex-1 h-px bg-gray-600/50"></div>
+                                        </div>
                                         <!-- Signal Lost Divider (conditional) -->
-                                        <div x-show="$store.atc.shouldShowSignalLostDivider(aircraft, index)" class="flex items-center justify-center py-2 mb-1">
-                                            <div class="flex-1 h-px bg-gray-600"></div>
-                                            <span class="px-3 text-xs text-gray-400 font-medium uppercase tracking-wide">Signal Lost</span>
-                                            <div class="flex-1 h-px bg-gray-600"></div>
+                                        <div x-show="$store.atc.shouldShowSignalLostDivider(aircraft, index)" class="flex items-center justify-center py-1.5 mb-1 mt-1">
+                                            <div class="flex-1 h-px bg-gray-600/50"></div>
+                                            <span class="px-3 text-[10px] text-gray-500 font-medium uppercase tracking-wider">Signal Lost — <span x-text="$store.atc.filteredAircraft.filter(a => a.status === 'signal_lost').length"></span></span>
+                                            <div class="flex-1 h-px bg-gray-600/50"></div>
                                         </div>
                                         
                                         <!-- PERFORMANCE: Use CSS hover instead of Alpine hoveredAircraft state to prevent full table re-renders -->
-                                        <div class="flex items-stretch rounded-lg overflow-hidden border transition-all duration-0 bg-black/30 mt-0.5 group-hover:border-gray-400/30 group-hover:bg-gray-500/10"
+                                        <div class="flight-strip flex items-stretch rounded-md overflow-hidden border transition-all duration-0 mt-0.5"
                                              :class="{
-                                                'border-gray-400/50 bg-gray-500/20': $store.atc.selectedAircraft?.hex === aircraft.hex,
-                                                'border-border': !($store.atc.selectedAircraft?.hex === aircraft.hex) && !($store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex)),
-                                                'border-green-400/35': $store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex) && !($store.atc.selectedAircraft?.hex === aircraft.hex)
+                                                'flight-strip-active': $store.atc.selectedAircraft?.hex === aircraft.hex,
+                                                'flight-strip-on-map': $store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex) && !($store.atc.selectedAircraft?.hex === aircraft.hex)
                                              }">
                                             <!-- Phase cell -->
                                             <div class="p-1.5 text-center w-[70px] flex items-center justify-center">
@@ -875,14 +989,14 @@
                                             </div>
                                             
                                             <!-- Callsign cell -->
-                                            <div class="p-1.5 text-left w-[80px] transition-colors">
+                                            <div class="p-1.5 text-left flex-1 min-w-0 transition-colors">
                                                 <div class="flex flex-col">
                                                     <span x-html="$store.atc.highlightSearchMatch(aircraft.flight || aircraft.hex)"
                                                           :title="aircraft.last_seen ? 'Last seen: ' + $store.atc.getSecondsSinceLastSeen(aircraft) + 's ago' : 'Unknown'"
                                                           :class="{
-                                                              'text-red-400': aircraft.status === 'signal_lost',
                                                               'text-highlight': !aircraft.on_ground && aircraft.status !== 'signal_lost',
-                                                              'text-white': aircraft.on_ground && aircraft.status !== 'signal_lost'
+                                                              'text-white': aircraft.on_ground && aircraft.status !== 'signal_lost',
+                                                              'text-gray-400': aircraft.status === 'signal_lost'
                                                           }"
                                                           class="text-sm"></span>
                                                     <div class="flex items-center gap-1 -mt-1">
@@ -912,10 +1026,9 @@
                                                     <span class="text-[9px] text-gray-400 -mt-0.5 whitespace-nowrap" x-show="typeof aircraft.adsb?.alt_baro === 'number'" x-text="$store.atc.getAltitudeUnitLabel(aircraft)"></span>
                                                 </div>
                                             </div>
-                                            
-                                            <!-- Divider -->
-                                            <div class="w-px bg-transparent my-1"></div>
-                                            
+
+                                            <div class="w-px flight-strip-divider my-1.5"></div>
+
                                             <!-- Heading cell -->
                                             <div class="p-1.5 text-right w-[55px]">
                                                 <div class="flex flex-col items-end">
@@ -923,10 +1036,9 @@
                                                     <span class="text-[9px] text-gray-400 -mt-0.5" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType(aircraft).type)"></span>
                                                 </div>
                                             </div>
-                                            
-                                            <!-- Divider -->
-                                            <div class="w-px bg-transparent my-1"></div>
-                                            
+
+                                            <div class="w-px flight-strip-divider my-1.5"></div>
+
                                             <!-- TAS cell -->
                                             <div class="p-1.5 text-right w-[55px]">
                                                 <div class="flex flex-col items-end">
@@ -934,10 +1046,9 @@
                                                     <span class="text-[9px] text-gray-400 -mt-0.5">tas</span>
                                                 </div>
                                             </div>
-                                            
-                                            <!-- Divider -->
-                                            <div class="w-px bg-transparent my-1"></div>
-                                            
+
+                                            <div class="w-px flight-strip-divider my-1.5"></div>
+
                                             <!-- GS cell -->
                                             <div class="p-1.5 text-right w-[55px]">
                                                 <div class="flex flex-col items-end">
@@ -945,10 +1056,9 @@
                                                     <span class="text-[9px] text-gray-400 -mt-0.5">gs</span>
                                                 </div>
                                             </div>
-                                            
-                                            <!-- Divider -->
-                                            <div class="w-px bg-transparent my-1"></div>
-                                            
+
+                                            <div class="w-px flight-strip-divider my-1.5"></div>
+
                                             <!-- Distance cell -->
                                             <div class="p-1.5 text-right w-[55px] pr-3">
                                                 <div class="flex flex-col items-end">
@@ -972,7 +1082,7 @@
                         <!-- Flight Strip at the top -->
                         <div class="mb-3">
                             <!-- Flight Strip at the top -->
-                            <div class="flex items-stretch rounded-lg overflow-hidden border border-highlight/30 transition-all duration-200 bg-black/30 mb-2 shadow-[0_0_10px_rgba(76,175,80,0.05)]">
+                            <div class="flight-strip flight-strip-detail flex items-stretch rounded-md overflow-hidden border transition-all duration-200 mb-2">
                                 <!-- Phase cell -->
                                 <div class="px-2.5 py-2 text-center w-[70px] flex items-center justify-center">
                                     <span x-show="$store.atc.selectedAircraft.phase && $store.atc.selectedAircraft.phase.current && $store.atc.selectedAircraft.phase.current.length > 0"
@@ -996,10 +1106,14 @@
                                 </div>
                                 
                                 <!-- Callsign cell -->
-                                <div class="px-2.5 py-2 text-left w-[80px] transition-colors">
+                                <div class="px-2.5 py-2 text-left flex-1 min-w-0 transition-colors">
                                     <div class="flex flex-col">
                                         <span x-html="$store.atc.highlightSearchMatch($store.atc.selectedAircraft.flight || $store.atc.selectedAircraft.hex)"
-                                              :class="{'text-highlight': !$store.atc.selectedAircraft.on_ground, 'text-white': $store.atc.selectedAircraft.on_ground}"
+                                              :class="{
+                                                  'text-highlight': !$store.atc.selectedAircraft.on_ground && $store.atc.selectedAircraft.status !== 'signal_lost',
+                                                  'text-white': $store.atc.selectedAircraft.on_ground && $store.atc.selectedAircraft.status !== 'signal_lost',
+                                                  'text-gray-400': $store.atc.selectedAircraft.status === 'signal_lost'
+                                              }"
                                               class="font-bold text-sm"></span>
                                         <span class="text-[9px] text-gray-500 -mt-1" x-text="$store.atc.selectedAircraft.bsdb?.icao_type_code || $store.atc.selectedAircraft.adsb?.t || ''"></span>
                                     </div>
@@ -1017,9 +1131,8 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Divider -->
-                                <div class="w-px bg-transparent my-1.5"></div>
-                                
+                                <div class="w-px flight-strip-divider my-2"></div>
+
                                 <!-- Heading cell -->
                                 <div class="px-2.5 py-2 text-right w-[55px]">
                                     <div class="flex flex-col items-end">
@@ -1027,10 +1140,9 @@
                                         <span class="text-[9px] text-gray-400 -mt-0.5" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType($store.atc.selectedAircraft).type)"></span>
                                     </div>
                                 </div>
-                                
-                                <!-- Divider -->
-                                <div class="w-px bg-transparent my-1.5"></div>
-                                
+
+                                <div class="w-px flight-strip-divider my-2"></div>
+
                                 <!-- TAS cell -->
                                 <div class="px-2.5 py-2 text-right w-[55px]">
                                     <div class="flex flex-col items-end">
@@ -1038,10 +1150,9 @@
                                         <span class="text-[9px] text-gray-400 -mt-0.5">tas</span>
                                     </div>
                                 </div>
-                                
-                                <!-- Divider -->
-                                <div class="w-px bg-transparent my-1.5"></div>
-                                
+
+                                <div class="w-px flight-strip-divider my-2"></div>
+
                                 <!-- GS cell -->
                                 <div class="px-2.5 py-2 text-right w-[55px]">
                                     <div class="flex flex-col items-end">
@@ -1049,10 +1160,9 @@
                                         <span class="text-[9px] text-gray-400 -mt-0.5">gs</span>
                                     </div>
                                 </div>
-                                
-                                <!-- Divider -->
-                                <div class="w-px bg-transparent my-1.5"></div>
-                                
+
+                                <div class="w-px flight-strip-divider my-2"></div>
+
                                 <!-- Distance cell -->
                                 <div class="px-2.5 py-2 text-right w-[55px] pr-4">
                                     <div class="flex flex-col items-end">

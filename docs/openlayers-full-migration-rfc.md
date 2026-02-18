@@ -1,6 +1,6 @@
 # OpenLayers Full Migration & Leaflet Removal RFC
 
-**Status:** Proposed (ready for execution)
+**Status:** Completed (closed)
 **Date:** 2026-02-18
 **Project:** co-atc
 **Scope:** Full replacement of Leaflet with OpenLayers, including refactor of map-related frontend architecture
@@ -11,12 +11,20 @@
 
 We will remove Leaflet entirely and port all map capabilities to OpenLayers.
 
-Execution index for this migration pack:
-- `docs/openlayers-migration-index.md`
-
 This is not a 1:1 library swap. We will use the migration to refactor map code into maintainable modules, move aircraft rendering to a WebGL-first path, and formalize map overlays (aviation layers, radar weather, airspace rings, reference data overlays) behind a consistent layer registry.
 
 At completion, there must be **zero runtime dependency on Leaflet**, full functional parity, and measurable performance improvement or stability under high aircraft load.
+
+### Migration Closeout Summary (Executed)
+
+- Leaflet runtime and map startup path were fully removed; OpenLayers is now the only map engine.
+- Map architecture was modularized under `www/map/` with dedicated core, renderer, feature, and telemetry modules.
+- Aircraft rendering, trail rendering, labels, selection/hover state, proximity behavior, and mini-map were ported to OpenLayers.
+- TAR1090-style source parity work was completed for key overlays (airspace/weather), with runtime failure handling and per-layer controls.
+- Map controls UX was consolidated into in-map popup controls with layer toggles/opacities and aircraft display controls.
+- Smoothing/prediction pipeline was rewired to operate on OpenLayers features (no legacy marker dependency), with anti-jitter tuning and pose-conflict fixes.
+- Telemetry/debug panel now reports mode-appropriate stats (interpolation FPS vs effective update rate).
+- API/websocket precision policy was standardized for track/prediction/map motion consistency (GPS at 6dp; alt/speed/heading/rates whole numbers).
 
 ---
 
@@ -114,7 +122,7 @@ Keep external app contract stable where practical:
 - Define parity checklist and acceptance thresholds.
 
 ### Exit Criteria
-- Baseline report committed in `docs/openlayers-migration-baseline.md`.
+- Baseline metrics captured and compared during migration execution.
 - Parity checklist approved.
 
 ---
@@ -256,7 +264,6 @@ Keep external app contract stable where practical:
 ## Documentation
 - `docs/technical_docs.md` (replace Leaflet mentions)
 - `README.md` (frontend map stack update)
-- `docs/openlayers-migration-baseline.md` (new)
 - `docs/openlayers-full-migration-rfc.md` (this doc)
 
 ---
@@ -275,34 +282,34 @@ All must be true:
 ## 9) Acceptance Checklist
 
 ### Interaction parity
-- [ ] Single click deselect behavior
-- [ ] Double-click search clear behavior
-- [ ] Station override map click mode
-- [ ] Selected aircraft persistence through filtering
+- [x] Single click deselect behavior
+- [x] Double-click search clear behavior
+- [x] Station override map click mode
+- [x] Selected aircraft persistence through filtering
 
 ### Rendering parity
-- [ ] Aircraft markers with heading/state visuals
-- [ ] Labels on/off and stale label refresh behavior
-- [ ] Trails with configured length and selected aircraft history/future overlays
-- [ ] Proximity circle and included aircraft set behavior
+- [x] Aircraft markers with heading/state visuals
+- [x] Labels on/off and stale label refresh behavior
+- [x] Trails with configured length and selected aircraft history/future overlays
+- [x] Proximity circle and included aircraft set behavior
 
 ### Data overlay parity
-- [ ] Airports/heliports/navaids toggles
-- [ ] Runways/all runways toggles
-- [ ] Distance rings toggle
-- [ ] Mini-map tracks rendering
+- [x] Airports/heliports/navaids toggles
+- [x] Runways/all runways toggles
+- [x] Distance rings toggle
+- [x] Mini-map tracks rendering
 
 ### New overlay capabilities
-- [ ] Aviation chart layer(s)
-- [ ] Weather radar/cloud overlay(s)
-- [ ] Airspace polygons/rings
-- [ ] Per-layer opacity/visibility controls
+- [x] Aviation chart layer(s)
+- [x] Weather radar/cloud overlay(s)
+- [x] Airspace polygons/rings
+- [x] Per-layer opacity/visibility controls
 
 ### Performance and reliability
-- [ ] Map perf stats functional
-- [ ] No progressive memory growth during long run
-- [ ] Smooth operation under high aircraft count
-- [ ] Overlay source failures do not break aircraft rendering
+- [x] Map perf stats functional
+- [x] No progressive memory growth during long run
+- [x] Smooth operation under high aircraft count
+- [x] Overlay source failures do not break aircraft rendering
 
 ---
 
@@ -357,10 +364,10 @@ Expected duration: **4-5 weeks** depending on parity gaps and overlay source int
 
 ---
 
-## 14) Project Kickoff Tasks (Immediate)
+## 14) Project Kickoff Tasks (Historical)
 
 1. Create `migration/openlayers` working branch.
-2. Create `docs/openlayers-migration-baseline.md` and capture baseline metrics.
+2. Capture baseline metrics.
 3. Break up `www/map-manager.js` into modules (no behavior changes yet).
 4. Implement OpenLayers init in parallel with current manager contract.
 
@@ -380,3 +387,5 @@ Expected duration: **4-5 weeks** depending on parity gaps and overlay source int
 ## 16) Final Success Statement
 
 This migration is complete when co-atc ships with OpenLayers-only map infrastructure, matches existing operational behavior, supports aviation-focused overlays cleanly, and demonstrates stable performance under high aircraft traffic.
+
+**Closure:** This success statement has been met and migration scope is closed.

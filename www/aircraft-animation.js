@@ -1,3 +1,21 @@
+/**
+ * Module: aircraft-animation
+ * Why it exists:
+ * - Smooths visual aircraft movement between sparse/non-uniform realtime updates.
+ * - Reduces perceptual jitter by blending prediction, heading smoothing, and correction easing.
+ *
+ * Key responsibilities:
+ * - Maintain per-aircraft animation state and lifecycle.
+ * - Predict short-horizon pose and merge toward real observations.
+ * - Emit pose updates to the map manager at the configured interpolation cadence.
+ * - Track runtime animation telemetry for debug/performance overlays.
+ *
+ * Quirks / contracts:
+ * - Prediction is intentionally conservative and bounded by deadbands/thresholds to
+ *   avoid oscillation from noisy deltas.
+ * - Designed to coexist with map upsert logic that preserves pose while smoothing
+ *   is active; bypassing that contract causes visible snap-back artifacts.
+ */
 class AircraftAnimationEngine {
     constructor(mapManager, store) {
         this.mapManager = mapManager;
@@ -7,7 +25,15 @@ class AircraftAnimationEngine {
             enabled: true,
             interpolationFps: 30,
             maxPredictionSeconds: 3.0,
+            predictionGain: 0.72,
+            predictedJitterDeadbandNm: 0.0035,
+            predictedHeadingDeadbandDeg: 1.4,
             mergeDurationMs: 450,
+            minCorrectionDurationMs: 180,
+            maxCorrectionDurationMs: 900,
+            realCorrectionThresholdNm: 0.016,
+            predictedCorrectionThresholdNm: 0.004,
+            headingSmoothingAlpha: 0.22,
             viewportCulling: true,
             adaptivePerformance: true,
             maxFrameBudgetMs: 14,
@@ -120,16 +146,36 @@ class AircraftAnimationEngine {
 
         const previousReal = state.lastReal;
         const previousRendered = state.lastRendered || previousReal;
+        let effectiveSnapshot = snapshot;
+
+        if (previousReal && snapshot.source === 'predicted') {
+            effectiveSnapshot = this._blendPredictedSnapshot(previousReal, snapshot);
+        }
 
         state.lastSeenAt = Date.now();
         state.status = aircraft.status || 'active';
         state.lastSampleSource = snapshot.source || 'real';
-        if (Number.isFinite(snapshot.heading)) {
-            state.displayHeading = snapshot.heading;
+        if (Number.isFinite(effectiveSnapshot.heading)) {
+            const baseAlpha = Number.isFinite(this.config.headingSmoothingAlpha)
+                ? this.config.headingSmoothingAlpha
+                : 0.22;
+            const alpha = snapshot.source === 'predicted'
+                ? baseAlpha
+                : Math.min(0.45, baseAlpha * 1.35);
+            const currentHeading = Number.isFinite(state.displayHeading) ? state.displayHeading : null;
+            const headingDelta = Number.isFinite(currentHeading)
+                ? Math.abs(this._angleDiffDeg(effectiveSnapshot.heading, currentHeading))
+                : Infinity;
+            const headingDeadband = Number.isFinite(this.config.predictedHeadingDeadbandDeg)
+                ? this.config.predictedHeadingDeadbandDeg
+                : 1.4;
+            if (!(snapshot.source === 'predicted' && Number.isFinite(headingDelta) && headingDelta < headingDeadband)) {
+                state.displayHeading = this._lerpAngleDeg(state.displayHeading, effectiveSnapshot.heading, alpha);
+            }
         }
 
         if (previousReal && snapshot.source !== 'predicted') {
-            const derivedVelocity = this._deriveVelocity(previousReal, snapshot);
+            const derivedVelocity = this._deriveVelocity(previousReal, effectiveSnapshot);
             if (derivedVelocity) {
                 state.velocity = this._blendVelocity(state.velocity, derivedVelocity);
             }
@@ -137,18 +183,27 @@ class AircraftAnimationEngine {
 
         if (previousReal) {
             if (previousRendered) {
-                const distanceNm = this._distanceNm(previousRendered.lat, previousRendered.lon, snapshot.lat, snapshot.lon);
-                const correctionThresholdNm = snapshot.source === 'predicted' ? 0.001 : 0.01;
+                const distanceNm = this._distanceNm(previousRendered.lat, previousRendered.lon, effectiveSnapshot.lat, effectiveSnapshot.lon);
+                const correctionThresholdNm = snapshot.source === 'predicted'
+                    ? this.config.predictedCorrectionThresholdNm
+                    : this.config.realCorrectionThresholdNm;
                 if (distanceNm > correctionThresholdNm) {
+                    const distanceFactor = Math.min(1, distanceNm / 0.08);
+                    const sourceBias = snapshot.source === 'predicted' ? 0.9 : 1.2;
+                    const baseDuration = Math.max(this.config.minCorrectionDurationMs, this.config.mergeDurationMs);
+                    const correctionDurationMs = Math.min(
+                        this.config.maxCorrectionDurationMs,
+                        Math.round(baseDuration * (0.75 + (distanceFactor * 0.75)) * sourceBias)
+                    );
                     state.correction = {
                         fromLat: previousRendered.lat,
                         fromLon: previousRendered.lon,
                         fromAlt: previousRendered.alt,
-                        toLat: snapshot.lat,
-                        toLon: snapshot.lon,
-                        toAlt: snapshot.alt,
+                        toLat: effectiveSnapshot.lat,
+                        toLon: effectiveSnapshot.lon,
+                        toAlt: effectiveSnapshot.alt,
                         startAt: now,
-                        endAt: now + Math.max(120, this.config.mergeDurationMs)
+                        endAt: now + correctionDurationMs
                     };
                 } else {
                     state.correction = null;
@@ -158,10 +213,10 @@ class AircraftAnimationEngine {
             state.correction = null;
         }
 
-        state.lastReal = snapshot;
+        state.lastReal = effectiveSnapshot;
 
         if (!state.lastRendered) {
-            state.lastRendered = { ...snapshot };
+            state.lastRendered = { ...effectiveSnapshot };
         }
     }
 
@@ -263,7 +318,7 @@ class AircraftAnimationEngine {
         if (state.correction) {
             const duration = Math.max(1, state.correction.endAt - state.correction.startAt);
             const t = Math.min(1, Math.max(0, (now - state.correction.startAt) / duration));
-            const eased = 1 - Math.pow(1 - t, 3);
+            const eased = t * t * (3 - (2 * t));
 
             const lat = this._lerp(state.correction.fromLat, state.correction.toLat, eased);
             const lon = this._lerp(state.correction.fromLon, state.correction.toLon, eased);
@@ -286,7 +341,8 @@ class AircraftAnimationEngine {
         }
 
         const elapsedSec = Math.max(0, (now - real.timestamp) / 1000);
-        const horizon = Math.min(this.config.maxPredictionSeconds * this.qualityLevel, elapsedSec);
+        const baseHorizon = Math.min(this.config.maxPredictionSeconds * this.qualityLevel, elapsedSec);
+        const horizon = baseHorizon * (Number.isFinite(this.config.predictionGain) ? this.config.predictionGain : 0.72);
 
         const dNorth = state.velocity.northMps * horizon;
         const dEast = state.velocity.eastMps * horizon;
@@ -305,9 +361,6 @@ class AircraftAnimationEngine {
     }
 
     _applyPose(hex, pose, state) {
-        const markerInfo = this.mapManager?.markers?.[hex];
-        if (!markerInfo?.aircraft) return false;
-
         const previous = state.lastRendered;
         const positionChanged = !previous ||
             Math.abs(previous.lat - pose.lat) >= 1e-8 ||
@@ -318,16 +371,17 @@ class AircraftAnimationEngine {
             return false;
         }
 
-        if (positionChanged) {
-            const latLng = [pose.lat, pose.lon];
-            markerInfo.aircraft.setLatLng(latLng);
-            if (markerInfo.label) {
-                markerInfo.label.setLatLng(latLng);
-            }
+        if (!this.mapManager || typeof this.mapManager.updateAnimatedAircraftPose !== 'function') {
+            return false;
         }
 
-        if (headingChanged && this.mapManager?._applyAircraftRotation) {
-            this.mapManager._applyAircraftRotation(markerInfo.aircraft, pose.heading);
+        const applied = this.mapManager.updateAnimatedAircraftPose(hex, {
+            lat: pose.lat,
+            lon: pose.lon,
+            heading: pose.heading,
+        });
+        if (!applied) {
+            return false;
         }
 
         state.lastRendered = {
@@ -428,6 +482,60 @@ class AircraftAnimationEngine {
             verticalMps: this._lerp(existing.verticalMps, incoming.verticalMps, alpha),
             headingDeg: incoming.headingDeg
         };
+    }
+
+    _blendPredictedSnapshot(previousReal, predictedSnapshot) {
+        const distanceNm = this._distanceNm(previousReal.lat, previousReal.lon, predictedSnapshot.lat, predictedSnapshot.lon);
+        const headingDelta = Number.isFinite(previousReal.heading) && Number.isFinite(predictedSnapshot.heading)
+            ? Math.abs(this._angleDiffDeg(predictedSnapshot.heading, previousReal.heading))
+            : Infinity;
+        const jitterDeadbandNm = Number.isFinite(this.config.predictedJitterDeadbandNm)
+            ? this.config.predictedJitterDeadbandNm
+            : 0.0035;
+        const headingDeadbandDeg = Number.isFinite(this.config.predictedHeadingDeadbandDeg)
+            ? this.config.predictedHeadingDeadbandDeg
+            : 1.4;
+
+        if (distanceNm < jitterDeadbandNm && headingDelta < headingDeadbandDeg) {
+            const carryHeading = Number.isFinite(previousReal.heading)
+                ? previousReal.heading
+                : predictedSnapshot.heading;
+            return {
+                ...predictedSnapshot,
+                lat: previousReal.lat,
+                lon: previousReal.lon,
+                alt: this._lerp(previousReal.alt, predictedSnapshot.alt, 0.35),
+                heading: carryHeading,
+            };
+        }
+
+        const gain = 0.78;
+        const lat = this._lerp(previousReal.lat, predictedSnapshot.lat, gain);
+        const lon = this._lerp(previousReal.lon, predictedSnapshot.lon, gain);
+        const alt = this._lerp(previousReal.alt, predictedSnapshot.alt, gain);
+        const heading = Number.isFinite(predictedSnapshot.heading)
+            ? predictedSnapshot.heading
+            : previousReal.heading;
+
+        return {
+            ...predictedSnapshot,
+            lat,
+            lon,
+            alt,
+            heading,
+        };
+    }
+
+    _lerpAngleDeg(previous, target, alpha) {
+        if (!Number.isFinite(target)) return Number.isFinite(previous) ? previous : 0;
+        if (!Number.isFinite(previous)) return this._normalizeHeadingDeg(target);
+        const diff = this._angleDiffDeg(target, previous);
+        return this._normalizeHeadingDeg(previous + (diff * alpha));
+    }
+
+    _normalizeHeadingDeg(value) {
+        if (!Number.isFinite(value)) return 0;
+        return ((value % 360) + 360) % 360;
     }
 
     _getAnimationTargetHexes() {

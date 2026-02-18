@@ -16,7 +16,7 @@ Co-ATC is built as a Go-based backend server with a web frontend, designed for r
 2. **Frontend** (`www/`)
    - HTML5/CSS3/JavaScript web application
    - Alpine.js for reactive UI components
-   - Leaflet.js for interactive mapping
+  - OpenLayers for interactive mapping
    - Real-time WebSocket communication
 
 3. **Data Storage**
