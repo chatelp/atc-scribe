@@ -192,9 +192,9 @@ func (s *Server) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 // Broadcast sends a message to all connected clients
 func (s *Server) Broadcast(message *Message) {
-	s.logger.Debug("Broadcasting message to all clients",
-		String("message_type", message.Type),
-		String("client_count", fmt.Sprintf("%d", len(s.clients))))
+	//s.logger.Debug("Broadcasting message to all clients",
+	//	String("message_type", message.Type),
+	//	String("client_count", fmt.Sprintf("%d", len(s.clients))))
 
 	// Aircraft movement updates should be dispatched immediately (no server-side queueing)
 	if message.Type == MessageTypeAircraftAdded || message.Type == MessageTypeAircraftUpdate || message.Type == MessageTypeAircraftRemoved || message.Type == MessageTypeAircraftPredictedState {
@@ -339,9 +339,9 @@ func (c *Client) writePump() {
 			}
 
 			// Write message
-			c.server.logger.Debug("Sending message to client",
-				String("message_type", message.Type),
-				String("message_length", fmt.Sprintf("%d bytes", len(data))))
+			//c.server.logger.Debug("Sending message to client",
+			//	String("message_type", message.Type),
+			//	String("message_length", fmt.Sprintf("%d bytes", len(data))))
 
 			w.Write(data)
 

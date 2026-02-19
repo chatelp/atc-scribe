@@ -349,8 +349,8 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 	}
 
 	data := map[string]interface{}{
-		"type":        change.Type,
-		"hex":         change.Hex,
+		"type": change.Type,
+		"hex":  change.Hex,
 	}
 
 	observedAt := time.Now().UTC()
@@ -635,24 +635,29 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 			}
 		}
 
-		// Determine if aircraft is currently flying using corrected values and config
-		currentlyFlying := IsFlying(NumberOrZero(a.ADSB.TAS), NumberOrZero(a.ADSB.GS), a.ADSB.AltBaro.Float64(), &s.flightPhasesConfig)
-
-		// Guard against false on_ground from missing data: Mode S first contacts may
-		// report zero altitude, zero speed, and no position. That's "no data available",
-		// not "on the ground". Defaulting to on_ground here would cause a false T/O
-		// when real data arrives on the next cycle.
-		noUsableData := a.ADSB.AltBaro.Float64() == 0 && NumberOrZero(a.ADSB.GS) == 0 && NumberOrZero(a.ADSB.TAS) == 0
-		if noUsableData {
-			// No sensor data at all — preserve previous ground state if known,
-			// otherwise assume airborne (safer than triggering false T/O later)
-			if prevOnGround, known := existingOnGround[a.Hex]; known {
-				a.OnGround = prevOnGround
-			} else {
-				a.OnGround = false
-			}
+		if a.ADSB.SourceType == SourceTypeExternalOpenSky && a.ADSB.OnGroundReported != nil {
+			// Prefer source-provided OpenSky on_ground when available.
+			a.OnGround = *a.ADSB.OnGroundReported
 		} else {
-			a.OnGround = !currentlyFlying
+			// Determine if aircraft is currently flying using corrected values and config
+			currentlyFlying := IsFlying(NumberOrZero(a.ADSB.TAS), NumberOrZero(a.ADSB.GS), a.ADSB.AltBaro.Float64(), &s.flightPhasesConfig)
+
+			// Guard against false on_ground from missing data: Mode S first contacts may
+			// report zero altitude, zero speed, and no position. That's "no data available",
+			// not "on the ground". Defaulting to on_ground here would cause a false T/O
+			// when real data arrives on the next cycle.
+			noUsableData := a.ADSB.AltBaro.Float64() == 0 && NumberOrZero(a.ADSB.GS) == 0 && NumberOrZero(a.ADSB.TAS) == 0
+			if noUsableData {
+				// No sensor data at all — preserve previous ground state if known,
+				// otherwise assume airborne (safer than triggering false T/O later)
+				if prevOnGround, known := existingOnGround[a.Hex]; known {
+					a.OnGround = prevOnGround
+				} else {
+					a.OnGround = false
+				}
+			} else {
+				a.OnGround = !currentlyFlying
+			}
 		}
 
 		// Feed corrected data into trajectory tracker for phase analysis

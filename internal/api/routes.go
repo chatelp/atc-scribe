@@ -16,6 +16,8 @@ import (
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
+var defaultCORSAllowedOrigins = []string{"*"}
+
 // Router is the API router
 type Router struct {
 	handler    *Handler
@@ -42,7 +44,7 @@ func (r *Router) Routes() http.Handler {
 	router.Use(r.middleware.RequestID)
 	router.Use(r.middleware.Logger)
 	router.Use(r.middleware.Recoverer)
-	router.Use(r.middleware.CORS(r.config.Server.CORSAllowedOrigins))
+	router.Use(r.middleware.CORS(defaultCORSAllowedOrigins))
 
 	// API routes
 	router.Route("/api/v1", func(router chi.Router) {
@@ -107,8 +109,8 @@ func (r *Router) Routes() http.Handler {
 		router.Get("/simulation/aircraft", r.handler.GetSimulatedAircraft)
 	})
 
-	// Serve static files from the configured directory
-	staticHandler := NewStaticFileHandler(r.config.Server.StaticFilesDir, r.logger)
+	// Serve static files from the hardcoded web directory
+	staticHandler := NewStaticFileHandler("www", r.logger)
 	router.Handle("/*", staticHandler)
 
 	return router

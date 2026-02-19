@@ -38,4 +38,5 @@ Thumbs.db
 /temp/
 
 /configs/config.toml
+/configs/opensky_credentials.json
 config.toml

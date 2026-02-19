@@ -3,6 +3,7 @@ package templating
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/yegors/co-atc/internal/adsb"
@@ -12,6 +13,9 @@ import (
 	"github.com/yegors/co-atc/internal/weather"
 	"github.com/yegors/co-atc/pkg/logger"
 )
+
+const activeRunwayProbabilityThreshold = 0.15
+const defaultTranscriptionHistorySeconds = 600
 
 // DataAggregator collects and formats airspace data for template rendering
 type DataAggregator struct {
@@ -90,6 +94,7 @@ func (da *DataAggregator) GetTemplateContext(opts FormattingOptions) (*TemplateC
 			runways = []RunwayInfo{}
 		}
 		context.Runways = runways
+		context.ActiveRunways = da.getActiveRunwayScores(2)
 	}
 
 	// Get recent communications if requested (only for ATC Chat)
@@ -109,6 +114,30 @@ func (da *DataAggregator) GetTemplateContext(opts FormattingOptions) (*TemplateC
 		logger.Int("communication_count", len(context.TranscriptionHistory)))
 
 	return context, nil
+}
+
+func (da *DataAggregator) getActiveRunwayScores(maxRunways int) []adsb.RunwayScore {
+	if da.adsbService == nil || maxRunways <= 0 {
+		return nil
+	}
+
+	scores := da.adsbService.GetRunwayInUseScores(10)
+	if len(scores) == 0 {
+		return nil
+	}
+
+	detected := make([]adsb.RunwayScore, 0, maxRunways)
+	for _, score := range scores {
+		if score.Probability < activeRunwayProbabilityThreshold {
+			continue
+		}
+		detected = append(detected, score)
+		if len(detected) >= maxRunways {
+			break
+		}
+	}
+
+	return detected
 }
 
 // getAircraftData retrieves aircraft data with distance filtering
@@ -150,6 +179,7 @@ func (da *DataAggregator) getAircraftData(maxAircraft int) ([]*adsb.Aircraft, er
 				// Include if within radius OR if airborne (preserve all airborne traffic)
 				if distance <= radius || !ac.OnGround {
 					ac.Distance = &distance
+					adsb.AttachATCDerivedMetrics(ac)
 					aircraft = append(aircraft, ac)
 				}
 			}
@@ -216,8 +246,8 @@ func (da *DataAggregator) getRecentCommunications() ([]TranscriptionSummary, err
 		return []TranscriptionSummary{}, nil
 	}
 
-	// Get recent transcriptions (last 60 seconds as per ATC chat implementation)
-	timeWindowSeconds := 60
+	// Get recent transcriptions (default: last 10 minutes)
+	timeWindowSeconds := defaultTranscriptionHistorySeconds
 	if da.config.ATCChat.TranscriptionHistorySeconds > 0 {
 		timeWindowSeconds = da.config.ATCChat.TranscriptionHistorySeconds
 	}
@@ -233,6 +263,15 @@ func (da *DataAggregator) getRecentCommunications() ([]TranscriptionSummary, err
 	// Convert to TranscriptionSummary format
 	var communications []TranscriptionSummary
 	for _, t := range transcriptions {
+		content := strings.TrimSpace(t.ContentProcessed)
+		if content == "" {
+			content = strings.TrimSpace(t.Content)
+		}
+
+		if content == "" {
+			continue
+		}
+
 		// Get frequency name
 		frequencyName := t.FrequencyID
 		if da.frequencyService != nil {
@@ -244,7 +283,7 @@ func (da *DataAggregator) getRecentCommunications() ([]TranscriptionSummary, err
 		communications = append(communications, TranscriptionSummary{
 			Timestamp: t.CreatedAt,
 			Frequency: frequencyName,
-			Content:   t.ContentProcessed,
+			Content:   content,
 			Speaker:   t.SpeakerType,
 			Callsign:  t.Callsign,
 		})

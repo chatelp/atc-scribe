@@ -133,11 +133,15 @@ AI-Enhanced Airspace Monitoring System - Think of it as the Tesla of air traffic
 
 ### What Works Now
 - **Real-time aircraft tracking** from multiple ADS-B sources
+- **ADS-B source modes**: tar1090, readsb-api, readsb-file, external-rapidapi, external-opensky
+- **OpenSky OAuth2 support** via client-credentials file for authenticated public API access
 - **Live audio streaming** from multiple ATC frequencies
 - **AI-powered transcription** of all radio communications
 - **Intelligent post-processing** with speaker identification
 - **Interactive AI ATC assistant** with voice chat
 - **Comprehensive web interface** with maps and data
+- **Active runway detection** from live approach/landing/departure evidence
+- **Asset-based enrichment** using aircraft/airline/airport/runway/navaid reference datasets
 - **Simulated aircraft** for training and testing
 - **Clearance tracking** with real-time alerts
 - **Performance optimized** for 24/7 operation

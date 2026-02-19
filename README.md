@@ -8,7 +8,9 @@ Co-ATC is an AI-enhanced system designed to monitor airspace activity, supportin
 
 ![Co-ATC Main Interface - Proximity Alerts](docs/main_screen3.png)
 
-![Co-ATC Main Interface - Proximity Alerts](docs/main_screen4.png)
+![Co-ATC Main Interface - AI ATC](docs/main_screen4.png)
+
+![Co-ATC Main Interface - Map Styles](docs/main_screen5.png)
 
 ## What Co-ATC Does
 
@@ -173,9 +175,16 @@ nano configs/config.toml
 #### Essential Configuration Settings
 
 **Mandatory:**
-- `local_source_url` - Set your local tar1090 server URL (e.g., `"http://localhost:8080/data/aircraft.json"`) or configure remote API in `[adsb.external_api]` section if using external ADS-B data
+- `[adsb].source_type` - Choose one source mode:
+   - `tar1090` - base URL serving `aircraft.json`, `receiver.json`, `stats.json`
+   - `readsb-api` - readsb HTTP API endpoint (e.g. `http://host:30152/?all`)
+   - `readsb-file` - local readsb runtime files (auto-detected, optional `readsb_data_dir` override)
+   - `external-rapidapi` - external ADS-B API using `external_source_url` + API host/key
+   - `external-opensky` - OpenSky `/states/all` with optional OAuth2 client-credentials
 
-![Co-ATC Main Interface vs Tar1090](docs/split_tar1090.png)
+- For `external-opensky` + OAuth2:
+   - Set `opensky_auth_mode = "oauth2"`
+   - Set `opensky_oauth2_credentials_path` to a JSON file shaped as `{"clientId":"...","clientSecret":"..."}`
 
 **Optional but Recommended:**
 - `[station]` - Configure your airport/station location (Toronto CYYZ example provided)
@@ -206,37 +215,32 @@ Open your web browser and navigate to `http://localhost:8080` to access the Co-A
 
 ## Key Features
 
-### Interactive Map
-- Real-time aircraft positions with smooth-ish animations
-- Flight path history and future trajectory predictions
-- Runway overlays with approach/departure information - see `assets/runways.json`
-- Weather data (METAR, TAF and NOTAMs)
-- Range rings and navigation aids (soon)
+### Interactive Map (OpenLayers)
+- OpenLayers map engine with real-time aircraft rendering
+- Modular map architecture under `www/map/` (core, renderers, features, telemetry)
+- Aircraft, trails, labels, selection/hover, proximity, and mini-map
+- Basemap/chart styles: dark, light, OpenStreetMap, VFR sectional, terminal, IFR low, IFR high
+- Supported overlays/layers: airports, runways, navaids, distance rings, weather radar/cloud, airspace overlays, and aviation chart overlay
+- In-map controls for layer toggles/opacities and aircraft display behavior
+- Overlay failure isolation and stable behavior under high aircraft load
 
-### Aircraft Monitoring
-- Comprehensive aircraft details and telemetry
-- Flight phase tracking with visual indicators
-- Alert system for status changes and movements
-- Historical position data and analytics
+### Aircraft Monitoring & ADS-B Sources
+- Real-time aircraft telemetry with historical, hindcast, and future trajectories
+- Flight phase tracking with trajectory-aware transitions and signal-loss handling
+- Active runway detection from live approach/landing/departure evidence
+- Data enrichment from local asset datasets (`assets/aircraft.csv`, `assets/airlines.dat`, `assets/airports.csv`, `assets/runways.csv`, `assets/navaids.csv`)
+- Multiple source modes: `tar1090`, `readsb-api`, `readsb-file`, `external-rapidapi`, `external-opensky`
 
-### AI Assistant
-- Voice-activated ATC assistant with push-to-talk functionality
-- Real-time airspace awareness and context
-- Natural language interaction for air traffic queries
-- Automatic context updates with current aircraft and weather data
-- Basic vectoring capabilities
+### AI + Audio Workflow
+- Multi-frequency ATC stream ingestion and low-latency browser audio delivery
+- Real-time transcription + optional AI post-processing and clearance extraction
+- Voice ATC assistant with live airspace/context updates
+- Transcription history and operational data exposed through REST + WebSocket
 
-### Audio Processing
-- Real-time transcription of ATC communications
-- AI-powered post-processing for clarity and speaker identification (~70% accurate)
-- ATC clearance extraction and tracking
-- Multi-frequency audio stream support
-
-### Simulation Capabilities (WIP)
-- Create and control simulated aircraft
-- Adjust heading, speed, and vertical rate in real-time
-- Training scenarios and testing environments
-- Integration with live traffic data
+### Simulation & Operations
+- Simulated aircraft with real-time control (heading/speed/vertical rate)
+- Integration of simulation traffic into the same monitoring and alert pipelines
+- Settings panel includes ADS-B source health and concise decoder metrics
 
 ## API Documentation
 

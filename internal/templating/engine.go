@@ -113,8 +113,10 @@ func (e *Engine) prepareTemplateData(context *TemplateContext, opts FormattingOp
 	// Format runway data if available
 	if opts.IncludeRunways {
 		data.Runways = FormatRunwayData(context.Runways)
+		data.ActiveRunways = FormatActiveRunwaysData(context.ActiveRunways)
 	} else {
 		data.Runways = "Runway information not available."
+		data.ActiveRunways = "Active runway detection not available."
 	}
 
 	// Format transcription history if requested (only for ATC Chat)

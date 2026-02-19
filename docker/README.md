@@ -57,7 +57,7 @@ Co-ATC is an AI-enhanced aircraft monitoring system that provides:
 ## Prerequisites
 
 - Docker & Docker Compose installed
-- ADS-B data source (local tar1090 or external API)
+- ADS-B data source (tar1090, readsb, OpenSky, or external RapidAPI)
 - OpenAI API key (optional, for AI features)
 - FFmpeg support is included in the container
 
@@ -72,14 +72,37 @@ Configure your aircraft data source:
 
 ```toml
 [adsb]
-# For local tar1090 server (recommended)
-source_type = "local"
-local_source_url = "http://your-tar1090-server:8080/tar1090/data/aircraft.json"
+# Source types:
+# - "tar1090"
+# - "readsb-api"
+# - "readsb-file"
+# - "external-rapidapi"
+# - "external-opensky"
 
-# OR for external API (requires API key)
-# source_type = "external"
+# Example: tar1090
+source_type = "tar1090"
+tar1090_base_url = "http://your-tar1090-server:8080/tar1090/data/"
+
+# Example: readsb API
+# source_type = "readsb-api"
+# readsb_api_url = "http://your-readsb-host:30152/?all"
+
+# Example: external RapidAPI
+# source_type = "external-rapidapi"
 # external_source_url = "https://adsbexchange-com1.p.rapidapi.com/v2/lat/%f/lon/%f/dist/%.0f/"
+# api_host = "adsbexchange-com1.p.rapidapi.com"
 # api_key = "your-api-key-here"
+
+# Example: external OpenSky (anonymous)
+# source_type = "external-opensky"
+# opensky_base_url = "https://opensky-network.org/api"
+# opensky_auth_mode = "anonymous"
+
+# Example: external OpenSky (OAuth2 client credentials)
+# source_type = "external-opensky"
+# opensky_auth_mode = "oauth2"
+# opensky_token_url = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
+# opensky_oauth2_credentials_path = "configs/opensky_credentials.json"
 ```
 
 #### 2. Station Location

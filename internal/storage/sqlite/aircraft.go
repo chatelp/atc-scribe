@@ -780,7 +780,7 @@ func (s *AircraftStorage) getPositionHistory(hex string, maxPositions int) ([]ad
 		}
 
 		// Log external data for debugging
-		if sourceType == "external_api" && (registration != "" || aircraftType != "") {
+		if sourceType == "external-rapidapi" && (registration != "" || aircraftType != "") {
 			s.logger.Debug("Position with external data",
 				logger.String("hex", hex),
 				logger.String("registration", registration),
@@ -879,7 +879,7 @@ func (s *AircraftStorage) GetAllPositionHistory(hex string) ([]adsb.Position, er
 		}
 
 		// Log external data for debugging
-		if sourceType == "external_api" && (registration != "" || aircraftType != "") {
+		if sourceType == "external-rapidapi" && (registration != "" || aircraftType != "") {
 			s.logger.Debug("Position with external data",
 				logger.String("hex", hex),
 				logger.String("registration", registration),
@@ -1124,7 +1124,7 @@ func (s *AircraftStorage) Upsert(aircraft *adsb.Aircraft) {
 			return
 		}
 
-		backoff := time.Duration((attempt + 1) * 100) * time.Millisecond
+		backoff := time.Duration((attempt+1)*100) * time.Millisecond
 		s.logger.Warn("SQLite busy during aircraft upsert, retrying",
 			logger.String("hex", aircraft.Hex),
 			logger.Int("attempt", attempt+1),

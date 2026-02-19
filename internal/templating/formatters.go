@@ -9,6 +9,20 @@ import (
 	"github.com/yegors/co-atc/internal/weather"
 )
 
+func firstNonEmptyString(values ...interface{}) string {
+	for _, value := range values {
+		s, ok := value.(string)
+		if !ok {
+			continue
+		}
+		trimmed := strings.TrimSpace(s)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
 // FormatAircraftData formats aircraft data for template rendering
 // Uses the same format as ATC chat for consistency
 func FormatAircraftData(aircraft []*adsb.Aircraft, airport AirportInfo) string {
@@ -66,20 +80,28 @@ func formatAirborneAircraft(ac *adsb.Aircraft, airport AirportInfo) string {
 	if callsign == "" {
 		callsign = "Unknown"
 	}
+	airline := ac.Airline
+	if airline == "" {
+		airline = "N/A"
+	}
+	operator := "N/A"
+	if ac.BSDB != nil && strings.TrimSpace(ac.BSDB.RegisteredOwners) != "" {
+		operator = strings.TrimSpace(ac.BSDB.RegisteredOwners)
+	}
+	typeCode := "N/A"
+	if ac.BSDB != nil {
+		if strings.TrimSpace(ac.BSDB.Type) != "" {
+			typeCode = strings.TrimSpace(ac.BSDB.Type)
+		} else if strings.TrimSpace(ac.BSDB.ICAOTypeCode) != "" {
+			typeCode = strings.TrimSpace(ac.BSDB.ICAOTypeCode)
+		}
+	}
+	if typeCode == "N/A" && ac.ADSB != nil && strings.TrimSpace(ac.ADSB.AircraftType) != "" {
+		typeCode = strings.TrimSpace(ac.ADSB.AircraftType)
+	}
 
 	builder.WriteString(fmt.Sprintf("%s", callsign))
-
-	// Operator from ADSB data
-	if ac.Airline != "" {
-		builder.WriteString(fmt.Sprintf(" (%s)", ac.Airline))
-	}
-
-	builder.WriteString(" | ")
-
-	// Aircraft type
-	if ac.ADSB != nil && ac.ADSB.AircraftType != "" {
-		builder.WriteString(fmt.Sprintf("Type: %s | ", ac.ADSB.AircraftType))
-	}
+	builder.WriteString(fmt.Sprintf(" | Airline: %s | Operator: %s | Type: %s | ", airline, operator, typeCode))
 
 	// Wake category
 	if ac.ADSB != nil && ac.ADSB.Category != "" {
@@ -133,11 +155,11 @@ func formatAirborneAircraft(ac *adsb.Aircraft, airport AirportInfo) string {
 	if ac.Distance != nil && ac.ADSB != nil && ac.ADSB.HasPosition() {
 		lat, lon, _ := ac.ADSB.Position()
 		bearingToStation := adsb.CalculateBearing(lat, lon, airport.Coordinates[0], airport.Coordinates[1])
-		bearingFromStation := bearingToStation + 180
-		if bearingFromStation >= 360 {
-			bearingFromStation -= 360
-		}
-		builder.WriteString(fmt.Sprintf(" | Airport position: %.1f NM, heading %.0f° | BFS (airport->plane): %.0f°", *ac.Distance, bearingToStation, bearingFromStation))
+		builder.WriteString(fmt.Sprintf(" | Airport position: %.1f NM, fly heading %.0f", *ac.Distance, bearingToStation))
+	}
+
+	if ac.ADSB != nil && ac.ADSB.ATCDerived != nil && ac.ADSB.ATCDerived.ETAStationSec != nil {
+		builder.WriteString(fmt.Sprintf(" | ATC Derived: ETA to Station: %s", formatEtaToStation(*ac.ADSB.ATCDerived.ETAStationSec)))
 	}
 
 	// Flight phase
@@ -167,20 +189,28 @@ func formatGroundAircraft(ac *adsb.Aircraft, airport AirportInfo) string {
 	if callsign == "" {
 		callsign = "Unknown"
 	}
+	airline := ac.Airline
+	if airline == "" {
+		airline = "N/A"
+	}
+	operator := "N/A"
+	if ac.BSDB != nil && strings.TrimSpace(ac.BSDB.RegisteredOwners) != "" {
+		operator = strings.TrimSpace(ac.BSDB.RegisteredOwners)
+	}
+	typeCode := "N/A"
+	if ac.BSDB != nil {
+		if strings.TrimSpace(ac.BSDB.Type) != "" {
+			typeCode = strings.TrimSpace(ac.BSDB.Type)
+		} else if strings.TrimSpace(ac.BSDB.ICAOTypeCode) != "" {
+			typeCode = strings.TrimSpace(ac.BSDB.ICAOTypeCode)
+		}
+	}
+	if typeCode == "N/A" && ac.ADSB != nil && strings.TrimSpace(ac.ADSB.AircraftType) != "" {
+		typeCode = strings.TrimSpace(ac.ADSB.AircraftType)
+	}
 
 	builder.WriteString(fmt.Sprintf("%s", callsign))
-
-	// Operator from ADSB data
-	if ac.Airline != "" {
-		builder.WriteString(fmt.Sprintf(" (%s)", ac.Airline))
-	}
-
-	builder.WriteString(" | ")
-
-	// Aircraft type
-	if ac.ADSB != nil && ac.ADSB.AircraftType != "" {
-		builder.WriteString(fmt.Sprintf("Type: %s | ", ac.ADSB.AircraftType))
-	}
+	builder.WriteString(fmt.Sprintf(" | Airline: %s | Operator: %s | Type: %s | ", airline, operator, typeCode))
 
 	// Wake category
 	if ac.ADSB != nil && ac.ADSB.Category != "" {
@@ -228,6 +258,10 @@ func formatGroundAircraft(ac *adsb.Aircraft, airport AirportInfo) string {
 		} else {
 			builder.WriteString(", T/O: N/A")
 		}
+	}
+
+	if ac.ADSB != nil && ac.ADSB.ATCDerived != nil && ac.ADSB.ATCDerived.ETAStationSec != nil {
+		builder.WriteString(fmt.Sprintf(" | ATC Derived: ETA to Station: %s", formatEtaToStation(*ac.ADSB.ATCDerived.ETAStationSec)))
 	}
 
 	// Flight phase
@@ -301,8 +335,11 @@ func FormatWeatherData(weather *weather.WeatherData) string {
 	// TAF summary (keep this but simplified)
 	if weather.TAF != nil {
 		if tafMap, ok := weather.TAF.(map[string]interface{}); ok {
-			if _, exists := tafMap["decoded"]; exists {
-				builder.WriteString("TAF Summary: Terminal forecast available\n")
+			tafText := firstNonEmptyString(tafMap["taf"], tafMap["decoded"], tafMap["raw"])
+			if tafText != "" {
+				builder.WriteString(fmt.Sprintf("TAF: %s\n", tafText))
+			} else {
+				builder.WriteString("TAF: Terminal forecast available\n")
 			}
 		}
 	}
@@ -335,6 +372,21 @@ func FormatRunwayData(runways []RunwayInfo) string {
 	return builder.String()
 }
 
+// FormatActiveRunwaysData formats detected active runways for template rendering
+func FormatActiveRunwaysData(scores []adsb.RunwayScore) string {
+	if len(scores) == 0 {
+		return "No active runway detected."
+	}
+
+	var builder strings.Builder
+	builder.WriteString("DETECTED ACTIVE RUNWAY(S):\n")
+	for _, score := range scores {
+		builder.WriteString(fmt.Sprintf("• %s (%.0f%% confidence)\n", score.RunwayEnd, score.Probability*100.0))
+	}
+
+	return strings.TrimSpace(builder.String())
+}
+
 // FormatTranscriptionHistory formats recent communications for template rendering
 func FormatTranscriptionHistory(communications []TranscriptionSummary) string {
 	if len(communications) == 0 {
@@ -342,7 +394,7 @@ func FormatTranscriptionHistory(communications []TranscriptionSummary) string {
 	}
 
 	var builder strings.Builder
-	builder.WriteString("RECENT RADIO COMMUNICATIONS (last 10 minutes):\n\n")
+	builder.WriteString("RECENT RADIO COMMUNICATIONS:\n\n")
 
 	for _, comm := range communications {
 		timeSince := time.Since(comm.Timestamp)
@@ -387,4 +439,14 @@ func formatDuration(d time.Duration) string {
 		}
 		return fmt.Sprintf("%dh%dm", hours, minutes)
 	}
+}
+
+func formatEtaToStation(seconds float64) string {
+	totalSec := int(seconds + 0.5)
+	if totalSec < 0 {
+		totalSec = 0
+	}
+	minutes := totalSec / 60
+	secs := totalSec % 60
+	return fmt.Sprintf("%dm %ds", minutes, secs)
 }

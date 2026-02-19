@@ -324,9 +324,10 @@ Returns ADS-B source mode health and source metadata for Settings UI.
 ```
 
 **Mode behavior:**
-- `external_api`: `receiver` and `stats` are unavailable (`available=false`, `data=null`)
-- `readsb_api`: `receiver` and `stats` are unavailable (`available=false`, `data=null`)
-- `tar1090` and `readsb_file`: `receiver` and `stats` include raw JSON payloads from source files
+- `external-rapidapi`: `receiver` and `stats` are unavailable (`available=false`, `data=null`)
+- `external-opensky`: `receiver` and `stats` are unavailable (`available=false`, `data=null`)
+- `readsb-api`: `receiver` and `stats` are unavailable (`available=false`, `data=null`)
+- `tar1090` and `readsb-file`: `receiver` and `stats` include raw JSON payloads from source files
 
 ### GET /api/v1/station
 

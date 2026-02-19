@@ -1,8 +1,6 @@
 package adsb
 
 import (
-	"encoding/json"
-
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
 )
@@ -109,14 +107,14 @@ func (h *WebSocketHandler) handleSimulationControlUpdate(client *websocket.Clien
 
 // sendToClient sends a message to a specific client
 func (h *WebSocketHandler) sendToClient(client *websocket.Client, message *websocket.Message) error {
-	messageData, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
+	//messageData, err := json.Marshal(message)
+	//if err != nil {
+	//	return err
+	//}
 
-	h.logger.Debug("Sending message to client",
-		logger.String("type", message.Type),
-		logger.Int("data_size", len(messageData)))
+	//h.logger.Debug("Sending message to client",
+	//	logger.String("type", message.Type),
+	//	logger.Int("data_size", len(messageData)))
 
 	// Send message to the specific client
 	if client.SendMessage(message) {

@@ -12,6 +12,7 @@ type TemplateContext struct {
 	Aircraft             []*adsb.Aircraft       `json:"aircraft"`
 	Weather              *weather.WeatherData   `json:"weather"`
 	Runways              []RunwayInfo           `json:"runways"`
+	ActiveRunways        []adsb.RunwayScore     `json:"active_runways"`
 	TranscriptionHistory []TranscriptionSummary `json:"transcription_history"`
 	Airport              AirportInfo            `json:"airport"`
 	Timestamp            time.Time              `json:"timestamp"`
@@ -22,6 +23,7 @@ type TemplateData struct {
 	Aircraft             string    `json:"aircraft"`
 	Weather              string    `json:"weather"`
 	Runways              string    `json:"runways"`
+	ActiveRunways        string    `json:"active_runways"`
 	TranscriptionHistory string    `json:"transcription_history"` // Only populated for ATC Chat
 	Airport              string    `json:"airport"`
 	Time                 string    `json:"time"`

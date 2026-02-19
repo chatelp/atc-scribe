@@ -544,6 +544,7 @@ func (s *Service) GenerateSystemPromptWithVariables(sessionID string) (*PromptWi
 			"Aircraft":             "Error retrieving aircraft data",
 			"Weather":              "Error retrieving weather data",
 			"Runways":              "Error retrieving runway data",
+			"ActiveRunways":        "Error retrieving active runway data",
 			"TranscriptionHistory": "Error retrieving transcription data",
 			"Airport":              "Error retrieving airport data",
 		}
@@ -558,6 +559,7 @@ func (s *Service) GenerateSystemPromptWithVariables(sessionID string) (*PromptWi
 		"Aircraft":             templating.FormatAircraftData(context.Aircraft, context.Airport),
 		"Weather":              templating.FormatWeatherData(context.Weather),
 		"Runways":              templating.FormatRunwayData(context.Runways),
+		"ActiveRunways":        templating.FormatActiveRunwaysData(context.ActiveRunways),
 		"TranscriptionHistory": templating.FormatTranscriptionHistory(context.TranscriptionHistory),
 		"Airport":              templating.FormatAirportData(context.Airport),
 	}

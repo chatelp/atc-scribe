@@ -21,40 +21,44 @@ type Config struct {
 	Transcription  TranscriptionConfig  `toml:"transcription"`   // Audio transcription settings
 	PostProcessing PostProcessingConfig `toml:"post_processing"` // Post-processing settings for transcriptions
 	FlightPhases   FlightPhasesConfig   `toml:"flight_phases"`   // Flight phase detection settings
-	Weather WeatherConfig `toml:"wx"`       // Weather data fetching and caching settings
-	ATCChat ATCChatConfig `toml:"atc_chat"` // ATC Chat voice assistant settings
+	Weather        WeatherConfig        `toml:"wx"`              // Weather data fetching and caching settings
+	ATCChat        ATCChatConfig        `toml:"atc_chat"`        // ATC Chat voice assistant settings
 }
 
 // ServerConfig contains HTTP server configuration settings
 type ServerConfig struct {
-	Port               int      `toml:"port"`                  // Primary HTTP port for the server
-	Host               string   `toml:"host"`                  // Host address to bind to (e.g., 127.0.0.1 for localhost only, 0.0.0.0 for all interfaces)
-	CORSAllowedOrigins []string `toml:"cors_allowed_origins"`  // List of origins allowed for CORS requests (use ["*"] for all origins)
-	ReadTimeoutSecs    int      `toml:"read_timeout_seconds"`  // Maximum duration for reading the entire request (0 = no timeout)
-	WriteTimeoutSecs   int      `toml:"write_timeout_seconds"` // Maximum duration for writing the response (0 = no timeout, recommended for streaming)
-	IdleTimeoutSecs    int      `toml:"idle_timeout_seconds"`  // Maximum duration to wait for the next request when keep-alives are enabled
-	AdditionalPorts    []int    `toml:"additional_ports"`      // Additional HTTP ports to listen on (useful for multiple interfaces)
-	StaticFilesDir     string   `toml:"static_files_dir"`      // Directory to serve static files from (e.g., "www")
+	Port             int    `toml:"port"`                  // Primary HTTP port for the server
+	Host             string `toml:"host"`                  // Host address to bind to (e.g., 127.0.0.1 for localhost only, 0.0.0.0 for all interfaces)
+	ReadTimeoutSecs  int    `toml:"read_timeout_seconds"`  // Maximum duration for reading the entire request (0 = no timeout)
+	WriteTimeoutSecs int    `toml:"write_timeout_seconds"` // Maximum duration for writing the response (0 = no timeout, recommended for streaming)
+	IdleTimeoutSecs  int    `toml:"idle_timeout_seconds"`  // Maximum duration to wait for the next request when keep-alives are enabled
+	AdditionalPorts  []int  `toml:"additional_ports"`      // Additional HTTP ports to listen on (useful for multiple interfaces)
 }
 
 // ADSBConfig contains ADS-B aircraft tracking data source configuration
 type ADSBConfig struct {
 	// Source selection
-	SourceType string `toml:"source_type"` // Data source type: "external_api", "tar1090", "readsb_api", or "readsb_file"
+	SourceType string `toml:"source_type"` // Data source type: "external-rapidapi", "external-opensky", "tar1090", "readsb-api", or "readsb-file"
 
-	// External API source settings (used when source_type = "external_api")
+	// External API source settings (used when source_type = "external-rapidapi")
 	ExternalSourceURL string `toml:"external_source_url"` // URL template for external API with format placeholders for lat, lon, and distance
 	APIHost           string `toml:"api_host"`            // API host header value (e.g., for RapidAPI)
 	APIKey            string `toml:"api_key"`             // API key for authentication with external service
 	SearchRadiusNM    int    `toml:"search_radius_nm"`    // Search radius in nautical miles for external API queries
 
+	// OpenSky source settings (used when source_type = "external-opensky")
+	OpenSkyBaseURL               string `toml:"opensky_base_url"`                // OpenSky API base URL (e.g. https://opensky-network.org/api)
+	OpenSkyTokenURL              string `toml:"opensky_token_url"`               // OAuth2 token endpoint URL
+	OpenSkyAuthMode              string `toml:"opensky_auth_mode"`               // Auth mode: "anonymous" or "oauth2"
+	OpenSkyOAuth2CredentialsPath string `toml:"opensky_oauth2_credentials_path"` // Path to OAuth2 client credentials JSON file
+
 	// Tar1090 source settings (used when source_type = "tar1090")
 	Tar1090BaseURL string `toml:"tar1090_base_url"` // Base URL where aircraft.json, receiver.json, stats.json are served
 
-	// readsb API settings (used when source_type = "readsb_api")
+	// readsb API settings (used when source_type = "readsb-api")
 	ReadsbAPIURL string `toml:"readsb_api_url"` // Full readsb API URL (e.g., http://host:30152/?all)
 
-	// readsb file settings (used when source_type = "readsb_file")
+	// readsb file settings (used when source_type = "readsb-file")
 	ReadsbDataDir string `toml:"readsb_data_dir"` // Optional override directory for readsb runtime files (auto-detected when empty)
 
 	// Common settings
@@ -88,12 +92,12 @@ type StationConfig struct {
 
 // ReferenceConfig contains paths to reference data CSV files
 type ReferenceConfig struct {
-	AircraftCSVPath    string `toml:"aircraft_csv_path"`             // Path to aircraft.csv (wiedehopf/tar1090-db)
-	AirlinesDATPath    string `toml:"airlines_dat_path"`             // Path to airlines.dat (OpenFlights)
-	AirportsCSVPath    string `toml:"airports_csv_path"`             // Path to airports.csv (OurAirports)
-	FrequenciesCSVPath string `toml:"airport_frequencies_csv_path"`  // Path to airport-frequencies.csv (OurAirports)
-	RunwaysCSVPath     string `toml:"runways_csv_path"`              // Path to runways.csv (OurAirports)
-	NavaidsCSVPath     string `toml:"navaids_csv_path"`              // Path to navaids.csv (OurAirports)
+	AircraftCSVPath    string `toml:"aircraft_csv_path"`            // Path to aircraft.csv (wiedehopf/tar1090-db)
+	AirlinesDATPath    string `toml:"airlines_dat_path"`            // Path to airlines.dat (OpenFlights)
+	AirportsCSVPath    string `toml:"airports_csv_path"`            // Path to airports.csv (OurAirports)
+	FrequenciesCSVPath string `toml:"airport_frequencies_csv_path"` // Path to airport-frequencies.csv (OurAirports)
+	RunwaysCSVPath     string `toml:"runways_csv_path"`             // Path to runways.csv (OurAirports)
+	NavaidsCSVPath     string `toml:"navaids_csv_path"`             // Path to navaids.csv (OurAirports)
 }
 
 // TranscriptionConfig contains settings for audio transcription services
@@ -228,14 +232,14 @@ type FlightPhasesConfig struct {
 	// The trajectory system maintains a rolling window of recent ADS-B observations per
 	// aircraft and uses statistical analysis (linear regression, median filtering) to make
 	// noise-resistant phase decisions instead of relying on single data points.
-	TrajectoryBufferDurationSec  int     `toml:"trajectory_buffer_duration_sec"`  // Seconds of ADS-B history per aircraft (default: 90)
-	TrajectoryMinPoints          int     `toml:"trajectory_min_points"`           // Min valid points before full trajectory analysis (default: 5)
-	TrajectoryStaleTimeoutSec    int     `toml:"trajectory_stale_timeout_sec"`    // Remove aircraft not seen for this long (default: 300)
-	TrajectoryCleanupIntervalSec int     `toml:"trajectory_cleanup_interval_sec"` // Cleanup goroutine interval (default: 30)
-	TrajectoryDescentThresholdFPM  float64 `toml:"trajectory_descent_threshold_fpm"`  // Altitude trend below this = descending (default: -200)
-	TrajectoryClimbThresholdFPM    float64 `toml:"trajectory_climb_threshold_fpm"`    // Altitude trend above this = climbing (default: 200)
-	TrajectoryLevelBandFt          float64 `toml:"trajectory_level_band_ft"`          // (AltMax-AltMin) within this = level flight (default: 200)
-	TrajectoryTurningRateDeg       float64 `toml:"trajectory_turning_rate_deg"`       // |TrackRate| above this = turning (default: 1.5 deg/sec)
+	TrajectoryBufferDurationSec   int     `toml:"trajectory_buffer_duration_sec"`   // Seconds of ADS-B history per aircraft (default: 90)
+	TrajectoryMinPoints           int     `toml:"trajectory_min_points"`            // Min valid points before full trajectory analysis (default: 5)
+	TrajectoryStaleTimeoutSec     int     `toml:"trajectory_stale_timeout_sec"`     // Remove aircraft not seen for this long (default: 300)
+	TrajectoryCleanupIntervalSec  int     `toml:"trajectory_cleanup_interval_sec"`  // Cleanup goroutine interval (default: 30)
+	TrajectoryDescentThresholdFPM float64 `toml:"trajectory_descent_threshold_fpm"` // Altitude trend below this = descending (default: -200)
+	TrajectoryClimbThresholdFPM   float64 `toml:"trajectory_climb_threshold_fpm"`   // Altitude trend above this = climbing (default: 200)
+	TrajectoryLevelBandFt         float64 `toml:"trajectory_level_band_ft"`         // (AltMax-AltMin) within this = level flight (default: 200)
+	TrajectoryTurningRateDeg      float64 `toml:"trajectory_turning_rate_deg"`      // |TrackRate| above this = turning (default: 1.5 deg/sec)
 
 	// Runway-in-use detection
 	// Observes aircraft approach/landing/departure patterns to determine which runway
@@ -349,47 +353,65 @@ func (c *Config) Validate() error {
 		portsSeen[p] = true
 	}
 
-	// Set default static files directory if not specified
-	if c.Server.StaticFilesDir == "" {
-		c.Server.StaticFilesDir = "www"
-	}
-
-	// Validate static files directory exists
-	if _, err := os.Stat(c.Server.StaticFilesDir); os.IsNotExist(err) {
-		return fmt.Errorf("static files directory does not exist: %s", c.Server.StaticFilesDir)
+	// Validate hardcoded static files directory exists
+	if _, err := os.Stat("www"); os.IsNotExist(err) {
+		return fmt.Errorf("static files directory does not exist: %s", "www")
 	}
 
 	// Validate ADSB config
 	if c.ADSB.SourceType == "" {
-		return fmt.Errorf("adsb.source_type is required (must be one of: external_api, tar1090, readsb_api, readsb_file)")
+		return fmt.Errorf("adsb.source_type is required (must be one of: external-rapidapi, external-opensky, tar1090, readsb-api, readsb-file)")
 	}
 
 	switch c.ADSB.SourceType {
-	case "external_api":
+	case "external-rapidapi":
 		if c.ADSB.ExternalSourceURL == "" {
-			return fmt.Errorf("external_source_url is required when source_type is external_api")
+			return fmt.Errorf("external_source_url is required when source_type is external-rapidapi")
 		}
 		if c.ADSB.APIHost == "" {
-			return fmt.Errorf("api_host is required when source_type is external_api")
+			return fmt.Errorf("api_host is required when source_type is external-rapidapi")
 		}
 		if c.ADSB.APIKey == "" {
-			return fmt.Errorf("api_key is required when source_type is external_api")
+			return fmt.Errorf("api_key is required when source_type is external-rapidapi")
 		}
 		if c.ADSB.SearchRadiusNM <= 0 {
-			return fmt.Errorf("search_radius_nm must be positive when source_type is external_api")
+			return fmt.Errorf("search_radius_nm must be positive when source_type is external-rapidapi")
+		}
+	case "external-opensky":
+		if c.ADSB.OpenSkyBaseURL == "" {
+			return fmt.Errorf("opensky_base_url is required when source_type is external-opensky")
+		}
+		if c.ADSB.SearchRadiusNM <= 0 {
+			return fmt.Errorf("search_radius_nm must be positive when source_type is external-opensky")
+		}
+		if c.ADSB.OpenSkyAuthMode == "" {
+			c.ADSB.OpenSkyAuthMode = "anonymous"
+		}
+		switch c.ADSB.OpenSkyAuthMode {
+		case "anonymous":
+			// no additional required fields
+		case "oauth2":
+			if c.ADSB.OpenSkyTokenURL == "" {
+				return fmt.Errorf("opensky_token_url is required when source_type is external-opensky and opensky_auth_mode is oauth2")
+			}
+			if c.ADSB.OpenSkyOAuth2CredentialsPath == "" {
+				return fmt.Errorf("opensky_oauth2_credentials_path is required when source_type is external-opensky and opensky_auth_mode is oauth2")
+			}
+		default:
+			return fmt.Errorf("invalid opensky_auth_mode: %s (must be one of: anonymous, oauth2)", c.ADSB.OpenSkyAuthMode)
 		}
 	case "tar1090":
 		if c.ADSB.Tar1090BaseURL == "" {
 			return fmt.Errorf("tar1090_base_url is required when source_type is tar1090")
 		}
-	case "readsb_api":
+	case "readsb-api":
 		if c.ADSB.ReadsbAPIURL == "" {
-			return fmt.Errorf("readsb_api_url is required when source_type is readsb_api")
+			return fmt.Errorf("readsb_api_url is required when source_type is readsb-api")
 		}
-	case "readsb_file":
+	case "readsb-file":
 		// No mandatory fields. Auto-detection uses standard filesystem paths when readsb_data_dir is empty.
 	default:
-		return fmt.Errorf("invalid ADSB source type: %s (must be one of: external_api, tar1090, readsb_api, readsb_file)", c.ADSB.SourceType)
+		return fmt.Errorf("invalid ADSB source type: %s (must be one of: external-rapidapi, external-opensky, tar1090, readsb-api, readsb-file)", c.ADSB.SourceType)
 	}
 
 	if c.ADSB.FetchIntervalSecs <= 0 {
@@ -801,4 +823,3 @@ type ATCChatConfig struct {
 	SystemPromptPath        string `toml:"system_prompt_path"`    // Path to system prompt template file
 	RefreshSystemPromptSecs int    `toml:"refresh_system_prompt"` // Automatic system prompt refresh interval in seconds (0 = disabled)
 }
-

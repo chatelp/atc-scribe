@@ -3,10 +3,11 @@ package adsb
 import "time"
 
 const (
-	SourceTypeExternalAPI = "external_api"
-	SourceTypeTar1090     = "tar1090"
-	SourceTypeReadsbAPI   = "readsb_api"
-	SourceTypeReadsbFile  = "readsb_file"
+	SourceTypeExternalAPI     = "external-rapidapi"
+	SourceTypeExternalOpenSky = "external-opensky"
+	SourceTypeTar1090         = "tar1090"
+	SourceTypeReadsbAPI       = "readsb-api"
+	SourceTypeReadsbFile      = "readsb-file"
 )
 
 type SourceChannelStatus struct {

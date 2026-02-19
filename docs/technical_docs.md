@@ -90,9 +90,12 @@ co-atc/
 │   └── websocket/            # WebSocket server
 │       └── server.go         # WebSocket server implementation
 ├── assets/                   # Static data files
-│   ├── airlines.json         # Airline database
-│   ├── airports.json         # Airport database
-│   └── runways.json          # Runway database
+│   ├── aircraft.csv          # Aircraft enrichment data
+│   ├── airlines.dat          # Airline reference data
+│   ├── airports.csv          # Airport reference data
+│   ├── airport-frequencies.csv # Airport frequency reference data
+│   ├── runways.csv           # Runway reference data
+│   └── navaids.csv           # Navaid reference data
 ├── prompts/                  # AI system prompts
 │   ├── atc_chat_prompt.txt   # ATC chat voice assistant prompt
 │   ├── post_processing_prompt.txt # Post-processing prompt
@@ -103,7 +106,8 @@ co-atc/
     ├── index.html            # Main HTML page
     ├── style.css             # CSS styles
     ├── app.js                # Main application logic
-    ├── map-manager.js        # Map visualization
+  ├── map/                  # OpenLayers map modules (core/renderers/features/perf)
+  ├── map-manager.js        # Compatibility shim
     ├── websocket-client.js   # WebSocket client
     ├── aircraft-animation.js # Aircraft animation engine
     ├── atc-chat.js           # ATC chat interface
@@ -128,7 +132,10 @@ Co-ATC uses several background workers and goroutines to handle concurrent opera
 - **Purpose**: Processes aircraft tracking data
 - **Workers**:
   - fetchLoop: Periodically fetches and processes ADS-B data at configured intervals
+  - Supports source modes: `tar1090`, `readsb-api`, `readsb-file`, `external-rapidapi`, `external-opensky`
+  - Validates configured source on startup (fail-fast on inaccessible/invalid source)
   - Detects aircraft takeoffs and landings
+  - Performs active runway-in-use detection from approach/landing/departure evidence
   - Updates aircraft status (active, stale, signal_lost)
   - Broadcasts aircraft events via WebSocket
 
