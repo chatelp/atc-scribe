@@ -21,13 +21,12 @@ type AircraftRecord struct {
 
 // AircraftStorage is a SQLite-based storage for aircraft data
 type AircraftStorage struct {
-	db                *sql.DB
-	logger            *logger.Logger
-	maxPositionsInAPI int
+	db     *sql.DB
+	logger *logger.Logger
 }
 
 // NewAircraftStorage creates a new SQLite-based aircraft storage
-func NewAircraftStorage(dbPath string, maxPositionsInAPI int, log *logger.Logger) (*AircraftStorage, error) {
+func NewAircraftStorage(dbPath string, log *logger.Logger) (*AircraftStorage, error) {
 	storageLogger := log.Named("sqlite")
 
 	storageLogger.Info("Initializing SQLite storage",
@@ -53,9 +52,8 @@ func NewAircraftStorage(dbPath string, maxPositionsInAPI int, log *logger.Logger
 	}
 
 	storage := &AircraftStorage{
-		db:                db,
-		logger:            storageLogger,
-		maxPositionsInAPI: maxPositionsInAPI,
+		db:     db,
+		logger: storageLogger,
 	}
 
 	return storage, nil
@@ -641,7 +639,7 @@ func (s *AircraftStorage) getRecentPhaseHistoryBatch(hexCodes []string, limit in
 }
 
 // getPositionHistoryMinimal returns minimal position history (lat, lon, alt_baro, timestamp) for map trails
-func (s *AircraftStorage) getPositionHistoryMinimal(hex string, maxPositions int) ([]adsb.PositionMinimal, error) {
+func (s *AircraftStorage) getPositionHistoryMinimal(hex string) ([]adsb.PositionMinimal, error) {
 	//s.logger.Debug("Getting minimal position history",
 	//	logger.String("hex", hex),
 	//	logger.Int("maxPositions", maxPositions))
@@ -651,8 +649,7 @@ func (s *AircraftStorage) getPositionHistoryMinimal(hex string, maxPositions int
 		FROM adsb_targets
 		WHERE aircraft_hex = ?
 		ORDER BY timestamp DESC
-		LIMIT ?
-	`, hex, maxPositions)
+	`, hex)
 
 	if err != nil {
 		s.logger.Error("Error querying position history", logger.Error(err), logger.String("hex", hex))
@@ -1020,7 +1017,7 @@ func (s *AircraftStorage) GetByHex(hex string) (*adsb.Aircraft, bool) {
 	}
 
 	// Get minimal position history for map trails
-	minimalPositions, err := s.getPositionHistoryMinimal(hex, s.maxPositionsInAPI)
+	minimalPositions, err := s.getPositionHistoryMinimal(hex)
 	if err == nil {
 		a.History = minimalPositions
 	} else {

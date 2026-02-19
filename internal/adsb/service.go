@@ -210,7 +210,6 @@ type Service struct {
 	client             *Client
 	storage            Storage
 	fetchInterval      time.Duration
-	maxPositionsInAPI  int // Maximum number of positions to return in the API response
 	logger             *logger.Logger
 	lastFetchTime      time.Time
 	lastFetchStatus    bool
@@ -246,7 +245,6 @@ func NewService(
 	client *Client,
 	storage Storage,
 	fetchInterval time.Duration,
-	maxPositionsInAPI int,
 	logger *logger.Logger,
 	stationCfg config.StationConfig,
 	adsbCfg config.ADSBConfig,
@@ -264,7 +262,6 @@ func NewService(
 		client:             client,
 		storage:            storage,
 		fetchInterval:      fetchInterval,
-		maxPositionsInAPI:  maxPositionsInAPI,
 		logger:             logger.Named("adsb"),
 		stopCh:             make(chan struct{}),
 		stationLat:         stationCfg.Latitude,

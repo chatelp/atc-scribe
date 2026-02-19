@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -27,6 +28,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+const defaultDBRetentionDays = 7
 
 // refAdapter wraps reference.Service to implement adsb.ReferenceService interface
 type refAdapter struct {
@@ -124,12 +127,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := cleanupOldDailyDatabases(dbDir, dbPath, cfg.Storage.DBRetentionDays, time.Now().UTC(), log); err != nil {
+		log.Warn("Failed to clean up old database files",
+			logger.Error(err),
+			logger.String("path", dbDir),
+			logger.Int("retention_days", cfg.Storage.DBRetentionDays))
+	}
+
 	log.Info("Using daily database", logger.String("path", dbPath))
 
 	// Create SQLite storage with no retention settings
 	sqliteStorage, err := sqlite.NewAircraftStorage(
 		dbPath,
-		cfg.Storage.MaxPositionsInAPI,
 		log,
 	)
 	if err != nil {
@@ -159,7 +168,6 @@ func main() {
 		adsbClient,
 		adsbStorage,
 		time.Duration(cfg.ADSB.FetchIntervalSecs)*time.Second,
-		cfg.Storage.MaxPositionsInAPI,
 		log,
 		cfg.Station,
 		cfg.ADSB,
@@ -199,6 +207,8 @@ func main() {
 	// Start ADS-B service
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	go runDatabaseRetentionCleanup(ctx, dbDir, dbPath, cfg.Storage.DBRetentionDays, log)
 
 	if err := adsbService.Start(ctx); err != nil {
 		log.Error("Failed to start ADS-B service", logger.Error(err))
@@ -368,4 +378,109 @@ func main() {
 	log.Info("All HTTP servers shutdown.")
 
 	log.Info("Server fully stopped")
+}
+
+func runDatabaseRetentionCleanup(ctx context.Context, dbDir, activeDBPath string, keepDays int, log *logger.Logger) {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := ensureTodayDatabaseFile(dbDir, log); err != nil {
+				log.Warn("Failed to create today's database file",
+					logger.Error(err),
+					logger.String("path", dbDir))
+			}
+
+			if err := cleanupOldDailyDatabases(dbDir, activeDBPath, keepDays, time.Now().UTC(), log); err != nil {
+				log.Warn("Periodic database retention cleanup failed",
+					logger.Error(err),
+					logger.String("path", dbDir),
+					logger.Int("retention_days", keepDays))
+			}
+		}
+	}
+}
+
+func ensureTodayDatabaseFile(dbDir string, log *logger.Logger) error {
+	today := time.Now().Format("2006-01-02")
+	todayDBPath := filepath.Join(dbDir, fmt.Sprintf("co-atc-%s.db", today))
+
+	if _, err := os.Stat(todayDBPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat today's db: %w", err)
+	}
+
+	storage, err := sqlite.NewAircraftStorage(todayDBPath, log)
+	if err != nil {
+		return fmt.Errorf("initialize today's db: %w", err)
+	}
+	defer storage.Close()
+
+	log.Info("Created new daily database file",
+		logger.String("path", todayDBPath))
+
+	return nil
+}
+
+func cleanupOldDailyDatabases(dbDir, activeDBPath string, keepDays int, now time.Time, log *logger.Logger) error {
+	if keepDays <= 0 {
+		keepDays = defaultDBRetentionDays
+	}
+
+	entries, err := os.ReadDir(dbDir)
+	if err != nil {
+		return fmt.Errorf("read db directory: %w", err)
+	}
+
+	absActiveDBPath, _ := filepath.Abs(activeDBPath)
+	cutoffDate := now.UTC().Truncate(24 * time.Hour).AddDate(0, 0, -(keepDays - 1))
+
+	deletedCount := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		fileName := entry.Name()
+		if !strings.HasPrefix(fileName, "co-atc-") || !strings.HasSuffix(fileName, ".db") {
+			continue
+		}
+
+		dateStr := strings.TrimSuffix(strings.TrimPrefix(fileName, "co-atc-"), ".db")
+		fileDate, parseErr := time.Parse("2006-01-02", dateStr)
+		if parseErr != nil {
+			continue
+		}
+
+		if !fileDate.Before(cutoffDate) {
+			continue
+		}
+
+		filePath := filepath.Join(dbDir, fileName)
+		absFilePath, _ := filepath.Abs(filePath)
+		if absFilePath == absActiveDBPath {
+			continue
+		}
+
+		if removeErr := os.Remove(filePath); removeErr != nil {
+			return fmt.Errorf("remove old db '%s': %w", filePath, removeErr)
+		}
+		deletedCount++
+		log.Info("Deleted old database file",
+			logger.String("path", filePath),
+			logger.String("file_date", fileDate.Format("2006-01-02")))
+	}
+
+	if deletedCount > 0 {
+		log.Info("Database retention cleanup complete",
+			logger.Int("deleted_files", deletedCount),
+			logger.Int("retention_days", keepDays))
+	}
+
+	return nil
 }

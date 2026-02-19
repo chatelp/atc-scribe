@@ -294,12 +294,6 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		// For proximity queries, don't include history data to reduce payload size
 		if isProximityQuery {
 			a.History = nil
-		} else {
-			// Limit the number of positions returned in the API response
-			if len(a.History) > h.config.Storage.MaxPositionsInAPI {
-				// Keep only the most recent positions up to the limit
-				a.History = a.History[len(a.History)-h.config.Storage.MaxPositionsInAPI:]
-			}
 		}
 
 		// Future array is now populated by the prediction algorithm
@@ -781,8 +775,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 			"fetch_interval_seconds": h.config.ADSB.FetchIntervalSecs,
 		},
 		"storage": map[string]interface{}{
-			"sqlite_base_path":     h.config.Storage.SQLiteBasePath,
-			"max_positions_in_api": h.config.Storage.MaxPositionsInAPI,
+			"sqlite_base_path": h.config.Storage.SQLiteBasePath,
 		},
 		"frequencies": map[string]interface{}{
 			"buffer_size_kb":          h.config.Frequencies.BufferSizeKB,

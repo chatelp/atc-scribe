@@ -87,8 +87,8 @@ type = "sqlite"
 # The actual filename will be generated as co-atc-YYYY-MM-DD.db
 sqlite_base_path = "data"
 
-# Maximum number of positions to return in the /aircraft API response (for all aircraft - excludes /aircraft/:id/history)
-max_positions_in_api = 50
+# Number of daily SQLite DB files to keep (older co-atc-YYYY-MM-DD.db files are deleted)
+db_retention_days = 7
 
 #######################################################
 # Station Location Configuration

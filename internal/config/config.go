@@ -74,9 +74,9 @@ type LoggingConfig struct {
 
 // StorageConfig contains data persistence configuration
 type StorageConfig struct {
-	Type              string `toml:"type"`                 // Storage backend type (currently only "sqlite" is supported)
-	SQLiteBasePath    string `toml:"sqlite_base_path"`     // Base path for SQLite database files (actual filename will be generated as co-atc-YYYY-MM-DD.db)
-	MaxPositionsInAPI int    `toml:"max_positions_in_api"` // Maximum number of positions to return in the /aircraft API response
+	Type            string `toml:"type"`              // Storage backend type (currently only "sqlite" is supported)
+	SQLiteBasePath  string `toml:"sqlite_base_path"`  // Base path for SQLite database files (actual filename will be generated as co-atc-YYYY-MM-DD.db)
+	DBRetentionDays int    `toml:"db_retention_days"` // Number of daily SQLite DB files to keep (older files are deleted)
 }
 
 // StationConfig contains physical location configuration for the monitoring station
@@ -417,9 +417,8 @@ func (c *Config) Validate() error {
 	if c.ADSB.FetchIntervalSecs <= 0 {
 		return fmt.Errorf("invalid fetch interval: %d", c.ADSB.FetchIntervalSecs)
 	}
-	// Set default value for MaxPositionsInAPI if not specified
-	if c.Storage.MaxPositionsInAPI <= 0 {
-		c.Storage.MaxPositionsInAPI = 60 // Default to 60 positions if not specified
+	if c.Storage.DBRetentionDays <= 0 {
+		c.Storage.DBRetentionDays = 7 // Default to 7 days
 	}
 
 	// Validate logging config
