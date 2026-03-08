@@ -1136,6 +1136,10 @@
         setMapStyle(styleId) {
             if (!this.engine || typeof this.engine.setBaseMapStyle !== 'function') return;
             this.engine.setBaseMapStyle(styleId);
+            // Aircraft icon colors depend on map style (dark vs light), so force a full re-render
+            if (this._aircraftRenderer) {
+                this.applyFiltersAndRefreshView();
+            }
         }
 
         centerOnStation() {

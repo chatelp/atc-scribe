@@ -292,6 +292,20 @@
 
     function getAltitudeBandColor(aircraft, store) {
         const band = getAltitudeColorBand(aircraft, store);
+        const isBrightMap = (store?.settings?.mapStyle || 'dark').toLowerCase() !== 'dark';
+
+        if (isBrightMap) {
+            switch (band) {
+                case 'high': return '#0E7490';
+                case 'mid': return '#B45309';
+                case 'low': return '#C2410C';
+                case 'very-low': return '#B91C1C';
+                case 'cruise':
+                default:
+                    return '#1D4ED8';
+            }
+        }
+
         switch (band) {
             case 'high': return '#F8D857';
             case 'mid': return '#F4B55A';
