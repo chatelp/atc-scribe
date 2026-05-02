@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -160,15 +159,6 @@ func (c *OpenAIClient) CreateSession(ctx context.Context, config Config) (string
 		return "", "", fmt.Errorf("unexpected status code: %d, response: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	// Parse response
-	var result struct {
-		SessionID    string `json:"session_id"`
-		ClientSecret struct {
-			Value     string `json:"value"`
-			ExpiresAt int64  `json:"expires_at"`
-		} `json:"client_secret"`
-	}
-
 	// Read the response body for logging
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -179,29 +169,64 @@ func (c *OpenAIClient) CreateSession(ctx context.Context, config Config) (string
 	c.logger.Debug("OpenAI API response",
 		logger.String("response", string(bodyBytes)))
 
-	// Parse the response
-	if err := json.Unmarshal(bodyBytes, &result); err != nil {
-		return "", "", fmt.Errorf("failed to parse response: %w", err)
+	sessionID, clientSecret, err := parseTranscriptionSessionResponse(bodyBytes)
+	if err != nil {
+		return "", "", err
 	}
 
 	// Log the parsed result
-	secretPrefix := result.ClientSecret.Value
+	secretPrefix := clientSecret
 	if len(secretPrefix) > 10 {
 		secretPrefix = secretPrefix[:10] + "..."
 	}
 	c.logger.Debug("Parsed OpenAI API response",
-		logger.String("session_id", result.SessionID),
-		logger.String("client_secret_value_prefix", secretPrefix),
-		logger.Int64("client_secret_expires_at", result.ClientSecret.ExpiresAt))
+		logger.String("session_id", sessionID),
+		logger.String("client_secret_value_prefix", secretPrefix))
+
+	return sessionID, clientSecret, nil
+}
+
+func parseTranscriptionSessionResponse(bodyBytes []byte) (string, string, error) {
+	var result struct {
+		SessionID    string `json:"id"`
+		ClientSecret struct {
+			Value     string `json:"value"`
+			ExpiresAt int64  `json:"expires_at"`
+		} `json:"client_secret"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return "", "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if result.SessionID == "" {
+		return "", "", fmt.Errorf("failed to parse response: missing session id")
+	}
+	if result.ClientSecret.Value == "" {
+		return "", "", fmt.Errorf("failed to parse response: missing client secret")
+	}
 
 	return result.SessionID, result.ClientSecret.Value, nil
 }
 
+func realtimeTranscriptionWebSocketURL() string {
+	return "wss://api.openai.com/v1/realtime?intent=transcription"
+}
+
 // ConnectWebSocket establishes a WebSocket connection to the transcription API with reconnection logic
 func (c *OpenAIClient) ConnectWebSocket(ctx context.Context, sessionID, clientSecret string) (*OpenAIWebSocketConn, error) {
+	if sessionID == "" {
+		return nil, fmt.Errorf("session id is required to connect to transcription WebSocket")
+	}
+	if clientSecret == "" {
+		return nil, fmt.Errorf("client secret is required to connect to transcription WebSocket")
+	}
+
 	// Create WebSocket URL
-	wsURL := fmt.Sprintf("wss://api.openai.com/v1/realtime?session_id=%s", url.QueryEscape(sessionID))
-	c.logger.Debug("Connecting to OpenAI WebSocket", logger.String("url", wsURL))
+	wsURL := realtimeTranscriptionWebSocketURL()
+	c.logger.Debug("Connecting to OpenAI WebSocket",
+		logger.String("url", wsURL),
+		logger.String("session_id", sessionID))
 
 	// Create WebSocket dialer
 	dialer := websocket.Dialer{
