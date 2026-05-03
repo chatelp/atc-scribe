@@ -50,3 +50,10 @@ func TestRealtimeTranscriptionWebSocketURLUsesIntentTranscription(t *testing.T) 
 		t.Fatalf("realtimeTranscriptionWebSocketURL() = %q, want %q", got, want)
 	}
 }
+
+func TestReconnectableWebSocketErrorsIncludesOpenAIKeepaliveTimeout(t *testing.T) {
+	err := "websocket: close 1011 (internal server error): keepalive ping timeout"
+	if !isReconnectableWebSocketError(err) {
+		t.Fatalf("expected %q to be reconnectable", err)
+	}
+}

@@ -38,6 +38,7 @@ type Processor struct {
 	sessionID           string
 	clientSecret        string
 	wsConn              *OpenAIWebSocketConn
+	wsMu                sync.RWMutex
 	chunkCount          int
 	chunkCountMu        sync.Mutex
 	transcriptionConfig Config
@@ -103,11 +104,12 @@ func (p *Processor) Start() error {
 	p.sessionStartTime = time.Now()
 
 	// Connect to OpenAI WebSocket
-	p.wsConn, err = p.openaiClient.ConnectWebSocket(p.ctx, p.sessionID, p.clientSecret)
+	wsConn, err := p.openaiClient.ConnectWebSocket(p.ctx, p.sessionID, p.clientSecret)
 	if err != nil {
 		p.audioReader.Close()
 		return fmt.Errorf("failed to connect to WebSocket: %w", err)
 	}
+	p.setWebSocketConn(wsConn)
 	p.logger.Info("Connected to OpenAI WebSocket")
 
 	// Log service start to file
@@ -133,8 +135,8 @@ func (p *Processor) Stop() error {
 	p.cancel()
 
 	// Close WebSocket connection
-	if p.wsConn != nil {
-		p.wsConn.Close()
+	if wsConn := p.getWebSocketConn(); wsConn != nil {
+		wsConn.Close()
 	}
 
 	// Close audio reader
@@ -155,7 +157,6 @@ func (p *Processor) processAudio() {
 	// Track consecutive errors for backoff
 	consecutiveErrors := 0
 	maxConsecutiveErrors := 5
-	reconnectAttempted := false
 
 	for {
 		select {
@@ -209,18 +210,17 @@ func (p *Processor) processAudio() {
 							}
 						}
 
-						// After several consecutive errors, try to reconnect
-						if consecutiveErrors >= maxConsecutiveErrors && !reconnectAttempted {
+						// After several consecutive errors, keep trying to reconnect. A single
+						// failed reconnect must not permanently strand the sender on a bad socket.
+						if consecutiveErrors >= maxConsecutiveErrors && (consecutiveErrors == maxConsecutiveErrors || consecutiveErrors%10 == 0) {
 							p.logger.Info("Too many consecutive errors, attempting to reconnect WebSocket")
 
 							// Try to reconnect
 							if err := p.reconnectOpenAI(); err != nil {
 								p.logger.Error("Failed to reconnect to OpenAI", Error(err))
-								reconnectAttempted = true // Only try once per error burst
 							} else {
 								p.logger.Info("Successfully reconnected to OpenAI")
 								consecutiveErrors = 0
-								reconnectAttempted = false
 							}
 						}
 
@@ -239,7 +239,6 @@ func (p *Processor) processAudio() {
 						p.logger.Info("Audio chunk sending recovered after errors",
 							Int("previous_consecutive_errors", consecutiveErrors))
 						consecutiveErrors = 0
-						reconnectAttempted = false
 					}
 				}
 			}
@@ -253,6 +252,33 @@ func min(x, y int) int {
 		return x
 	}
 	return y
+}
+
+func (p *Processor) getWebSocketConn() *OpenAIWebSocketConn {
+	p.wsMu.RLock()
+	defer p.wsMu.RUnlock()
+	return p.wsConn
+}
+
+func (p *Processor) setWebSocketConn(conn *OpenAIWebSocketConn) {
+	p.wsMu.Lock()
+	defer p.wsMu.Unlock()
+	p.wsConn = conn
+}
+
+func (p *Processor) isCurrentWebSocketConn(conn *OpenAIWebSocketConn) bool {
+	p.wsMu.RLock()
+	defer p.wsMu.RUnlock()
+	return p.wsConn == conn
+}
+
+func (p *Processor) sleepWithContext(duration time.Duration) bool {
+	select {
+	case <-p.ctx.Done():
+		return false
+	case <-time.After(duration):
+		return true
+	}
 }
 
 // sendAudioChunk sends an audio chunk to OpenAI
@@ -280,11 +306,40 @@ func (p *Processor) sendAudioChunk(encodedChunk string) error {
 	}
 
 	// Send to OpenAI
-	if err := p.wsConn.Send(string(data)); err != nil {
+	wsConn := p.getWebSocketConn()
+	if wsConn == nil {
+		return fmt.Errorf("WebSocket connection is not established")
+	}
+	if err := wsConn.Send(string(data)); err != nil {
 		return fmt.Errorf("failed to send audio chunk: %w", err)
 	}
 
 	return nil
+}
+
+func isReconnectableWebSocketError(errorMsg string) bool {
+	reconnectableErrors := []string{
+		"websocket: close 1000 (normal)",
+		"websocket: close 1001 (going away)",
+		"websocket: close 1006 (abnormal closure)",
+		"websocket: close 1006 (abnormal closure): unexpected EOF",
+		"websocket: close 1011",
+		"keepalive ping timeout",
+		"use of closed network connection",
+		"connection reset by peer",
+		"EOF",
+		"websocket: close sent",
+		"websocket: close received",
+		"i/o timeout",
+		"read: connection reset by peer",
+	}
+
+	for _, reconnectErr := range reconnectableErrors {
+		if errorMsg == reconnectErr || strings.Contains(errorMsg, reconnectErr) {
+			return true
+		}
+	}
+	return false
 }
 
 // processTranscriptions processes transcription events from OpenAI
@@ -306,7 +361,21 @@ func (p *Processor) processTranscriptions() {
 			return
 		default:
 			// Receive message from OpenAI
-			message, err := p.wsConn.Receive()
+			wsConn := p.getWebSocketConn()
+			if wsConn == nil {
+				p.logger.Warn("OpenAI WebSocket connection is nil, attempting reconnect",
+					String("frequency_id", p.frequencyID))
+				if err := p.reconnectOpenAI(); err != nil {
+					p.logger.Error("Failed to reconnect nil OpenAI WebSocket", Error(err))
+					if !p.sleepWithContext(time.Duration(reconnectBackoffSeconds) * time.Second) {
+						return
+					}
+					reconnectBackoffSeconds = min(reconnectBackoffSeconds*2, 60)
+				}
+				continue
+			}
+
+			message, err := wsConn.Receive()
 			if err != nil {
 				// Check if context is canceled or connection is closed
 				select {
@@ -317,31 +386,19 @@ func (p *Processor) processTranscriptions() {
 						String("session_id", p.sessionID))
 					return
 				default:
+					// If another goroutine already replaced this connection, the read error
+					// is expected fallout from closing the stale socket. Keep receiving on
+					// the current socket instead of starting a second reconnect cycle.
+					if !p.isCurrentWebSocketConn(wsConn) {
+						p.logger.Info("Ignoring read error from stale OpenAI WebSocket",
+							Error(err),
+							String("frequency_id", p.frequencyID))
+						continue
+					}
+
 					// Categorize the error
-					isReconnectableError := false
 					errorMsg := err.Error()
-
-					// Common WebSocket errors that indicate connection issues
-					reconnectableErrors := []string{
-						"websocket: close 1000 (normal)",
-						"websocket: close 1001 (going away)",
-						"websocket: close 1006 (abnormal closure)",
-						"websocket: close 1006 (abnormal closure): unexpected EOF",
-						"use of closed network connection",
-						"connection reset by peer",
-						"EOF",
-						"websocket: close sent",
-						"websocket: close received",
-						"i/o timeout",
-						"read: connection reset by peer",
-					}
-
-					for _, reconnectErr := range reconnectableErrors {
-						if errorMsg == reconnectErr || strings.Contains(errorMsg, reconnectErr) {
-							isReconnectableError = true
-							break
-						}
-					}
+					isReconnectableError := isReconnectableWebSocketError(errorMsg)
 
 					// Log the error with appropriate level
 					if isReconnectableError {
@@ -374,10 +431,16 @@ func (p *Processor) processTranscriptions() {
 								reconnectAttempts = 0
 								reconnectBackoffSeconds = 1
 							} else {
-								p.logger.Error("Exceeded maximum reconnection attempts",
+								p.logger.Error("Exceeded maximum reconnection attempts; cooling down but staying alive",
 									String("frequency_id", p.frequencyID),
-									Int("max_attempts", maxReconnectAttempts))
-								return
+									Int("max_attempts", maxReconnectAttempts),
+									String("cooldown", (time.Minute*5).String()))
+								if !p.sleepWithContext(time.Minute * 5) {
+									return
+								}
+								reconnectAttempts = 0
+								reconnectBackoffSeconds = 1
+								continue
 							}
 						}
 
@@ -388,7 +451,9 @@ func (p *Processor) processTranscriptions() {
 							String("backoff_duration", backoffDuration.String()),
 							Int("attempt", reconnectAttempts+1))
 
-						time.Sleep(backoffDuration)
+						if !p.sleepWithContext(backoffDuration) {
+							return
+						}
 
 						// Attempt to reconnect
 						if err := p.reconnectOpenAI(); err != nil {
@@ -592,10 +657,7 @@ func (p *Processor) reconnectOpenAI() error {
 	p.sessionRefreshMu.Lock()
 	defer p.sessionRefreshMu.Unlock()
 
-	// Close existing connection
-	if p.wsConn != nil {
-		p.wsConn.Close()
-	}
+	oldConn := p.getWebSocketConn()
 
 	// Create new session
 	var err error
@@ -608,10 +670,16 @@ func (p *Processor) reconnectOpenAI() error {
 	// Reset session start time
 	p.sessionStartTime = time.Now()
 
-	// Connect to WebSocket
-	p.wsConn, err = p.openaiClient.ConnectWebSocket(p.ctx, p.sessionID, p.clientSecret)
+	// Connect to WebSocket before swapping it into active use. This avoids
+	// leaving audio senders pointed at a known-closed connection while the
+	// session creation/dial path is retrying.
+	newConn, err := p.openaiClient.ConnectWebSocket(p.ctx, p.sessionID, p.clientSecret)
 	if err != nil {
 		return fmt.Errorf("failed to connect to WebSocket: %w", err)
+	}
+	p.setWebSocketConn(newConn)
+	if oldConn != nil && oldConn != newConn {
+		oldConn.Close()
 	}
 	p.logger.Info("Reconnected to OpenAI WebSocket")
 

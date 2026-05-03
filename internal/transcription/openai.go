@@ -284,6 +284,11 @@ func (c *OpenAIClient) ConnectWebSocket(ctx context.Context, sessionID, clientSe
 	return wsConn, nil
 }
 
+const (
+	openAIWebSocketWriteTimeout = 30 * time.Second
+	openAIWebSocketReadTimeout  = 10 * time.Minute
+)
+
 // Send sends a message to the WebSocket
 func (ws *OpenAIWebSocketConn) Send(message string) error {
 	ws.mu.Lock()
@@ -293,11 +298,17 @@ func (ws *OpenAIWebSocketConn) Send(message string) error {
 		return fmt.Errorf("WebSocket connection is closed")
 	}
 
+	if err := ws.conn.SetWriteDeadline(time.Now().Add(openAIWebSocketWriteTimeout)); err != nil {
+		return fmt.Errorf("failed to set WebSocket write deadline: %w", err)
+	}
 	return ws.conn.WriteMessage(websocket.TextMessage, []byte(message))
 }
 
 // Receive receives a message from the WebSocket
 func (ws *OpenAIWebSocketConn) Receive() (string, error) {
+	if err := ws.conn.SetReadDeadline(time.Now().Add(openAIWebSocketReadTimeout)); err != nil {
+		return "", fmt.Errorf("failed to set WebSocket read deadline: %w", err)
+	}
 	_, message, err := ws.conn.ReadMessage()
 	if err != nil {
 		return "", err
