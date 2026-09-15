@@ -276,3 +276,19 @@ utile. À évaluer avec Q6.
 Second usage, pour l'évaluation : **compter les hallucinations de toponymes est un
 indicateur en soi**, bien moins coûteux à produire qu'un WER et plus parlant pour ce
 produit qu'un taux d'erreur moyen.
+
+### Q16 — Que publier du jeu d'évaluation ? *(nouvelle, 15/09)*
+
+Le jeu de 120 transmissions (`09-jeu-de-test.md`) est constitué et **volontairement laissé
+hors du dépôt**. Ce sont des enregistrements de communications radio réelles portant des
+indicatifs identifiables : les rediffuser n'est pas le même geste que publier du code.
+
+Ce qui est publiable sans difficulté : **la graine du tirage, la liste des noms de
+fichiers, et les annotations**. Cela suffit à rejouer la mesure à l'identique pour qui
+possède la station, et à comparer des modèles sur les transcriptions de référence, sans
+rediffuser une seconde d'audio.
+
+Ce qui ne se décide pas ici : s'il faut, un jour, publier un sous-ensemble audio — ce
+serait le premier corpus d'ATC francophone ouvert, et c'est précisément le vide que
+`03-transcription.md` identifie. Le gain scientifique est réel ; la question ne se pose
+utilement qu'après la mesure, et elle demande un avis qui n'est pas technique.

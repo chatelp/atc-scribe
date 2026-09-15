@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Minimal annotation server for building ATC transcription ground truth.
+
+Serves a corpus directory of short audio clips plus a single-page UI, and
+persists annotations to a JSON file. Standard library only, no dependencies.
+
+    python3 tools/annotate/server.py --corpus /path/to/clips --out truth.json
+
+The corpus directory is expected to contain a `manifeste.json` describing the
+sample (see docs-fr/09-jeu-de-test.md), or, failing that, any nested audio
+files, which are then discovered by scanning.
+
+Binds to localhost only. This tool has no authentication and is not meant to
+be reachable from anywhere else.
+"""
+import argparse
+import json
+import mimetypes
+import os
+import posixpath
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import unquote, urlparse
+
+AUDIO_EXTENSIONS = (".mp3", ".wav", ".flac", ".ogg", ".m4a")
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+lock = threading.Lock()
+
+
+def load_items(corpus):
+    """Return the ordered list of clips to annotate."""
+    manifest = os.path.join(corpus, "manifeste.json")
+    if os.path.exists(manifest):
+        with open(manifest, encoding="utf-8") as fh:
+            data = json.load(fh)
+        items = data["items"] if isinstance(data, dict) else data
+        return [dict(it) for it in items]
+
+    found = []
+    for root, _dirs, files in os.walk(corpus):
+        for name in sorted(files):
+            if name.lower().endswith(AUDIO_EXTENSIONS):
+                rel = os.path.relpath(os.path.join(root, name), corpus)
+                found.append({"id": rel.replace(os.sep, "/"), "fichier": name})
+    return found
+
+
+def load_annotations(path):
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    return {}
+
+
+def save_annotations(path, data):
+    """Write atomically: a half-written truth file would be worse than none."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, ensure_ascii=False, indent=1, sort_keys=True)
+    os.replace(tmp, path)
+
+
+def make_handler(corpus, out_path):
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, fmt, *args):  # quieter than the default
+            if not self.path.startswith("/audio/"):
+                super().log_message(fmt, *args)
+
+        def _send(self, code, body, ctype="application/json; charset=utf-8"):
+            if isinstance(body, str):
+                body = body.encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            path = unquote(urlparse(self.path).path)
+
+            if path in ("/", "/index.html"):
+                with open(os.path.join(HERE, "index.html"), "rb") as fh:
+                    return self._send(200, fh.read(), "text/html; charset=utf-8")
+
+            if path == "/api/items":
+                with lock:
+                    payload = {
+                        "items": load_items(corpus),
+                        "annotations": load_annotations(out_path),
+                    }
+                return self._send(200, json.dumps(payload, ensure_ascii=False))
+
+            if path.startswith("/audio/"):
+                rel = posixpath.normpath(path[len("/audio/"):])
+                if rel.startswith("..") or os.path.isabs(rel):
+                    return self._send(403, '{"error":"forbidden"}')
+                full = os.path.join(corpus, rel)
+                if not os.path.isfile(full):
+                    return self._send(404, '{"error":"not found"}')
+                ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
+                with open(full, "rb") as fh:
+                    return self._send(200, fh.read(), ctype)
+
+            return self._send(404, '{"error":"not found"}')
+
+        def do_POST(self):
+            if urlparse(self.path).path != "/api/annotation":
+                return self._send(404, '{"error":"not found"}')
+            length = int(self.headers.get("Content-Length", 0))
+            entry = json.loads(self.rfile.read(length) or b"{}")
+            clip_id = entry.get("id")
+            if not clip_id:
+                return self._send(400, '{"error":"missing id"}')
+            with lock:
+                data = load_annotations(out_path)
+                data[clip_id] = entry
+                save_annotations(out_path, data)
+                done = sum(1 for v in data.values() if v.get("text") or v.get("no_speech"))
+            return self._send(200, json.dumps({"ok": True, "done": done}))
+
+    return Handler
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--corpus", required=True, help="directory holding the clips")
+    parser.add_argument("--out", default="ground-truth.json", help="annotations file")
+    parser.add_argument("--port", type=int, default=8777)
+    args = parser.parse_args()
+
+    corpus = os.path.abspath(args.corpus)
+    out_path = os.path.abspath(args.out)
+    items = load_items(corpus)
+    done = len([v for v in load_annotations(out_path).values()
+                if v.get("text") or v.get("no_speech")])
+    print(f"{len(items)} clips in {corpus}")
+    print(f"{done} already annotated in {out_path}")
+    print(f"open http://127.0.0.1:{args.port}/  (Ctrl-C to stop)")
+
+    ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(corpus, out_path)).serve_forever()
+
+
+if __name__ == "__main__":
+    main()

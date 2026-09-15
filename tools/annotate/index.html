@@ -1,0 +1,148 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ATC ground truth</title>
+<style>
+  :root{--bg:#14161a;--fg:#e6e8ea;--dim:#8b939c;--line:#2a2f37;--ok:#5fd18a;--warn:#e0b050;--accent:#6aa6ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 ui-sans-serif,system-ui,sans-serif}
+  header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .bar{flex:1;min-width:140px;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--ok);width:0}
+  main{max-width:920px;margin:0 auto;padding:20px 16px 120px}
+  .meta{color:var(--dim);font-size:12px;margin-bottom:8px}
+  .meta b{color:var(--fg);font-weight:600}
+  audio{width:100%;margin:8px 0 14px}
+  textarea{width:100%;min-height:110px;background:#0e1013;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:10px;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
+  textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .row{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:10px 0}
+  label{display:flex;gap:6px;align-items:center;cursor:pointer;user-select:none}
+  button{background:#1e232b;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#06121f;font-weight:600}
+  kbd{background:#0e1013;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px;color:var(--dim)}
+  .hint{color:var(--dim);font-size:12px;margin-top:14px;line-height:1.7}
+  .nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .pill{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--dim)}
+  .pill.fr{border-color:#7a5cc4;color:#b9a3ec}
+  .pill.en{border-color:#3f7fb8;color:#9fc7ea}
+  .done{color:var(--ok)}
+  ol{padding-left:20px;margin:6px 0}
+</style>
+
+<header>
+  <strong>ATC ground truth</strong>
+  <span id="pos" class="meta"></span>
+  <div class="bar"><i id="prog"></i></div>
+  <span id="count" class="meta"></span>
+  <span id="saved" class="meta"></span>
+</header>
+
+<main>
+  <div class="meta" id="info"></div>
+  <audio id="player" controls preload="auto"></audio>
+
+  <textarea id="text" placeholder="Type exactly what you hear. Leave empty and tick « no speech » if there is none."></textarea>
+
+  <div class="row">
+    <span class="meta">Language actually spoken:</span>
+    <label><input type="radio" name="lang" value="fr"> French</label>
+    <label><input type="radio" name="lang" value="en"> English</label>
+    <label><input type="radio" name="lang" value="mixed"> Both</label>
+    <label><input type="radio" name="lang" value="other"> Other / unsure</label>
+  </div>
+
+  <div class="row">
+    <label><input type="checkbox" id="nospeech"> No speech at all</label>
+    <label><input type="checkbox" id="partial"> Partly unintelligible</label>
+  </div>
+
+  <div class="row nav">
+    <button id="prev">← Previous</button>
+    <button id="replay">Replay <kbd>space</kbd></button>
+    <button id="next" class="primary">Save &amp; next <kbd>⌘↵</kbd></button>
+    <button id="skip">Skip</button>
+  </div>
+
+  <div class="hint">
+    <b>Method — this is ground truth, so it must not be influenced by any model.</b>
+    <ol>
+      <li>Write what is <em>said</em>, not what would be correct. Keep errors, hesitations and readbacks.</li>
+      <li>Numbers as spoken: « flight level three five zero », not « FL350 ».</li>
+      <li>Mark what you cannot make out as <code>[unclear]</code> rather than guessing.</li>
+      <li>If French and English alternate in one transmission, tick « Both ».</li>
+    </ol>
+    Saved automatically on every change. Close and reopen at will — progress is kept.
+  </div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+let items = [], ann = {}, i = 0, timer = null;
+
+async function boot(){
+  const r = await fetch('/api/items');
+  const d = await r.json();
+  items = d.items; ann = d.annotations || {};
+  i = Math.max(0, items.findIndex(it => !isDone(ann[it.id])));
+  if (i === -1) i = 0;
+  render();
+}
+const isDone = a => !!a && (!!(a.text||'').trim() || a.no_speech);
+
+function render(){
+  const it = items[i]; if(!it) return;
+  const a = ann[it.id] || {};
+  $('#pos').textContent = `${i+1} / ${items.length}`;
+  const done = items.filter(x => isDone(ann[x.id])).length;
+  $('#prog').style.width = (100*done/items.length) + '%';
+  $('#count').innerHTML = `<span class="done">${done}</span> annotated`;
+  const pill = it.langue_attendue ? `<span class="pill ${it.langue_attendue}">expected ${it.langue_attendue}</span>` : '';
+  $('#info').innerHTML = `<b>${it.fichier||it.id}</b> &nbsp; ${it.freq ? it.freq.replace(/(\d{3})(\d+)/,'$1.$2')+' MHz' : ''} &nbsp; ${it.service||''} &nbsp; ${pill}`;
+  $('#player').src = '/audio/' + it.id;
+  $('#player').play().catch(()=>{});
+  $('#text').value = a.text || '';
+  $('#nospeech').checked = !!a.no_speech;
+  $('#partial').checked = !!a.partial;
+  document.querySelectorAll('[name=lang]').forEach(r => r.checked = (a.lang === r.value));
+  $('#text').focus();
+}
+
+function collect(){
+  const it = items[i];
+  return {
+    id: it.id, freq: it.freq, fichier: it.fichier,
+    expected_lang: it.langue_attendue || null,
+    text: $('#text').value.trim(),
+    lang: (document.querySelector('[name=lang]:checked')||{}).value || null,
+    no_speech: $('#nospeech').checked,
+    partial: $('#partial').checked,
+    at: new Date().toISOString()
+  };
+}
+
+async function save(){
+  const e = collect(); ann[e.id] = e;
+  $('#saved').textContent = 'saving…';
+  await fetch('/api/annotation', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(e)});
+  $('#saved').textContent = 'saved';
+  setTimeout(()=>{ $('#saved').textContent=''; }, 1200);
+  render();
+}
+
+const debounced = () => { clearTimeout(timer); timer = setTimeout(save, 700); };
+['#text','#nospeech','#partial'].forEach(s => $(s).addEventListener('input', debounced));
+document.querySelectorAll('[name=lang]').forEach(r => r.addEventListener('change', debounced));
+
+$('#next').onclick = async () => { await save(); if(i < items.length-1){ i++; render(); } };
+$('#prev').onclick = () => { if(i > 0){ i--; render(); } };
+$('#skip').onclick = () => { if(i < items.length-1){ i++; render(); } };
+$('#replay').onclick = () => { $('#player').currentTime = 0; $('#player').play(); };
+
+addEventListener('keydown', e => {
+  if (e.key === ' ' && e.target.tagName !== 'TEXTAREA'){ e.preventDefault(); $('#replay').click(); }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter'){ e.preventDefault(); $('#next').click(); }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowLeft'){ e.preventDefault(); $('#prev').click(); }
+});
+
+boot();
+</script>
