@@ -1,3 +1,20 @@
+> ## This is `co-atc-local` — a fork of [yegors/co-atc](https://github.com/yegors/co-atc)
+>
+> **Goal: run Co-ATC entirely on-premises, with no cloud API, on a bilingual
+> French/English receiving station.** Upstream relies on the OpenAI API for
+> transcription, post-processing and the voice assistant; this fork replaces that with a
+> local Whisper pipeline.
+>
+> **Status: work in progress.** Nothing is replaced yet. What works today is upstream's
+> own `tar1090` ADS-B path, pointed at a local receiver — see `docs-fr/`.
+>
+> Upstream is MIT-licensed (`LICENSE`, Copyright (c) 2025 Yegor S) and this fork stays
+> MIT. Upstream history is preserved; the `docs/` directory is upstream's and is left
+> untouched. Working notes live in `docs-fr/` and are written in French.
+>
+> Like upstream, this has **no authentication of any kind** and must never be exposed to
+> the internet.
+
 # Co-ATC: Aircraft Monitoring System
 
 Co-ATC is an AI-enhanced system designed to monitor airspace activity, supporting (imaginary) ATC operations. It integrates real-time ADSB data (local or remote), streams ATC communications (local VHF radio or LiveATC) while leveraging AI to transcribe and interpret communications, track ATC instructions, and generate alerts for potential conflicts or non-compliance.
