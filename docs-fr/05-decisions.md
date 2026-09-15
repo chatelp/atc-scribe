@@ -106,10 +106,10 @@ Pour le mode par canal. L'injection dans `radio-ctl` est recommandée (une seule
 de vérité pour les fréquences) mais demande de toucher à `serveur.py`, qui tourne en
 production.
 
-### Q5 — L assistant vocal : **mis de côté** *(15/09)*
+### Q5 — L'assistant vocal : **mis de côté** *(15/09)*
 
-Décision du propriétaire : hors chantier pour l instant. Il dépend d un modèle de
-langue, et la question ne se pose utilement qu une fois la transcription locale
+Décision du propriétaire : hors chantier pour l'instant. Il dépend d'un modèle de
+langue, et la question ne se pose utilement qu'une fois la transcription locale
 acquise. Ne pas y consacrer de temps ; se contenter de ne pas casser le code
 existant, ou de le neutraliser proprement derrière un drapeau de configuration.
 
@@ -152,7 +152,7 @@ sous MIT). Plus rien d'ouvert ici.
 ### Q9 — Transcrire les ATIS : **oui, mais pour une seule fréquence**
 
 La question posée était : à quoi bon, si le METAR est gratuit en ligne ? Vérifié le
-15 septembre auprès d Aviation Weather Center, requête sur les terrains de la zone :
+15 septembre auprès d'Aviation Weather Center, requête sur les terrains de la zone :
 
 | Terrain | METAR public | ATIS reçu ici |
 |---|---|---|
@@ -160,38 +160,38 @@ La question posée était : à quoi bon, si le METAR est gratuit en ligne ? Vér
 | LFPO Orly | **oui** | +4,6 / +6,9 dB, sous le seuil |
 | LFPB Le Bourget | **oui** | +14,6 dB, faible |
 | LFPN Toussus | **oui** | +21,8 dB, correct |
-| LFPV Villacoublay | **oui** | pas d ATIS catalogué |
+| LFPV Villacoublay | **oui** | pas d'ATIS catalogué |
 | **LFPZ Saint-Cyr** | **NON** | **+49,4 dB, le plus fort de toute la bande** |
 | **LFPX Chavenay** | **NON** | +13,8 dB, faible |
 
-Le résultat s inverse : **le seul ATIS que la station reçoive parfaitement est le seul
+Le résultat s'inverse : **le seul ATIS que la station reçoive parfaitement est le seul
 dont la météo ne soit disponible nulle part en ligne**. Les cinq terrains qui publient
-un METAR gratuit sont précisément ceux dont l ATIS arrive mal ou pas du tout.
+un METAR gratuit sont précisément ceux dont l'ATIS arrive mal ou pas du tout.
 
-Et surtout, **un ATIS n est pas un METAR**. Il porte en plus la **piste en service**,
-le type d approche, le niveau de transition et les travaux en cours sur le terrain —
-rien de tout cela n est dans un METAR, ni disponible gratuitement en temps réel. Pour
+Et surtout, **un ATIS n'est pas un METAR**. Il porte en plus la **piste en service**,
+le type d'approche, le niveau de transition et les travaux en cours sur le terrain —
+rien de tout cela n'est dans un METAR, ni disponible gratuitement en temps réel. Pour
 Co-ATC en particulier, qui détecte les phases de vol et la piste utilisée, **la piste en
 service de Saint-Cyr est une donnée directement exploitable par sa logique**.
 
 **Recommandation : un module tardif, optionnel, sur une seule fréquence** —
 131,025, échantillonnée toutes les quelques minutes, dont on extrait la piste en service
-plutôt qu on ne reconstitue un METAR complet. C est une porteuse permanente (médiane
-collée à la crête), donc aucun problème de squelch : il suffit d enregistrer N secondes
+plutôt qu'on ne reconstitue un METAR complet. C'est une porteuse permanente (médiane
+collée à la crête), donc aucun problème de squelch : il suffit d'enregistrer N secondes
 à intervalle régulier.
 
-> ⚠️ **Un obstacle connu** : l ATIS de Saint-Cyr **sature le récepteur** — le
-> propriétaire l a constaté à l oreille, un souffle continu par-dessus la voix. À +49 dB
-> c est attendu. Il faudra un gain réduit ou une quantification plus basse **sur ce canal
+> ⚠️ **Un obstacle connu** : l'ATIS de Saint-Cyr **sature le récepteur** — le
+> propriétaire l'a constaté à l'oreille, un souffle continu par-dessus la voix. À +49 dB
+> c'est attendu. Il faudra un gain réduit ou une quantification plus basse **sur ce canal
 > seulement** — ce que le mode de diffusion par canal rend justement possible.
 
-C est probablement la seule donnée réellement originale que la station produise : tout
+C'est probablement la seule donnée réellement originale que la station produise : tout
 le reste est, en principe, téléchargeable.
 
 ### Q10 — Écart de comptage entre les documents et `06-catalogue.csv` *(ouvert, 15/09)*
 
 Relevé le 15/09 en comptant le CSV : **68 lignes**, réparties en 28 « identifiee »,
-14 « non identifiee », 7 « porteuse permanente », 2 « absente de l AIP » et 17 « sous le
+14 « non identifiee », 7 « porteuse permanente », 2 « absente de l'AIP » et 17 « sous le
 seuil ». Or `00-mission.md` et `01-station.md` annoncent tous deux « 52 fréquences
 identifiées », et `01-station.md` parle de « quinze fréquences actives dans aucune liste
 publique ».
@@ -354,3 +354,66 @@ fichier par transmission **dégrade le flux en direct** (`01-station.md` : médi
 
 En attendant, le jeu de 120 reste utile — il tranche la question française, qui est
 l'apport revendiqué du projet — mais **il ne suffit pas à trancher Q1**.
+
+---
+
+## Mesure du 15/09 — la sortie fichier continue ne dégrade pas le direct
+
+**Q2 de D2 est tranchée.** Session de captation sur `orly-approche`,
+**12:05:16 → 14:43:10 CEST**, cinq canaux, sortie `type = "file"` continue
+(`split_on_transmission = false`, `continuous = true`) **ajoutée** au mélangeur.
+
+Trois relevés `salves.py` à chaque état, parce qu'une prise isolée ne vaut rien :
+
+```
+AVANT    12:01  med 4,4 s  <1 s  0 %      12:03  med 2,3 s  30 %    12:04  med 1,2 s  46 %
+PENDANT  12:08  med 5,0 s  <1 s 20 %      12:10  med 2,7 s  25 %    12:11  med 3,9 s   0 %
+APRES    14:46  med 2,5 s  <1 s 40 %      14:48  med 5,0 s  25 %    14:49  med 6,3 s   0 %
+```
+
+Moyennes : 2,6 s / 25 % avant, **3,9 s / 15 % pendant**, 4,6 s / 22 % après.
+**Aucune dégradation** — et la dispersion à l'intérieur de chaque triplet est plus
+grande que l'écart entre les triplets. Rien à voir avec les sorties *par
+transmission*, qui faisaient 4,6 s → 0,1 s et 0 % → 64 %.
+
+**Le mécanisme est confirmé** : c'est l'ouverture/fermeture d'un encodeur LAME à
+chaque squelch qui fragmentait le direct, pas l'écriture elle-même. Un encodeur
+unique tenu ouvert pour la session ne coûte rien au flux.
+
+Charge machine pendant la captation : `rtl_airband` à 7,8 %, aucun processus en
+attente disque, iowait plat. Les pointes de charge observées venaient des relevés
+de contrôle eux-mêmes, pas de la captation.
+
+### Ce que la session a produit
+
+Quinze fichiers, trois par canal, **découpés à l'heure** — `c_AAAAMMJJ_HH.mp3` :
+
+| dossier | volume | ce que c'est |
+|---|---|---|
+| `123875` | 11 Mo | Orly Approche |
+| `124350` | 11 Mo | Approche CDG + Le Bourget |
+| `124625` | 9,7 Mo | Paris Contrôle secteur DG |
+| `125825` | 13 Mo | De Gaulle Approche |
+| `125933` | 9,7 Mo | **non identifiée** — premier enregistrement |
+
+Servis en HTTP : `http://macmini-fedora.lan/fichiers/transmissions/<freq>/`
+
+> ⚠️ **Ne pas se fier à la durée annoncée par l'en-tête.** Ce sont des MP3 à débit
+> variable sans en-tête Xing : `ffprobe` en déduit des durées fausses, de 1,99 h à
+> 2,95 h selon le fichier. Le comptage de trames donne la vérité — et elle est
+> rassurante : **45 554 / 49 998 / 36 093 trames, identiques sur les cinq canaux**,
+> soit 3 280 + 3 600 + 2 599 = **9 479 s = 2 h 38 min**, ce qui recoupe l'horloge à
+> cinq secondes près.
+>
+> **Les cinq canaux sont alignés à la trame près.** C'est une propriété précieuse
+> pour recouper avec l'ADS-B : un même instant porte le même numéro de trame sur
+> les cinq fichiers. Trame MP3 à 8 kHz = 576 échantillons = 72 ms.
+
+Quelques avertissements `Header missing` du décodeur sur la première trame de
+certains fichiers — le flux commence en cours de trame. Sans conséquence, mais
+ignorer la première trame par prudence.
+
+**Gabarit restauré à 14:43**, zéro sortie fichier dans `orly-approche.tmpl` comme
+dans `rtl_airband.conf`. La sauvegarde du gabarit modifié reste dans
+`modes/orly-approche.tmpl.avant-captation-20260915-120506` si la manipulation est
+à refaire.

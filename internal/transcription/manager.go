@@ -193,8 +193,8 @@ func (m *TranscriptionManager) StartTranscriptionWithExternalAudio(
 		return nil
 	}
 
-	// Skip if no OpenAI API key is provided
-	if m.openAIAPIKey == "" {
+	// Skip if no OpenAI API key is provided. The local backend needs none.
+	if m.transcriptionConfig.Backend != BackendLocal && m.openAIAPIKey == "" {
 		m.logger.Info("Transcription disabled - no OpenAI API key provided",
 			logger.String("id", frequencyID),
 			logger.String("name", frequencyName))
