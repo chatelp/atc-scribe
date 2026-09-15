@@ -258,6 +258,16 @@ func render(role Role, digits string, toks []string, end int) string {
 	}
 }
 
+// trailingRoles are the words that give a number its role by following it rather
+// than preceding it. Terminal control speaks altitudes as "four thousand feet",
+// never "altitude four thousand" — measured: only 8 of 409 transmissions from an
+// approach sector carried a flight level, while feet were everywhere.
+var trailingRoles = map[string]Role{
+	"feet": RoleAltitude, "foot": RoleAltitude, "ft": RoleAltitude,
+	"knots": RoleSpeed, "knot": RoleSpeed,
+	"degrees": RoleHeading,
+}
+
 // letterGroups collects runs of NATO letters not already consumed as a value.
 // Three or more in a row is a light-aircraft callsign such as F-GKPV read out.
 func letterGroups(toks []string, used []bool) []string {
@@ -303,6 +313,13 @@ func looseNumbers(toks []string, used []bool) []Value {
 			// The token looked like a digit but read as none — an ambiguous word
 			// with nothing numeric after it. Advance, or we never leave this index.
 			continue
+		}
+		if end < len(toks) {
+			if role, ok := trailingRoles[toks[end]]; ok {
+				out = append(out, Value{Role: role, Digits: digits, Text: digits, Word: i})
+				i = end
+				continue
+			}
 		}
 		if role, text := classifyBare(digits); role != RoleUnknown {
 			out = append(out, Value{Role: role, Digits: digits, Text: text, Word: i})

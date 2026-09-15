@@ -4,13 +4,16 @@ import (
 	"bufio"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 )
 
 // Aircraft is one target the ADS-B receiver is currently seeing.
 type Aircraft struct {
-	Callsign string // as filed, e.g. "AFR1081", "EZY36VJ"
-	Hex      string
+	Callsign   string // as filed, e.g. "AFR1081", "EZY36VJ"
+	Hex        string
+	AltitudeFt float64 // barometric altitude, 0 if unknown
+	Phase      string  // "CRZ", "ARR", "DEP", "T/O", "TAX", "" if unknown
 }
 
 // Match is the outcome of trying to attach a transmission to an aircraft.
@@ -154,6 +157,32 @@ func (m *Matcher) Match(r Result, fleet []Aircraft) (Match, bool) {
 			score += 0.4
 			why = append(why, "operator named")
 		}
+
+		// Altitude is the one corroboration where both sides are measured rather
+		// than heard: a spoken flight level and a barometric altitude. When they
+		// agree it is strong evidence; when they disagree by more than a level
+		// change could explain, it is evidence against, which is why this may
+		// subtract where a spoken airline name may not.
+		if ft, ok := spokenAltitudeFt(r); ok && ac.AltitudeFt > 0 {
+			switch d := absF(ac.AltitudeFt - ft); {
+			case d <= 1500:
+				score += 0.4
+				why = append(why, "altitude agrees")
+			case d >= 8000:
+				score -= 0.3
+				why = append(why, "altitude contradicts")
+			}
+		}
+
+		// A landing or approach clearance is not issued to an aircraft in cruise.
+		if hasClearance(r, "landing", "approach") && ac.Phase == "CRZ" {
+			score -= 0.25
+			why = append(why, "cruising, not landing")
+		}
+		if hasClearance(r, "takeoff") && (ac.Phase == "CRZ" || ac.Phase == "ARR") {
+			score -= 0.25
+			why = append(why, "airborne, not departing")
+		}
 		best = append(best, scored{ac, score, strings.Join(why, " + ")})
 	}
 
@@ -179,6 +208,45 @@ func (m *Matcher) Match(r Result, fleet []Aircraft) (Match, bool) {
 		}
 	}
 	return out, true
+}
+
+// spokenAltitudeFt returns the height the transmission names, in feet, whether it
+// was spoken as a flight level or in feet. Approach control uses feet, en-route
+// uses levels, and the same station hears both.
+func spokenAltitudeFt(r Result) (float64, bool) {
+	for _, v := range r.Values {
+		n, err := strconv.Atoi(v.Digits)
+		if err != nil {
+			continue
+		}
+		switch v.Role {
+		case RoleFlightLevel:
+			return float64(n) * 100, true
+		case RoleAltitude:
+			if n >= 500 && n <= 45000 {
+				return float64(n), true
+			}
+		}
+	}
+	return 0, false
+}
+
+func hasClearance(r Result, kinds ...string) bool {
+	for _, c := range r.Clearances {
+		for _, k := range kinds {
+			if c.Type == k {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func absF(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // operatorsIn finds the ICAO codes of every operator named in the text. Single
