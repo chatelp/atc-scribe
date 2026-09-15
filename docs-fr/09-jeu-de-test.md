@@ -71,6 +71,34 @@ et on veut pouvoir mesurer s'il le fait bien.
 **3. `[unclear]` plutôt qu'une hypothèse.** Un annotateur qui devine fabrique de la
 fausse vérité terrain, et pénalise ensuite un modèle qui, lui, avait raison.
 
+## Un défaut du corpus, mesuré au passage
+
+**1 fichier sur 170 est illisible par ffmpeg.** Sur les 170 transmissions téléchargées le
+15/09 (jeu de test + échantillon pilote), une a fait échouer le décodage :
+`132500/t_20260914_225745.mp3`, `Invalid data found when processing input`.
+
+Ce n'est pas un téléchargement tronqué — les 8 593 octets correspondent à ce que sert la
+station. Le fichier commence par la balise `LAME3.100` suivie de remplissage `0xAA`, **sans
+la trame MPEG qui devrait l'envelopper** ; la première synchro de trame n'arrive qu'à
+l'octet 19. RTLSDR-Airband a écrit un en-tête malformé à la fermeture de ce squelch-là.
+
+La réparation est triviale : **jeter les octets qui précèdent la première synchro**
+(`0xFF` suivi de trois bits à 1). Le fichier rend alors 4,50 s d'audio parfaitement
+lisible.
+
+```python
+d = open(path, 'rb').read()
+i = next(k for k in range(len(d)-1) if d[k] == 0xFF and (d[k+1] & 0xE0) == 0xE0)
+open(path, 'wb').write(d[i:])
+```
+
+Appliqué au jeu de test : 0 fichier illisible restant. **À prévoir dans toute chaîne qui
+consomme ces enregistrements** — 0,6 % de perte silencieuse, c'est peu, mais une
+transcription qui échoue sans qu'on regarde pourquoi est une mesure faussée.
+
+Sans objet pour la production : la chaîne en direct consomme un flux continu, pas des
+fichiers par transmission.
+
 ## Ce qu'on mesurera dessus
 
 Dans cet ordre de priorité, d'après `04-corpus.md` :
