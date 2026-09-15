@@ -47,6 +47,27 @@ transmissions annotées), un nouveau comparatif **avec l'amorce de l'amont** —
 testé sans prompt alors que l'amont en fournit un, donc B n'a pas été jugé à la loyale —
 et une mesure de la fiabilité de l'aiguillage lui-même, qui est le point faible de A.
 
+**Deuxième série, 50 transmissions tirées au hasard** (`10-mesure-amorces.md`), qui
+corrige l'échantillonnage alphabétique de la première :
+
+- **L'amorce de l'amont est à jeter.** Elle multiplie par sept les boucles de
+  dégénérescence sur le français, double le temps de calcul, et **fuit dans la sortie**
+  (« Aircraft are at cruise level and use ICA-7, Yankee Papa… »). Écrite pour un flux
+  continu via l'API temps réel, elle pèse plus que l'audio sur une transmission de 3 s.
+- **Une amorce dans la langue de la fréquence répare presque tout** : boucles 7 → 1,
+  temps 4,84 s → 1,99 s. L'a priori par fréquence ne sert donc pas qu'à aiguiller entre
+  deux modèles : il choisit aussi la langue de l'amorce. C'est gratuit.
+- **Les deux modèles échouent différemment, et une seule façon est réparable.** jacktol
+  produit 14 noms de compagnie, dont 4 « Air Berlin » — compagnie disparue en 2017, donc
+  nécessairement faux — et 4 « Lufthansa » sur la tour d'un aéroclub. turbo n'en produit
+  qu'un seul, mais rend « opharnentureth » et « Jepenst er brent ». **L'erreur de jacktol
+  est structurée : le post-traitement de Co-ATC jette déjà le nom de compagnie et apparie
+  sur les chiffres contre la liste ADS-B. Celle de turbo n'offre aucune prise.** Argument
+  de poids pour A, invisible avant d'avoir les deux sorties côte à côte.
+- **La détection de langue échoue surtout sur des fichiers déjà perdus** (sorties en
+  russe, japonais, norvégien = charabia). L'aiguillage est donc moins fragile qu'on ne le
+  craignait, **à condition** de garder l'a priori par fréquence par défaut.
+
 ### Q2 — mlx-whisper et le modèle de jacktol : **tranchée, oui** *(15/09)*
 
 **Oui, après conversion et un renommage de fichier.** Mesures et détail dans

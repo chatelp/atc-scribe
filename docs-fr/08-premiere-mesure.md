@@ -4,7 +4,8 @@
 `~/Dev/Aero/whisper-lab/`. Chiffres bruts dans `q2c-resultats.json`.*
 
 > ⚠️ **Ce n'est pas une évaluation.** 16 fichiers, **non annotés**, pris dans l'ordre
-> alphabétique et non au hasard — exactement le piège d'échantillonnage que
+> alphabétique et non au hasard — refait proprement depuis, sur tirage aléatoire, dans
+> `10-mesure-amorces.md`, qui corrige deux conclusions de ce document — exactement le piège d'échantillonnage que
 > `04-corpus.md` décrit. Aucun taux d'erreur de mots n'est calculé ici et aucun ne peut
 > l'être. Ce document sert à répondre à Q2 (le modèle affiné se charge-t-il ?) et à
 > dégrossir Q1. **La mesure qui décidera reste celle des 120 transmissions annotées.**
@@ -53,6 +54,11 @@ Par fréquence :
 
 **Six fois plus rapide.** C'est plus que l'écart de taille de modèle ne le laissait
 attendre ; le décodage monolingue y contribue.
+
+> ⚠️ **Corrigé le 15/09 par `10-mesure-amorces.md`.** Cet écart **ne vaut que sans
+> amorce**. Dès qu'on fournit une amorce au modèle — ce que l'amont fait — jacktol tombe
+> à 7,5× et turbo à 1,2×, par repli de température. La conclusion « la vitesse ne
+> départagera pas » tient toujours, et même mieux qu'annoncé ; le facteur six, non.
 
 **Ce que ça dit du dimensionnement.** `01-station.md` donne 3 à 5 % d'occupation par
 fréquence de contrôle. Sept canaux à 5 % font 0,35 × temps réel de parole à traiter.
@@ -134,10 +140,10 @@ modèle rabat ce qu'il ne comprend pas sur le vocabulaire de son corpus d'entra�
 - Aucun WER, sur aucune des deux langues. Il faut la vérité terrain.
 - Rien sur le taux de reconnaissance des indicatifs et des chiffres, qui est le critère
   qui compte (`04-corpus.md`, point 3).
-- Rien sur `large-v3-turbo` correctement amorcé : ces essais ont été faits **sans prompt
-  initial**. L'amont en utilise un (`prompts/transcription_prompt.txt`) et il demande
-  explicitement la phraséologie et les chiffres en toutes lettres. Une part de l'écart
-  observé pourrait s'expliquer ainsi. **À refaire avec amorce avant toute conclusion sur B.**
+- ~~Rien sur `large-v3-turbo` correctement amorcé.~~ **Fait le 15/09** :
+  `10-mesure-amorces.md`. Résultat contraire à l'hypothèse — l'amorce de l'amont
+  *dégrade* le résultat, multiplie les boucles par sept sur le français et fuit dans la
+  sortie. L'écart mesuré ici n'était donc pas dû à l'absence d'amorce.
 - Rien sur l'aiguillage lui-même, qui est le cœur de la stratégie A.
 
 ## Suite
