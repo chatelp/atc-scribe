@@ -81,6 +81,20 @@ var roleKeywords = []struct {
 	{[]string{"qnh"}, RoleQNH},
 	{[]string{"squawk"}, RoleSquawk},
 	{[]string{"transponder"}, RoleSquawk},
+
+	// Phraséologie française. Le contrôle français emploie les mêmes rôles avec
+	// d'autres mots, et cette station les entend tous les jours.
+	{[]string{"niveau", "de", "vol"}, RoleFlightLevel},
+	{[]string{"niveau"}, RoleFlightLevel},
+	{[]string{"altitude"}, RoleAltitude},
+	{[]string{"cap"}, RoleHeading},
+	{[]string{"vitesse"}, RoleSpeed},
+	{[]string{"piste"}, RoleRunway},
+	{[]string{"fréquence"}, RoleFrequency},
+	{[]string{"frequence"}, RoleFrequency},
+	{[]string{"contactez"}, RoleFrequency},
+	{[]string{"transpondeur"}, RoleSquawk},
+	{[]string{"affichez"}, RoleSquawk},
 }
 
 // atcPhrases are said by controllers and not echoed as instructions by pilots.
@@ -183,6 +197,16 @@ func readNumber(toks []string, i int) (string, int) {
 			j++
 			continue
 		}
+		if n, ok := frenchGrouped[w]; ok {
+			b.WriteString(strconv.Itoa(n))
+			j++
+			continue
+		}
+		if w == wordMille && b.Len() > 0 {
+			b.WriteString("000")
+			j++
+			continue
+		}
 		if w == wordHundred && b.Len() > 0 {
 			b.WriteString("00")
 			j++
@@ -266,6 +290,8 @@ var trailingRoles = map[string]Role{
 	"feet": RoleAltitude, "foot": RoleAltitude, "ft": RoleAltitude,
 	"knots": RoleSpeed, "knot": RoleSpeed,
 	"degrees": RoleHeading,
+	"pieds":   RoleAltitude, "noeuds": RoleSpeed, "nœuds": RoleSpeed,
+	"degrés": RoleHeading, "degres": RoleHeading,
 }
 
 // letterGroups collects runs of NATO letters not already consumed as a value.
@@ -294,6 +320,32 @@ func letterGroups(toks []string, used []bool) []string {
 	return out
 }
 
+// opensNumber reports whether a token can start a number.
+func opensNumber(w string) bool {
+	if _, ok := isDigitWord(w); ok {
+		return true
+	}
+	if _, ok := groupedNumbers[w]; ok {
+		return true
+	}
+	if _, ok := frenchGrouped[w]; ok {
+		return true
+	}
+	return isNumeric(w)
+}
+
+func isNumeric(w string) bool {
+	if w == "" {
+		return false
+	}
+	for i := 0; i < len(w); i++ {
+		if w[i] < '0' || w[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // looseNumbers picks up digit runs with no keyword in front. They are the callsign
 // candidates: in ICAO phraseology a bare number group is almost always the flight
 // number, everything else being introduced by its role word.
@@ -303,10 +355,12 @@ func looseNumbers(toks []string, used []bool) []Value {
 		if used[i] {
 			continue
 		}
-		if _, ok := isDigitWord(toks[i]); !ok {
-			if _, ok2 := groupedNumbers[toks[i]]; !ok2 {
-				continue
-			}
+		// A run may open on a spelled digit, a grouped form, or a bare numeral:
+		// the models write both, sometimes in the same sentence — "manoeuvre 470
+		// Maya" next to "Latour Five Eight Seven". Only opening on spelled digits
+		// silently discarded every numeral the models produced.
+		if !opensNumber(toks[i]) {
+			continue
 		}
 		digits, end := readNumber(toks, i)
 		if end <= i {

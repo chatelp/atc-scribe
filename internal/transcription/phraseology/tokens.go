@@ -26,6 +26,35 @@ var numberWords = map[string]string{
 	"nine": "9", "niner": "9",
 }
 
+// frenchNumbers. The grammar was written for English and produced zero callsign
+// candidates on 280 French transmissions — not because the model failed but
+// because the parser had no French digits at all. French ATC spells numbers out
+// the same way: "autorisé décollage piste deux huit".
+var frenchNumbers = map[string]string{
+	"zero": "0", "zéro": "0",
+	"un": "1", "une": "1",
+	"deux":   "2",
+	"trois":  "3",
+	"quatre": "4",
+	"cinq":   "5",
+	"six":    "6",
+	"sept":   "7",
+	"huit":   "8",
+	"neuf":   "9",
+}
+
+// frenchGrouped covers the forms a French speaker uses for altitudes and levels.
+var frenchGrouped = map[string]int{
+	"dix": 10, "onze": 11, "douze": 12, "treize": 13, "quatorze": 14,
+	"quinze": 15, "seize": 16, "vingt": 20, "trente": 30, "quarante": 40,
+	"cinquante": 50, "soixante": 60, "cent": 100, "cents": 100,
+}
+
+const (
+	wordCent  = "cent"
+	wordMille = "mille"
+)
+
 // groupedNumbers are forms models produce even though ICAO phraseology avoids
 // them: "flight level three hundred" for FL300, "one thousand" for 1000.
 var groupedNumbers = map[string]int{
@@ -81,9 +110,17 @@ var homophones = map[string]bool{
 	"ait": true, "tree": true,
 }
 
-// isDigitWord reports whether w is a spoken single digit.
+// isDigitWord reports whether w is a spoken single digit, in either language.
+//
+// "six" and "sept" exist in both, with the same value in French and a different
+// one in English for "sept" — which is not an English digit at all, so there is
+// no collision. "un" is French only, "one" English only. The two tables can be
+// consulted in sequence without ambiguity.
 func isDigitWord(w string) (string, bool) {
-	d, ok := numberWords[w]
+	if d, ok := numberWords[w]; ok {
+		return d, ok
+	}
+	d, ok := frenchNumbers[w]
 	return d, ok
 }
 
