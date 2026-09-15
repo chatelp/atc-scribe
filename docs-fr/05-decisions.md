@@ -292,3 +292,44 @@ Ce qui ne se décide pas ici : s'il faut, un jour, publier un sous-ensemble audi
 serait le premier corpus d'ATC francophone ouvert, et c'est précisément le vide que
 `03-transcription.md` identifie. Le gain scientifique est réel ; la question ne se pose
 utilement qu'après la mesure, et elle demande un avis qui n'est pas technique.
+
+### Q17 — Le corpus ne contient aucune fréquence anglophone **bloquante pour Q1**, *(mesurée le 15/09)*
+
+Croisement fait le 15/09 entre `06-catalogue.csv` et les 12 dossiers réellement présents
+dans `/opt/adsb/public/transmissions/` :
+
+| Langue attendue au catalogue | Fréquences | Dont enregistrées |
+|---|---|---|
+| **anglais dominant** | 11 | **0** |
+| français dominant | 6 | 2 — 128,950 et 129,525 |
+| bilingue | 6 | 2 — 127,750 et 127,850 |
+| langue inconnue | 22 | 7 — l'amas 132-133 |
+
+**33 des 44 fréquences marquées « à transcrire » n'ont aucun enregistrement**, dont la
+totalité de CDG (approche, tour, sol, prévol), Orly Tour et Orly Approche, Le Bourget,
+Saint-Cyr, Toussus, et les secteurs DG et DO de Paris Contrôle. Le corpus est le résidu
+de deux groupes d'écoute seulement : `paris5-avec-enregistrement` et `amas-132-133`.
+
+**Ce que ça invalide.** L'anglais du jeu d'évaluation (`09-jeu-de-test.md`) repose sur
+132,500 — non identifiée, langue *supposée* — et 127,750, étiquetée bilingue. La mesure ne
+dira donc rien de l'anglais d'approche d'un grand aéroport : débit rapide, secteur saturé,
+collationnements serrés, accents non natifs. **C'est exactement le régime pour lequel
+jacktol a été affiné** (ATCO2, UWB-ATCC), donc la mesure risque de le sous-estimer.
+Conclure sur Q1 sans ça serait conclure sur la moitié du problème.
+
+**Comment y remédier, et pourquoi ça réordonne le chantier.** Enregistrer un groupe CDG
+demande de basculer le groupe d'écoute — donc l'accord du propriétaire — et la sortie
+fichier par transmission **dégrade le flux en direct** (`01-station.md` : médiane de salve
+4,6 s → 0,1 s, 0 % → 64 % de salves sous la seconde).
+
+> **Mais le mode de diffusion par canal (D2) est aussi la façon propre de collecter.**
+> Un point de montage Icecast continu par fréquence n'ouvre pas un encodeur LAME à chaque
+> squelch : il échappe par construction au piège de fragmentation. Ce qu'il faut bâtir de
+> toute façon pour brancher Co-ATC sur la station est aussi ce qui débloque le corpus
+> anglophone.
+>
+> **Proposition : remonter le mode par canal avant l'enrichissement du corpus**, au lieu
+> de l'ordre initialement prévu. Décision du propriétaire.
+
+En attendant, le jeu de 120 reste utile — il tranche la question française, qui est
+l'apport revendiqué du projet — mais **il ne suffit pas à trancher Q1**.
