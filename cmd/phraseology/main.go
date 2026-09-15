@@ -37,9 +37,21 @@ func main() {
 	shuffle := flag.Int64("shuffle", 0, "seed: draw each fleet from a random other moment — the real null hypothesis")
 	airlines := flag.String("airlines", "assets/airlines.dat", "OpenFlights airlines.dat")
 	minDigits := flag.Int("min-digits", 3, "shortest spoken number that may be a flight number")
+	capture := flag.String("capture", "", "transcripts of a recorded capture (JSON)")
+	adsb := flag.String("adsb", "", "ADS-B history recovered from readsb heatmaps (JSON)")
+	seeds := flag.Int("seeds", 5, "control runs")
+	offset := flag.Int("offset-hours", 2, "hours to subtract from capture times to reach UTC")
 	field := flag.String("field", "texte", "object key holding the text")
 	verbose := flag.Bool("v", false, "print every parsed transmission")
 	flag.Parse()
+
+	if *capture != "" {
+		if err := measureCapture(*capture, *adsb, *airlines, *window, *minDigits, *seeds, *offset, *verbose); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if *db != "" {
 		if err := measureAgainstADSB(*db, *airlines, *window, *control, *shuffle, *minDigits, *verbose); err != nil {

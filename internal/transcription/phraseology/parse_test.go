@@ -144,3 +144,45 @@ func TestGarbageDoesNotPanic(t *testing.T) {
 		_ = Parse(s)
 	}
 }
+
+func TestFrenchPhraseology(t *testing.T) {
+	// Real output from the French-specialised model on this station's audio.
+	// The grammar produced nothing at all on 280 French transmissions before
+	// French digits existed.
+	r := Parse("Fox Alpha Charlie, autorisé décollage piste deux huit, rappelez vent arrière")
+	v, ok := find(r, RoleRunway)
+	if !ok || v.Text != "28" {
+		t.Errorf("piste: got %q (found=%v), want 28", v.Text, ok)
+	}
+	if len(r.Letters) == 0 || r.Letters[0] != "FAC" {
+		t.Errorf("letters: got %v, want FAC first", r.Letters)
+	}
+}
+
+func TestFrenchFlightLevelAndHeading(t *testing.T) {
+	cases := []struct {
+		in   string
+		role Role
+		want string
+	}{
+		{"montez niveau trois cinq zero", RoleFlightLevel, "FL350"},
+		{"cap deux sept zero", RoleHeading, "270"},
+		{"quatre mille pieds", RoleAltitude, "4000"},
+		{"vitesse deux deux zero", RoleSpeed, "220"},
+	}
+	for _, c := range cases {
+		v, ok := find(Parse(c.in), c.role)
+		if !ok || v.Text != c.want {
+			t.Errorf("%q: got %q (found=%v), want %q", c.in, v.Text, ok, c.want)
+		}
+	}
+}
+
+func TestFrenchDigitsDoNotBreakEnglish(t *testing.T) {
+	// "six" and "sept" exist in both languages; "sept" is not an English digit,
+	// so adding French must not disturb an English reading.
+	v, ok := find(Parse("descend flight level three five zero"), RoleFlightLevel)
+	if !ok || v.Text != "FL350" {
+		t.Errorf("got %q (found=%v), want FL350", v.Text, ok)
+	}
+}
