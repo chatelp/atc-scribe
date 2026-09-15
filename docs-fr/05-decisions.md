@@ -19,10 +19,18 @@ motif. Une question qui se pose s'ajoute à la seconde.*
 | D9 | **Les données de référence sont déjà mondiales — rien à fournir pour l'Île-de-France** | 15/09 | `assets/` est livré peuplé dans le dépôt amont (OurAirports + tar1090-db + OpenFlights). Les sept terrains (LFPG, LFPO, LFPB, LFPZ, LFPX, LFPN, LFPV) sont présents avec leurs pistes. Au démarrage : 307 aérodromes, 67 pistes et 43 balises dans les 100 NM. L'affirmation contraire de `02-co-atc-amont.md` était fausse et a été corrigée. |
 | D10 | **Le moteur d'exécution est mlx-whisper** | 15/09 | Q2 tranchée par la mesure (`08-premiere-mesure.md`) : le modèle affiné de jacktol se convertit en 10,5 s et se charge. Mesuré sur 16 transmissions réelles, **× 8,5 le temps réel en médiane contre × 1,4 pour `large-v3-turbo`**. Et le moteur que l'amont recommande, faster-whisper, n'a pas d'accélération Metal. Décision révisable si l'affinage maison (stratégie C) impose un autre format. |
 | D11 | **Passe de confidentialité sur les documents publiables** — les coordonnées de la station restent, le reste part | 15/09 | `CLAUDE.md` demande « pas d'adresse exacte » tout en notant que la position est déjà publique via FlightAware. Arbitrage du propriétaire : **on garde la position** (48.80586 / 2.04932 / 152 m), sans laquelle aucune mesure de portée ou de propagation n'a de sens, et **on retire de `01-station.md` l'étage, l'orientation de la prise d'antenne et les identifiants de compte FlightAware et Flightradar24** — aucune valeur technique, et ensemble ils désignaient un logement plutôt qu'une station. Fait avant le premier commit : **rien de tout cela n'est entré dans l'historique git**. |
+| D12 | **Le modèle anglais est `large-v3-atco2` multilingue, pas `jacktol medium.en`** | 16/09 | Départagé par l'ADS-B, pas par un accord entre modèles : sur 1 468 transmissions de la captation du 15/09, le multilingue affiné ATC produit **94 appariements vrais contre 62,6**, et gagne sur les cinq fréquences sans exception. Sur 124,625 le modèle anglais tombe **au niveau du hasard**. `03-transcription.md` désignait le mauvais candidat ; c'est corrigé. Détail dans `18-nuit-du-15.md`. |
+| D13 | **La base SQLite de Co-ATC ne s'efface jamais** | 15/09 | Un `rm -rf data/` a détruit l'historique ADS-B d'une fenêtre de captation. Récupéré depuis `globe_history` de readsb, mais la règle tient : cette base est la seule trace locale du croisement radio/ADS-B, et elle ne se reconstitue pas toute seule. |
 
 ## Questions ouvertes
 
-### Q1 — Quelle stratégie de modèle pour le bilinguisme ? **bloquante** *(premiers éléments, 15/09)*
+### Q1 — Quelle stratégie de modèle pour le bilinguisme ? **branche anglaise tranchée** *(16/09)*
+
+> **La branche anglaise est réglée (D12)** : `sfabriece/whisper-large-v3-atco2-asr-mlx`,
+> départagé par l'appariement ADS-B sur 1 468 transmissions réelles. Ce qui reste ouvert,
+> et qui l'était depuis le début, **c'est le français** — et rien de ce qui a été mesuré
+> depuis ne l'a fait bouger.
+
 
 Deux modèles avec aiguillage par langue (A), un seul multilingue générique (B), ou un
 affinage maison (C). **À trancher par la mesure**, protocole dans `04-corpus.md`. C'est la
@@ -417,3 +425,23 @@ ignorer la première trame par prudence.
 dans `rtl_airband.conf`. La sauvegarde du gabarit modifié reste dans
 `modes/orly-approche.tmpl.avant-captation-20260915-120506` si la manipulation est
 à refaire.
+
+### Q18 — L'historique ADS-B de readsb : à préserver *(nouvelle, 16/09)*
+
+`/opt/adsb/globe_history` sur la station contient un historique permanent complet —
+une tranche binaire gzip par demi-heure, avec positions, altitudes **et indicatifs**.
+Format non documenté, décodé le 15/09 et reconstitué sans perte : 53 568 positions,
+1 092 avions nommés, 100 % avec indicatif sur la fenêtre de captation. Décodeur dans
+`whisper-lab/heatmap.py`.
+
+**Conséquence** : aucune captation future n'a besoin d'un enregistrement ADS-B en
+parallèle. Il suffit que ces tranches ne soient pas purgées. À dire à l'agent de la
+station, et à vérifier : combien de jours sont conservés ?
+
+### Q19 — Pourquoi 125,825 est-elle la moins bien transcrite ? *(nouvelle, 16/09)*
+
+49 % de précision, la dernière des cinq, alors qu'elle porte le plus de trafic —
+491 transmissions, **26 % d'occupation** contre les 3 à 5 % d'une fréquence ordinaire.
+L'hypothèse simple est que la saturation est la cause : chevauchements, débit rapide.
+**Non vérifiée.** Le test serait de mesurer la précision en fonction de l'occupation
+instantanée — faisable avec les données déjà en main.
