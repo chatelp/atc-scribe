@@ -42,3 +42,8 @@ Thumbs.db
 config.toml
 # Local run logs (co-atc-local fork)
 /runs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
