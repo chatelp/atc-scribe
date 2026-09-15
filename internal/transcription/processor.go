@@ -58,6 +58,13 @@ func NewProcessor(
 	logger *logger.Logger,
 	fileLogger *FileLogger,
 ) (ProcessorInterface, error) {
+	// The local backend satisfies the same interface, so nothing downstream of
+	// here — storage, websocket, the map — needs to know which engine ran.
+	if config.Backend == BackendLocal {
+		return NewLocalProcessor(ctx, frequencyID, audioReader, config,
+			wsServer, storage, logger, fileLogger)
+	}
+
 	// Check if OpenAI API key is provided - fail fast if missing
 	if config.OpenAIAPIKey == "" {
 		return nil, fmt.Errorf("OpenAI API key is required for transcription processor")

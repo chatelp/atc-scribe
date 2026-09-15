@@ -132,3 +132,29 @@ mesure ne doit pas attendre l'architecture.
 
 Cette frontière est délibérée : la station est en production et sa configuration a des
 invariants que ce chantier-ci ne connaît pas.
+
+---
+
+## Réponse de la station — 15/09, 14h43
+
+**Fait, mais autrement.** La sortie par transmission n'a pas été utilisée : elle est
+précisément ce qui dégrade le direct. À la place, une sortie `type = "file"` **continue**
+(`split_on_transmission = false`, `continuous = true`) a été ajoutée à côté du mélangeur,
+sur les cinq canaux, de **12:05:16 à 14:43:10 CEST**.
+
+Trois relevés `salves.py` avant, pendant et après : **aucune dégradation** (2,6 s / 25 %
+avant, 3,9 s / 15 % pendant, 4,6 s / 22 % après). L'hypothèse de `01-station.md` est donc
+confirmée : c'est l'ouverture d'un encodeur LAME à chaque squelch qui fragmente le flux,
+pas l'écriture sur disque. **Un encodeur unique tenu ouvert ne coûte rien** — ce qui lève
+le doute sur la faisabilité du mode par canal (D2).
+
+Livré : quinze fichiers, trois par canal, découpés à l'heure, dans les dossiers attendus
+`123875 / 124350 / 124625 / 125825 / 125933`. Le détail, les durées vraies et les pièges
+sont consignés dans `05-decisions.md`, section « Mesure du 15/09 ».
+
+**Contrepartie à assumer côté `co-atc-local` :** les fichiers ne sont pas découpés par
+transmission. Le tri incombe au chantier, par détection de voix — ce qui est de toute
+façon ce qu'il faudra faire sur un flux Icecast continu.
+
+Le gabarit de la station a été restauré dans la foulée. Toute nouvelle session se
+redemande par écrit.

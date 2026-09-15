@@ -470,7 +470,7 @@ type Service struct {
 	streamPortIndex      int   // For round-robin port selection
 	allServerPorts       []int // Combined list of primary and additional ports
 	transcriptionManager *transcription.TranscriptionManager
-	wsServer             *websocket.Server // WebSocket server for broadcasting status updates
+	wsServer             *websocket.Server               // WebSocket server for broadcasting status updates
 	connectionStatus     map[string]connectionStatusInfo // Track connection status per frequency
 	statusMu             sync.RWMutex                    // Mutex for connectionStatus map
 }
@@ -507,7 +507,26 @@ func NewService(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Create transcription manager
+	// Expected language per frequency, straight from the catalogue.
+	frequencyLanguages := make(map[string]string, len(config.Frequencies.Sources))
+	for _, src := range config.Frequencies.Sources {
+		if src.Language != "" {
+			frequencyLanguages[src.ID] = src.Language
+		}
+	}
+
 	transcriptionConfig := transcription.Config{
+		Backend:            config.Transcription.Backend,
+		FrequencyLanguages: frequencyLanguages,
+		Local: transcription.LocalSTTConfig{
+			ServerURL:         config.Transcription.Local.ServerURL,
+			TimeoutSeconds:    config.Transcription.Local.TimeoutSeconds,
+			SegmentSilenceMs:  config.Transcription.Local.SegmentSilenceMs,
+			SegmentMinMs:      config.Transcription.Local.SegmentMinMs,
+			SegmentMaxSeconds: config.Transcription.Local.SegmentMaxSeconds,
+			SegmentPrerollMs:  config.Transcription.Local.SegmentPrerollMs,
+			SilenceThreshold:  config.Transcription.Local.SilenceThreshold,
+		},
 		OpenAIAPIKey:          config.Transcription.OpenAIAPIKey,
 		Model:                 config.Transcription.Model,
 		Language:              config.Transcription.Language,
