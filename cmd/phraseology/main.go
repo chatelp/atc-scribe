@@ -176,23 +176,25 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		at     time.Time
 		flight string
 		hex    string
+		alt    float64
 	}
 	var sky []sighting
-	rows, err := conn.Query(`SELECT timestamp, flight, hex FROM adsb_targets
+	rows, err := conn.Query(`SELECT timestamp, flight, hex, COALESCE(alt_baro, 0) FROM adsb_targets
 	                          WHERE flight IS NOT NULL AND TRIM(flight) != ''`)
 	if err != nil {
 		return err
 	}
 	for rows.Next() {
 		var ts, fl, hx string
-		if err := rows.Scan(&ts, &fl, &hx); err != nil {
+		var alt float64
+		if err := rows.Scan(&ts, &fl, &hx, &alt); err != nil {
 			return err
 		}
 		t, err := time.Parse(time.RFC3339, ts)
 		if err != nil {
 			continue
 		}
-		sky = append(sky, sighting{t, strings.TrimSpace(fl), hx})
+		sky = append(sky, sighting{t, strings.TrimSpace(fl), hx, alt})
 	}
 	rows.Close()
 	sort.Slice(sky, func(i, j int) bool { return sky[i].at.Before(sky[j].at) })
@@ -263,13 +265,14 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		}
 		covered++
 
-		seen := map[string]string{}
+		// The last sighting inside the window is the aircraft's state at that moment.
+		seen := map[string]phraseology.Aircraft{}
 		for _, s := range sky[lo:hi] {
-			seen[s.flight] = s.hex
+			seen[s.flight] = phraseology.Aircraft{Callsign: s.flight, Hex: s.hex, AltitudeFt: s.alt}
 		}
 		fleet := make([]phraseology.Aircraft, 0, len(seen))
-		for cs, hx := range seen {
-			fleet = append(fleet, phraseology.Aircraft{Callsign: cs, Hex: hx})
+		for _, ac := range seen {
+			fleet = append(fleet, ac)
 		}
 		fleetSizes = append(fleetSizes, len(fleet))
 

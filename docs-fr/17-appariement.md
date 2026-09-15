@@ -121,12 +121,39 @@ du projet — et c'est insuffisant pour alimenter directement l'extraction de cl
 une fausse clairance d'atterrissage sur un avion réel est une faute grave, et une sur
 quatre le serait.
 
-Les leviers non essayés, par ordre d'intérêt :
+## Le contexte de vol — ajouté, et mesuré
 
-1. **Le contexte de vol.** Une clairance d'atterrissage va à un avion en approche, pas à
-   un avion au FL380. Co-ATC connaît la phase de chaque avion (`CRZ`, `ARR`, `DEP`) et
-   c'est exactement ce que le prompt de l'amont exploite. **Probablement le plus rentable.**
-2. **La continuité.** Un indicatif entendu se répète sur plusieurs transmissions
+**C'est la seule corroboration où les deux côtés sont mesurés plutôt qu'entendus** : une
+altitude prononcée et une altitude barométrique. Quand elles s'accordent à moins de
+1 500 pieds, +0,40 ; quand elles divergent de plus de 8 000 pieds, **−0,30**. C'est le seul
+endroit où une règle *retire* du score — un nom de compagnie ne le fait jamais, parce qu'il
+peut être halluciné ; une altitude ADS-B, non.
+
+S'y ajoutent deux règles de bon sens : une clairance d'atterrissage ne va pas à un avion en
+croisière, une clairance de décollage ne va pas à un avion en l'air.
+
+**Et une leçon de méthode.** Le premier jet comparait un niveau de vol prononcé à
+l'altitude ADS-B — et ne s'est **jamais déclenché**. Diagnostic : sur 409 transmissions de
+ce corpus d'approche, **8 seulement portent un niveau de vol**. Les contrôleurs d'approche
+disent « four thousand feet », pas « flight level four zero ». La grammaire ne savait pas
+lire les pieds : il lui manquait les **mots-clés qui suivent le nombre** au lieu de le
+précéder — `feet`, `knots`, `degrees`.
+
+Résultat après correction :
+
+| | Appariés | Hasard | Précision | Vrais | z |
+|---|---|---|---|---|---|
+| Sans contexte de vol | 40 | 9,8 | 76 % | 30,2 | 10,7 |
+| **Avec contexte de vol** | **45** | **9,5** | **79 %** | **35,5** | **11,8** |
+
+Curiosité qui mérite d'être dite : **un seul appariement porte la mention « altitude
+agrees »**. Le gain ne vient donc pas du bonus mais de la **pénalité**, qui écarte les
+avions concurrents dont l'altitude contredit ce qui est dit, et laisse le bon remonter. La
+règle travaille surtout en éliminant, pas en confirmant.
+
+Les leviers restants :
+
+1. **La continuité.** Un indicatif entendu se répète sur plusieurs transmissions
    consécutives ; un appariement isolé est plus douteux qu'un appariement répété.
 3. **La qualité de la transcription elle-même**, qui reste le plancher de tout le reste.
 
