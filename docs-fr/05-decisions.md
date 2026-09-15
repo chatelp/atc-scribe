@@ -1,0 +1,278 @@
+# Décisions et questions ouvertes
+
+*Tenir ce fichier à jour est une consigne, pas une option : c'est la mémoire du
+chantier. Une décision prise se déplace dans la première section avec sa date et son
+motif. Une question qui se pose s'ajoute à la seconde.*
+
+## Décisions prises
+
+| # | Décision | Date | Motif |
+|---|---|---|---|
+| D1 | **Le service tournera sur le Mac mini M4**, pas sur la station | 15/09 | Deux cœurs Haswell déjà chargés côté station ; la transcription locale demande de la puissance. L'ADS-B et l'audio traversent le réseau : quelques centaines de kbit/s, sans commune mesure avec le lien disponible. |
+| D2 | **Le mode de diffusion par canal s'ajoute au mélangeur, il ne le remplace pas** — et il est activable à la demande | 15/09 | Le flux mélangé `aero.mp3` est écouté tous les jours et ne doit pas changer. Le mode par canal rejoint la mécanique de bascule existante de `radio-ctl`. |
+| D3 | **Transcription entièrement locale**, l'API OpenAI est retirée | 15/09 | Coût récurrent, envoi de l'audio chez un tiers, dépendance réseau sur une station autonome. C'est la raison d'être du fork. |
+| D4 | **Nom du dépôt : `co-atc-local`** | 15/09 | Destiné à un dépôt public. C'est ce qu'on cherche quand on veut Co-ATC sans OpenAI. Whisper est le moyen, « local » est la promesse. |
+| D5 | **Le service reste sur le réseau local**, jamais exposé | 15/09 | Co-ATC n'a aucune authentification et son auteur déconseille l'exposition. |
+| D6 | **La licence amont est MIT — le fork est publiable** | 15/09 | Vérifié le 15/09 dans `LICENSE` sur la branche `main` du dépôt amont : « MIT License — Copyright (c) 2025 Yegor S ». MIT autorise la modification et la redistribution sans réciprocité et sans autorisation préalable. **Seule obligation : conserver la notice de copyright et le texte de la licence dans toute copie.** Concrètement : garder le fichier `LICENSE` amont tel quel, et signaler le fork dans le README. |
+| D7 | **Le fork est publié sous licence MIT**, comme l'amont | 15/09 | Décision du propriétaire. Un fork MIT d'un projet MIT n'ajoute aucune friction pour qui voudrait reprendre le travail et garde ouverte la possibilité de renvoyer des morceaux en amont (consigne « le fork reste rebasable »). Le fichier `LICENSE` amont est conservé tel quel ; la notice du fork s'ajoute, elle ne remplace pas. |
+| D8 | **La source ADS-B de la station fonctionne sans adaptation** — mode `tar1090` de l'amont, tel quel | 15/09 | Mesuré le 15/09 : `tar1090_base_url = "http://192.168.1.10:8080/data/"`, validation réussie au démarrage, **128 avions suivis dont 96 positionnés**, phases détectées (68 CRZ, 17 ARR, 9 DEP, 1 T/O). Aucune ligne de Go écrite. La moitié du produit est acquise. |
+| D9 | **Les données de référence sont déjà mondiales — rien à fournir pour l'Île-de-France** | 15/09 | `assets/` est livré peuplé dans le dépôt amont (OurAirports + tar1090-db + OpenFlights). Les sept terrains (LFPG, LFPO, LFPB, LFPZ, LFPX, LFPN, LFPV) sont présents avec leurs pistes. Au démarrage : 307 aérodromes, 67 pistes et 43 balises dans les 100 NM. L'affirmation contraire de `02-co-atc-amont.md` était fausse et a été corrigée. |
+| D10 | **Le moteur d'exécution est mlx-whisper** | 15/09 | Q2 tranchée par la mesure (`08-premiere-mesure.md`) : le modèle affiné de jacktol se convertit en 10,5 s et se charge. Mesuré sur 16 transmissions réelles, **× 8,5 le temps réel en médiane contre × 1,4 pour `large-v3-turbo`**. Et le moteur que l'amont recommande, faster-whisper, n'a pas d'accélération Metal. Décision révisable si l'affinage maison (stratégie C) impose un autre format. |
+| D11 | **Passe de confidentialité sur les documents publiables** — les coordonnées de la station restent, le reste part | 15/09 | `CLAUDE.md` demande « pas d'adresse exacte » tout en notant que la position est déjà publique via FlightAware. Arbitrage du propriétaire : **on garde la position** (48.80586 / 2.04932 / 152 m), sans laquelle aucune mesure de portée ou de propagation n'a de sens, et **on retire de `01-station.md` l'étage, l'orientation de la prise d'antenne et les identifiants de compte FlightAware et Flightradar24** — aucune valeur technique, et ensemble ils désignaient un logement plutôt qu'une station. Fait avant le premier commit : **rien de tout cela n'est entré dans l'historique git**. |
+
+## Questions ouvertes
+
+### Q1 — Quelle stratégie de modèle pour le bilinguisme ? **bloquante** *(premiers éléments, 15/09)*
+
+Deux modèles avec aiguillage par langue (A), un seul multilingue générique (B), ou un
+affinage maison (C). **À trancher par la mesure**, protocole dans `04-corpus.md`. C'est la
+question centrale du projet.
+
+**Premiers éléments, 16 transmissions non annotées** (`08-premiere-mesure.md`) — à ne pas
+confondre avec l'évaluation :
+
+- Sur l'anglais, **jacktol est nettement meilleur que `large-v3-turbo`** et six fois plus
+  rapide. Sur du vrai contrôle en route, il rend de la phraséologie OACI bien formée là
+  où le générique produit du charabia, une boucle dégénérative et des caractères hébreux.
+- Sur le français, **jacktol est pire qu'inutile : il est plausible.** Sur des
+  transmissions d'aéroclub francophone, il a produit « cleared to land runway zero five »
+  et « lufthansa one romeo romeo is ready for immediate clearance ». Une sortie bien
+  formée, confiante et entièrement inventée — un échec indiscernable d'une réussite pour
+  tout ce qui est en aval.
+- **La vitesse ne départagera pas.** Sept canaux à 5 % d'occupation demandent 0,35 × temps
+  réel ; les deux modèles tiennent largement. Le choix se fera sur la seule qualité.
+
+**Ce qui manque avant de trancher, et qui est bloquant :** la vérité terrain (120
+transmissions annotées), un nouveau comparatif **avec l'amorce de l'amont** — B a été
+testé sans prompt alors que l'amont en fournit un, donc B n'a pas été jugé à la loyale —
+et une mesure de la fiabilité de l'aiguillage lui-même, qui est le point faible de A.
+
+### Q2 — mlx-whisper et le modèle de jacktol : **tranchée, oui** *(15/09)*
+
+**Oui, après conversion et un renommage de fichier.** Mesures et détail dans
+`08-premiere-mesure.md`. Trois points à retenir pour les instructions d'installation :
+
+- `convert.py` n'est pas dans le paquet pip `mlx-whisper` — il faut `ml-explore/mlx-examples`,
+  dossier `whisper/`. Dépendance non versionnée.
+- La conversion prend **10,5 s** et produit 1,42 Gio en float16.
+- **`convert.py` écrit `model.safetensors`, `mlx_whisper` cherche `weights.safetensors`.**
+  Un `cp` corrige ; sans lui, l'erreur (`[load_npz] Input must be a zip file`) n'oriente
+  pas du tout vers la vraie cause.
+
+Q2 ne bloque plus Q1. Voir aussi D10.
+
+### Q3 — Comment Co-ATC apprend-il quelles fréquences sont actives ?
+
+La station change de groupe de fréquences à la demande. Trois options dans
+`01-station.md`. Dépend de ce que la configuration de Co-ATC permet de recharger à
+chaud — **pas encore cherché dans le code, à faire**.
+
+Deux éléments relevés le 15/09 qui aideront :
+
+- `/radio/etat` renvoie déjà le mode actif **et la liste de ses fréquences** sous forme
+  exploitable (`"freqs": ["123.875", "124.350", ...]`), plus un champ `accord` qui dit si
+  ce qui sort d'Icecast correspond au gabarit chargé. Mesuré : mode `chaine`, groupe
+  `orly-approche`, `accord: true`.
+- Côté Co-ATC, une fréquence dont la source ne répond pas provoque une **relance de
+  ffmpeg toutes les 4 à 5 secondes, sans recul de cadence**, indéfiniment (observé sur
+  les flux LiveATC de la configuration par défaut). Déclarer toutes les fréquences et
+  accepter que la plupart soient muettes n'est donc **pas** gratuit : à vérifier sur un
+  flux Icecast silencieux, qui n'est pas la même chose qu'un flux absent.
+
+### Q4 — Duplication des gabarits ou injection à la génération ?
+
+Pour le mode par canal. L'injection dans `radio-ctl` est recommandée (une seule source
+de vérité pour les fréquences) mais demande de toucher à `serveur.py`, qui tourne en
+production.
+
+### Q5 — L assistant vocal : **mis de côté** *(15/09)*
+
+Décision du propriétaire : hors chantier pour l instant. Il dépend d un modèle de
+langue, et la question ne se pose utilement qu une fois la transcription locale
+acquise. Ne pas y consacrer de temps ; se contenter de ne pas casser le code
+existant, ou de le neutraliser proprement derrière un drapeau de configuration.
+
+### Q6 — Le post-traitement peut-il se faire par règles plutôt que par un LLM ? *(précisée, 15/09)*
+
+Lecture faite de `prompts/post_processing_prompt.txt` (90 lignes) et de
+`internal/transcription/post_processor.go`. Le prompt réclame **cinq choses**, et elles
+ne sont pas du même niveau de difficulté :
+
+| | Ce qui est demandé | Codable par règles ? |
+|---|---|---|
+| 1 | corriger librement les erreurs de transcription | **non** — c'est le seul vrai besoin de modèle de langue |
+| 2 | écrire nombres, caps, niveaux et fréquences en chiffres | oui, grammaire de phraséologie |
+| 3 | décider si le locuteur est ATC ou pilote | probablement, aux tournures |
+| 4 | rattacher la transmission à un indicatif **de la liste ADS-B courante** | oui — appariement approximatif sur une liste courte et connue |
+| 5 | extraire les clairances et la piste | oui, motifs fermés et énumérés dans le prompt |
+
+**L'astuce centrale du produit est le point 4**, et elle n'est pas magique : le prompt
+reçoit la liste des avions que l'ADS-B voit en ce moment et interdit au modèle d'en
+inventer d'autres. Sur notre station cette liste fait 128 avions (mesuré le 15/09 à 11 h).
+Apparier « nonsense 353 » contre 128 indicatifs connus est une distance d'édition
+pondérée, pas un modèle de langue.
+
+Et le point 1 est celui dont on peut se passer : `content` brut reste stocké à côté de
+`content_processed`. **Q6 est donc plus prometteuse qu'elle n'en avait l'air — mais rien
+n'est mesuré.** Il faut le jeu de test annoté de `04-corpus.md` d'abord.
+
+Détail complet dans `07-carte-openai.md`.
+
+### Q7 — Quelles sources pour la météo française ?
+
+Windy est à remplacer. METAR et TAF sont disponibles publiquement ; les NOTAM français
+passent par le SIA. À arbitrer selon les conditions d'utilisation.
+
+### Q8 — Licence du fork : **tranchée** *(15/09)*
+
+Voir D6 (la licence amont est MIT, le fork est publiable) et D7 (le fork est publié
+sous MIT). Plus rien d'ouvert ici.
+
+### Q9 — Transcrire les ATIS : **oui, mais pour une seule fréquence**
+
+La question posée était : à quoi bon, si le METAR est gratuit en ligne ? Vérifié le
+15 septembre auprès d Aviation Weather Center, requête sur les terrains de la zone :
+
+| Terrain | METAR public | ATIS reçu ici |
+|---|---|---|
+| LFPG De Gaulle | **oui** | +16,6 / +20,5 dB, faible |
+| LFPO Orly | **oui** | +4,6 / +6,9 dB, sous le seuil |
+| LFPB Le Bourget | **oui** | +14,6 dB, faible |
+| LFPN Toussus | **oui** | +21,8 dB, correct |
+| LFPV Villacoublay | **oui** | pas d ATIS catalogué |
+| **LFPZ Saint-Cyr** | **NON** | **+49,4 dB, le plus fort de toute la bande** |
+| **LFPX Chavenay** | **NON** | +13,8 dB, faible |
+
+Le résultat s inverse : **le seul ATIS que la station reçoive parfaitement est le seul
+dont la météo ne soit disponible nulle part en ligne**. Les cinq terrains qui publient
+un METAR gratuit sont précisément ceux dont l ATIS arrive mal ou pas du tout.
+
+Et surtout, **un ATIS n est pas un METAR**. Il porte en plus la **piste en service**,
+le type d approche, le niveau de transition et les travaux en cours sur le terrain —
+rien de tout cela n est dans un METAR, ni disponible gratuitement en temps réel. Pour
+Co-ATC en particulier, qui détecte les phases de vol et la piste utilisée, **la piste en
+service de Saint-Cyr est une donnée directement exploitable par sa logique**.
+
+**Recommandation : un module tardif, optionnel, sur une seule fréquence** —
+131,025, échantillonnée toutes les quelques minutes, dont on extrait la piste en service
+plutôt qu on ne reconstitue un METAR complet. C est une porteuse permanente (médiane
+collée à la crête), donc aucun problème de squelch : il suffit d enregistrer N secondes
+à intervalle régulier.
+
+> ⚠️ **Un obstacle connu** : l ATIS de Saint-Cyr **sature le récepteur** — le
+> propriétaire l a constaté à l oreille, un souffle continu par-dessus la voix. À +49 dB
+> c est attendu. Il faudra un gain réduit ou une quantification plus basse **sur ce canal
+> seulement** — ce que le mode de diffusion par canal rend justement possible.
+
+C est probablement la seule donnée réellement originale que la station produise : tout
+le reste est, en principe, téléchargeable.
+
+### Q10 — Écart de comptage entre les documents et `06-catalogue.csv` *(ouvert, 15/09)*
+
+Relevé le 15/09 en comptant le CSV : **68 lignes**, réparties en 28 « identifiee »,
+14 « non identifiee », 7 « porteuse permanente », 2 « absente de l AIP » et 17 « sous le
+seuil ». Or `00-mission.md` et `01-station.md` annoncent tous deux « 52 fréquences
+identifiées », et `01-station.md` parle de « quinze fréquences actives dans aucune liste
+publique ».
+
+Les chiffres se recoupent si « 52 » désigne les fréquences **au-dessus du seuil**
+(68 − 17 = 51) et « 15 » les non catalogées (14 + 2 = 16) — à une unité près dans les
+deux cas. Il manque donc soit une ligne au CSV, soit une définition explicite.
+**Ne pas corriger les documents à l'aveugle** : trancher en reprenant la mesure d'origine
+sur la station. Sans importance pour la suite du chantier, mais à régler avant publication
+— un dépôt public qui annonce trois nombres différents pour la même chose s'expose.
+
+### Q11 — Vrai fork rebasable, ou dépôt séparé ? *(mesuré le 15/09)*
+
+**La question posée était : est-ce que ça vaut le coup, si on prévoit des modifications
+de fond ?** Elle se tranche par deux mesures, faites le 15/09 sur le clone amont.
+
+**Mesure 1 — notre empreinte réelle.** Le fork est *profond* mais *étroit* :
+
+| Zone | Lignes Go | Notre sort |
+|---|---|---|
+| `internal/transcription` | 2 457 | réécrite |
+| `internal/atcchat` | 1 119 | neutralisée (Q5) |
+| `internal/weather` | 690 | réécrite (Q7) |
+| **sous-total réécrit** | **4 266** | **17 % du Go** |
+| `internal/adsb` | 7 084 | intacte |
+| `internal/api`, `storage`, `frequencies`, `audio`, `templating`, `reference`… | ~13 000 | intactes |
+| `www/` (JS + HTML + CSS) | 15 798 | **intacte, à 100 %** |
+
+Total Go amont : 24 834 lignes. **Nous en réécrivons 17 %, et nous ne touchons pas une
+ligne de l'interface.**
+
+**Mesure 2 — où l'amont travaille, lui.** 46 commits, du 10 juillet 2025 au 3 mai 2026,
+**silencieux depuis 134 jours**. Lignes ajoutées et supprimées par zone sur tout
+l'historique :
+
+| Zone | Amont | Lecture |
+|---|---|---|
+| `www` | 23 317+ / 7 006− | c'est là qu'il vit |
+| `internal/adsb` | 8 806+ / 1 722− | activité soutenue |
+| `internal/api` | 3 553+ / 196− | croissance, peu de remaniement |
+| `internal/transcription` | 2 594+ / **78−** | écrite une fois, presque jamais retouchée |
+| `internal/atcchat` | 1 123+ / **4−** | idem |
+| `internal/weather` | 690+ / **0−** | **jamais modifiée depuis sa création** |
+
+**Les trois paquets que nous réécrivons sont exactement ceux que l'amont ne touche pas.**
+Nos conflits de rebase porteront donc sur des fichiers dont il ne bouge presque rien,
+pendant qu'il travaille sur les 72 % de code et les 15 798 lignes d'interface que nous
+laissons intacts.
+
+**Conclusion : oui, et l'argument s'inverse même.** Ce n'est pas « malgré » les
+modifications de fond qu'il faut un vrai fork, c'est **à cause** d'elles. Plus notre part
+est profonde et concentrée, plus il est précieux de pouvoir absorber sans effort le
+travail de l'amont sur la carte, l'ADS-B et les phases de vol — qui est la moitié du
+produit et 100 % de son activité récente. Un dépôt séparé nous ferait payer ce travail-là
+en réintégration manuelle, indéfiniment.
+
+**Réserve honnête** : un amont silencieux depuis 4 mois pourrait ne jamais reprendre. Dans
+ce cas le vrai fork n'aura rien coûté — c'est le même `git clone` avec un remote en plus.
+Le pari est asymétrique.
+
+**Décision du propriétaire.** Reste le détail de nommage : l'amont a déjà un `docs/` bien
+rempli (dont `LOCAL-STT.md`, qu'on veut garder). Nos documents français ont besoin d'un
+dossier à eux — `dossier/` ou `chantier/`.
+
+### Q12 — Quel `airport_code` pour la station ?
+
+`[station] airport_code` sert à deux choses : choisir les pistes du « terrain de
+référence » et interroger la météo. Aucun terrain n'est à la station ; le plus proche est
+**LFPZ Saint-Cyr, à environ 1,5 km**, retenu provisoirement le 15/09.
+
+Conséquence mesurée immédiatement : **Windy renvoie 204 sur LFPZ pour METAR et TAF**
+(les NOTAM passent). C'est la confirmation empirique de Q9 — LFPZ ne publie pas de METAR.
+Le service continue de tourner, il réessaie trois fois puis renonce et journalise une
+erreur toutes les dix minutes.
+
+Trois options : garder LFPZ et accepter l'absence de météo jusqu'à ce que Q7 la remplace ;
+mettre LFPO Orly, qui publie un METAR mais dont les pistes n'ont rien à voir avec ce
+qu'on entend sur les fréquences d'aéroclub ; ou dissocier les deux réglages, ce qui
+demande de toucher au code.
+
+### Q13 — Faut-il stocker la langue détectée ?
+
+Le schéma amont (`transcriptions`) n'a **aucun champ pour la langue** : `content`,
+`content_processed`, `speaker_type`, `callsign`. Sur une station bilingue c'est une
+information qu'on voudra garder — pour mesurer, pour afficher, et pour alimenter l'a
+priori par fréquence décrit dans `03-transcription.md`. Ajouter une colonne `language`
+est une divergence avec l'amont : petite, mais à assumer et à signaler comme telle si on
+propose le code en retour.
+
+### Q14 — Contraindre la sortie contre la géographie réelle ? *(nouvelle, 15/09)*
+
+Mesuré le 15/09 : le modèle de jacktol produit des toponymes **tchèques** — `praha`,
+`ruzyne`, `venox` — y compris sur un fichier de **Chavenay**, aéroclub des Yvelines. Or
+`large-v3-turbo` n'en produit nulle part. Ce n'est donc pas de la réception lointaine mais
+un **biais d'affinage** : jacktol est entraîné sur ATCO2 et UWB-ATCC, corpus de contrôle
+aérien tchèque, et rabat ce qu'il ne comprend pas sur le vocabulaire qu'il connaît.
+
+Le produit a déjà la parade en magasin : Co-ATC charge **43 balises dans les 100 NM** de
+la station et contraint déjà les indicatifs contre la liste ADS-B courante. Étendre la
+même contrainte aux points de report et aux toponymes est peu coûteux et directement
+utile. À évaluer avec Q6.
+
+Second usage, pour l'évaluation : **compter les hallucinations de toponymes est un
+indicateur en soi**, bien moins coûteux à produire qu'un WER et plus parlant pour ce
+produit qu'un taux d'erreur moyen.

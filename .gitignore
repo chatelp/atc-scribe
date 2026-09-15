@@ -40,3 +40,5 @@ Thumbs.db
 /configs/config.toml
 /configs/opensky_credentials.json
 config.toml
+# Local run logs (co-atc-local fork)
+/runs/

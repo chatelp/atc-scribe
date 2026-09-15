@@ -1,0 +1,69 @@
+mhz,service,crete_db,mediane_db,ecart_db,statut,langue_attendue,transcrire
+118.000,"Saint-Cyr Tour (LFPZ)",43.8,-0.1,43.9,"identifiee",fr,oui
+118.150,"Approche De Gaulle + Le Bourget",32.4,17.3,15.1,"identifiee",en,oui
+118.400,"Le Bourget Tour (secours)",2.8,0.6,2.2,"sous le seuil",?,non
+118.650,"De Gaulle Tour",0.2,-0.5,0.7,"sous le seuil",?,non
+118.700,"Orly Tour",38.6,2.8,35.8,"identifiee",mixte,oui
+118.800,"jamais cataloguee - des. 118.805",32.0,-0.7,32.7,"non identifiee",?,oui
+118.883,"jamais cataloguee - des. 118.885, voisine du Bourget",33.5,-1.2,34.7,"non identifiee",?,oui
+118.892,"jamais cataloguee - des. 118.890, voisine du Bourget",26.4,-1.2,27.6,"non identifiee",?,oui
+118.925,"Le Bourget Tour (LFPB)",29.8,1.7,28.1,"identifiee",mixte,oui
+119.250,"De Gaulle Tour",29.9,6.0,23.9,"identifiee",?,oui
+119.425,"Villacoublay Approche (LFPV)",41.7,-0.6,42.3,"identifiee",fr,oui
+119.625,"De Gaulle Tour (secours)",2.7,-0.5,3.2,"sous le seuil",?,non
+119.850,"Approche De Gaulle + Le Bourget",26.4,7.4,19.0,"identifiee",en,oui
+120.000,"Le Bourget ATIS",14.6,13.7,0.9,"porteuse permanente",?,non
+120.650,"De Gaulle Tour (secours)",2.8,-4.1,6.9,"sous le seuil",?,non
+120.750,"Toussus Tour (LFPN)",29.6,3.8,25.8,"identifiee",fr,oui
+120.900,"De Gaulle Tour",31.4,6.0,25.4,"identifiee",?,oui
+121.150,"Approche De Gaulle + Le Bourget",37.4,22.2,15.2,"identifiee",en,oui
+121.500,"Detresse",2.4,0.0,2.4,"sous le seuil",?,non
+121.550,"Orly Prevol",6.1,5.0,1.1,"sous le seuil",?,non
+121.608,"De Gaulle Sol",15.9,10.6,5.3,"identifiee",?,oui
+121.700,"Orly Sol",2.6,1.0,1.6,"sous le seuil",?,non
+121.725,"De Gaulle Prevol",10.6,1.0,9.6,"sous le seuil",?,non
+121.750,"Villacoublay Sol",7.3,1.1,6.2,"sous le seuil",?,non
+121.775,"De Gaulle Sol",12.7,8.0,4.7,"identifiee",?,oui
+121.808,"De Gaulle Sol",11.8,6.8,5.0,"identifiee",?,oui
+121.842,"De Gaulle Prevol",15.5,10.7,4.8,"identifiee",?,oui
+121.900,"Chavenay Sol / Le Bourget Sol",10.2,3.2,7.0,"sous le seuil",fr,non
+121.950,"Le Bourget Prevol",13.1,1.4,11.7,"identifiee",mixte,oui
+121.975,"De Gaulle Sol",8.0,3.9,4.1,"sous le seuil",?,non
+123.600,"De Gaulle Tour",4.7,-4.9,9.6,"sous le seuil",?,non
+123.875,"Orly Approche",37.6,16.1,21.5,"identifiee",mixte,oui
+124.350,"Approche De Gaulle + Le Bourget",44.6,25.6,19.0,"identifiee",en,oui
+124.450,"Orly Approche 2",6.6,1.5,5.1,"sous le seuil",?,non
+124.625,"Paris Controle - secteur DG",46.9,6.2,40.7,"identifiee",en,oui
+125.275,"Chavenay ATIS",13.8,10.9,2.9,"porteuse permanente",?,non
+125.325,"De Gaulle Tour (secours)",10.4,-0.6,11.0,"sous le seuil",?,non
+125.825,"De Gaulle Approche",35.4,14.1,21.3,"identifiee",en,oui
+125.933,"jamais cataloguee - des. 125.935",34.5,11.0,23.5,"non identifiee",?,oui
+126.425,"De Gaulle Approche (L)",37.0,27.7,9.3,"identifiee",en,oui
+126.500,"Orly ATIS (FR)",4.6,2.1,2.5,"sous le seuil",?,non
+126.575,"De Gaulle Approche (secours)",1.7,-0.4,2.1,"sous le seuil",?,non
+127.125,"De Gaulle ATIS (EN)",20.5,17.6,2.9,"porteuse permanente",?,non
+127.475,"Toussus ATIS",21.8,21.1,0.7,"porteuse permanente",?,non
+127.750,"Orly Depart",34.9,3.9,31.0,"identifiee",mixte,oui
+127.850,"Reims Controle - secteur KN",43.9,0.1,43.8,"identifiee",mixte,oui
+128.142,"8.33 - designateur 128.140, jamais cherche",42.5,0.9,41.6,"absente de l AIP",?,oui
+128.225,"De Gaulle ATIS (FR)",16.6,15.3,1.3,"porteuse permanente",?,non
+128.950,"Villacoublay Tour (LFPV)",32.4,-5.0,37.4,"identifiee",fr,oui
+129.525,"Chavenay Tour (LFPX)",39.4,10.3,29.1,"identifiee",fr,oui
+131.025,"Saint-Cyr ATIS",49.4,48.7,0.7,"porteuse permanente",?,non
+131.200,"De Gaulle Approche",43.1,16.1,27.0,"identifiee",en,oui
+131.350,"Orly ATIS (EN)",6.9,3.6,3.3,"sous le seuil",?,non
+132.275,"jamais cataloguee - des. 132.280",34.4,2.6,31.8,"non identifiee",?,oui
+132.500,"jamais cataloguee - des. 132.505",38.5,0.7,37.8,"non identifiee",?,oui
+132.733,"jamais cataloguee - des. 132.735",32.6,5.2,27.4,"non identifiee",?,oui
+132.742,"porteuse permanente - des. 132.740",24.1,20.7,3.4,"porteuse permanente",?,non
+132.783,"jamais cataloguee - des. 132.785",36.0,2.5,33.5,"non identifiee",?,oui
+132.825,"jamais cataloguee - des. 132.830",36.9,0.7,36.2,"non identifiee",?,oui
+133.000,"jamais cataloguee - des. 133.005",33.0,-0.2,33.2,"non identifiee",?,oui
+133.250,"jamais cataloguee - des. 133.255",37.4,-0.5,37.9,"non identifiee",?,oui
+133.375,"De Gaulle Approche",47.8,24.3,23.5,"identifiee",en,oui
+135.033,"jamais cataloguee - des. 135.035",32.8,1.0,31.8,"non identifiee",?,oui
+135.400,"Paris Controle - secteur DO",30.4,22.3,8.1,"identifiee",en,oui
+135.500,"jamais cataloguee - des. 135.505",35.7,0.5,35.2,"non identifiee",?,oui
+135.550,"jamais cataloguee - des. 135.555",35.4,3.1,32.3,"non identifiee",?,oui
+135.967,"8.33 - designateur 135.965, jamais cherche",39.9,6.3,33.6,"absente de l AIP",?,oui
+136.275,"De Gaulle Approche",30.3,14.0,16.3,"identifiee",en,oui
