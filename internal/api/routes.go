@@ -56,69 +56,73 @@ func (r *Router) Routes() http.Handler {
 		router.Post("/auth/login", r.handler.PostLogin)
 		router.Post("/auth/logout", r.handler.PostLogout)
 
-		// Everything below carries data from the receiver.
-		router.Use(r.handler.Auth().Require)
+		// Everything below carries data from the receiver. A Group is a mux of
+		// its own, which is what lets its middleware be declared after the public
+		// routes above -- chi refuses a Use() that follows a route on the same mux.
+		router.Group(func(router chi.Router) {
+			router.Use(r.handler.Auth().Require)
 
-		// Aircraft routes
-		router.Get("/aircraft", r.handler.GetAllAircraft)
-		router.Get("/aircraft/{id}", r.handler.GetAircraftByHex)
-		router.Get("/aircraft/{id}/tracks", r.handler.GetAircraftTracks)
+			// Aircraft routes
+			router.Get("/aircraft", r.handler.GetAllAircraft)
+			router.Get("/aircraft/{id}", r.handler.GetAircraftByHex)
+			router.Get("/aircraft/{id}/tracks", r.handler.GetAircraftTracks)
 
-		// Frequency routes
-		router.Get("/frequencies", r.handler.GetAllFrequencies)
-		router.Get("/frequencies/{id}", r.handler.GetFrequencyByID)
+			// Frequency routes
+			router.Get("/frequencies", r.handler.GetAllFrequencies)
+			router.Get("/frequencies/{id}", r.handler.GetFrequencyByID)
 
-		// Audio stream route
-		router.Get("/stream/{id}", r.handler.StreamAudio)
-		router.Head("/stream/{id}", r.handler.StreamAudio) // Add support for HEAD requests
+			// Audio stream route
+			router.Get("/stream/{id}", r.handler.StreamAudio)
+			router.Head("/stream/{id}", r.handler.StreamAudio) // Add support for HEAD requests
 
-		// WebSocket route
-		router.Get("/ws", r.handler.HandleWebSocket)
+			// WebSocket route
+			router.Get("/ws", r.handler.HandleWebSocket)
 
-		// Transcription routes
-		router.Get("/transcriptions", r.handler.GetAllTranscriptions)
-		router.Get("/transcriptions/frequency/{id}", r.handler.GetTranscriptionsByFrequency)
-		router.Get("/transcriptions/time-range", r.handler.GetTranscriptionsByTimeRange)
-		router.Get("/transcriptions/speaker/{type}", r.handler.GetTranscriptionsBySpeaker)
-		router.Get("/transcriptions/callsign/{callsign}", r.handler.GetTranscriptionsByCallsign)
+			// Transcription routes
+			router.Get("/transcriptions", r.handler.GetAllTranscriptions)
+			router.Get("/transcriptions/frequency/{id}", r.handler.GetTranscriptionsByFrequency)
+			router.Get("/transcriptions/time-range", r.handler.GetTranscriptionsByTimeRange)
+			router.Get("/transcriptions/speaker/{type}", r.handler.GetTranscriptionsBySpeaker)
+			router.Get("/transcriptions/callsign/{callsign}", r.handler.GetTranscriptionsByCallsign)
 
-		// Configuration
-		router.Get("/config", r.handler.GetConfig)
+			// Configuration
+			router.Get("/config", r.handler.GetConfig)
 
-		// How the server is actually running: database growth, disk, retention,
-		// log level. See internal/api/server_handlers.go.
-		router.Get("/server", r.handler.GetServerState)
-		router.Get("/adsb/source", r.handler.GetADSBSourceStatus)
+			// How the server is actually running: database growth, disk, retention,
+			// log level. See internal/api/server_handlers.go.
+			router.Get("/server", r.handler.GetServerState)
+			router.Get("/adsb/source", r.handler.GetADSBSourceStatus)
 
-		// Station Configuration
-		router.Get("/station", r.handler.GetStationConfig)    // New route for station config
-		router.Post("/station", r.handler.SetStationOverride) // New route for station override
+			// Station Configuration
+			router.Get("/station", r.handler.GetStationConfig)    // New route for station config
+			router.Post("/station", r.handler.SetStationOverride) // New route for station override
 
-		// Weather Data
-		router.Get("/wx", r.handler.GetWeatherData)
+			// Weather Data
+			router.Get("/wx", r.handler.GetWeatherData)
 
-		// Reference data (airports, navaids, runways)
-		router.Get("/airports", r.handler.GetAirports)
-		router.Get("/airports/{ident}", r.handler.GetAirportByIdent)
-		router.Get("/heliports", r.handler.GetHeliports)
-		router.Get("/navaids", r.handler.GetNavaids)
-		router.Get("/navaids/{ident}", r.handler.GetNavaidByIdent)
-		router.Get("/runways", r.handler.GetRunways)
+			// Reference data (airports, navaids, runways)
+			router.Get("/airports", r.handler.GetAirports)
+			router.Get("/airports/{ident}", r.handler.GetAirportByIdent)
+			router.Get("/heliports", r.handler.GetHeliports)
+			router.Get("/navaids", r.handler.GetNavaids)
+			router.Get("/navaids/{ident}", r.handler.GetNavaidByIdent)
+			router.Get("/runways", r.handler.GetRunways)
 
-		// ATC Chat routes
-		router.Post("/atc-chat/session", r.handler.CreateATCChatSession)
-		router.Delete("/atc-chat/session/{sessionId}", r.handler.EndATCChatSession)
-		router.Get("/atc-chat/session/{sessionId}/status", r.handler.GetATCChatSessionStatus)
-		router.Post("/atc-chat/session/{sessionId}/update-context", r.handler.UpdateATCChatSessionContext)
-		router.Get("/atc-chat/sessions", r.handler.GetATCChatSessions)
-		router.Get("/atc-chat/airspace-status", r.handler.GetATCChatAirspaceStatus)
-		router.Get("/atc-chat/ws/{sessionId}", r.handler.HandleATCChatWebSocket)
+			// ATC Chat routes
+			router.Post("/atc-chat/session", r.handler.CreateATCChatSession)
+			router.Delete("/atc-chat/session/{sessionId}", r.handler.EndATCChatSession)
+			router.Get("/atc-chat/session/{sessionId}/status", r.handler.GetATCChatSessionStatus)
+			router.Post("/atc-chat/session/{sessionId}/update-context", r.handler.UpdateATCChatSessionContext)
+			router.Get("/atc-chat/sessions", r.handler.GetATCChatSessions)
+			router.Get("/atc-chat/airspace-status", r.handler.GetATCChatAirspaceStatus)
+			router.Get("/atc-chat/ws/{sessionId}", r.handler.HandleATCChatWebSocket)
 
-		// Simulation routes
-		router.Post("/simulation/aircraft", r.handler.CreateSimulatedAircraft)
-		router.Put("/simulation/aircraft/{hex}/controls", r.handler.UpdateSimulationControls)
-		router.Delete("/simulation/aircraft/{hex}", r.handler.RemoveSimulatedAircraft)
-		router.Get("/simulation/aircraft", r.handler.GetSimulatedAircraft)
+			// Simulation routes
+			router.Post("/simulation/aircraft", r.handler.CreateSimulatedAircraft)
+			router.Put("/simulation/aircraft/{hex}/controls", r.handler.UpdateSimulationControls)
+			router.Delete("/simulation/aircraft/{hex}", r.handler.RemoveSimulatedAircraft)
+			router.Get("/simulation/aircraft", r.handler.GetSimulatedAircraft)
+		})
 	})
 
 	// Serve static files from the hardcoded web directory
