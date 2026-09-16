@@ -167,6 +167,10 @@ frequency_mhz = 118.700          # 118.7 MHz
 url = "https://s1-bos.liveatc.net/cyyz7"
 order = 3                        # Third in display order
 transcribe_audio = true          # Transcribe this frequency
+language = "en"                  # Expected language, from the catalogue rather
+                                 # than from the model: measured on a bilingual
+                                 # band, automatic detection is wrong on 16% of
+                                 # French and 28% of English transmissions.
 
 # Toronto Pearson Arrivals
 [[frequencies.sources]]
@@ -203,7 +207,14 @@ transcribe_audio = true
 # - This will eat up your API credits, so please be careful.
 #######################################################
 [transcription]
-# OpenAI API settings
+# Transcription engine: "openai" or "local".
+# "local" posts whole transmissions to the sidecar in sidecar/, which runs a
+# Whisper model on this machine: no API key, and no audio leaving the host.
+# It implements the contract upstream documented in docs/LOCAL-STT.md.
+# Settings for it are in [transcription.local], at the end of this section.
+backend = "openai"
+
+# OpenAI API settings, used when backend = "openai"
 openai_api_key = ""              # Replace with your actual API key
 model = "gpt-4o-transcribe"      # OpenAI model to use for transcription
 language = "en"                  # Primary language for transcription (e.g., "en" for English)
@@ -247,12 +258,61 @@ prompt_path = "prompts/transcription_prompt.txt"
 # Leave empty to disable file logging
 log_dir = "data/transcriptions"
 
+# Local speech-to-text, used when backend = "local".
+#
+# This sub-table MUST stay at the end of [transcription]: everything written
+# after a sub-table header belongs to the sub-table, so a key placed below it
+# silently lands in the wrong place.
+#
+# The realtime API told us where speech began and ended; a local model does not,
+# so this side cuts the stream into transmissions itself. On an SDR feed that is
+# easy -- RTLSDR-Airband writes digital silence between transmissions, measured
+# at -90 dBFS and not a noise floor -- and the defaults below are tuned for that.
+# On a noisier source (LiveATC, for instance) raise silence_threshold.
+[transcription.local]
+server_url = "http://127.0.0.1:8178"
+timeout_seconds = 60
+segment_silence_ms = 600      # silence that ends a transmission
+segment_min_ms = 400          # shorter than this is discarded
+segment_max_seconds = 30
+segment_preroll_ms = 200      # keep audio from before speech starts
+silence_threshold = 0.005     # an SDR stream sits at -90 dBFS when squelch is closed
+
 #######################################################
 # Post-Processing Configuration
 #######################################################
 [post_processing]
 # Enable or disable post-processing
 enabled = true
+
+# Which implementation assigns a speaker, a callsign and any clearance to a
+# stored transcription.
+#   "openai" - the GPT-4o pass below; needs transcription.openai_api_key
+#   "local"  - a closed-vocabulary grammar for ICAO phraseology, matched against
+#              the aircraft the ADS-B receiver can currently see. No key.
+# The two write the same columns and the same clearances table, so the map and
+# the web UI behave identically either way.
+backend = "openai"
+
+# The four settings below apply to backend = "local" only.
+#
+# They are measured rather than chosen. Against 1468 recorded transmissions and
+# the receiver's own ADS-B history, with eight shuffled control fleets, this is
+# the best operating point of the sweep:
+#
+#   min_digits  fleet window  matches  above chance  true matches
+#          3          30s       131        70%           91.1
+#          3          60s       138        69%           94.7   <- these defaults
+#          3         120s       140        66%           91.9
+#          4          60s        58        71%           41.1
+#
+# Raising min_score to 1.0 demands corroboration -- an altitude or an operator
+# name on top of exact digits -- and reaches 88% above chance, but only 26
+# matches, and frequencies where altitude is rarely spoken fall silent.
+airlines_dat_path = "assets/airlines.dat"
+min_score = 0.0             # extra floor on top of the matcher's own 0.6; 0 = none
+min_digits = 3              # shortest spoken number that may be a flight number
+fleet_last_seen_minutes = 1 # how stale an ADS-B target may be and still be a candidate
 
 # OpenAI model to use for post-processing
 model = "gpt-4o"
