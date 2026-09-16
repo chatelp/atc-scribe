@@ -947,6 +947,26 @@ Trois comportements vérifiés en conditions réelles le 16/09 :
    montré un). `Setpgid` au lancement, `kill(-pid)` à l'arrêt, et un test dédié le
    vérifie sur un petit-enfant.
 
+**Un troisième piège, trouvé en répondant à « et il se ferme avec lui ? ».** La question
+avait l'air rhétorique ; la vérifier a rapporté deux défauts.
+
+- **`SIGHUP` n'était pas écouté.** Fermer la fenêtre du terminal tuait co-atc par l'action
+  par défaut, sans arrêt propre : sidecar orphelin, port 8178 retenu.
+- **Et surtout, les signaux étaient armés trop tard.** `signal.Notify` se trouvait après
+  le démarrage de tous les services. Chronométré : le sidecar part à **+0,05 s**, le
+  serveur finit de démarrer à **+1,78 s** — **1,7 s pendant lesquelles n'importe quel
+  signal tuait co-atc sans nettoyage.** Je m'en suis aperçu parce qu'un essai a d'abord
+  paru contredire un essai antérieur ; la première explication qui m'est venue était « mon
+  banc d'essai est sale », et elle était fausse.
+
+Corrigé en armant `signal.NotifyContext` **en tête de `main`**, avant toute création de
+service. Effet de bord utile : le contexte sert aussi d'attente au sidecar, donc un Ctrl-C
+pendant sa sonde interrompt le démarrage au lieu de le subir.
+
+Vérification finale, **six cas** — `SIGTERM`, `SIGINT`, `SIGHUP`, chacun tiré dans la
+fenêtre de course puis une fois tout démarré : co-atc s'arrête, le sidecar part, aucun
+orphelin.
+
 **Ce qui n'est pas couvert, et c'est assumé** : un `kill -9` sur co-atc orpheline le
 sidecar — aucun parent ne peut s'en prémunir. En revanche il n'y a **aucun appel `Fatal`
 après le démarrage du sidecar** dans `main.go` (vérifié), donc le chemin d'arrêt normal
