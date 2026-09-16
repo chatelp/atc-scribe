@@ -215,6 +215,21 @@ func readNumber(toks []string, i int) (string, int) {
 			if homophones[w] && !digitFollows(toks, j+1) {
 				break
 			}
+			// A completed VHF frequency ends the number, even when digits follow.
+			// Measured live: "one two four three five five seven six zero Papa
+			// X-ray" is a handoff read-back -- 124.355, then the registration --
+			// and reading it greedily produced the single nine-digit blob
+			// "124355760", which matched an aircraft only by the accident of
+			// ending in its digits. No callsign, squawk or level is six digits
+			// long, so a six-digit run opening in the VHF band is a frequency and
+			// nothing else.
+			// Count digits, not bytes: a spoken "decimal" puts a point in the
+			// buffer, and counting it as a digit truncated 121.055 to 121.05.
+			// A frequency said with its decimal point is already unambiguous and
+			// needs no splitting, so only a bare run is cut here.
+			if cur := b.String(); len(cur) == 6 && !strings.Contains(cur, ".") && isVHFBand(cur) {
+				break
+			}
 			b.WriteString(d)
 			j++
 			continue
@@ -326,8 +341,13 @@ var trailingRoles = map[string]Role{
 func letterGroups(toks []string, used []bool) []string {
 	var out []string
 	var cur []byte
+	// Two letters are enough. A light aircraft is routinely called by the last
+	// two letters of its registration -- "Seven Six Zero Papa X-ray" for N760PX --
+	// and requiring three discarded exactly that case, which is most of the
+	// traffic this station hears from its neighbouring aerodromes. False letters
+	// cost nothing: the matcher may only ever raise a score with them.
 	flush := func() {
-		if len(cur) >= 3 {
+		if len(cur) >= 2 {
 			out = append(out, string(cur))
 		}
 		cur = cur[:0]
@@ -417,6 +437,16 @@ func looseNumbers(toks []string, used []bool) []Value {
 // digit group starting in that range is a frequency handoff and not a flight
 // number — measured on 125.933, where "one three two five zero five" was counted
 // three times in forty transmissions as an aircraft.
+// isVHFBand reports whether a bare digit string opens in the aeronautical VHF
+// band, 118.000 to 136.975 MHz.
+func isVHFBand(digits string) bool {
+	if len(digits) < 3 {
+		return false
+	}
+	head, err := strconv.Atoi(digits[:3])
+	return err == nil && head >= 118 && head <= 136
+}
+
 func classifyBare(digits string) (Role, string) {
 	if strings.Contains(digits, ".") {
 		if mhz, err := strconv.ParseFloat(digits, 64); err == nil && mhz >= 118 && mhz < 137 {
@@ -424,10 +454,8 @@ func classifyBare(digits string) (Role, string) {
 		}
 		return RoleUnknown, ""
 	}
-	if n := len(digits); n == 5 || n == 6 {
-		if head, err := strconv.Atoi(digits[:3]); err == nil && head >= 118 && head <= 136 {
-			return RoleFrequency, digits[:3] + "." + digits[3:]
-		}
+	if n := len(digits); (n == 5 || n == 6) && isVHFBand(digits) {
+		return RoleFrequency, digits[:3] + "." + digits[3:]
 	}
 	return RoleUnknown, ""
 }
