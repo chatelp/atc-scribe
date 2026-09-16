@@ -640,14 +640,77 @@ donne une liste filtrée et une carte qui ne l'est pas — c'est exactement ce q
 arrivé au premier essai, et seule la capture d'écran l'a montré.
 
 
-### Q25 — Le bonus d'opérateur discrimine-t-il vraiment ? *(nouvelle, 16/09)*
+### Q25 — Le bonus d'opérateur discrimine-t-il vraiment ? *(16/09 — répondue le jour même, dans l'autre sens)*
 
-La mesure du complément de lexique a montré autre chose que ce qu'elle cherchait :
-ajouter des opérateurs fait monter le **hasard** de 3,6 à 5,4 sur l'amas. Autrement
-dit, +0,40 pour « opérateur nommé » se déclenche aussi bien sur une flotte tirée au
-mauvais moment que sur la bonne.
+Prémisse d'origine : le complément de lexique faisait monter le hasard de 3,6 à 5,4 sur
+l'amas, donc le bonus se déclencherait aussi bien sur une flotte prise au mauvais
+moment. **Remesuré sous la règle de production, avec et sans le complément, sur quatre
+fenêtres : le hasard bouge de ± 1 selon la fenêtre, sous la résolution de l'instrument
+(écart-type 2 à 3 appariements sur huit témoins).** La prémisse n'est pas établie.
 
-C'est logique — au-dessus de Paris, un Air France quelconque est presque toujours
-présent — et c'est le même défaut qui avait condamné la règle « chiffres à un près ».
-**Non mesuré directement.** Le test serait de retirer le bonus et de refaire les
-trois groupes, comme pour `-fuzzy`.
+Réponse du panel (doc 23, A.5), vérifiée dans le code : **le bonus ne discrimine rien
+par construction.** `restrict` garantit que tous les candidats survivants portent
+l'opérateur nommé, ou aucun ; le +0,40 est un décalage constant qui ne change ni le
+classement ni l'écart d'ambiguïté. Son seul effet est sur le plancher de 0,60 — et là
+il porte une classe entière : les indicatifs à queue de lettres, `letters + operator
+named = 0,70`. Six appariements sur 168 dans la journée en dépendent, cinq en fenêtres
+de 51 min, pour **0,38 de hasard sur huit témoins : 93 % au-dessus**. C'est l'inverse de
+la règle « à un près ».
+
+**Décision : le bonus reste.** Le retirer éteindrait AFR89VR, AFR44SA, AFR78HN, AFR65AR,
+AFR74UP — ceux que doc 19 crédite de la précision des tours.
+
+
+### D17 — L'outil `-db` applique la règle de production *(16/09)*
+
+Le panel a trouvé que `cmd/phraseology -db` ignorait `-strict`, `-min-score` et
+`-context` : déclarés, jamais transmis. Les quatre fenêtres de groupes comptaient les
+ambigus comme attachés. Corrigé — le chemin SQLite porte maintenant la mémoire par
+fréquence et refuse les ambigus — et remesuré : au plus 3 appariements et 5 points
+d'écart, aucune conclusion ne bouge (doc 19). Deux divergences avec la production
+subsistent, listées en Q27.
+
+### Q19 — *(réponse partielle, 16/09)*
+
+La saturation divise presque par deux les appariements vrais sur 125,825 entre sa
+moitié chargée et sa moitié calme — mais 124,350 et 124,625 montrent l'effet inverse.
+« La charge nuit à la précision » n'est pas une loi sur ce corpus. Et 29 % des
+appariements de 125,825 reposent sur le seul palier « suffixe » (18 % ailleurs).
+L'occupation instantanée suggérée ici n'est pas calculable depuis la base :
+`transcriptions` ne porte ni durée ni occupation. Ouverte.
+
+### Q26 — La base de données ne tourne jamais *(nouvelle, 16/09)*
+
+Vérifié dans le code par le panel puis par moi : le stockage est ouvert **une fois** au
+démarrage et jamais rouvert ; `ensureTodayDatabaseFile` (`cmd/server/main.go:415`)
+crée un fichier vide pour le nouveau jour et le referme ; `cleanupOldDailyDatabases`
+(`:437`) saute le fichier actif. Un processus qui tourne une semaine écrit *un* fichier
+sans limite, que la rétention ne touche pas.
+
+Mesuré le 16/09 : `adsb_targets` à 64,7 lignes/s, **1,49 Go en 4 h 15** (~8,4 Go par
+jour pleine), dont 54 % de `raw_data` — une copie JSON de colonnes déjà analysées. À
+48 Gio libres : **disque plein en ~6 jours** de marche continue.
+
+C'est un défaut de l'amont et **un bloqueur pour toute marche sans surveillance**. Le
+correctif est du code — rouvrir la base à minuit, ou ne plus stocker `raw_data` — et un
+candidat naturel à une pull request amont. Pas de veilleur : il dirait au jour 5 ce que
+le code dit au jour 0.
+
+### Q27 — Ce que les instruments hors ligne ne mesurent pas *(nouvelle, 16/09)*
+
+Trois écarts entre les deux outils de mesure et la production, relevés par le panel :
+
+1. **La phase n'est jamais renseignée** dans la flotte hors ligne (`-capture` comme
+   `-db`), donc les deux pénalités de −0,25 de `matcher.go` (« en croisière, pas en
+   atterrissage » ; « en vol, pas au départ ») ne sont validées par **aucune** mesure du
+   dossier. `phase_changes` existe dans la base : à porter.
+2. **Les 74 transmissions à lettres seules** (5 % de la captation) sont exclues des
+   deux outils, qui exigent un indicatif chiffré — alors que la production les tente.
+   Plafond mesuré ≤ 6,25 vrais sur 1 415 : petit, mais non mesuré.
+3. **La fenêtre de flotte** est symétrique (± 60 s) hors ligne, unilatérale vers le passé
+   en production (`GetAllAircraftWithLastSeenFilter(1)`).
+
+Et un compteur absent des deux côtés : **le taux de rejet du VAD en production** n'est
+journalisé nulle part au niveau courant (`local.go:194` en Debug ; le sidecar ne le
+trace pas). « Le parasite est-il absent le jour ? » reste sans réponse tant qu'il
+n'existe pas.
