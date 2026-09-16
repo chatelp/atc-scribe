@@ -39,6 +39,13 @@ type Handler struct {
 	transcriptionStorage *sqlite.TranscriptionStorage
 	clearanceStorage     *sqlite.ClearanceStorage
 	valueStorage         *sqlite.PhraseologyStorage // what the grammar recovered, see docs-fr/19
+
+	// Operational state for the settings panel. See server_handlers.go.
+	runtime       *config.Runtime
+	activeDBPath  string
+	startedAt     time.Time
+	dbSampleAt    time.Time
+	dbSampleBytes int64
 }
 
 // NewHandler creates a new API handler
@@ -55,6 +62,8 @@ func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Servi
 
 	return &Handler{
 		valueStorage:         valueStorage,
+		startedAt:            time.Now(),
+		dbSampleAt:           time.Now(),
 		adsbService:          adsbService,
 		frequenciesService:   frequenciesService,
 		weatherService:       weatherService,

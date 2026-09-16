@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -127,11 +128,17 @@ func New(config Config) (*Logger, error) {
 		return nil, fmt.Errorf("unsupported log format: %s", config.Format)
 	}
 
+	// An atomic level so the threshold can be raised or lowered while the server
+	// runs. Turning debug on to look at something, then off again, should not need
+	// a restart -- a restart drops the audio stream and the ADS-B history window.
+	atomic := zap.NewAtomicLevelAt(level)
+	setLevel(atomic)
+
 	// Create core
 	core := zapcore.NewCore(
 		encoder,
 		zapcore.AddSync(os.Stdout),
-		level,
+		atomic,
 	)
 
 	// Create logger options
@@ -184,4 +191,35 @@ func (l *Logger) WithRequestID(requestID string) *Logger {
 // WithError returns a logger with the error field
 func (l *Logger) WithError(err error) *Logger {
 	return l.With(zap.Error(err))
+}
+
+// The process-wide log level, held atomically so it can be changed at runtime.
+// Package scope because every Logger built by New shares one core threshold, and a
+// caller changing the level means "make the server quieter", not "make this one
+// logger quieter".
+var currentLevel atomic.Pointer[zap.AtomicLevel]
+
+func setLevel(l zap.AtomicLevel) { currentLevel.Store(&l) }
+
+// Level reports the threshold in force, as it is written in the configuration.
+func Level() string {
+	if l := currentLevel.Load(); l != nil {
+		return l.Level().String()
+	}
+	return ""
+}
+
+// SetLevel changes the threshold in force. The caller-visible names are those of
+// the configuration file, so a value read from Level can be handed back unchanged.
+func SetLevel(name string) error {
+	l := currentLevel.Load()
+	if l == nil {
+		return fmt.Errorf("no logger has been created yet")
+	}
+	parsed, err := parseLogLevel(name)
+	if err != nil {
+		return err
+	}
+	l.SetLevel(parsed)
+	return nil
 }

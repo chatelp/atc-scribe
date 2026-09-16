@@ -76,6 +76,10 @@ func (r *Router) Routes() http.Handler {
 
 		// Configuration
 		router.Get("/config", r.handler.GetConfig)
+
+		// How the server is actually running: database growth, disk, retention,
+		// log level. See internal/api/server_handlers.go.
+		router.Get("/server", r.handler.GetServerState)
 		router.Get("/adsb/source", r.handler.GetADSBSourceStatus)
 
 		// Station Configuration
@@ -115,3 +119,7 @@ func (r *Router) Routes() http.Handler {
 
 	return router
 }
+
+// Handler exposes the router's handler so the caller can attach what only it knows
+// -- the live settings and the database file actually opened at start.
+func (r *Router) Handler() *Handler { return r.handler }
