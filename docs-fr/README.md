@@ -30,6 +30,8 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `18-nuit-du-15.md` | la nuit de mesure : modèle anglais tranché, étagement de la TMA |
 | `19-appariement-en-ligne.md` | la mise en service de l'appariement : point de greffe, réglages mesurés, limites |
 | `20-captation-nuit.md` | **compte rendu de l'agent station** : captation nocturne 132-133, 4 h, 7 canaux |
+| `21-nuit-132-133.md` | la nuit du 15 : 88 % de déclenchements sans parole, le peigne à 100 Hz |
+| `22-correction-lexicale.md` | corriger le texte sans IA : mesuré, gain nul, **abandonné** |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
 
 > Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas
