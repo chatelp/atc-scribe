@@ -3,6 +3,7 @@ package phraseology
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -96,7 +97,53 @@ func NewMatcher(airlinesDatPath string) (*Matcher, error) {
 			}
 		}
 	}
-	return m, sc.Err()
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+
+	// Then what this station has actually heard. OpenFlights is frozen around 2014
+	// and 30% of the operators flying over the receiver are missing from it, so a
+	// spoken name that would have restricted the candidates simply finds nothing.
+	// The supplement is optional: without it the matcher works exactly as before.
+	m.loadSpokenForms(filepath.Join(filepath.Dir(airlinesDatPath), spokenFormsFile))
+	return m, nil
+}
+
+// spokenFormsFile sits beside airlines.dat and records what the transcription
+// models write in front of a callsign, garbled forms included -- "mazda" for Malta
+// Air earns its place precisely because that is what comes out of the model.
+const spokenFormsFile = "spoken-operators.csv"
+
+// loadSpokenForms adds observed spoken names. A missing or malformed file is not
+// an error: it can only ever add operators, never remove or contradict one, so an
+// installation without it loses a bonus and nothing else.
+func (m *Matcher) loadSpokenForms(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Split(line, ",")
+		if len(fields) < 2 {
+			continue
+		}
+		key, icao := normalizeName(fields[0]), strings.ToUpper(strings.TrimSpace(fields[1]))
+		if len(key) < 3 || len(icao) != 3 {
+			continue
+		}
+		// airlines.dat wins where the two disagree: it is a reference, this is a
+		// record of what one receiver happened to hear.
+		if _, seen := m.telephony[key]; !seen {
+			m.telephony[key] = icao
+		}
+	}
 }
 
 // Match returns the best aircraft for a parsed transmission, with no context.
