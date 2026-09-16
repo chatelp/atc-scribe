@@ -46,6 +46,18 @@ type GrammarProcessor struct {
 	config   PostProcessingConfig
 	interval time.Duration
 	logger   *logger.Logger
+
+	// What was just matched on each frequency, used only to break ties between
+	// aircraft a transmission already names. See MatchWithContext for why it may
+	// never do more than that.
+	recentMu sync.Mutex
+	recent   map[string][]heard
+}
+
+// heard is one aircraft named on a frequency at a moment.
+type heard struct {
+	at       time.Time
+	callsign string
 }
 
 // NewGrammarProcessor builds the local post-processor. The airlines file is
@@ -95,6 +107,7 @@ func NewGrammarProcessor(
 		fleet:                fleet,
 		config:               config,
 		interval:             interval,
+		recent:               map[string][]heard{},
 		logger:               log.Named("grammar-processor"),
 	}, nil
 }
@@ -233,7 +246,8 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 	callsign := ""
 	var match phraseology.Match
 	if len(sky) > 0 {
-		if m, ok := p.matcher.Match(result, sky); ok && !m.Ambiguous && m.Score >= p.config.MinScore {
+		ctx := p.recentlyHeard(record.FrequencyID, record.CreatedAt)
+		if m, ok := p.matcher.MatchWithContext(result, sky, ctx); ok && !m.Ambiguous && m.Score >= p.config.MinScore {
 			match = m
 			callsign = m.Callsign
 		} else if ok && m.Ambiguous {
@@ -254,6 +268,7 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 	}
 
 	if callsign != "" {
+		p.remember(record.FrequencyID, record.CreatedAt, callsign)
 		p.logger.Info("Attached a transmission to an aircraft",
 			logger.Int64("id", record.ID),
 			logger.String("callsign", callsign),
@@ -265,6 +280,38 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 	p.storeValues(record, result, callsign)
 	p.storeClearances(record, result, callsign)
 	p.broadcast(record, processed, speaker, callsign)
+}
+
+// recentlyHeard returns the aircraft named on this frequency in the last two
+// minutes. Two minutes because an exchange -- instruction, read-back, reply --
+// closes well inside that, and anything longer is a different conversation.
+func (p *GrammarProcessor) recentlyHeard(frequencyID string, at time.Time) []string {
+	const window = 2 * time.Minute
+
+	p.recentMu.Lock()
+	defer p.recentMu.Unlock()
+
+	var out []string
+	for _, h := range p.recent[frequencyID] {
+		if d := at.Sub(h.at); d >= 0 && d <= window {
+			out = append(out, h.callsign)
+		}
+	}
+	return out
+}
+
+// remember records an aircraft as heard on a frequency.
+func (p *GrammarProcessor) remember(frequencyID string, at time.Time, callsign string) {
+	const keep = 40
+
+	p.recentMu.Lock()
+	defer p.recentMu.Unlock()
+
+	h := append(p.recent[frequencyID], heard{at: at, callsign: callsign})
+	if len(h) > keep {
+		h = h[len(h)-keep:]
+	}
+	p.recent[frequencyID] = h
 }
 
 // storeValues keeps what the grammar recovered -- levels, headings, runways,

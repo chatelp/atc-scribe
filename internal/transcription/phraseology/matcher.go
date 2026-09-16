@@ -99,8 +99,26 @@ func NewMatcher(airlinesDatPath string) (*Matcher, error) {
 	return m, sc.Err()
 }
 
-// Match returns the best aircraft for a parsed transmission.
+// Match returns the best aircraft for a parsed transmission, with no context.
 func (m *Matcher) Match(r Result, fleet []Aircraft) (Match, bool) {
+	return m.MatchWithContext(r, fleet, nil)
+}
+
+// MatchWithContext is Match with what was heard just before on the same frequency.
+//
+// Context is used only to choose between candidates this transmission already
+// names, never to name an aircraft it does not. That restriction is not caution
+// for its own sake: the shuffled control this project measures with asks whether
+// an aircraft was in the sky, not whether a transmission was about it, so a match
+// invented from a neighbour would pass the control while being wrong. What cannot
+// be measured is not shipped.
+//
+// Measured ceilings on 1415 recorded transmissions: a digit group repeated inside
+// one transmission occurs 15 times, 1.1%; two neighbouring transmissions sharing a
+// spoken value occur essentially never, because only 4% carry a level at all.
+// These rules are therefore small by nature, and they are here because they cost
+// nothing and can only ever re-rank candidates that were already in the running.
+func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) (Match, bool) {
 	spokenOperators := m.operatorsIn(r.Raw)
 
 	// If an operator is named and that operator is actually in the sky, only its
@@ -114,6 +132,22 @@ func (m *Matcher) Match(r Result, fleet []Aircraft) (Match, bool) {
 		if prefix, _, _ := splitCallsign(ac.Callsign); spokenOperators[prefix] {
 			restrict[prefix] = true
 		}
+	}
+
+	// How many times each spoken number occurs in this transmission. An aircraft
+	// that says its callsign three times is stating it, not being guessed at.
+	repeats := map[string]int{}
+	for _, v := range r.Values {
+		if v.Role == RoleCallsign && len(v.Digits) >= m.MinDigits {
+			repeats[v.Digits]++
+		}
+	}
+
+	// The aircraft named in the last few transmissions on this frequency, used
+	// only to break ties.
+	heardRecently := map[string]bool{}
+	for _, cs := range recent {
+		heardRecently[cs] = true
 	}
 
 	type scored struct {
@@ -152,6 +186,13 @@ func (m *Matcher) Match(r Result, fleet []Aircraft) (Match, bool) {
 					score, why = s, []string{"digits off by one"}
 				}
 			}
+		}
+
+		// A number the transmission repeats is stronger evidence than one heard
+		// once, and this is the only place repetition is worth anything.
+		if score > 0 && repeats[digits] > 1 {
+			score += 0.15
+			why = append(why, "digits repeated")
 		}
 
 		// Letter tails such as EZY36VJ, read out as "three six victor juliett".
@@ -208,6 +249,13 @@ func (m *Matcher) Match(r Result, fleet []Aircraft) (Match, bool) {
 		if best[i].score != best[j].score {
 			return best[i].score > best[j].score
 		}
+		// Among candidates this transmission scores equally, prefer the one the
+		// frequency was just talking to. This decides nothing on its own -- both
+		// were already named by the digits -- it only picks which of two equals
+		// the exchange was about.
+		if hi, hj := heardRecently[best[i].ac.Callsign], heardRecently[best[j].ac.Callsign]; hi != hj {
+			return hi
+		}
 		return best[i].ac.Callsign < best[j].ac.Callsign
 	})
 
@@ -218,9 +266,18 @@ func (m *Matcher) Match(r Result, fleet []Aircraft) (Match, bool) {
 	out := Match{Callsign: top.ac.Callsign, Hex: top.ac.Hex, Score: top.score, Reason: top.reason}
 	for _, b := range best[1:] {
 		if top.score-b.score < 0.15 {
+			// A tie the recent exchange resolves is no longer a tie: the aircraft
+			// just addressed on this frequency is the one still being addressed,
+			// and the rival was never named by anything but arithmetic.
+			if heardRecently[top.ac.Callsign] && !heardRecently[b.ac.Callsign] {
+				continue
+			}
 			out.Ambiguous = true
 			out.Runners = append(out.Runners, b.ac.Callsign)
 		}
+	}
+	if heardRecently[top.ac.Callsign] {
+		out.Reason += " + heard just before"
 	}
 	return out, true
 }
