@@ -207,6 +207,8 @@ type SimulationService interface {
 
 // Service is the main service for ADS-B data processing
 type Service struct {
+	voiceState // what the radio has said about each aircraft; see voice.go
+
 	client             *Client
 	storage            Storage
 	fetchInterval      time.Duration
@@ -1029,6 +1031,9 @@ func (s *Service) HandleBulkRequest(filters map[string]interface{}) (*AircraftBu
 
 	// Apply Air/Ground and Phase filters
 	aircraft = s.filterByAirGroundAndPhases(aircraft, showAir, showGround, phases)
+
+	// Carried, not filtered: the browser decides what to show.
+	s.attachVoice(aircraft)
 
 	// Calculate counts
 	groundActive, groundTotal, airActive, airTotal := s.calculateCounts(aircraft)

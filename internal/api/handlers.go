@@ -322,6 +322,24 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Populate what voice has said about each aircraft. One grouped query serves
+	// them all, unlike the clearance loop below, which asks once per target.
+	if h.transcriptionStorage != nil {
+		if summaries, err := h.transcriptionStorage.VoiceSummaries(); err != nil {
+			h.logger.Error("Failed to summarise voice by callsign", logger.Error(err))
+		} else {
+			for _, a := range aircraft {
+				if v, ok := summaries[strings.TrimSpace(a.Flight)]; ok {
+					a.Voice = &adsb.VoiceData{
+						Transmissions: v.Transmissions,
+						LastHeard:     v.LastHeard,
+						LastText:      v.LastText,
+					}
+				}
+			}
+		}
+	}
+
 	// Populate clearances for each aircraft
 	for _, aircraft := range aircraft {
 		clearances, err := h.clearanceStorage.GetClearancesByCallsign(aircraft.Flight, 10) // Last 10 clearances

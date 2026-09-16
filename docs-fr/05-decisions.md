@@ -588,3 +588,31 @@ exactement là qu'un test de ce genre serait tentant.
 Corollaire à garder en tête : **co-atc compte lui aussi comme auditeur.** Il tire
 `aero.mp3` par un `ffmpeg` tant qu'il tourne. Une mesure d'audience faite pendant que
 notre binaire tourne compte donc au moins deux auditeurs qui ne sont personne.
+
+
+### D16 — Le fork touche le frontend pour la première fois *(16/09)*
+
+Filtrer les avions dont la voix a parlé demandait un bouton. Jusqu'ici le fork
+modifiait **0 % de `www/`**, ce qui garantissait l'absence de conflit de rebase du
+côté que l'amont fait le plus évoluer. C'est fini, et c'est assumé : l'appariement
+produisait une information que personne ne pouvait voir.
+
+Trois fichiers touchés, et l'empreinte a été tenue au minimum :
+
+| fichier | ajout |
+|---|---|
+| `www/index.html` | un bouton, 14 lignes |
+| `www/app.js` | un réglage persisté, une bascule, un compteur, deux prédicats, une mise à jour en direct |
+| `www/map/core/visibility-rules.js` | une fonction `isVisibleByVoice` et son branchement |
+
+**Le serveur ne filtre pas.** `handleFilterUpdate` porte la note de l'amont :
+*« Server-side filtering has been removed. All filtering is done client-side. »* On
+suit ce choix — le serveur porte le fait sur chaque avion, le navigateur décide. Le
+filtre côté serveur aurait été plus simple à écrire et à contre-courant de
+l'architecture.
+
+**Piège rencontré, à retenir.** L'application a **trois** prédicats de filtrage :
+`_performFiltering` pour la liste, `aircraftPassesFilters` dans le store, et
+`MapVisibilityRules.shouldShowAircraftOnMap` pour la carte. N'en modifier qu'un
+donne une liste filtrée et une carte qui ne l'est pas — c'est exactement ce qui est
+arrivé au premier essai, et seule la capture d'écran l'a montré.

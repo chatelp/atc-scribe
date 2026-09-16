@@ -428,6 +428,9 @@ document.addEventListener('alpine:init', () => {
             showAirAircraft: JSON.parse(localStorage.getItem('showAirAircraft')) ?? true,
             showGroundAircraft: JSON.parse(localStorage.getItem('showGroundAircraft')) ?? true,
             showLocalDates: JSON.parse(localStorage.getItem('showLocalDates')) ?? false, // Default to UTC (false)
+            // Show only the aircraft the radio has named. The matching that fills this
+            // lives in internal/transcription/phraseology; see docs-fr/19-appariement-en-ligne.md.
+            voiceOnly: localStorage.getItem('voiceOnly') === 'true',
             phaseFilters: JSON.parse(localStorage.getItem('phaseFilters')) || { CRZ: true, CLB: true, DEP: true, APP: true, ARR: true, TAX: true, 'T/O': true, 'T/D': true, NEW: true, UNK: true },
             excludeOtherAirportsGrounded: JSON.parse(localStorage.getItem('excludeOtherAirportsGrounded')) ?? false, // Default to false (show all grounded aircraft)
             // Aircraft animation settings
@@ -481,6 +484,7 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('showGroundAircraft', this.settings.showGroundAircraft);
             localStorage.setItem('showLocalDates', this.settings.showLocalDates);
             localStorage.setItem('phaseFilters', JSON.stringify(this.settings.phaseFilters));
+            localStorage.setItem('voiceOnly', this.settings.voiceOnly);
             localStorage.setItem('excludeOtherAirportsGrounded', this.settings.excludeOtherAirportsGrounded);
             localStorage.setItem('showAirports', this.settings.showAirports);
             localStorage.setItem('showHeliports', this.settings.showHeliports);
@@ -654,7 +658,7 @@ document.addEventListener('alpine:init', () => {
         _performFiltering() {
             // Create lightweight hash of current filter state (include ALL filter settings)
             const phaseFilterHash = this.settings.phaseFilters ? Object.entries(this.settings.phaseFilters).map(([k, v]) => `${k}:${v}`).join(',') : '';
-            const filterHash = `${this.searchTerm}|${this.settings.showGroundAircraft}|${this.settings.showAirAircraft}|${this.settings.minAltitude}|${this.settings.maxAltitude}|${this.settings.lastSeenMinutes}|${this.settings.listSort}|${phaseFilterHash}|${Object.keys(this.aircraft).length}|${this.selectedAircraft?.hex}|${this.sortColumn}|${this.sortDirection}`;
+            const filterHash = `${this.settings.voiceOnly}|${this.searchTerm}|${this.settings.showGroundAircraft}|${this.settings.showAirAircraft}|${this.settings.minAltitude}|${this.settings.maxAltitude}|${this.settings.lastSeenMinutes}|${this.settings.listSort}|${phaseFilterHash}|${Object.keys(this.aircraft).length}|${this.selectedAircraft?.hex}|${this.sortColumn}|${this.sortDirection}`;
 
             // Return cached result if nothing changed (but always filter if no cache exists)
             if (this._lastFilterHash === filterHash && this._filteredAircraftCache) {
@@ -667,6 +671,12 @@ document.addEventListener('alpine:init', () => {
             const lastSeenCutoff = new Date(now.getTime() - (lastSeenMinutes * 60 * 1000));
 
             const filtered = Object.values(this.aircraft).filter(aircraft => {
+                // Keep only aircraft the radio has named, when asked. The voice
+                // field is attached server-side from the transcription callsigns.
+                if (this.settings.voiceOnly && !(aircraft.voice && aircraft.voice.transmissions > 0)) {
+                    return false;
+                }
+
                 // Filter by last seen time - hide aircraft not seen recently
                 if (aircraft.last_seen) {
                     const lastSeenDate = new Date(aircraft.last_seen);
@@ -1327,6 +1337,21 @@ document.addEventListener('alpine:init', () => {
             if (this.mapManager) {
                 this.mapManager.applyFiltersAndRefreshView();
             }
+        },
+
+        // Toggle the "named by the radio" filter
+        toggleVoiceOnly() {
+            this.settings.voiceOnly = !this.settings.voiceOnly;
+            this.saveSettings();
+            this.applyFilters();
+            if (this.mapManager) {
+                this.mapManager.applyFiltersAndRefreshView();
+            }
+        },
+
+        // How many aircraft the radio has named, of those currently held
+        get voiceAircraftCount() {
+            return Object.values(this.aircraft).filter(a => a.voice && a.voice.transmissions > 0).length;
         },
 
         // Toggle flight phase filter
@@ -3334,6 +3359,24 @@ async initAircraftDataSource() {
                 console.error('Received transcription update without ID:', data);
                 return;
             }
+
+            // Attach the match to the aircraft straight away. The server carries
+            // the same fact on the next bulk refresh, but waiting for it would mean
+            // an aircraft the controller has just addressed stays hidden behind the
+            // voice filter for as long as that refresh takes.
+            if (data.callsign) {
+                const target = Object.values(this.aircraft).find(
+                    a => (a.flight || '').trim() === data.callsign);
+                if (target) {
+                    const previous = target.voice ? target.voice.transmissions : 0;
+                    target.voice = {
+                        transmissions: previous + 1,
+                        last_heard: data.timestamp,
+                        last_text: data.text
+                    };
+                    this.applyFilters();
+                }
+            }
             
             // Find the original transcription in the array by ID only
             const index = this.transcriptions.findIndex(t => t.id === data.id);
@@ -4060,6 +4103,13 @@ async initAircraftDataSource() {
 
         aircraftPassesFilters(aircraft) {
             // Apply all current filters to determine if aircraft should be displayed
+            // Keep this in step with _performFiltering: the map draws from here and
+            // the sidebar from there, and a filter added to only one of them shows
+            // an aircraft in the list that is not on the map.
+            if (this.settings.voiceOnly && !(aircraft.voice && aircraft.voice.transmissions > 0)) {
+                return false;
+            }
+
             const searchLower = this.searchTerm.toLowerCase();
             
             // Search filter - includes callsign, type, category, manufacturer

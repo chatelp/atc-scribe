@@ -915,6 +915,20 @@
                         </div>
                     </div>
 
+                    <!-- Heard on the radio: aircraft a transcription has been matched to -->
+                    <div class="flex mb-2">
+                        <button @click="$store.atc.toggleVoiceOnly()"
+                                :class="{
+                                    'filter-btn-active bg-amber-400/15 border-amber-400/40 text-amber-400': $store.atc.settings.voiceOnly,
+                                    'filter-btn-inactive text-text/50': !$store.atc.settings.voiceOnly
+                                }"
+                                title="Show only aircraft a transmission has been matched to"
+                                class="flex-1 px-2 py-1.5 border rounded-md text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span>
+                            <span class="whitespace-nowrap">Heard on the radio (<span x-text="$store.atc.voiceAircraftCount"></span>)</span>
+                        </button>
+                    </div>
+
                     <!-- Flight Phase Filter Buttons -->
                     <div class="mb-2">
                         <div class="grid grid-cols-10 gap-1">
