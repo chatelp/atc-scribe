@@ -106,6 +106,20 @@ func main() {
 		logger.String("config_path", resolvedConfigPath),
 	)
 
+	// Arm the shutdown signals before anything is started, not after.
+	//
+	// They used to be armed once every service was up, which left a measured
+	// 1.7 s window -- from spawning the STT sidecar to the end of startup --
+	// where a signal took its default action and killed the server outright:
+	// no deferred cleanup, and the sidecar orphaned. Arming first also lets a
+	// long startup be interrupted: signalCtx is what the sidecar waits on, so
+	// Ctrl-C during its health probe stops the wait and takes the child with it.
+	//
+	// SIGHUP is included because closing the terminal window sends it.
+	signalCtx, stopSignals := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	defer stopSignals()
+
 	// Create ADS-B components
 	adsbClient := adsb.NewClient(
 		cfg.ADSB,
@@ -135,7 +149,7 @@ func main() {
 			Command:               cfg.Transcription.Local.Command,
 			StartupTimeoutSeconds: cfg.Transcription.Local.StartupTimeoutSeconds,
 		}, log)
-		sidecarCtx, sidecarCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		sidecarCtx, sidecarCancel := context.WithTimeout(signalCtx, 5*time.Minute)
 		if err := sttSidecar.Start(sidecarCtx); err != nil {
 			sidecarCancel()
 			fatalLog := log.WithOptions(zap.AddStacktrace(zapcore.PanicLevel))
@@ -372,10 +386,9 @@ func main() {
 		}(server)
 	}
 
-	// Wait for interrupt signal
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
+	// Wait for one of the signals armed at startup. A signal that arrived while
+	// the services were still coming up is already recorded here.
+	<-signalCtx.Done()
 
 	log.Info("Shutting down server...")
 
