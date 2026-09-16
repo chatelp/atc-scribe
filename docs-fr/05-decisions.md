@@ -537,3 +537,31 @@ utilisée par câble.
 > pendant le diagnostic et a fait échouer `curl` aussi, ce qui m'a fait *abandonner la
 > bonne hypothèse* au moment où je la tenais. Une hypothèse qui explique l'observation
 > ne vaut rien tant qu'un test ne l'a pas opposée aux autres.
+
+
+### Q23 — Le lexique des compagnies date de 2014 *(nouvelle, 16/09)*
+
+`assets/airlines.dat` est la base OpenFlights que l'amont embarque. Mesure sur les
+avions réellement vus au-dessus de la station ce matin :
+
+**77 opérateurs distincts, dont 23 absents du fichier — 30 %.**
+
+```
+BEL EFW EJU EZS FJO FRO FSF ITY JFA KMM LHX NJE
+NOZ NSZ OYO RHH RUK VJH VLJ VXS WMT WUK XGO
+```
+
+Ce sont pour l'essentiel des compagnies nées ou renommées après 2014 : Malta Air
+(2019), ITA Airways (2021), les filiales easyJet Europe et Suisse, Ryanair UK,
+NetJets Europe. Le fichier ne peut pas les connaître.
+
+**Ce que ça coûte** : un opérateur nommé vaut +0,40 au score et restreint les
+candidats à sa flotte. Pour 30 % du trafic, ce levier est inerte et les chiffres
+décident seuls. Observé en direct : *« Fraction Four Four Seven Lima »* a bien été
+apparié à **NJE447L** — « Fraction » *est* l'indicatif radio de NetJets Europe —
+mais par les chiffres seuls, le mot n'ayant rien trouvé dans le lexique.
+
+**Non résolu, et à ne pas résoudre en inventant.** Compléter le fichier à la main
+reviendrait à écrire des indicatifs radio de mémoire, ce que la méthode du projet
+interdit. Il faut une source vérifiable et republiable — la question est laquelle,
+compte tenu du fait que le dépôt est destiné à être public.
