@@ -33,6 +33,7 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `21-nuit-132-133.md` | la nuit du 15 : 88 % de déclenchements sans parole, le peigne à 100 Hz |
 | `22-correction-lexicale.md` | corriger le texte sans IA : mesuré, gain nul, **abandonné** |
 | `23-voies-restantes.md` | **où on en est, et ce qu'il reste** : état mesuré, tout ce qui a été éliminé, le panel de relecture, la version courte à la fin |
+| `24-identification-amas.md` | **les sept fréquences de l'amas identifiées canal par canal** : Paris arrivée, Brest, cinq croisières |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
 
 > Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas
