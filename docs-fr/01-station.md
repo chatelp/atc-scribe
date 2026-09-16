@@ -218,6 +218,14 @@ de squelch ne contiennent pas de parole**. Contre 18 à 34 % en journée, qui es
 plancher normal d'un squelch à seuil 10. Une chaîne de transcription qui avale tout ce
 qui déclenche va donc brûler l'essentiel de son calcul sur du bruit, la nuit.
 
+> **Mesuré sur une nuit entière le 16/09** — 4 h continues, sept canaux, 4 126
+> ouvertures : **88,1 % sans parole en moyenne, mais de 7,7 % à 99,1 % selon le canal.**
+> Le « jusqu'à 98 % » est juste, et c'est bien une propriété de **quatre** fréquences
+> — 132,733, 132,825, 133,000, 133,250 — qui sont exactement celles où l'analyse
+> spectrale retrouve le peigne à 100 Hz décrit ci-dessus. Les trois autres canaux de
+> l'amas portent de la parole, dont un, **132,783, à 92 %**. Détail dans
+> `21-nuit-132-133.md`.
+
 **Il faut un détecteur de voix en amont du modèle.** Voir `03-transcription.md`.
 
 ## Les grandeurs qui comptent
