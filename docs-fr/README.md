@@ -32,6 +32,7 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `20-captation-nuit.md` | **compte rendu de l'agent station** : captation nocturne 132-133, 4 h, 7 canaux |
 | `21-nuit-132-133.md` | la nuit du 15 : 88 % de déclenchements sans parole, le peigne à 100 Hz |
 | `22-correction-lexicale.md` | corriger le texte sans IA : mesuré, gain nul, **abandonné** |
+| `23-voies-restantes.md` | **où on en est, et ce qu'il reste** : état mesuré, tout ce qui a été éliminé, le panel de relecture, la version courte à la fin |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
 
 > Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas

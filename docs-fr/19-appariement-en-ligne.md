@@ -442,3 +442,32 @@ Deux détails qui valent d'être notés :
 > fenêtre de 51 minutes classe les groupes grossièrement, pas finement. Ce qui tient :
 > les tours rapportent moitié moins ; gros-porteurs et amas se valent en volume ; l'amas
 > reste nettement plus précis, 90–93 % contre 80 %.
+
+### Correction du 16/09, 14 h : l'instrument ne mesurait pas la règle de production
+
+Le panel de relecture (doc 23) a trouvé que le chemin `-db` de `cmd/phraseology`
+**ignorait `-strict`, `-min-score` et `-context`** — déclarés, jamais transmis à
+`measureAgainstADSB`. Les quatre fenêtres ci-dessus comptaient donc les appariements
+ambigus comme attachés, alors que la production les refuse. Corrigé ; remesuré sous la
+règle de production (ambigus refusés, contexte 120 s, huit témoins) :
+
+| | tours | gros-porteurs | amas 10:48 | amas 12:34 |
+|---|---|---|---|---|
+| acceptés | 19 | 40 | 41 | 36 |
+| ambigus refusés | 1 | 2 | 3 | 0 |
+| hasard, 8 témoins | 1,6 | 8,8 | 3,8 | 5,5 |
+| **appariements vrais** | **17,4** | **31,3** | **37,3** | **30,5** |
+| au-dessus du hasard | 91 % | 78 % | 91 % | 85 % |
+
+Écarts avec les chiffres publiés plus haut : au plus 3 appariements et 5 points. **Aucune
+conclusion ne bouge.** À noter pour la suite : sur huit témoins, les tirages d'une même
+fenêtre s'étalent de 4 à 12 sur gros-porteurs — l'écart-type du hasard est de l'ordre
+de 2 à 3 appariements par fenêtre, soit **± 5 à 7 points de précision**. C'est la
+résolution de l'instrument ; un effet plus petit n'est pas visible avec lui.
+
+Même remesure avec et sans `assets/spoken-operators.csv` : 19 / 40 / 41 / 36 contre
+19 / 40 / 41 / 35 acceptés, et un hasard qui bouge de ± 1 dans un sens ou l'autre selon
+la fenêtre. **L'effet du complément sur le hasard est sous la résolution de
+l'instrument** — ni la hausse que j'avais notée (Q25), ni la baisse que le panel a
+notée, ne sont établies. Voir Q25 dans `05-decisions.md` pour ce que le panel a établi
+sur le bonus d'opérateur lui-même.

@@ -60,7 +60,7 @@ func main() {
 	}
 
 	if *db != "" {
-		if err := measureAgainstADSB(*db, *airlines, *window, *control, *shuffle, *minDigits, *verbose, *fuzzy, *from, *to); err != nil {
+		if err := measureAgainstADSB(*db, *airlines, *window, *control, *shuffle, *minDigits, *verbose, *fuzzy, *from, *to, *strict, *minScore, *contextSec); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -175,7 +175,7 @@ type transmission struct {
 // how often would a transmission attach to an aircraft that was nowhere near, at a
 // time it could not have been talking to? Comparing the real rate against that
 // shifted rate separates signal from arithmetic.
-func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int, shuffleSeed int64, minDigits int, verbose, fuzzy bool, from, to string) error {
+func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int, shuffleSeed int64, minDigits int, verbose, fuzzy bool, from, to string, strict bool, minScore float64, contextSec int) error {
 	conn, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return err
@@ -258,7 +258,39 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		sky[0].at.UTC().Format("15:04:05Z"), sky[len(sky)-1].at.UTC().Format("15:04:05Z"))
 
 	w := time.Duration(windowSec) * time.Second
-	var covered, withCandidate, matched, ambiguous int
+	var covered, withCandidate, matched, ambiguous, refusedAmbiguous, refusedScore int
+
+	// The same memory the production processor keeps: what was just matched on
+	// each frequency, used only to break ties. One history per run, so a control
+	// run never sees the real run's answers.
+	type memory struct {
+		at time.Time
+		cs string
+	}
+	history := map[string][]memory{}
+	recent := func(key string, at time.Time) []string {
+		if contextSec <= 0 {
+			return nil
+		}
+		var out []string
+		w := time.Duration(contextSec) * time.Second
+		for _, h := range history[key] {
+			if d := at.Sub(h.at); d >= 0 && d <= w {
+				out = append(out, h.cs)
+			}
+		}
+		return out
+	}
+	remember := func(key string, at time.Time, cs string) {
+		if contextSec <= 0 || cs == "" {
+			return
+		}
+		h := append(history[key], memory{at, cs})
+		if len(h) > 40 {
+			h = h[len(h)-40:]
+		}
+		history[key] = h
+	}
 	var fleetSizes []int
 
 	shift := time.Duration(controlShift) * time.Second
@@ -319,17 +351,34 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		}
 		withCandidate++
 
-		m, ok := matcher.Match(res, fleet)
+		m, ok := matcher.MatchWithContext(res, fleet, recent(tx.freq, tx.at))
 		if !ok {
 			if verbose {
 				fmt.Printf("  %s  —        %s\n", tx.at.Format("15:04:05"), trunc(tx.text, 80))
 			}
 			continue
 		}
+		// Apply the production rule, not merely the matcher's: an ambiguous match is
+		// refused when -strict is set, and a score under -min-score is refused. Until
+		// now this path counted both as attached, so -strict, -min-score and
+		// -context were silently inert on -db.
+		if strict && m.Ambiguous {
+			refusedAmbiguous++
+			if verbose {
+				fmt.Printf("  %s  ~ambig   %.2f %-22s %s (with %s)\n", tx.at.Format("15:04:05"),
+					m.Score, m.Reason, trunc(tx.text, 50), strings.Join(m.Runners, ", "))
+			}
+			continue
+		}
+		if m.Score < minScore {
+			refusedScore++
+			continue
+		}
 		matched++
 		if m.Ambiguous {
 			ambiguous++
 		}
+		remember(tx.freq, tx.at, m.Callsign)
 		if verbose {
 			flag := ""
 			if m.Ambiguous {
@@ -351,6 +400,10 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 	fmt.Printf("attached to an aircraft    %d  (%.0f%% of candidates)\n",
 		matched, pct(matched, withCandidate))
 	fmt.Printf("  of which ambiguous       %d\n", ambiguous)
+	if strict || minScore > 0 {
+		fmt.Printf("  refused as ambiguous     %d\n", refusedAmbiguous)
+		fmt.Printf("  refused under min-score  %d\n", refusedScore)
+	}
 	fmt.Printf("median aircraft in window  %d\n", median)
 	return nil
 }
