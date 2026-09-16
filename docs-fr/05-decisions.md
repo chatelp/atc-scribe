@@ -537,6 +537,12 @@ utilisée par câble.
 > pendant le diagnostic et a fait échouer `curl` aussi, ce qui m'a fait *abandonner la
 > bonne hypothèse* au moment où je la tenais. Une hypothèse qui explique l'observation
 > ne vaut rien tant qu'un test ne l'a pas opposée aux autres.
+>
+> **Le confondant a un nom, depuis `20-captation-nuit.md`** : *« dix chutes du lien
+> Ethernet entre 22 h et 8 h 45, toutes suivies d'un retour en 4 à 5 secondes »*. La
+> coupure qui a brouillé le diagnostic en était une. Q21 tient — le test apparié
+> `curl` 5/5 contre Go 0/5 au même instant l'établit indépendamment — mais je n'avais
+> aucun moyen de distinguer les deux pannes sans ce relevé côté station.
 
 
 ### Q23 — Le lexique des compagnies date de 2014 *(nouvelle, 16/09)*
@@ -565,3 +571,20 @@ mais par les chiffres seuls, le mot n'ayant rien trouvé dans le lexique.
 reviendrait à écrire des indicatifs radio de mémoire, ce que la méthode du projet
 interdit. Il faut une source vérifiable et republiable — la question est laquelle,
 compte tenu du fait que le dépôt est destiné à être public.
+
+
+### Q24 — Le plancher d'auditeurs Icecast est 1, jamais 0 *(nouvelle, 16/09)*
+
+Relevé par l'agent de la station : `filtre-voix` consomme `aero.mp3` en permanence
+pour produire `aero-clair.mp3`. Le champ `auditeurs` de `/radio/etat` ne tombe donc
+jamais à zéro tant que la chaîne tourne. **Tout test « personne n'écoute » doit
+raisonner sur `auditeurs − 1`.** Le piège a failli annuler la captation nocturne en
+silence.
+
+**Vérifié : notre code n'est pas concerné** — rien dans `co-atc-local` ne lit
+`/radio/etat`. À retenir tout de même pour D2, le mode de diffusion par canal : c'est
+exactement là qu'un test de ce genre serait tentant.
+
+Corollaire à garder en tête : **co-atc compte lui aussi comme auditeur.** Il tire
+`aero.mp3` par un `ffmpeg` tant qu'il tourne. Une mesure d'audience faite pendant que
+notre binaire tourne compte donc au moins deux auditeurs qui ne sont personne.
