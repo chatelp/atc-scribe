@@ -49,7 +49,7 @@ func (t RunwayEventType) String() string {
 
 // RunwayEvent records a single piece of evidence that a runway end is in use.
 type RunwayEvent struct {
-	RunwayEnd string          // "05-23/05" format (matches RunwayApproachInfo.RunwayID)
+	RunwayEnd string // "05-23/05" format (matches RunwayApproachInfo.RunwayID)
 	Type      RunwayEventType
 	Hex       string // Aircraft that generated this event
 	Timestamp time.Time

@@ -5,7 +5,7 @@
  * - Ensures filtering semantics are identical across full passes and incremental updates.
  *
  * Key responsibilities:
- * - Evaluate search, ground/air state, altitude, phase, and recency filters.
+ * - Evaluate search, ground/air state, altitude, phase, voice, and recency filters.
  * - Preserve selected-aircraft visibility even when it no longer matches filters.
  *
  * Quirks / contracts:
@@ -62,6 +62,11 @@
         return !(settings.phaseFilters && settings.phaseFilters[currentPhase] === false);
     }
 
+    function isVisibleByVoice(aircraft, settings) {
+        if (!settings.voiceOnly) return true;
+        return !!(aircraft.voice && aircraft.voice.transmissions > 0);
+    }
+
     function isVisibleByLastSeen(aircraft, lastSeenCutoff) {
         if (!aircraft.last_seen) return true;
         const lastSeenDate = new Date(aircraft.last_seen);
@@ -73,11 +78,12 @@
         const groundVisible = isVisibleByGroundState(aircraft, store.settings);
         const altitudeVisible = isVisibleByAltitude(aircraft, store.settings);
         const phaseVisible = isVisibleByPhase(aircraft, store.settings);
+        const voiceVisible = isVisibleByVoice(aircraft, store.settings);
         const lastSeenVisible = options.lastSeenCutoff ? isVisibleByLastSeen(aircraft, options.lastSeenCutoff) : true;
         const selected = !!(store.selectedAircraft && store.selectedAircraft.hex === aircraft.hex);
         const inViewport = options.isInViewport !== false;
 
-        return (matches && groundVisible && altitudeVisible && phaseVisible && lastSeenVisible && inViewport) || selected;
+        return (matches && groundVisible && altitudeVisible && phaseVisible && voiceVisible && lastSeenVisible && inViewport) || selected;
     }
 
     window.MapVisibilityRules = {
@@ -86,6 +92,7 @@
         isVisibleByGroundState,
         isVisibleByAltitude,
         isVisibleByPhase,
+        isVisibleByVoice,
         isVisibleByLastSeen,
         shouldShowAircraftOnMap,
     };

@@ -248,6 +248,10 @@ func main() {
 	// The fleet adapter is what lets a spoken callsign be attached to a real
 	// target; with post_processing.backend = "openai" it is simply never read.
 	fleet := &adsbFleet{service: adsbService, lastSeenMinutes: cfg.PostProcessing.FleetLastSeenMinutes}
+
+	// What the radio has said about each aircraft, carried on the aircraft itself
+	// so the map can show which targets the controller is actually talking to.
+	adsbService.SetVoiceIndex(newVoiceIndex(context.Background(), transcriptionStorage, 5*time.Second, log))
 	frequenciesService := frequencies.NewService(cfg, log, wsServer, transcriptionStorage, sqliteStorage, clearanceStorage, templateService, fleet)
 
 	// Update templating service with frequencies service
@@ -441,7 +445,7 @@ func cleanupOldDailyDatabases(dbDir, activeDBPath string, keepDays int, now time
 	}
 
 	absActiveDBPath, _ := filepath.Abs(activeDBPath)
-	cutoffDate := now.UTC().Truncate(24 * time.Hour).AddDate(0, 0, -(keepDays - 1))
+	cutoffDate := now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -(keepDays - 1))
 
 	deletedCount := 0
 	for _, entry := range entries {
