@@ -103,6 +103,23 @@ var atcPhrases = [][]string{
 	{"line", "up", "and", "wait"}, {"hold", "short"}, {"continue", "approach"},
 	{"go", "around"}, {"radar", "contact"}, {"identified"}, {"no", "delay"},
 	{"report", "when"}, {"break", "break"}, {"traffic", "is"},
+
+	// Instructions in the imperative. These carry most of an approach frequency,
+	// and they are what separates a controller from a pilot reading back: the
+	// controller says "descend", the pilot answers "descending". The tense is the
+	// signal, so these must never be stemmed.
+	{"descend"}, {"climb"}, {"maintain"}, {"expect"}, {"squawk"}, {"resume"},
+	{"turn", "left"}, {"turn", "right"}, {"reduce"}, {"increase"}, {"vectors"},
+	{"cleared"}, {"approved"}, {"report"}, {"join"}, {"follow"}, {"caution"},
+	{"wind"}, {"qnh"}, {"say", "your"}, {"number", "one"}, {"number", "two"},
+
+	// French control says the same things in its own words, and this station hears
+	// them every day. The vouvoyed imperative is again the discriminator: the
+	// controller says "descendez", the pilot answers "on descend".
+	{"descendez"}, {"montez"}, {"maintenez"}, {"contactez"}, {"affichez"},
+	{"rappelez"}, {"tournez"}, {"virez"}, {"réduisez"}, {"reduisez"},
+	{"autorisé"}, {"autorise"}, {"autorisée"}, {"prenez"}, {"suivez"},
+	{"numéro", "un"}, {"numero", "un"}, {"vent"}, {"rappelez", "établi"},
 }
 
 // pilotPhrases are read-backs and requests.
@@ -110,6 +127,16 @@ var pilotPhrases = [][]string{
 	{"request"}, {"with", "you"}, {"wilco"}, {"we", "are"}, {"we", "will"},
 	{"ready", "for", "departure"}, {"ready", "for", "takeoff"}, {"good", "day"},
 	{"passing"}, {"leaving"}, {"on", "track"}, {"looking", "for"}, {"say", "again"},
+
+	// Read-backs, in the progressive that answers an imperative.
+	{"descending"}, {"climbing"}, {"turning"}, {"maintaining"}, {"squawking"},
+	{"established"}, {"roger"}, {"affirm"}, {"requesting"}, {"approaching"},
+	{"inbound"}, {"vacated"}, {"vacating"}, {"checking"}, {"out", "of"},
+
+	// French read-backs and requests.
+	{"on", "descend"}, {"on", "monte"}, {"nous", "descendons"}, {"nous", "montons"},
+	{"on", "affiche"}, {"on", "rappelle"}, {"on", "contacte"}, {"demandons"},
+	{"demande"}, {"au", "revoir"}, {"établi"}, {"etabli"}, {"dégagé"}, {"degage"},
 }
 
 // Parse extracts every fact the closed vocabulary of ICAO phraseology allows.
@@ -146,7 +173,7 @@ func Parse(text string) Result {
 
 	res.Letters = letterGroups(toks, used)
 	res.Values = append(res.Values, looseNumbers(toks, used)...)
-	res.Speaker = speakerOf(toks)
+	res.Speaker = speakerOf(toks, res.Values)
 	res.Clearances = clearances(toks, res.Values)
 	res.Normalized = normalize(text, res.Values)
 	return res
@@ -413,7 +440,7 @@ func plausibleFlightLevel(digits string) bool {
 	return err == nil && n >= 30 && n <= 660
 }
 
-func speakerOf(toks []string) Speaker {
+func speakerOf(toks []string, values []Value) Speaker {
 	atc, pilot := 0, 0
 	for i := range toks {
 		for _, p := range atcPhrases {
@@ -427,10 +454,50 @@ func speakerOf(toks []string) Speaker {
 			}
 		}
 	}
+	if atc != pilot {
+		if atc > pilot {
+			return SpeakerATC
+		}
+		return SpeakerPilot
+	}
+
+	// Nothing in the words decided it, so fall back on the one structural
+	// regularity of ICAO phraseology: the controller opens by naming the aircraft
+	// it is addressing, and the pilot signs off with its own callsign. This is a
+	// tie-break only — a transmission whose words already say who is speaking is
+	// never overruled by where the digits happened to fall.
+	return speakerByCallsignPosition(toks, values)
+}
+
+// speakerByCallsignPosition reads the position of the spoken callsign.
+//
+// Only a callsign near one end counts. A callsign in the middle of a transmission
+// is as likely to be a controller mid-instruction as a pilot mid-readback, and
+// guessing there would be noise dressed as a decision.
+func speakerByCallsignPosition(toks []string, values []Value) Speaker {
+	const edge = 3 // tokens from either end that count as "opening" or "closing"
+
+	if len(toks) < 4 {
+		return SpeakerUnknown
+	}
+
+	opens, closes := false, false
+	for _, v := range values {
+		if v.Role != RoleCallsign {
+			continue
+		}
+		if v.Word < edge {
+			opens = true
+		}
+		if v.Word >= len(toks)-edge {
+			closes = true
+		}
+	}
+
 	switch {
-	case atc > pilot:
+	case opens && !closes:
 		return SpeakerATC
-	case pilot > atc:
+	case closes && !opens:
 		return SpeakerPilot
 	default:
 		return SpeakerUnknown

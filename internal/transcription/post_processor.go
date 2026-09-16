@@ -22,6 +22,16 @@ type PostProcessingConfig struct {
 	ContextTranscriptions int
 	SystemPromptPath      string
 	TimeoutSeconds        int
+
+	// Backend selects which implementation fills in speaker, callsign and
+	// clearances: "openai" for the GPT-4o pass above, "local" for the
+	// closed-vocabulary grammar in phraseology/. The fields below apply to
+	// "local" only. See docs-fr/17-appariement.md.
+	Backend              string
+	AirlinesDatPath      string
+	MinScore             float64
+	MinDigits            int
+	FleetLastSeenMinutes int
 }
 
 // PostProcessingResult represents the structured result from the LLM

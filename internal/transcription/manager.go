@@ -23,8 +23,9 @@ type TranscriptionManager struct {
 	logger               *logger.Logger
 	openAIAPIKey         string
 	transcriptionConfig  Config
-	postProcessor        *PostProcessor
+	postProcessor        batchProcessor
 	postProcessingConfig PostProcessingConfig
+	fleet                FleetProvider // live ADS-B for the local post-processor; nil disables matching
 	templateRenderer     TemplateRenderer
 	frequencyNames       map[string]string // Map of frequency IDs to names
 	fileLogger           *FileLogger       // Optional file logger for transcriptions
@@ -42,6 +43,7 @@ func NewTranscriptionManager(
 	postProcessingConfig PostProcessingConfig,
 	templateRenderer TemplateRenderer,
 	frequencyConfigs []FrequencyConfig,
+	fleet FleetProvider,
 ) *TranscriptionManager {
 	// Create map of frequency IDs to names
 	frequencyNames := make(map[string]string)
@@ -73,6 +75,7 @@ func NewTranscriptionManager(
 		openAIAPIKey:         openAIAPIKey,
 		transcriptionConfig:  transcriptionConfig,
 		postProcessingConfig: postProcessingConfig,
+		fleet:                fleet,
 		templateRenderer:     templateRenderer,
 		frequencyNames:       frequencyNames,
 		fileLogger:           fileLogger,
@@ -320,6 +323,29 @@ func (m *TranscriptionManager) StartPostProcessing(ctx context.Context) error {
 		return nil
 	}
 
+	// The local backend replaces the GPT-4o pass with the phraseology grammar
+	// matched against live ADS-B. Same seam, same tables, no key.
+	if m.postProcessingConfig.Backend == BackendLocal {
+		grammar, err := NewGrammarProcessor(
+			ctx,
+			m.transcriptionStorage,
+			m.clearanceStorage,
+			m.wsServer,
+			m.fleet,
+			m.postProcessingConfig,
+			m.logger,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create local post-processor: %w", err)
+		}
+		if err := grammar.Start(); err != nil {
+			return fmt.Errorf("failed to start local post-processor: %w", err)
+		}
+		m.postProcessor = grammar
+		m.logger.Info("Post-processing started (local grammar)")
+		return nil
+	}
+
 	// Skip if no OpenAI API key is provided
 	if m.openAIAPIKey == "" {
 		m.logger.Info("Post-processing disabled - no OpenAI API key provided")
@@ -367,4 +393,13 @@ func (m *TranscriptionManager) StopPostProcessing() {
 	m.logger.Info("Stopping post-processor")
 	m.postProcessor.Stop()
 	m.postProcessor = nil
+}
+
+// batchProcessor is the second stage of the pipeline: it takes stored raw
+// transcriptions and fills in who spoke, which aircraft it concerned, and any
+// clearance issued. PostProcessor asks GPT-4o; GrammarProcessor works it out
+// locally. The manager only needs to start and stop whichever is configured.
+type batchProcessor interface {
+	Start() error
+	Stop() error
 }

@@ -445,3 +445,39 @@ station, et à vérifier : combien de jours sont conservés ?
 L'hypothèse simple est que la saturation est la cause : chevauchements, débit rapide.
 **Non vérifiée.** Le test serait de mesurer la précision en fonction de l'occupation
 instantanée — faisable avec les données déjà en main.
+
+### D14 — L'appariement en ligne remplace l'étage GPT-4o *(16/09)*
+
+L'amont découpe la transcription en deux étages : le texte brut, puis un
+post-traitement GPT-4o qui remplit le locuteur, l'indicatif et les autorisations.
+**Notre grammaire prend la place du second, à sa propre couture** —
+`post_processing.backend = "local"` — et écrit dans les tables de l'amont avec son
+vocabulaire. Zéro migration de schéma, zéro ligne de JavaScript.
+
+**Pourquoi c'est la bonne forme de greffe** : remplacer un composant à la couture
+que l'amont a lui-même définie se rebase ; ajouter une fonction à côté, non. Et le
+propriétaire peut rebasculer sur GPT-4o par une clé de configuration pour comparer
+les deux sur le même point.
+
+Réglages fixés par balayage, pas au jugé : **3 chiffres, fenêtre 60 s, refus des
+ambigus, pas de seuil de score supplémentaire**. Le tableau complet est dans
+`19-appariement-en-ligne.md` et recopié en commentaire dans `config.toml`, pour que
+le compromis reste celui du propriétaire.
+
+### D15 — La position de l'indicatif départage le locuteur *(16/09)*
+
+La détection du locuteur ne couvrait que **10 %** des transmissions, et **0 %** du
+français. Deux ajouts : les verbes d'instruction à l'impératif — c'est le temps qui
+discrimine, *descend* contre *descending*, *descendez* contre *on descend*, donc ces
+formes ne doivent jamais être lemmatisées — et la règle structurelle OACI selon
+laquelle le contrôleur ouvre par l'indicatif et le pilote le termine par le sien.
+
+Couverture **10 % → 54 %**. La justesse, elle, **n'est pas établie** : voir Q20.
+
+### Q20 — La détection du locuteur est-elle juste ? *(nouvelle, 16/09)*
+
+Couverture mesurée, justesse non. Un contrôle falsifiable a été écrit à défaut
+d'annotations : un collationnement suit son instruction, donc les étiquettes doivent
+alterner sur deux transmissions proches partageant un nombre. Résultat **61 % et
+59 % contre 50 % au hasard — sur 35 paires seulement, ce n'est pas concluant.**
+Le contrôle est rejouable ; il demande un corpus plus long.

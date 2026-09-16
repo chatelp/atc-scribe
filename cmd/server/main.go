@@ -244,8 +244,11 @@ func main() {
 		log,
 	)
 
-	// Create frequencies service
-	frequenciesService := frequencies.NewService(cfg, log, wsServer, transcriptionStorage, sqliteStorage, clearanceStorage, templateService)
+	// Create frequencies service.
+	// The fleet adapter is what lets a spoken callsign be attached to a real
+	// target; with post_processing.backend = "openai" it is simply never read.
+	fleet := &adsbFleet{service: adsbService, lastSeenMinutes: cfg.PostProcessing.FleetLastSeenMinutes}
+	frequenciesService := frequencies.NewService(cfg, log, wsServer, transcriptionStorage, sqliteStorage, clearanceStorage, templateService, fleet)
 
 	// Update templating service with frequencies service
 	templateService = templating.NewService(
