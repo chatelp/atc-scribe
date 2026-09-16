@@ -225,6 +225,14 @@ type LocalSTTFileConfig struct {
 	ServerURL      string `toml:"server_url"`      // Base URL of the sidecar
 	TimeoutSeconds int    `toml:"timeout_seconds"` // HTTP timeout for one transmission
 
+	// Command starts the sidecar with the server and stops it on exit. Leave it
+	// empty to use a sidecar you run yourself at ServerURL -- upstream's
+	// docs/LOCAL-STT.md specifies a URL precisely so it may live elsewhere.
+	// Either way the server probes /health at startup and refuses to run half
+	// deaf. Measured on this machine: a cold sidecar answers in 1.6 s.
+	Command               []string `toml:"command"`
+	StartupTimeoutSeconds int      `toml:"startup_timeout_seconds"`
+
 	// Where one transmission begins and ends. An SDR feed is digitally silent
 	// between transmissions, so these defaults suit it; a noisier source needs a
 	// higher silence_threshold and relies on segment_max_seconds as a backstop.

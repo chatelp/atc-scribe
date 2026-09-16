@@ -25,6 +25,7 @@ import (
 	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/templating"
+	"github.com/yegors/co-atc/internal/transcription"
 	"github.com/yegors/co-atc/internal/weather"
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
@@ -122,6 +123,27 @@ func main() {
 	}
 	probeCancel()
 	log.Info("ADS-B source validation succeeded", logger.String("source_type", cfg.ADSB.SourceType))
+
+	// The other half of the product gets the same treatment. Without this the
+	// server starts, serves the map and the audio, and transcribes nothing --
+	// one error line per transmission and no transcript, which is a worse
+	// failure than not starting at all.
+	var sttSidecar *transcription.Sidecar
+	if cfg.Transcription.Backend == transcription.BackendLocal {
+		sttSidecar = transcription.NewSidecar(transcription.SidecarConfig{
+			ServerURL:             cfg.Transcription.Local.ServerURL,
+			Command:               cfg.Transcription.Local.Command,
+			StartupTimeoutSeconds: cfg.Transcription.Local.StartupTimeoutSeconds,
+		}, log)
+		sidecarCtx, sidecarCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		if err := sttSidecar.Start(sidecarCtx); err != nil {
+			sidecarCancel()
+			fatalLog := log.WithOptions(zap.AddStacktrace(zapcore.PanicLevel))
+			fatalLog.Fatal("Local transcription sidecar unavailable", logger.Error(err))
+		}
+		sidecarCancel()
+		defer sttSidecar.Stop()
+	}
 	// Processor has been moved into the service
 
 	// Create SQLite storage
@@ -365,6 +387,11 @@ func main() {
 	log.Info("Stopping frequencies service...")
 	frequenciesService.Stop()
 	log.Info("Frequencies service stopped.")
+
+	// After the frequencies service: nothing will ask it to transcribe again.
+	if sttSidecar != nil {
+		sttSidecar.Stop()
+	}
 
 	// Stop ATC Chat service if it was created
 	if atcChatService != nil {

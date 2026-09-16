@@ -1,0 +1,269 @@
+package transcription
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
+	"github.com/yegors/co-atc/pkg/logger"
+)
+
+// Sidecar ties the local speech-to-text service to the lifetime of this server.
+//
+// Upstream's docs/LOCAL-STT.md specifies the sidecar as an HTTP service behind a
+// URL, which deliberately leaves it free to run elsewhere -- another terminal,
+// another machine, a container. That stays true: with no Command configured this
+// only probes the URL. But a transcription service has no reason to outlive the
+// program that is its only client, so when Command is set we start one and stop
+// it on the way out.
+//
+// The probe is not optional either way. Without it co-atc starts perfectly,
+// serves the map and the audio, and silently transcribes nothing: every
+// transmission logs one error and is dropped. Measured on this station, a busy
+// day would produce ~1300 such lines and no transcript. The ADS-B source is
+// validated at startup for exactly this reason; this is the same guarantee for
+// the other half of the product.
+type Sidecar struct {
+	url     string
+	command []string
+	timeout time.Duration
+	logger  *logger.Logger
+
+	mu      sync.Mutex
+	cmd     *exec.Cmd
+	output  *tailBuffer
+	stopped bool
+
+	// A child is reaped as soon as it is started. Without that, an exec.Cmd whose
+	// process has died still reports nothing: ProcessState is only filled in by
+	// Wait, and signal 0 succeeds against a zombie. A sidecar that exits on
+	// startup would then be indistinguishable from one still loading, and the
+	// operator would wait out the whole timeout for a bare "did not answer".
+	done    chan struct{}
+	waitErr error
+}
+
+// SidecarConfig is what main needs to supply; it maps onto [transcription.local].
+type SidecarConfig struct {
+	ServerURL             string
+	Command               []string
+	StartupTimeoutSeconds int
+}
+
+// NewSidecar returns a supervisor for the local STT service. It does nothing
+// until Start is called.
+func NewSidecar(cfg SidecarConfig, log *logger.Logger) *Sidecar {
+	timeout := time.Duration(cfg.StartupTimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = 60 * time.Second
+	}
+	return &Sidecar{
+		url:     strings.TrimRight(cfg.ServerURL, "/"),
+		command: cfg.Command,
+		timeout: timeout,
+		logger:  log.Named("stt-sidecar"),
+		output:  &tailBuffer{limit: 4096},
+	}
+}
+
+// Start launches the sidecar when one is configured, then waits for it to answer
+// /health. It returns an error rather than degrading quietly: a server that
+// cannot transcribe should say so at startup, not one log line at a time.
+func (s *Sidecar) Start(ctx context.Context) error {
+	if len(s.command) > 0 {
+		if err := s.spawn(); err != nil {
+			return err
+		}
+	}
+
+	deadline := time.Now().Add(s.timeout)
+	var lastErr error
+	announced := false
+	for {
+		if err := s.probe(ctx); err == nil {
+			if len(s.command) > 0 {
+				s.logger.Info("Local STT sidecar is up", logger.String("url", s.url))
+			} else {
+				s.logger.Info("Local STT sidecar reached", logger.String("url", s.url))
+			}
+			return nil
+		} else {
+			lastErr = err
+			// Say we are waiting, once. Sixty silent seconds before a failure
+			// look like a hang, and the operator cannot tell whether to go and
+			// start the sidecar themselves.
+			if !announced {
+				announced = true
+				s.logger.Info("Waiting for the local STT sidecar",
+					logger.String("url", s.url+"/health"),
+					logger.String("timeout", s.timeout.String()))
+			}
+		}
+
+		// A child that has already exited will never answer; say so now, with
+		// whatever it printed, instead of waiting out the timeout.
+		if err := s.exited(); err != nil {
+			return fmt.Errorf("local STT sidecar exited during startup: %w\n%s", err, s.output.String())
+		}
+
+		if time.Now().After(deadline) {
+			s.Stop()
+			if len(s.command) > 0 {
+				return fmt.Errorf("local STT sidecar did not answer %s/health within %s: %w\n%s",
+					s.url, s.timeout, lastErr, s.output.String())
+			}
+			return fmt.Errorf("no local STT sidecar answering at %s/health: %w\n"+
+				"Start one (see sidecar/README.md), point transcription.local.server_url at it, "+
+				"or set transcription.local.command so co-atc starts it itself", s.url, lastErr)
+		}
+
+		select {
+		case <-ctx.Done():
+			s.Stop()
+			return ctx.Err()
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+}
+
+// Stop terminates a sidecar we started. One that was already running when we
+// arrived is left alone -- it is not ours to kill.
+func (s *Sidecar) Stop() {
+	s.mu.Lock()
+	cmd := s.cmd
+	if cmd == nil || cmd.Process == nil || s.stopped {
+		s.mu.Unlock()
+		return
+	}
+	s.stopped = true
+	s.mu.Unlock()
+
+	pid := cmd.Process.Pid
+	s.logger.Info("Stopping local STT sidecar", logger.Int("pid", pid))
+
+	// Signal the whole process group. The sidecar's dependencies fork helpers of
+	// their own -- Silero leaves a multiprocessing resource_tracker behind -- and
+	// signalling only the parent orphans them.
+	if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+	}
+
+	s.mu.Lock()
+	done := s.done
+	s.mu.Unlock()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		s.logger.Warn("Local STT sidecar did not stop on SIGTERM, killing", logger.Int("pid", pid))
+		_ = syscall.Kill(-pid, syscall.SIGKILL)
+		<-done
+	}
+}
+
+func (s *Sidecar) spawn() error {
+	cmd := exec.Command(s.command[0], s.command[1:]...)
+	// Its own process group, so Stop can reach the children too.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// The sidecar's own logs stay visible on the terminal, and a copy is kept so
+	// a startup failure can be reported with its cause attached.
+	cmd.Stdout = io.MultiWriter(os.Stdout, s.output)
+	cmd.Stderr = io.MultiWriter(os.Stderr, s.output)
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start local STT sidecar %q: %w", strings.Join(s.command, " "), err)
+	}
+
+	done := make(chan struct{})
+	s.mu.Lock()
+	s.cmd = cmd
+	s.done = done
+	s.mu.Unlock()
+
+	go func() {
+		err := cmd.Wait()
+		s.mu.Lock()
+		s.waitErr = err
+		s.mu.Unlock()
+		close(done)
+	}()
+
+	s.logger.Info("Started local STT sidecar",
+		logger.Int("pid", cmd.Process.Pid),
+		logger.String("command", strings.Join(s.command, " ")))
+	return nil
+}
+
+// exited reports how the child ended, or nil while it is still running (or was
+// never ours to begin with).
+func (s *Sidecar) exited() error {
+	s.mu.Lock()
+	done, cmd, waitErr := s.done, s.cmd, s.waitErr
+	s.mu.Unlock()
+	if done == nil || cmd == nil {
+		return nil
+	}
+	select {
+	case <-done:
+		if waitErr != nil {
+			return waitErr
+		}
+		return fmt.Errorf("exited cleanly without serving %s/health", s.url)
+	default:
+		return nil
+	}
+}
+
+func (s *Sidecar) probe(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.url+"/health", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("health returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// tailBuffer keeps the last `limit` bytes written to it, so a failure can be
+// reported with the sidecar's own output instead of a bare exit status.
+type tailBuffer struct {
+	mu    sync.Mutex
+	buf   bytes.Buffer
+	limit int
+}
+
+func (t *tailBuffer) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.buf.Write(p)
+	if t.buf.Len() > t.limit {
+		b := t.buf.Bytes()
+		trimmed := append([]byte(nil), b[t.buf.Len()-t.limit:]...)
+		t.buf.Reset()
+		t.buf.Write(trimmed)
+	}
+	return len(p), nil
+}
+
+func (t *tailBuffer) String() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return strings.TrimSpace(t.buf.String())
+}
