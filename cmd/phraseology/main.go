@@ -46,6 +46,8 @@ func main() {
 	strict := flag.Bool("strict", false, "refuse a match when a second aircraft scores nearly as well")
 	minScore := flag.Float64("min-score", 0, "refuse a match below this score")
 	fuzzy := flag.Bool("fuzzy", false, "accept a spoken number one digit off (measured 81% noise)")
+	from := flag.String("from", "", "with -db: only transmissions at or after this RFC3339 time")
+	to := flag.String("to", "", "with -db: only transmissions before this RFC3339 time")
 	flag.Parse()
 
 	if *capture != "" {
@@ -57,7 +59,7 @@ func main() {
 	}
 
 	if *db != "" {
-		if err := measureAgainstADSB(*db, *airlines, *window, *control, *shuffle, *minDigits, *verbose); err != nil {
+		if err := measureAgainstADSB(*db, *airlines, *window, *control, *shuffle, *minDigits, *verbose, *fuzzy, *from, *to); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -172,7 +174,7 @@ type transmission struct {
 // how often would a transmission attach to an aircraft that was nowhere near, at a
 // time it could not have been talking to? Comparing the real rate against that
 // shifted rate separates signal from arithmetic.
-func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int, shuffleSeed int64, minDigits int, verbose bool) error {
+func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int, shuffleSeed int64, minDigits int, verbose, fuzzy bool, from, to string) error {
 	conn, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return err
@@ -184,6 +186,7 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		return fmt.Errorf("airlines.dat: %w", err)
 	}
 	matcher.MinDigits = minDigits
+	matcher.FuzzyDigits = fuzzy
 
 	// Every ADS-B sighting, sorted, so each transmission can binary-search its
 	// own moment instead of re-querying 300 times over 300k rows.
@@ -215,8 +218,20 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 	sort.Slice(sky, func(i, j int) bool { return sky[i].at.Before(sky[j].at) })
 
 	var txs []transmission
-	rows, err = conn.Query(`SELECT created_at, content, frequency_id FROM transcriptions
-	                         WHERE content != '' ORDER BY created_at`)
+	// A time window lets one recording be split by whatever changed during it --
+	// the listening group, a matcher setting -- and each slice measured on the
+	// same footing, with its own control.
+	q := `SELECT created_at, content, frequency_id FROM transcriptions WHERE content != ''`
+	var args []any
+	if from != "" {
+		q += " AND created_at >= ?"
+		args = append(args, from)
+	}
+	if to != "" {
+		q += " AND created_at < ?"
+		args = append(args, to)
+	}
+	rows, err = conn.Query(q+" ORDER BY created_at", args...)
 	if err != nil {
 		return err
 	}
