@@ -45,10 +45,11 @@ func main() {
 	verbose := flag.Bool("v", false, "print every parsed transmission")
 	strict := flag.Bool("strict", false, "refuse a match when a second aircraft scores nearly as well")
 	minScore := flag.Float64("min-score", 0, "refuse a match below this score")
+	fuzzy := flag.Bool("fuzzy", false, "accept a spoken number one digit off (measured 81% noise)")
 	flag.Parse()
 
 	if *capture != "" {
-		if err := measureCapture(*capture, *adsb, *airlines, *window, *minDigits, *seeds, *offset, *verbose, *strict, *minScore); err != nil {
+		if err := measureCapture(*capture, *adsb, *airlines, *window, *minDigits, *seeds, *offset, *verbose, *strict, *minScore, *fuzzy); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

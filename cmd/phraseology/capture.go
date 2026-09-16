@@ -44,7 +44,7 @@ func loadJSON[T any](path string) ([]T, error) {
 }
 
 // measureCapture cross-checks a capture against recovered ADS-B history.
-func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits, seeds, offsetHours int, verbose, strict bool, minScore float64) error {
+func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits, seeds, offsetHours int, verbose, strict bool, minScore float64, fuzzy bool) error {
 	txs, err := loadJSON[captureTx](txPath)
 	if err != nil {
 		return fmt.Errorf("transcripts: %w", err)
@@ -60,6 +60,7 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		return err
 	}
 	matcher.MinDigits = minDigits
+	matcher.FuzzyDigits = fuzzy
 
 	// Capture filenames carry station local time; ADS-B carries UTC.
 	toUTC := func(local string) (time.Time, bool) {

@@ -44,6 +44,21 @@ type Matcher struct {
 	// Measured against live ADS-B with a shuffled control, two-digit groups match
 	// by arithmetic about as often as by truth; three is where signal starts.
 	MinDigits int
+
+	// FuzzyDigits accepts a spoken number one digit away from an aircraft's.
+	//
+	// Off by default, and the default is measured. On the recorded capture the
+	// rule adds 8 matches of which 1.5 are true and 6.5 are coincidence -- 81%
+	// noise -- costing three points of precision for nothing. Live on CDG
+	// approach it produced two of three wrong matches: "Air France Three Six
+	// Seven", said three times over, was attached to AFR377, and "Heli One Six
+	// Two" to N132QS.
+	//
+	// The flaw is structural rather than statistical. An off-by-one match scores
+	// 0.50, under the 0.60 floor, so it only lands with a corroboration -- and a
+	// single one is enough to carry it past. Over Paris, "Air France" corroborates
+	// almost anything.
+	FuzzyDigits bool
 }
 
 // NewMatcher builds the spoken-name index from OpenFlights' airlines.dat, which
@@ -132,7 +147,7 @@ func (m *Matcher) Match(r Result, fleet []Aircraft) (Match, bool) {
 				if s := 0.6; s > score {
 					score, why = s, []string{"digits suffix"}
 				}
-			case len(digits) >= 3 && len(v.Digits) == len(digits) && editDistance(v.Digits, digits) == 1:
+			case m.FuzzyDigits && len(digits) >= 3 && len(v.Digits) == len(digits) && editDistance(v.Digits, digits) == 1:
 				if s := 0.5; s > score {
 					score, why = s, []string{"digits off by one"}
 				}

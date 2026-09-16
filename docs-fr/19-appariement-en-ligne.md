@@ -222,3 +222,40 @@ gain, pas seulement une correction :
 La précision tient sur les cinq fréquences, et 124,625 passe de 56 % à 63 %. Une
 heure de direct a rapporté plus que la nuit de mesure sur ce point précis : les
 défauts de goulotte ne se voient que sur du trafic qu'on n'a pas choisi.
+
+
+---
+
+## La règle « chiffres à un près » était 81 % de bruit
+
+*16/09, sur le groupe `gros-porteurs`.* Sur les huit premiers appariements en direct,
+trois étaient douteux — et le journal, qui enregistre le score et la raison, montre que
+**deux venaient de la même règle** :
+
+> *« hello bonjour **Air France Three Six Seven** … Air France Three Six Seven … France
+> Three Six Seven »* → apparié à **AFR3 7 7**, `digits off by one + operator named`.
+> L'avion dit trois fois son numéro et ce n'est pas celui-là.
+
+> *« Wifi **Heli One Six Two** si on descend niveau six zero »* → apparié à **N1 3 2QS**,
+> `digits off by one + altitude agrees`.
+
+Le défaut est structurel, pas statistique. Un appariement à un chiffre près vaut 0,50,
+sous le plancher de 0,60 : il ne passe qu'avec une corroboration — et **une seule
+suffit**. Au-dessus de Paris, « Air France » corrobore à peu près n'importe quoi.
+
+Mesuré sur la captation, la règle appliquée identiquement au tirage réel et aux huit
+témoins :
+
+| | appariements | hasard | au-dessus | vrais |
+|---|---|---|---|---|
+| avec la règle | 152 | 47,3 | 69 % | **104,7** |
+| **sans** | 144 | **40,8** | **72 %** | 103,2 |
+
+Elle ajoute **8 appariements dont 1,5 vrai et 6,5 de coïncidence**. Éteinte par défaut ;
+`-fuzzy` la rallume pour qui veut refaire la mesure. La précision par fréquence gagne
+partout sauf sur 125,825 : 124,350 passe de 78 à 81 %, 124,625 de 63 à 70 %.
+
+**Ce que ça dit de la méthode.** Cette règle avait l'air raisonnable — les modèles
+entendent mal, un chiffre près semble une tolérance prudente. Elle a tenu depuis hier
+parce que personne ne l'avait mesurée *seule*. Huit appariements en direct ont suffi à
+la rendre suspecte, et le corpus enregistré à la condamner.
