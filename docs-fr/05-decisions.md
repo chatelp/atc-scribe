@@ -714,3 +714,38 @@ Et un compteur absent des deux côtés : **le taux de rejet du VAD en production
 journalisé nulle part au niveau courant (`local.go:194` en Debug ; le sidecar ne le
 trace pas). « Le parasite est-il absent le jour ? » reste sans réponse tant qu'il
 n'existe pas.
+
+
+### D18 — L'amas 132-133 est identifié canal par canal *(16/09)*
+
+Une passe de transcription **par canal** sur la captation nocturne — 462 transcriptions,
+neuf minutes de calcul, chaîne de production à l'identique — a identifié ce que le mode
+`amas-132-133` cherchait depuis sa création. Détail dans `24-identification-amas.md`,
+catalogue mis à jour.
+
+- **132,275 = Paris Contrôle, secteur d'arrivée de De Gaulle.** Trois preuves
+  convergentes : médiane FL200 avec FL120–FL130 (descente, pas croisière), **14
+  transferts vers 121,155** que le corpus nomme lui-même « de Gaulle », et un appel
+  initial de pilote — *« hello Paris good evening… »*. C'est aussi le seul canal
+  francophone de l'amas, 10 %.
+- **132,825 = Brest Contrôle, probable.** Un appel initial — *« breast control
+  hello… »* — sur neuf transcriptions seulement.
+- **132,500 · 132,733 · 132,783 · 133,000 · 133,250 = croisière haute**, FL270 à FL390.
+  Nature établie, organisme inconnu. 132,500 recoupe `16-grammaire-et-125933.md` :
+  125,933 la citait trois fois, et son profil de niveaux le confirme de l'autre côté.
+
+**L'amas n'est donc ni un organisme ni un étage** : c'est une tranche de spectre qui
+contient au moins deux centres et deux fonctions.
+
+### Q28 — Le flux mixé fabrique des moyennes trompeuses *(nouvelle, 16/09)*
+
+`21-nuit-132-133.md` concluait de trente segments tirés au hasard que l'amas était « de
+l'espace supérieur, FL160 à FL390 ». **Vrai en moyenne, faux canal par canal** :
+132,275 porte 62 % de la parole de l'amas et c'est le seul canal qui ne soit pas en
+croisière. Tirer au hasard dans un mélange déséquilibré, c'est échantillonner le canal
+dominant en croyant échantillonner l'ensemble.
+
+C'est un argument pour Q4 / D2 **distinct** de celui du doc 23 (R1, qualité de
+transcription) : ici ce n'est pas la transcription qui souffre du mélange, c'est
+**l'interprétation**. Et il n'est pas théorique — il a produit une conclusion fausse
+dans ce dossier, corrigée le lendemain.
