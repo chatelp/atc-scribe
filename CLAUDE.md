@@ -8,8 +8,7 @@
 >   est le plan de transcription locale écrit par l'auteur amont, et il nous sert de référence.
 > - `docs-fr/` est **notre dossier de chantier**, en français. Voir `docs-fr/README.md`.
 > - Ce fichier a remplacé le `CLAUDE.md` de l'amont, conservé à l'identique dans
->   `docs-fr/CLAUDE-amont.md`. C'est le seul fichier amont que nous modifions à la racine,
->   et donc le seul point de conflit prévisible au rebase.
+>   `docs-fr/CLAUDE-amont.md`.
 
 Tu travailles sur un **fork de [Co-ATC](https://github.com/yegors/co-atc)** adapté à une
 station de réception aéronautique privée à Fontenay-le-Fleury (Yvelines, France).
@@ -50,9 +49,14 @@ avec le propriétaire sont **en français**.
 - **Pas de secret dans le dépôt.** Ni clé d'API, ni mot de passe Icecast, ni adresse
   exacte. La position de la station est déjà publique via FlightAware, mais la
   configuration d'exemple doit rester générique.
-- **Le fork reste rebasable.** Sépare autant que possible ce qui est une adaptation
-  locale de ce qui est une contribution réutilisable en amont ; le second devrait
-  pouvoir partir en pull request un jour.
+- **Le dépôt reste un fork, mais la rebasabilité n'a plus valeur de contrainte.**
+  Mesuré le 16/09 (D19) : l'amont est silencieux depuis le 3 mai 2026, et notre empreinte
+  sur ses fichiers est faible là où ça compterait — 1,7 % de `www/app.js`, 0,2 % de
+  `internal/adsb/service.go`. **Modifie un fichier amont quand c'est la façon la plus
+  simple d'écrire la chose** ; n'ajoute pas d'accesseur pour contourner une signature.
+  En revanche, **garde identifiable ce qui est contribuable** : le sidecar de
+  transcription, le correctif de rotation de base (Q26), l'authentification et l'état
+  serveur doivent pouvoir partir en pull request tels quels.
 
 ## Commandes utiles
 

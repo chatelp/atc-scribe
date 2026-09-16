@@ -211,7 +211,11 @@ deux cas. Il manque donc soit une ligne au CSV, soit une définition explicite.
 sur la station. Sans importance pour la suite du chantier, mais à régler avant publication
 — un dépôt public qui annonce trois nombres différents pour la même chose s'expose.
 
-### Q11 — Vrai fork rebasable, ou dépôt séparé ? *(mesuré le 15/09)*
+### Q11 — Vrai fork rebasable, ou dépôt séparé ? *(mesuré le 15/09, **révisé par D19 le 16/09**)*
+
+> **La réponse « oui » tient toujours pour la forme du dépôt, mais plus pour la
+> méthode de travail.** Ce qui suit a été mesuré avant que le fork n'écrive une ligne ;
+> D19 le remesure après 38 commits. Lire les deux dans l'ordre.
 
 **La question posée était : est-ce que ça vaut le coup, si on prévoit des modifications
 de fond ?** Elle se tranche par deux mesures, faites le 15/09 sur le clone amont.
@@ -765,3 +769,67 @@ C'est un argument pour Q4 / D2 **distinct** de celui du doc 23 (R1, qualité de
 transcription) : ici ce n'est pas la transcription qui souffre du mélange, c'est
 **l'interprétation**. Et il n'est pas théorique — il a produit une conclusion fausse
 dans ce dossier, corrigée le lendemain.
+
+
+### D19 — Le dépôt reste un fork ; la rebasabilité cesse d'être une contrainte *(16/09)*
+
+Q11 avait tranché « vrai fork » sur une mesure faite **avant** d'écrire une ligne. Après
+38 commits, la même question se remesure — et la réponse se dédouble : **la forme du
+dépôt était le bon choix, la règle de conception qui en avait été tirée ne l'est plus.**
+
+**Ce que le fork est devenu, mesuré le 16/09 :** 38 commits, 85 fichiers,
+**+11 663 / −210 lignes**, 63 fichiers nouveaux contre 22 fichiers amont modifiés. Le
+`−210` est le chiffre qui compte : *nous ne supprimons presque rien chez eux.*
+
+Profondeur de nos modifications sur les fichiers amont, rapportée à leur taille :
+
+| fichier amont | lignes | notre empreinte |
+|---|---|---|
+| `www/app.js` | 5 512 | **1,7 %** |
+| `internal/adsb/service.go` | 1 987 | **0,2 %** |
+| `www/index.html` | 2 268 | 3,1 % |
+| `internal/api/handlers.go` | 2 157 | 3,7 % |
+| `internal/frequencies/service.go` | 1 109 | 2,6 % |
+| `cmd/server/main.go` | 486 | 24,7 % |
+| `internal/api/routes.go` | 117 | 116 % *(mais 117 lignes)* |
+
+Les seuls fichiers amont réellement réécrits sont **courts**. Les gros sont effleurés.
+D16 annonçait « le fork touche le frontend pour la première fois » comme une rupture :
+la mesure dit 1,7 %.
+
+**Et l'amont n'a pas bougé : dernier commit le 3 mai 2026**, soit 136 jours. La réserve
+honnête de Q11 — « un amont silencieux depuis 4 mois pourrait ne jamais reprendre » —
+s'est vérifiée quatre mois de plus.
+
+**Ce que la contrainte a coûté, en revanche, est concret.** Quatre accesseurs existent
+*uniquement* pour ne pas modifier une signature amont :
+
+```
+DBOf(s *TranscriptionStorage) *sql.DB     expose un champ privé
+(r *Router) Handler() *Handler            accesseur
+(h *Handler) AttachRuntime(...)           câblage après-coup
+(s *Service) SetVoiceIndex(...)           idem
+```
+
+Aucun n'existerait si le constructeur avait pris un paramètre de plus. Et D16 a hésité
+longuement sur **un bouton de 14 lignes**. C'est de la discipline dépensée contre un
+rebase qui n'a aucune raison d'arriver.
+
+**Décision, en trois points :**
+
+1. **Le dépôt reste un fork git** — historique amont, remote `upstream`, `LICENSE` MIT
+   de Yegor S conservé tel quel, fork signalé dans le README. Ça ne coûte rien et c'est
+   dû : l'interface, la carte OpenLayers et le suivi ADS-B sont leur travail, et
+   représentent toujours l'essentiel du produit.
+2. **La rebasabilité n'est plus une règle de conception.** On modifie un fichier amont
+   quand c'est la façon la plus simple d'écrire la chose. Les quatre accesseurs
+   ci-dessus restent en place — les défaire maintenant serait du bruit — mais on n'en
+   écrit plus de nouveaux pour cette raison.
+3. **Ce qui est contribuable reste identifiable**, parce que c'est utile à d'autres, pas
+   par espoir de rebase : le sidecar de transcription et `local.go` (ils implémentent le
+   contrat de **leur propre** `docs/LOCAL-STT.md`, jamais construit), le correctif de
+   rotation de base (Q26, leur défaut), `internal/auth/` (ils n'en ont aucune) et
+   `internal/api/server_handlers.go` (ils n'exposent aucun état opérationnel).
+
+**Ce que ça ne change pas** : D7 (licence MIT), D6 (obligation de conserver la notice
+amont), et le fait que `docs/` reste à eux.
