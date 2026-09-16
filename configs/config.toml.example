@@ -23,6 +23,22 @@ additional_ports = [8001, 8002, 8003, 8004]
 #######################################################
 # Aircraft Tracking (ADS-B) Configuration
 #######################################################
+
+# TLS served by co-atc itself. Leave both empty behind a reverse proxy that
+# terminates TLS, or fill them to serve HTTPS with no proxy at all -- neither shape
+# is the privileged one, and a standalone install must be as usable as a proxied
+# one. Passkeys, when they arrive, need one of the two: WebAuthn refuses to run on
+# plain HTTP to a LAN address.
+tls_cert = ""
+tls_key = ""
+
+# Reverse proxies whose X-Forwarded-Proto and X-Forwarded-For may be believed, as
+# CIDRs. EMPTY BY DEFAULT, and that matters: a forwarded header trusted from anyone
+# lets any client on the network declare itself already on HTTPS -- so the session
+# cookie loses its Secure flag -- or wear another address to escape the login rate
+# limit. Behind Traefik or Caddy, list the proxy's network and nothing else.
+trusted_proxies = []
+
 [adsb]
 # Data source type:
 # - "external-rapidapi": external ADS-B API (aircraft only)
@@ -277,6 +293,39 @@ segment_min_ms = 400          # shorter than this is discarded
 segment_max_seconds = 30
 segment_preroll_ms = 200      # keep audio from before speech starts
 silence_threshold = 0.005     # an SDR stream sits at -90 dBFS when squelch is closed
+
+#######################################################
+# Who may use this server
+#######################################################
+[auth]
+# DISABLED BY DEFAULT, and the default is deliberate: this file ships in a public
+# repository, and nobody cloning it should find themselves locked out of their own
+# receiver by a password they never set.
+#
+# Note what is unprotected while this is false. Three routes already write:
+# POST /station moves the station's position, POST/PUT/DELETE /simulation/aircraft
+# injects aircraft into the map, and POST /atc-chat/session spends OpenAI credit if
+# a key is configured. On a network you do not control, turn this on.
+enabled = false
+
+# Create an account without ever writing the password down:
+#
+#   co-atc -add-user <name>
+#
+# It reads the password without echoing it and prints the block to paste below.
+# Only the Argon2id hash is stored -- there is no recovery, by design.
+#
+# [[auth.users]]
+# name = "someone"
+# password_hash = "$argon2id$v=19$m=65536,t=3,p=2$...$..."
+
+session_ttl_hours = 720        # a session unused for this long expires; use slides it forward
+max_attempts = 8               # wrong passwords allowed per client address...
+attempt_window_minutes = 15    # ...within this window
+
+# Sessions are held in memory, so restarting the server ends every one of them.
+# That is the point: it is the one move an operator can always make to lock
+# everyone out, and it costs one password entry afterwards.
 
 #######################################################
 # Post-Processing Configuration

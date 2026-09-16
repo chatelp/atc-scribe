@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -23,6 +24,29 @@ type Config struct {
 	FlightPhases   FlightPhasesConfig   `toml:"flight_phases"`   // Flight phase detection settings
 	Weather        WeatherConfig        `toml:"wx"`              // Weather data fetching and caching settings
 	ATCChat        ATCChatConfig        `toml:"atc_chat"`        // ATC Chat voice assistant settings
+	Auth           AuthConfig           `toml:"auth"`            // Who may use this server; see internal/auth
+}
+
+// AuthConfig decides who may reach the data.
+//
+// Disabled by default, and that default is deliberate: this file ships in a public
+// repository, and someone cloning it must not find themselves locked out of their
+// own receiver by a password they never set. Turning it on is one line plus one
+// account, created with: co-atc -add-user <name>
+type AuthConfig struct {
+	Enabled           bool         `toml:"enabled"`
+	SessionTTLHours   int          `toml:"session_ttl_hours"` // how long a session lives without use
+	MaxAttempts       int          `toml:"max_attempts"`      // wrong passwords allowed per address, per window
+	AttemptWindowMins int          `toml:"attempt_window_minutes"`
+	Users             []UserConfig `toml:"users"`
+}
+
+// UserConfig is one account. The password itself never appears here -- only its
+// Argon2id hash, produced by co-atc -add-user, which reads the password without
+// echoing it and never writes it anywhere.
+type UserConfig struct {
+	Name         string `toml:"name"`
+	PasswordHash string `toml:"password_hash"`
 }
 
 // ServerConfig contains HTTP server configuration settings
@@ -33,6 +57,18 @@ type ServerConfig struct {
 	WriteTimeoutSecs int    `toml:"write_timeout_seconds"` // Maximum duration for writing the response (0 = no timeout, recommended for streaming)
 	IdleTimeoutSecs  int    `toml:"idle_timeout_seconds"`  // Maximum duration to wait for the next request when keep-alives are enabled
 	AdditionalPorts  []int  `toml:"additional_ports"`      // Additional HTTP ports to listen on (useful for multiple interfaces)
+
+	// TLS served by co-atc itself. Leave both empty behind a reverse proxy that
+	// terminates TLS; fill them to serve HTTPS with no proxy at all. Neither shape
+	// is privileged: the standalone install must be as usable as the proxied one.
+	TLSCert string `toml:"tls_cert"`
+	TLSKey  string `toml:"tls_key"`
+
+	// Reverse proxies whose X-Forwarded-Proto and X-Forwarded-For may be believed,
+	// as CIDRs. EMPTY BY DEFAULT, and that matters: a forwarded header trusted from
+	// anyone lets any client on the network declare itself already on HTTPS, or
+	// wear another address to escape the login rate limit.
+	TrustedProxies []string `toml:"trusted_proxies"`
 }
 
 // ADSBConfig contains ADS-B aircraft tracking data source configuration
@@ -377,6 +413,21 @@ func (c *Config) Validate() error {
 	if c.PostProcessing.Enabled && c.PostProcessing.ContextTranscriptions < 0 {
 		return fmt.Errorf("invalid context_transcriptions value: %d (must be >= 0)", c.PostProcessing.ContextTranscriptions)
 	}
+	if c.Auth.Enabled {
+		named := 0
+		for _, u := range c.Auth.Users {
+			if strings.TrimSpace(u.Name) != "" && u.PasswordHash != "" {
+				named++
+			}
+		}
+		if named == 0 {
+			return fmt.Errorf("auth.enabled is true but no user has a password_hash; run: co-atc -add-user <name>")
+		}
+	}
+	if (c.Server.TLSCert == "") != (c.Server.TLSKey == "") {
+		return fmt.Errorf("server.tls_cert and server.tls_key must be set together")
+	}
+
 	switch c.PostProcessing.Backend {
 	case "", PostProcessingBackendOpenAI, PostProcessingBackendLocal:
 	default:

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -16,6 +18,7 @@ import (
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/api"
 	"github.com/yegors/co-atc/internal/atcchat"
+	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
@@ -62,7 +65,16 @@ func (a *refAdapter) LookupAirlineCountry(code string) string {
 func main() {
 	// Parse command line flags
 	configPath := flag.String("config", "", "Path to configuration file (optional - will search in configs/ and root directory)")
+	addUser := flag.String("add-user", "", "Print a configuration block for a new account, reading the password without echoing it")
 	flag.Parse()
+
+	if *addUser != "" {
+		if err := printNewUser(*addUser); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// Load configuration with fallback logic
 	cfg, resolvedConfigPath, err := config.LoadWithFallbackAndPath(*configPath)
@@ -319,6 +331,16 @@ func main() {
 		servers = append(servers, server)
 
 		go func(s *http.Server) {
+			// TLS served by co-atc itself when a certificate is configured, and by
+			// nothing when it is not. Behind a reverse proxy both stay empty and the
+			// proxy terminates TLS -- neither shape is the privileged one.
+			if cfg.Server.TLSCert != "" && cfg.Server.TLSKey != "" {
+				log.Info("Starting HTTPS server", logger.String("addr", s.Addr))
+				if err := s.ListenAndServeTLS(cfg.Server.TLSCert, cfg.Server.TLSKey); err != nil && err != http.ErrServerClosed {
+					log.Error("HTTPS server error on startup", logger.String("addr", s.Addr), logger.Error(err))
+				}
+				return
+			}
 			log.Info("Starting HTTP server", logger.String("addr", s.Addr))
 			if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Error("HTTP server error on startup", logger.String("addr", s.Addr), logger.Error(err))
@@ -498,4 +520,77 @@ func cleanupOldDailyDatabases(dbDir, activeDBPath string, keepDays int, now time
 	}
 
 	return nil
+}
+
+// printNewUser reads a password twice without echoing it and prints the TOML block
+// to paste into the configuration.
+//
+// It prints rather than writes. Rewriting the configuration file would mean a
+// program editing the document that carries every measured default and the reason
+// for it; and a password that has been typed should reach exactly one place, the
+// hash, with no copy left in a backup file along the way.
+func printNewUser(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("a user name is required")
+	}
+
+	first, err := readPassword("Password for " + name + ": ")
+	if err != nil {
+		return err
+	}
+	again, err := readPassword("Repeat: ")
+	if err != nil {
+		return err
+	}
+	if first != again {
+		return fmt.Errorf("the two entries differ")
+	}
+
+	hash, err := auth.HashPassword(first)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("\n# Add this to your configuration, under [auth]:\n\n")
+	fmt.Printf("[auth]\nenabled = true\n\n[[auth.users]]\nname = %q\npassword_hash = %q\n\n", name, hash)
+	fmt.Printf("# The password itself is not stored anywhere. Losing it means creating\n")
+	fmt.Printf("# another account with this command; there is no recovery by design.\n")
+	return nil
+}
+
+// stdinReader is shared across reads. A fresh bufio.Reader per call would lose
+// whatever the previous one had already buffered, which makes the second prompt
+// read EOF when the input is piped rather than typed.
+var stdinReader = bufio.NewReader(os.Stdin)
+
+var warnedAboutEcho bool
+
+// readPassword turns off terminal echo through stty rather than pulling in a
+// dependency for it. If echo cannot be turned off -- a pipe, a terminal that does
+// not support it -- the caller is told plainly rather than typing a password into
+// a visible line without knowing.
+func readPassword(prompt string) (string, error) {
+	fmt.Fprint(os.Stderr, prompt)
+
+	stty := exec.Command("stty", "-echo")
+	stty.Stdin = os.Stdin
+	echoOff := stty.Run() == nil
+	if !echoOff && !warnedAboutEcho {
+		warnedAboutEcho = true
+		fmt.Fprint(os.Stderr, "\n[!] this terminal will not hide input; type with that in mind\n"+prompt)
+	}
+
+	line, err := stdinReader.ReadString('\n')
+
+	if echoOff {
+		restore := exec.Command("stty", "echo")
+		restore.Stdin = os.Stdin
+		restore.Run()
+		fmt.Fprintln(os.Stderr)
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimRight(line, "\r\n"), nil
 }

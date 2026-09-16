@@ -1,0 +1,149 @@
+package auth
+
+import (
+	"net"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+)
+
+// TrustedProxies decides whether the X-Forwarded-* headers of a request may be
+// believed.
+//
+// This exists because of a trap worth naming. Behind a reverse proxy, co-atc is
+// spoken to in plain HTTP even though the browser is on HTTPS: without reading
+// X-Forwarded-Proto it would set a cookie without the Secure flag and refuse
+// passkeys. But a forwarded header believed from anyone is a way in -- any client
+// on the network could declare itself already on HTTPS, or claim someone else's
+// address to escape rate limiting. So the list is explicit and empty by default:
+// with no trusted proxy configured, no forwarded header is read at all.
+type TrustedProxies struct {
+	nets []*net.IPNet
+}
+
+func NewTrustedProxies(cidrs []string) (*TrustedProxies, error) {
+	t := &TrustedProxies{}
+	for _, c := range cidrs {
+		c = strings.TrimSpace(c)
+		if c == "" {
+			continue
+		}
+		if !strings.Contains(c, "/") {
+			if ip := net.ParseIP(c); ip != nil {
+				bits := 32
+				if ip.To4() == nil {
+					bits = 128
+				}
+				c = c + "/" + itoa(bits)
+			}
+		}
+		_, n, err := net.ParseCIDR(c)
+		if err != nil {
+			return nil, err
+		}
+		t.nets = append(t.nets, n)
+	}
+	return t, nil
+}
+
+func itoa(i int) string {
+	if i == 32 {
+		return "32"
+	}
+	return "128"
+}
+
+func (t *TrustedProxies) trusts(addr string) bool {
+	if t == nil || len(t.nets) == 0 {
+		return false
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, n := range t.nets {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// Scheme reports the scheme the browser actually used: what co-atc is serving,
+// unless a trusted proxy says otherwise.
+func (t *TrustedProxies) Scheme(r *http.Request) string {
+	if t.trusts(r.RemoteAddr) {
+		if p := r.Header.Get("X-Forwarded-Proto"); p != "" {
+			return strings.ToLower(strings.TrimSpace(strings.Split(p, ",")[0]))
+		}
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
+}
+
+// ClientIP is the address to hold responsible for a request -- for rate limiting,
+// and for saying in a log who failed to sign in.
+func (t *TrustedProxies) ClientIP(r *http.Request) string {
+	if t.trusts(r.RemoteAddr) {
+		if f := r.Header.Get("X-Forwarded-For"); f != "" {
+			parts := strings.Split(f, ",")
+			return strings.TrimSpace(parts[len(parts)-1])
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// Limiter slows down password guessing.
+//
+// Per client address, with a window rather than a token bucket: the useful property
+// is not smooth throughput but a hard stop after a handful of wrong answers, and a
+// window says that in a way anyone reading it can check.
+type Limiter struct {
+	mu       sync.Mutex
+	attempts map[string][]time.Time
+	max      int
+	window   time.Duration
+}
+
+func NewLimiter(max int, window time.Duration) *Limiter {
+	return &Limiter{attempts: map[string][]time.Time{}, max: max, window: window}
+}
+
+// Allow records an attempt and reports whether it may proceed.
+func (l *Limiter) Allow(key string) bool {
+	now := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	var kept []time.Time
+	for _, t := range l.attempts[key] {
+		if now.Sub(t) < l.window {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) >= l.max {
+		l.attempts[key] = kept
+		return false
+	}
+	l.attempts[key] = append(kept, now)
+	return true
+}
+
+// Succeeded clears the count after a correct password, so a user who fumbled twice
+// and then got it right is not left one mistake from a lockout.
+func (l *Limiter) Succeeded(key string) {
+	l.mu.Lock()
+	delete(l.attempts, key)
+	l.mu.Unlock()
+}

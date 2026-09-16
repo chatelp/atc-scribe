@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/atcchat"
+	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
@@ -40,6 +42,9 @@ type Handler struct {
 	clearanceStorage     *sqlite.ClearanceStorage
 	valueStorage         *sqlite.PhraseologyStorage // what the grammar recovered, see docs-fr/19
 
+	// Who is asking. See internal/auth and auth_handlers.go.
+	auth *auth.Service
+
 	// Operational state for the settings panel. See server_handlers.go.
 	runtime       *config.Runtime
 	activeDBPath  string
@@ -60,7 +65,25 @@ func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Servi
 		valueStorage = nil
 	}
 
+	// Built here rather than attached afterwards: the router hangs its middleware
+	// on this service while it is constructing the routes, so it has to exist by
+	// then. A failure is fatal by design -- a server that cannot build its
+	// authentication must not come up serving the data unprotected.
+	authService, err := auth.NewService(auth.Config{
+		Enabled:        config.Auth.Enabled,
+		Users:          authUsers(config),
+		SessionTTL:     time.Duration(orDefault(config.Auth.SessionTTLHours, 720)) * time.Hour,
+		TrustedProxies: config.Server.TrustedProxies,
+		MaxAttempts:    config.Auth.MaxAttempts,
+		AttemptWindow:  time.Duration(orDefault(config.Auth.AttemptWindowMins, 15)) * time.Minute,
+	})
+	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to build authentication: %v", err))
+		os.Exit(1)
+	}
+
 	return &Handler{
+		auth:                 authService,
 		valueStorage:         valueStorage,
 		startedAt:            time.Now(),
 		dbSampleAt:           time.Now(),
@@ -2193,4 +2216,21 @@ func (h *Handler) GetSimulatedAircraft(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(aircraft)
+}
+
+// authUsers maps the accounts from the configuration file into the auth package,
+// which knows nothing about TOML.
+func authUsers(cfg *config.Config) []auth.User {
+	out := make([]auth.User, 0, len(cfg.Auth.Users))
+	for _, u := range cfg.Auth.Users {
+		out = append(out, auth.User{Name: u.Name, PasswordHash: u.PasswordHash})
+	}
+	return out
+}
+
+func orDefault(v, def int) int {
+	if v <= 0 {
+		return def
+	}
+	return v
 }
