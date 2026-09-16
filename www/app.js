@@ -163,6 +163,12 @@ document.addEventListener('alpine:init', () => {
         // State
         aircraft: [],
         filteredAircraft: [],
+
+        // What the radio said about the selected aircraft. Filled from
+        // /api/v1/transcriptions/callsign/{callsign}, an endpoint upstream already
+        // serves and no page ever called -- it only becomes useful once something
+        // fills the callsign column, which the local grammar now does.
+        aircraftRadio: { callsign: '', loading: false, transcriptions: [], values: {} },
         searchTerm: '',
         // Computed aircraft counts — derived from the live aircraft store so they stay
         // in sync as WebSocket adds/updates/removes aircraft at runtime.
@@ -1709,7 +1715,43 @@ document.addEventListener('alpine:init', () => {
         currentTimeForPhases: new Date(),
 
         // Methods for Aircraft Details Panel (moved from x-data in HTML)
+        // Fetch the transmissions matched to one aircraft, and the values the
+        // grammar recovered from them.
+        async loadAircraftRadio(callsign) {
+            const cs = (callsign || '').trim();
+            if (!cs) {
+                this.aircraftRadio = { callsign: '', loading: false, transcriptions: [], values: {} };
+                return;
+            }
+            if (this.aircraftRadio.callsign === cs && this.aircraftRadio.transcriptions.length) return;
+
+            this.aircraftRadio = { callsign: cs, loading: true, transcriptions: [], values: {} };
+            try {
+                const res = await fetch(`/api/v1/transcriptions/callsign/${encodeURIComponent(cs)}?limit=50`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                // The aircraft may have changed while the request was in flight.
+                if (this.aircraftRadio.callsign !== cs) return;
+                this.aircraftRadio = {
+                    callsign: cs,
+                    loading: false,
+                    transcriptions: (data.transcriptions || []).slice().reverse(),
+                    values: data.values || {}
+                };
+            } catch (e) {
+                console.warn('Failed to load radio for', cs, e);
+                if (this.aircraftRadio.callsign === cs) this.aircraftRadio.loading = false;
+            }
+        },
+
+        // The values recovered from one transcription, for the template.
+        radioValuesFor(id) {
+            return (this.aircraftRadio.values && this.aircraftRadio.values[id]) || [];
+        },
+
         setupAircraftDetailsPanel() {
+            this.loadAircraftRadio(this.selectedAircraft ? this.selectedAircraft.flight : '');
+
             if (!this.selectedAircraft) { // No aircraft selected, fully close and reset
                 this.aircraftDetailsShowHistoryView = false;
                 this.aircraftDetailsHistoryData = [];

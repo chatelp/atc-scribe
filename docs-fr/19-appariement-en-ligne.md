@@ -259,3 +259,80 @@ partout sauf sur 125,825 : 124,350 passe de 78 à 81 %, 124,625 de 63 à 70 %.
 entendent mal, un chiffre près semble une tolérance prudente. Elle a tenu depuis hier
 parce que personne ne l'avait mesurée *seule*. Huit appariements en direct ont suffi à
 la rendre suspecte, et le corpus enregistré à la condamner.
+
+
+---
+
+## Ce que co-atc faisait de la voix, et ce qu'il en fait maintenant
+
+Question posée le 16/09 : en cliquant sur un avion, on ne voyait rien de la radio.
+Inventaire fait dans le code, pas de mémoire :
+
+| donnée | stockée | affichée sur l'avion, avant |
+|---|---|---|
+| texte brut, texte normalisé | `transcriptions` | non — seulement dans la liste par fréquence |
+| locuteur ATC / PILOTE | `transcriptions.speaker_type` | non |
+| indicatif apparié | `transcriptions.callsign` | non |
+| autorisation | `clearances` | **oui, la seule** — et sans son texte |
+| niveau, cap, vitesse, piste, QNH, transpondeur | **nulle part** | non |
+
+Soit, mesuré sur les transmissions du jour : **66 % portent au moins une valeur
+structurée, 4 % une autorisation.** La fiche d'un avion montrait donc environ 4 % de
+ce que la voix contenait, et seulement quand l'appariement avait réussi en plus.
+
+Le plus frustrant : `GET /api/v1/transcriptions/callsign/{callsign}` **existe en
+amont**, il est indexé, il répond — et `grep transcriptions/callsign www/` ne renvoie
+rien. C'est logique de leur côté : l'endpoint ne sert à rien tant que la colonne
+`callsign` est vide, et elle ne se remplit qu'avec une clé OpenAI. Notre grammaire la
+remplit localement, donc la plomberie était vivante des deux bouts sans raccord.
+
+### Les trois manques comblés
+
+**1. Une section « Radio » sur la fiche avion.** Les transmissions rattachées à cet
+avion, avec l'heure, le locuteur en couleur et le texte, par l'endpoint qui existait
+déjà.
+
+**2. Les valeurs extraites, enfin conservées.** `Result.Values` était calculé puis
+jeté à chaque transmission. Elles vont dans une table `phraseology_values`, une ligne
+par valeur — les questions utiles sont relationnelles : tous les niveaux donnés à un
+avion, toutes les pistes entendues cette nuit.
+
+> **Pourquoi une table et non une colonne.** L'amont crée `transcriptions` avec
+> `CREATE TABLE IF NOT EXISTS` et ne migre jamais. Une colonne ajoutée laisserait
+> toute base existante un schéma en arrière, sans rien pour s'en apercevoir. Une
+> table séparée apparaît d'elle-même sur les bases anciennes comme neuves, et elle
+> ne gêne pas un rebase.
+
+**3. Le texte de l'autorisation**, colonne remplie depuis toujours et jamais affichée.
+
+### Le rattrapage, et un compteur qui mentait
+
+La table arrivant après les transcriptions, tout ce qui était déjà annoté serait resté
+muet pour toujours. Un rattrapage borné tourne au démarrage : anti-jointure sur les
+transmissions annotées sans valeur, idempotent par construction.
+
+Premier passage : `examined 341, stored 254`. **Le chiffre était faux.** La table n'en
+contenait que 92 : `storeValues` écarte les indicatifs — ils ont leur propre colonne —
+et les valeurs sans rôle, si bien que le compteur comptait les transmissions examinées
+avec au moins une valeur, pas celles qui avaient écrit quelque chose. Corrigé en
+`transmissions_with_values` et `values_stored`, distincts.
+
+Ce que le rattrapage a trouvé sur la matinée :
+
+| rôle | valeurs |
+|---|---|
+| niveau de vol | 27 |
+| fréquence de transfert | 26 |
+| altitude | 15 |
+| vitesse | 15 |
+| piste | 12 |
+| cap | 9 |
+| QNH | 6 |
+| transpondeur | 1 |
+
+### Une limite vue en passant
+
+`« one two zero heading Delta Two Two Zero »` ne rend aucun cap : la grammaire est
+ancrée sur le mot-clé et lit **vers l'avant**, alors qu'ici le nombre précède son
+mot-clé. `trailingRoles` gère déjà ce cas pour *feet*, *knots* et *degrees* ; *heading*
+n'y est pas. Non corrigé, non mesuré.

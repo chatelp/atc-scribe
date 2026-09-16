@@ -38,11 +38,23 @@ type Handler struct {
 	wsServer             *websocket.Server
 	transcriptionStorage *sqlite.TranscriptionStorage
 	clearanceStorage     *sqlite.ClearanceStorage
+	valueStorage         *sqlite.PhraseologyStorage // what the grammar recovered, see docs-fr/19
 }
 
 // NewHandler creates a new API handler
 func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, atcChatService *atcchat.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Handler {
+	// The grammar's values live in the same daily database as the transcriptions
+	// they came from. A failure here costs the radio panel its values and nothing
+	// else, so it is logged rather than fatal.
+	valueStorage, err := sqlite.NewPhraseologyStorage(sqlite.DBOf(transcriptionStorage))
+	if err != nil {
+		// The parameter shadows the logger package here, so no field constructor.
+		logger.Error(fmt.Sprintf("Failed to open phraseology value storage: %v", err))
+		valueStorage = nil
+	}
+
 	return &Handler{
+		valueStorage:         valueStorage,
 		adsbService:          adsbService,
 		frequenciesService:   frequenciesService,
 		weatherService:       weatherService,

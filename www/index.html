@@ -1639,16 +1639,17 @@
                                 <table class="w-full table-fixed text-xs">
                                     <thead>
                                         <tr>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[30%]">Time</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[20%]">Type</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[15%]">Runway</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[20%]">Status</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[15%]">Age</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[18%]">Time</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">Type</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[10%]">Rwy</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[34%]">Said</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">Status</th>
+                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[10%]">Age</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <template x-if="!$store.atc.selectedAircraft?.clearances || $store.atc.selectedAircraft.clearances.length === 0">
-                                            <tr><td colspan="5" class="p-4 text-center">No clearances issued</td></tr>
+                                            <tr><td colspan="6" class="p-4 text-center">No clearances issued</td></tr>
                                         </template>
                                         <template x-for="clearance in $store.atc.selectedAircraft?.clearances || []" :key="clearance.id">
                                             <tr class="hover:bg-hover/50 transition-colors">
@@ -1666,6 +1667,9 @@
                                                 </td>
                                                 <td class="p-1.5 text-left border-b border-border font-mono">
                                                     <span x-text="clearance.runway || '-'"></span>
+                                                </td>
+                                                <td class="p-1.5 text-left border-b border-border text-text/70 italic" :title="clearance.text">
+                                                    <span x-text="clearance.text || '-'"></span>
                                                 </td>
                                                 <td class="p-1.5 text-left border-b border-border">
                                                     <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
@@ -1685,6 +1689,46 @@
                                 </table>
                             </div>
                             
+                            <!-- Radio: the transmissions matched to this aircraft, and the
+                                 facts the phraseology grammar recovered from them. -->
+                            <div class="mb-4 w-full">
+                                <div class="mb-2 text-sm font-semibold text-amber-400 border-b border-border pb-1 flex items-center justify-between">
+                                    <span>Radio</span>
+                                    <span class="text-[10px] text-text/50 font-normal"
+                                          x-text="$store.atc.aircraftRadio.loading ? 'loading…' : ($store.atc.aircraftRadio.transcriptions.length + ' transmission(s)')"></span>
+                                </div>
+
+                                <template x-if="!$store.atc.aircraftRadio.loading && $store.atc.aircraftRadio.transcriptions.length === 0">
+                                    <div class="p-4 text-center text-xs text-text/50">Nothing on this aircraft has been matched to a transmission</div>
+                                </template>
+
+                                <template x-for="t in $store.atc.aircraftRadio.transcriptions" :key="t.id">
+                                    <div class="mb-1.5 px-2 py-1.5 border-l-2 rounded-r bg-hover/20"
+                                         :class="{
+                                             'border-orange-400': t.speaker_type === 'ATC',
+                                             'border-green-400': t.speaker_type === 'PILOT',
+                                             'border-gray-500': !t.speaker_type
+                                         }">
+                                        <div class="flex items-center gap-2 mb-0.5">
+                                            <span class="text-[10px] font-mono text-text/60" x-text="$store.atc.formatDate(t.created_at, true)"></span>
+                                            <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
+                                                  :class="{
+                                                      'bg-orange-400/20 text-orange-400': t.speaker_type === 'ATC',
+                                                      'bg-green-400/20 text-green-400': t.speaker_type === 'PILOT',
+                                                      'bg-gray-500/20 text-gray-400': !t.speaker_type
+                                                  }"
+                                                  x-text="t.speaker_type || 'unknown'"></span>
+                                            <template x-for="v in $store.atc.radioValuesFor(t.id)" :key="v.id">
+                                                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/25"
+                                                      :title="v.role"
+                                                      x-text="v.text"></span>
+                                            </template>
+                                        </div>
+                                        <div class="text-xs text-text/85 leading-snug" x-text="t.content_processed || t.content"></div>
+                                    </div>
+                                </template>
+                            </div>
+
                             <div x-html="$store.atc.formatAircraftDetails()"></div>
                         </div>
 

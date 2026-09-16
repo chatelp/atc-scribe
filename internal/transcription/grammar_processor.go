@@ -37,6 +37,7 @@ type GrammarProcessor struct {
 
 	transcriptionStorage *sqlite.TranscriptionStorage
 	clearanceStorage     *sqlite.ClearanceStorage
+	valueStorage         *sqlite.PhraseologyStorage
 	wsServer             *websocket.Server
 
 	matcher *phraseology.Matcher
@@ -73,12 +74,22 @@ func NewGrammarProcessor(
 		interval = 10 * time.Second
 	}
 
+	// Where the extracted levels, headings and squawks are kept. A failure here is
+	// not fatal: the speaker, the callsign and the clearances are the load-bearing
+	// output, and they do not depend on it.
+	values, err := sqlite.NewPhraseologyStorage(sqlite.DBOf(transcriptionStorage))
+	if err != nil {
+		log.Error("Failed to open phraseology value storage; values will not be kept", Error(err))
+		values = nil
+	}
+
 	procCtx, procCancel := context.WithCancel(ctx)
 	return &GrammarProcessor{
 		ctx:                  procCtx,
 		cancel:               procCancel,
 		transcriptionStorage: transcriptionStorage,
 		clearanceStorage:     clearanceStorage,
+		valueStorage:         values,
 		wsServer:             wsServer,
 		matcher:              matcher,
 		fleet:                fleet,
@@ -101,6 +112,8 @@ func (p *GrammarProcessor) Start() error {
 		logger.Float64("min_score", p.config.MinScore),
 		logger.Int("min_digits", p.matcher.MinDigits),
 		logger.Bool("adsb_matching", p.fleet != nil))
+
+	p.backfillValues()
 
 	p.wg.Add(1)
 	go func() {
@@ -129,6 +142,46 @@ func (p *GrammarProcessor) Stop() error {
 	p.cancel()
 	p.wg.Wait()
 	return nil
+}
+
+// backfillValues parses transmissions that were annotated before the value table
+// existed, so an aircraft selected today shows the facts of transmissions stored
+// yesterday.
+//
+// Bounded, and idempotent by construction: a transcription that already has one
+// value row is never returned again, so a restart repairs what is missing and
+// touches nothing else. The grammar is deterministic, so re-parsing gives what the
+// original pass would have given.
+func (p *GrammarProcessor) backfillValues() {
+	if p.valueStorage == nil {
+		return
+	}
+	const limit = 5000
+	pending, err := p.valueStorage.TranscriptionsWithoutValues(limit)
+	if err != nil {
+		p.logger.Error("Failed to look for transcriptions without values", logger.Error(err))
+		return
+	}
+	if len(pending) == 0 {
+		return
+	}
+
+	rows, withValues := 0, 0
+	for i := range pending {
+		r := pending[i]
+		n := p.storeValues(&r, phraseology.Parse(r.Content), r.Callsign)
+		if n > 0 {
+			withValues++
+			rows += n
+		}
+		// A transmission that yields nothing keeps no marker, so it is examined
+		// again on the next start. That is cheap, and the alternative is a column
+		// on an upstream table for a question nobody asks.
+	}
+	p.logger.Info("Backfilled phraseology values",
+		logger.Int("examined", len(pending)),
+		logger.Int("transmissions_with_values", withValues),
+		logger.Int("values_stored", rows))
 }
 
 // processNextBatch annotates every transcription that has not been annotated yet.
@@ -209,8 +262,41 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 			logger.String("why", match.Reason))
 	}
 
+	p.storeValues(record, result, callsign)
 	p.storeClearances(record, result, callsign)
 	p.broadcast(record, processed, speaker, callsign)
+}
+
+// storeValues keeps what the grammar recovered -- levels, headings, runways,
+// squawks -- so a transmission can be read as facts and not only as text.
+//
+// Everything is kept, including values from transmissions no aircraft could be
+// found for. A level heard without knowing whose it was still says what the sector
+// is working, and discarding it would make the record depend on the matcher.
+func (p *GrammarProcessor) storeValues(record *sqlite.TranscriptionRecord, result phraseology.Result, callsign string) int {
+	if p.valueStorage == nil || len(result.Values) == 0 {
+		return 0
+	}
+	rows := make([]sqlite.PhraseologyValue, 0, len(result.Values))
+	for _, v := range result.Values {
+		if v.Role == phraseology.RoleUnknown || v.Role == phraseology.RoleCallsign {
+			continue // the callsign has its own column; "unknown" is a non-answer
+		}
+		rows = append(rows, sqlite.PhraseologyValue{
+			TranscriptionID: record.ID,
+			Callsign:        callsign,
+			Role:            string(v.Role),
+			Digits:          v.Digits,
+			Text:            v.Text,
+			CreatedAt:       record.CreatedAt,
+		})
+	}
+	if err := p.valueStorage.StoreValues(rows); err != nil {
+		p.logger.Error("Failed to store phraseology values",
+			logger.Int64("id", record.ID), logger.Error(err))
+		return 0
+	}
+	return len(rows)
 }
 
 // storeClearances records the clearances a controller issued.
