@@ -18,8 +18,22 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `06-catalogue.csv` | les fréquences mesurées : niveau, écart crête-médiane, langue, à transcrire ou non |
 | `07-carte-openai.md` | où l'amont appelle OpenAI, avec quels formats — le plan du remplacement |
 | `08-premiere-mesure.md` | premières mesures de transcription locale sur le corpus réel |
+| `09-jeu-de-test.md` | construction du jeu d'évaluation et protocole d'annotation |
+| `10-mesure-amorces.md` | ce que coûte l'amorce de transcription : dégénérescence ×7 |
+| `11-demande-station.md` | ce qui a été demandé à l'agent de la station, et pourquoi |
+| `12-concatenation.md` | concaténer les transmissions consécutives : mesure et verdict |
+| `13-strategie-bilingue.md` | la stratégie bilingue : routage par langue, modèles candidats |
+| `14-mesure-modeles-francais.md` | comparatif des Whisper francisés sur le corpus |
+| `15-chaine-locale.md` | la chaîne locale de bout en bout : sidecar, segmenteur, contrat |
+| `16-grammaire-et-125933.md` | la grammaire de phraséologie, et l'identification de 125,933 |
+| `17-appariement.md` | l'appariement des indicatifs contre l'ADS-B : méthode et témoin |
+| `18-nuit-du-15.md` | la nuit de mesure : modèle anglais tranché, étagement de la TMA |
 | `19-appariement-en-ligne.md` | la mise en service de l'appariement : point de greffe, réglages mesurés, limites |
+| `20-captation-nuit.md` | **compte rendu de l'agent station** : captation nocturne 132-133, 4 h, 7 canaux |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
+
+> Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas
+> savoir que `15-chaine-locale.md` existait déjà. Renuméroté ici, contenu intact.
 
 `05-decisions.md` se tient à jour au fil de l'eau. C'est la seule consigne non
 négociable de ce dossier.
