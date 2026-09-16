@@ -154,3 +154,71 @@ fois sur quatre. Le contrôle est écrit et rejouable ; il demande un corpus plu
 - **Les chiffres ci-dessus viennent d'une captation de nuit de 2 h 38.** Le trafic
   de jour est plus dense : plus d'avions dans la fenêtre, donc plus de coïncidences.
   Le compromis devra être remesuré de jour.
+
+
+---
+
+## Ce que la première heure en direct a appris
+
+Mise en service le 16/09 à 09:04 sur `aero.mp3`. Chaîne complète vérifiée :
+flux → segmenteur → sidecar `atco2` → base → grammaire → appariement → carte.
+
+**Le segmenteur va bien, contrairement à ce que je soupçonnais.** Je pensais que le
+réencodage MP3 du flux mixé avait détruit le silence numérique sur lequel il
+s'appuie. Mesure sur 60 s de flux, fenêtres de 20 ms : **87,3 % sont à exactement
+zéro**. Le silence à −90 dBFS traverse le mélange et l'encodage. `silence_threshold
+= 0.005` est le bon réglage, et 12,3 % des fenêtres portent de la parole — c'est
+l'occupation du flux mixé.
+
+Transcription en **0,80 s** par transmission, conforme aux 0,72 s médians mesurés
+la veille. Débit observé : environ **3 transmissions par minute**.
+
+### La mesure qui change l'ordre des priorités
+
+Sur le premier échantillon en direct, **37 % des transmissions contiennent des mots
+français**, et 12 % partent en boucle de dégénérescence — le symptôme du modèle
+anglais sur de l'audio français. Le catalogue déclare `language = "en"` sur le flux
+mixé, donc tout part vers `atco2`, français compris.
+
+C'est le premier chiffre de proportion réelle qu'on ait. Le français n'est pas un
+complément : **c'est plus du tiers de ce que la station entend.**
+
+### Le premier appariement, juste pour la mauvaise raison
+
+> *« one two four three five five seven six zero Papa X-ray thank you »*
+> → **N760PX**, réellement en vue à 2 175 ft.
+
+L'avion est le bon. Mais la trace montre que la grammaire y est arrivée par accident,
+et découvre trois défauts d'une seule racine :
+
+| | avant | après |
+|---|---|---|
+| valeurs extraites | un bloc unique `124355760` | **fréquence 124.355** + **indicatif 760** |
+| lettres | aucune | **PX** |
+| score | 0,60 « suffixe de chiffres » | **1,20 « chiffres exacts + lettres »** |
+| locuteur | **ATC**, faux | aucun — le départage ne se trompe plus |
+
+1. `readNumber` lisait goulûment les chiffres de la fréquence **et** ceux de
+   l'indicatif en un seul nombre de neuf chiffres. Il s'arrête maintenant sur une
+   fréquence VHF complète : aucun indicatif, transpondeur ou niveau ne fait six
+   chiffres, donc six chiffres ouvrant dans la bande 118–136 sont une fréquence et
+   rien d'autre.
+2. `letterGroups` exigeait **trois** lettres et jetait « Papa X-ray ». Or un avion
+   léger est appelé par les deux dernières lettres de son immatriculation — c'est
+   l'essentiel du trafic des aérodromes voisins. Seuil ramené à deux. Le risque est
+   nul par construction : le matcher ne peut que *monter* un score avec des lettres.
+3. Le locuteur était **ATC** sur ce qui est un collationnement de pilote, parce que
+   le départage positionnel avait pris la fréquence de tête pour un indicatif. Le
+   découpage corrige la cause.
+
+**Vérifié contre régression sur les 1 468 transmissions enregistrées** — et c'est un
+gain, pas seulement une correction :
+
+| | appariements vrais (`atc-multi`) |
+|---|---|
+| avant | 94,7 |
+| **après** | **104,7** — **+11 %** |
+
+La précision tient sur les cinq fréquences, et 124,625 passe de 56 % à 63 %. Une
+heure de direct a rapporté plus que la nuit de mesure sur ce point précis : les
+défauts de goulotte ne se voient que sur du trafic qu'on n'a pas choisi.
