@@ -1,4 +1,4 @@
-# co-atc-local — instructions permanentes
+# atc-scribe — instructions permanentes
 
 > **Disposition du dépôt.** Ce dépôt **est** un fork de `yegors/co-atc` : son historique
 > est celui de l'amont, qui reste accessible via le remote `upstream`. Le travail se fait

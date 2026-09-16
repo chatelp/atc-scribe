@@ -1,6 +1,6 @@
 # `docs-fr/` — le dossier de chantier
 
-Ce dossier est **la documentation de travail du fork `co-atc-local`**, en français.
+Ce dossier est **la documentation de travail du fork `atc-scribe`**, en français.
 Ce n'est pas une traduction de `docs/` : `docs/` appartient au projet amont et reste
 tel quel, y compris `LOCAL-STT.md`, qui nous sert de référence.
 
@@ -38,6 +38,10 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 
 > Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas
 > savoir que `15-chaine-locale.md` existait déjà. Renuméroté ici, contenu intact.
+
+> Le dépôt s'appelait `co-atc-local` jusqu'au 16 septembre (D20). `11-demande-station.md`
+> et `20-captation-nuit.md` gardent l'ancien nom : c'est de la correspondance datée entre
+> agents, et on ne réécrit pas une lettre après coup.
 
 `05-decisions.md` se tient à jour au fil de l'eau. C'est la seule consigne non
 négociable de ce dossier.

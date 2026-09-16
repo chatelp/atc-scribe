@@ -2,7 +2,7 @@
 
 *Relevé le 15 septembre 2026 sur la machine. La référence d'exploitation complète vit
 dans le projet Claude « Radio » du propriétaire ; ce document en extrait ce dont
-co-atc-local a besoin.*
+atc-scribe a besoin.*
 
 ## Machine
 
@@ -18,7 +18,7 @@ Attention : **152 m est une altitude au-dessus du niveau de la mer**, pas une ha
 d'antenne au-dessus du sol (qui vaut 13 m). Les deux champs existent selon les outils et
 la confusion a déjà coûté une erreur de configuration chez FlightAware.
 
-**Machine de développement : un Mac mini M4, 192.168.1.28.** C'est là que co-atc-local
+**Machine de développement : un Mac mini M4, 192.168.1.28.** C'est là que atc-scribe
 tournera. Les deux machines sont sur le même réseau local, mais la station est câblée
 dans une borne mesh dont le lien de retour est radio : **8,7 ms de latence et 68 Mbit/s
 utiles** vers la station, pas du gigabit. Des boîtiers CPL sont commandés pour corriger

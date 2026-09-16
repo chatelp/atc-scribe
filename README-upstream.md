@@ -1,6 +1,6 @@
 <!--
 Preserved verbatim from upstream yegors/co-atc at commit 0e4d685.
-co-atc-local replaced the root README; this copy keeps upstream's installation
+atc-scribe replaced the root README; this copy keeps upstream's installation
 notes, configuration reference and screenshots, which are still accurate for
 everything this fork did not change.
 -->

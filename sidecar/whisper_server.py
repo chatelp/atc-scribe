@@ -1,4 +1,4 @@
-"""Local speech-to-text sidecar for co-atc-local.
+"""Local speech-to-text sidecar for atc-scribe.
 
 Implements the HTTP contract described in upstream's `docs/LOCAL-STT.md`, which
 was designed but never built: the Go side posts raw PCM and gets a transcript
@@ -41,7 +41,7 @@ WHISPER_RATE = 16000
 
 log = logging.getLogger("stt")
 cfg = Config()
-app = FastAPI(title="co-atc-local STT sidecar")
+app = FastAPI(title="atc-scribe STT sidecar")
 
 _models: dict[str, object] = {}
 _vad = None
