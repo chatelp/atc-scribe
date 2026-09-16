@@ -336,3 +336,47 @@ Ce que le rattrapage a trouvé sur la matinée :
 ancrée sur le mot-clé et lit **vers l'avant**, alors qu'ici le nombre précède son
 mot-clé. `trailingRoles` gère déjà ce cas pour *feet*, *knots* et *degrees* ; *heading*
 n'y est pas. Non corrigé, non mesuré.
+
+
+---
+
+## Quel groupe d'écoute rapporte le plus ? Deux mesurés, un en cours
+
+Trois groupes, **fenêtres de 51 minutes identiques**, et surtout : mesurés **hors
+ligne sur la base du jour**, avec le même matcher et le même témoin mélangé à huit
+tirages. C'est ce qui rend la comparaison possible — pendant la matinée le matcher a
+changé deux fois, et des comptes relevés en direct n'auraient pas été comparables.
+
+> La base garde `adsb_targets` : 270 000 relevés sur la matinée. Toute la journée peut
+> donc être remesurée a posteriori, avec la version du jour de la grammaire. C'est à
+> ça que servent `-from` et `-to`.
+
+| | tours (`decollages-atterrissages`) | `gros-porteurs` |
+|---|---|---|
+| fenêtre | 09:04 → 09:56 | 09:56 → 10:47 |
+| transmissions | 192 | **256** |
+| avec un indicatif candidat | 114 — 59 % | **197 — 77 %** |
+| appariés | 20 | **42** |
+| hasard, 8 témoins | 1,7 | 9,0 |
+| **appariements vrais** | 18,3 | **33,0** |
+| au-dessus du hasard | **91 %** | 79 % |
+| avions dans la fenêtre, médiane | 76 | 93 |
+
+**`gros-porteurs` rapporte 80 % d'appariements vrais en plus.** Il porte aussi
+sensiblement plus de transmissions contenant un indicatif — 77 % contre 59 %, ce qui
+est la différence entre une fréquence d'approche, où chaque échange nomme l'avion, et
+une tour, où l'on entend des rappels de piste et des messages courts.
+
+**Mais les tours sont plus précises**, 91 % contre 79 %, et ce n'est pas un hasard :
+la médiane des avions dans la fenêtre y est de 76 contre 93. Moins d'avions, moins de
+coïncidences arithmétiques possibles. Le trafic local à indicatifs en lettres, qui ne
+s'apparie jamais par chance, tire aussi la précision vers le haut.
+
+Autrement dit, les deux chiffres ne mesurent pas la même chose : le volume suit le
+trafic, la précision suit l'inverse de la densité. Un groupe dense donne plus
+d'appariements *et* plus de faux.
+
+**Troisième groupe en cours** : l'amas 132-133, basculé à 10:48 sur le gabarit sans
+sortie fichier. La mesure de la nuit le situe dans l'espace supérieur, FL160 à FL390 —
+donc peu d'avions à la fois et de l'anglais, ce qui devrait donner beaucoup de
+précision. Reste à voir le volume.
