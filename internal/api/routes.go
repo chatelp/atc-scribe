@@ -48,6 +48,17 @@ func (r *Router) Routes() http.Handler {
 
 	// API routes
 	router.Route("/api/v1", func(router chi.Router) {
+		// Reachable without a session: the login form must be able to ask whether
+		// anyone needs to sign in, and health has to answer a probe that has no
+		// credentials to offer.
+		router.Get("/health", r.handler.GetHealth)
+		router.Get("/auth/status", r.handler.GetAuthStatus)
+		router.Post("/auth/login", r.handler.PostLogin)
+		router.Post("/auth/logout", r.handler.PostLogout)
+
+		// Everything below carries data from the receiver.
+		router.Use(r.handler.Auth().Require)
+
 		// Aircraft routes
 		router.Get("/aircraft", r.handler.GetAllAircraft)
 		router.Get("/aircraft/{id}", r.handler.GetAircraftByHex)
@@ -70,9 +81,6 @@ func (r *Router) Routes() http.Handler {
 		router.Get("/transcriptions/time-range", r.handler.GetTranscriptionsByTimeRange)
 		router.Get("/transcriptions/speaker/{type}", r.handler.GetTranscriptionsBySpeaker)
 		router.Get("/transcriptions/callsign/{callsign}", r.handler.GetTranscriptionsByCallsign)
-
-		// Health check
-		router.Get("/health", r.handler.GetHealth)
 
 		// Configuration
 		router.Get("/config", r.handler.GetConfig)
