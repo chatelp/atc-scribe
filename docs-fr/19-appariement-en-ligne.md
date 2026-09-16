@@ -376,7 +376,52 @@ Autrement dit, les deux chiffres ne mesurent pas la même chose : le volume suit
 trafic, la précision suit l'inverse de la densité. Un groupe dense donne plus
 d'appariements *et* plus de faux.
 
-**Troisième groupe en cours** : l'amas 132-133, basculé à 10:48 sur le gabarit sans
-sortie fichier. La mesure de la nuit le situe dans l'espace supérieur, FL160 à FL390 —
-donc peu d'avions à la fois et de l'anglais, ce qui devrait donner beaucoup de
-précision. Reste à voir le volume.
+### Le troisième groupe gagne sur les deux tableaux
+
+L'amas 132-133, basculé à 10:48 sur le gabarit sans sortie fichier, mesuré dans la
+même fenêtre de 51 minutes et avec les mêmes options :
+
+| | tours | gros-porteurs | **amas 132-133** |
+|---|---|---|---|
+| fenêtre | 09:04 → 09:56 | 09:56 → 10:47 | 10:48 → 11:39 |
+| transmissions couvertes | 192 | **256** | 175 |
+| avec un indicatif candidat | 114 — 59 % | **197 — 77 %** | 127 — 73 % |
+| appariés | 20 | 42 | **44** |
+| hasard, 8 témoins | 0,9 | 8,8 | 3,5 |
+| **appariements vrais** | 19,1 | 33,2 | **40,5** |
+| **au-dessus du hasard** | **96 %** | 80 % | **93 %** |
+| avions dans la fenêtre | 76 | 93 | **95** |
+
+**L'amas gagne sur le volume *et* sur la précision**, et c'est inattendu : il a la
+flotte la plus dense des trois — 95 avions dans la fenêtre — ce qui aurait dû lui
+coûter en coïncidences, exactement comme à `gros-porteurs`. Il fait pourtant deux
+fois moins de hasard que lui.
+
+L'explication est dans le texte. En route, un avion s'annonce en entier et proprement :
+
+```
+we descend level eight zero Air France Seventy Four Uniform   -> AFR74UP
+Brest Emirates Five Romeo Quebec is there any chance of ...   -> UAE5RQ
+Brest gojour Vueling Nine Six Charlie Charlie flight level    -> VLG96CC
+Rice Alpine One Four Bravo Whiskey bonjour flight level       -> EJU14BW
+hello Radar hello Stephen seven four three flight level       -> BAW743
+```
+
+Opérateur **et** chiffres **et** lettres dans la même phrase, là où une tour dit
+« *cleared to land* » et une approche donne un cap. Les indicatifs y sont longs et
+spécifiques, donc les collisions arithmétiques sont rares malgré la densité.
+
+Deux détails qui valent d'être notés :
+
+- **`EJU14BW` = easyJet Europe, dont l'indicatif radio est bien « Alpine ».** C'est l'un
+  des 23 opérateurs **absents d'`airlines.dat`** (Q23) : l'appariement s'est fait sur
+  les chiffres et les lettres seuls, sans le bonus opérateur. Le lexique périmé coûte,
+  et on le voit à l'œuvre.
+- **« Brest » revient dans les transmissions.** C'est le centre de contrôle en route
+  de l'Ouest. La nuit avait placé cet amas dans l'espace supérieur par les niveaux
+  entendus, FL160 à FL390 ; le jour le confirme en le nommant.
+
+> **Réserve sur le volume.** Les 175 transmissions de l'amas sont sous-estimées : co-atc
+> a été redémarré quatre fois pendant cette fenêtre, pour brancher le panneau Radio et
+> le contexte. Les *taux* sont bons, le *compte* ne l'est pas. À refaire sans
+> interruption avant d'en tirer une conclusion sur le débit.
