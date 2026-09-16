@@ -28,7 +28,9 @@ aero.mp3 (flux mixé, 4 à 7 canaux)
 
 Tout tourne en local, sans clé, sans qu'un octet d'audio ni de texte quitte le Mac.
 Le groupe écouté est choisi sur la station (`/opt/adsb/aero-mode`), aujourd'hui
-`amas-132-133-nuit-reference` : les sept canaux de l'amas, sans sortie fichier.
+`en-route-et-descente-cdg` : les mêmes sept canaux, avec sortie fichier par transmission.
+Les deux gabarits de la nuit du 15 au 16 (`…-nuit-continu` et `…-nuit-reference`) ont été
+archivés le 16/09, l'identification étant faite.
 
 ## A.2 Ce que chaque étage vaut, mesuré
 

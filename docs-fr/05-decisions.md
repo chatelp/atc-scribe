@@ -341,7 +341,8 @@ dans `/opt/adsb/public/transmissions/` :
 **33 des 44 fréquences marquées « à transcrire » n'ont aucun enregistrement**, dont la
 totalité de CDG (approche, tour, sol, prévol), Orly Tour et Orly Approche, Le Bourget,
 Saint-Cyr, Toussus, et les secteurs DG et DO de Paris Contrôle. Le corpus est le résidu
-de deux groupes d'écoute seulement : `paris5-avec-enregistrement` et `amas-132-133`.
+de deux groupes d'écoute seulement : `paris5-avec-enregistrement` et `amas-132-133`,
+renommé `en-route-et-descente-cdg` le 16/09.
 
 **Ce que ça invalide.** L'anglais du jeu d'évaluation (`09-jeu-de-test.md`) repose sur
 132,500 — non identifiée, langue *supposée* — et 127,750, étiquetée bilingue. La mesure ne
@@ -893,3 +894,63 @@ Yegor S restent (D6, D7), et l'attribution est portée par le README.
 **Et deux documents gardent l'ancien nom à dessein** : `11-demande-station.md` et
 `20-captation-nuit.md` sont de la correspondance datée entre agents. On ne réécrit pas
 une lettre après coup.
+
+### D21 — Le sidecar vit et meurt avec co-atc *(16/09)*
+
+**Le défaut trouvé d'abord.** Rien ne vérifiait la présence du sidecar. co-atc démarrait
+parfaitement — carte, ADS-B, flux audio, interface — et ne transcrivait rien : une ligne
+d'erreur par transmission, rien de stocké. Sur une journée comme celle du 15, **≈ 1 300
+lignes d'erreur et zéro transcription**, sans aucun signal dans l'interface. L'amont sonde
+pourtant sa source ADS-B au démarrage (`ValidateSource`, `main.go:118`) ; c'est notre
+moitié du produit qui n'avait pas la même garantie, et `local.go` est notre code.
+
+**La mesure qui a tranché la forme.** J'avais d'abord recommandé un service permanent
+(LaunchAgent) en arguant qu'il fallait garder les modèles chauds. Le propriétaire a
+écarté la prémisse — *« co-atc est un outil lancé ponctuellement, il n'y a pas de raison
+qu'un sidecar soit en permanence en route »*, et ça ne vaut pas plus pour qui teste
+l'outil. Chiffres relevés dans la foulée :
+
+| | durée |
+|---|---|
+| lancement du sidecar → `/health` répond | **1,56 s** |
+| surcoût de la 1ʳᵉ transcription sur un processus neuf | **+2,2 s** (3,53 s contre 1,33 s) |
+
+**Moins de quatre secondes à froid.** L'argument du démon permanent ne tient pas.
+
+> **Au passage : `--preload` ne précharge pas les poids.** Le journal dit « model
+> registered (1,06 s) puis (0,00 s) » — `load()` importe le module, mlx-whisper résout le
+> modèle paresseusement à la première transcription. C'est bien là que partent les
+> +2,2 s. Le commentaire du code le disait ; la mesure le confirme.
+
+**Décision.** `[transcription.local] command` lance le sidecar avec le serveur et
+l'arrête à la sortie. **Laissée vide par défaut** : le contrat de l'amont
+(`docs/LOCAL-STT.md`) spécifie une *URL*, précisément pour que le service puisse vivre
+ailleurs — autre terminal, autre machine, conteneur. Dans les deux cas, **la sonde
+`/health` est obligatoire et co-atc refuse de démarrer sans elle**.
+
+Trois comportements vérifiés en conditions réelles le 16/09 :
+
+| cas | résultat |
+|---|---|
+| sidecar sain | lancé et sain en **1,2 s**, PPID = co-atc, s'arrête avec lui |
+| ni sidecar ni commande | refus, code 1, message nommant les trois remèdes |
+| commande cassée | refus en **1 s**, portant la sortie de l'enfant |
+
+**Deux pièges rencontrés en l'écrivant, tous deux trouvés par un test :**
+
+1. **`kill(pid, 0)` réussit sur un zombie**, et `cmd.ProcessState` n'est renseigné
+   qu'après `Wait()`. Un sidecar mort au démarrage était donc indiscernable d'un sidecar
+   qui charge, et l'opérateur attendait les 60 s pour un « n'a pas répondu » sans cause.
+   Corrigé : l'enfant est moissonné dès son lancement.
+2. **Il faut signaler le groupe de processus, pas le processus.** On a observé sur cette
+   machine un `resource_tracker` de multiprocessing survivre à son parent (Q24 en a
+   montré un). `Setpgid` au lancement, `kill(-pid)` à l'arrêt, et un test dédié le
+   vérifie sur un petit-enfant.
+
+**Ce qui n'est pas couvert, et c'est assumé** : un `kill -9` sur co-atc orpheline le
+sidecar — aucun parent ne peut s'en prémunir. En revanche il n'y a **aucun appel `Fatal`
+après le démarrage du sidecar** dans `main.go` (vérifié), donc le chemin d'arrêt normal
+et tous les échecs de démarrage sont couverts.
+
+**Contribuable en amont tel quel** (D19) : c'est leur contrat, leur seam, et leur manque.
+

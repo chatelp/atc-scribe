@@ -142,9 +142,15 @@ gabarits dans `/opt/adsb/modes/*.tmpl`, entre lesquels il bascule.
 | `gros-porteurs` | 125,3900 | 124,350 · 124,625 · 125,825 · 126,425 |
 | `paris5` | 128,6400 | 127,750 · 127,850 · 128,142 · 128,950 · 129,525 |
 | `paris5-avec-enregistrement` | 128,6400 | idem + un fichier par transmission |
-| `amas-132-133` | 132,7625 | 132,275 · 132,500 · 132,733 · 132,783 · 132,825 · 133,000 · 133,250 |
+| `en-route-et-descente-cdg` | 132,7625 | 132,275 · 132,500 · 132,733 · 132,783 · 132,825 · 133,000 · 133,250 |
 | `en-route` | 135,8375 | 135,400 · 135,967 · 136,275 |
 | `fixe136` | 135,8005 | 136,275 seule |
+
+> **Le groupe `amas-132-133` s'appelle `en-route-et-descente-cdg` depuis le 16 septembre.**
+> Le mot « amas » disait ce qu'on ignorait : sept fréquences vues au balayage dans moins
+> d'un mégahertz, sans rien qui les relie. La nuit du 15 au 16 les a identifiées canal par
+> canal — voir `24-identification-amas.md`. Les documents datés d'avant le 16 gardent
+> l'ancien nom, qui était le bon ce jour-là ; la station, elle, ne le connaît plus.
 
 **Conséquence pour Co-ATC** : la liste des fréquences n'est pas figée, elle change quand
 le propriétaire bascule de groupe. Trois attitudes possibles, à arbitrer —
@@ -223,7 +229,7 @@ qui déclenche va donc brûler l'essentiel de son calcul sur du bruit, la nuit.
 > Le « jusqu'à 98 % » est juste, et c'est bien une propriété de **quatre** fréquences
 > — 132,733, 132,825, 133,000, 133,250 — qui sont exactement celles où l'analyse
 > spectrale retrouve le peigne à 100 Hz décrit ci-dessus. Les trois autres canaux de
-> l'amas portent de la parole, dont un, **132,783, à 92 %**. Détail dans
+> ce groupe portent de la parole, dont un, **132,783, à 92 %**. Détail dans
 > `21-nuit-132-133.md`.
 
 **Il faut un détecteur de voix en amont du modèle.** Voir `03-transcription.md`.

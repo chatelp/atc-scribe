@@ -14,7 +14,7 @@ déjà à l'antenne, pendant deux à trois heures de trafic diurne.**
 Le corpus de 4 642 transmissions ne contient **aucune fréquence anglophone** : croisé avec
 `06-catalogue.csv`, zéro des onze fréquences marquées « anglais dominant » a le moindre
 enregistrement (Q17). Les 4 642 fichiers sont le résidu de deux groupes seulement,
-`paris5-avec-enregistrement` et `amas-132-133`.
+`paris5-avec-enregistrement` et `amas-132-133` (renommé `en-route-et-descente-cdg` le 16/09).
 
 Or l'évaluation de la transcription locale doit trancher sur les deux langues. Sans
 anglais d'approche — débit rapide, secteur saturé, collationnements serrés, accents non

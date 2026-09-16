@@ -288,6 +288,25 @@ log_dir = "data/transcriptions"
 [transcription.local]
 server_url = "http://127.0.0.1:8178"
 timeout_seconds = 60
+
+# Start the sidecar with the server and stop it on the way out.
+#
+# Leave `command` empty to run the sidecar yourself and just point server_url at
+# it -- upstream's docs/LOCAL-STT.md specifies a URL precisely so it can live in
+# another terminal, on another machine, or in a container.
+#
+# Either way the server probes /health before it starts serving, and refuses to
+# run if nothing answers. Without that probe it starts perfectly, draws the map,
+# streams the audio and transcribes nothing: one error line per transmission and
+# no transcript. That is a worse outcome than not starting.
+#
+# Measured on this station: a cold sidecar answers /health in 1.6 s, and its
+# first transcription costs 2.2 s more than the next one -- under four seconds
+# in total, which is why there is no reason to leave it running permanently.
+#
+# command = ["python3", "sidecar/whisper_server.py", "--preload"]
+command = []
+startup_timeout_seconds = 60
 segment_silence_ms = 600      # silence that ends a transmission
 segment_min_ms = 400          # shorter than this is discarded
 segment_max_seconds = 30

@@ -74,7 +74,8 @@ une stratégie de modèle, pas après.
 
 ## Enrichir le corpus
 
-Le groupe `paris5-avec-enregistrement` et le groupe `amas-132-133` produisent des
+Le groupe `paris5-avec-enregistrement` et le groupe `en-route-et-descente-cdg`
+(nommé `amas-132-133` jusqu'au 16/09) produisent des
 fichiers par transmission. Pour constituer un corpus français riche, le meilleur choix
 est **Chavenay (129,525)** : c'est un aéroclub, ça parle français en continu, et les
 transmissions y sont longues — médiane double des fréquences de contrôle, avec des
