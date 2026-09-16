@@ -18,6 +18,7 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `06-catalogue.csv` | les fréquences mesurées : niveau, écart crête-médiane, langue, à transcrire ou non |
 | `07-carte-openai.md` | où l'amont appelle OpenAI, avec quels formats — le plan du remplacement |
 | `08-premiere-mesure.md` | premières mesures de transcription locale sur le corpus réel |
+| `19-appariement-en-ligne.md` | la mise en service de l'appariement : point de greffe, réglages mesurés, limites |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
 
 `05-decisions.md` se tient à jour au fil de l'eau. C'est la seule consigne non

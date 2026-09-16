@@ -44,7 +44,7 @@ func loadJSON[T any](path string) ([]T, error) {
 }
 
 // measureCapture cross-checks a capture against recovered ADS-B history.
-func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits, seeds, offsetHours int, verbose bool) error {
+func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits, seeds, offsetHours int, verbose, strict bool, minScore float64) error {
 	txs, err := loadJSON[captureTx](txPath)
 	if err != nil {
 		return fmt.Errorf("transcripts: %w", err)
@@ -103,6 +103,23 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		return time.Unix(sky[(seed*7919+i*104729)%len(sky)].T, 0).UTC()
 	}
 
+	// accept applies the same acceptance rule to the real fleet and to every
+	// control fleet. A rule that is only applied to one side would measure the
+	// rule instead of the signal.
+	accept := func(res phraseology.Result, fleet []phraseology.Aircraft) (phraseology.Match, bool) {
+		m, ok := matcher.Match(res, fleet)
+		if !ok {
+			return m, false
+		}
+		if strict && m.Ambiguous {
+			return m, false
+		}
+		if m.Score < minScore {
+			return m, false
+		}
+		return m, true
+	}
+
 	for i, tx := range txs {
 		if tx.Texte == "" {
 			continue
@@ -127,7 +144,7 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		}
 		b.candidates++
 
-		if m, ok := matcher.Match(res, fleetAt(at)); ok {
+		if m, ok := accept(res, fleetAt(at)); ok {
 			b.matched++
 			if verbose {
 				fmt.Printf("  %s %s %-9s %.2f %-34s %s\n", tx.Freq, at.Format("15:04:05"),
@@ -139,7 +156,7 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 			if s == 1 {
 				cb.candidates++
 			}
-			if _, ok := matcher.Match(res, fleetAt(pick(s, i))); ok {
+			if _, ok := accept(res, fleetAt(pick(s, i))); ok {
 				cb.matched++
 			}
 		}

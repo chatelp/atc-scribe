@@ -491,6 +491,7 @@ func NewService(
 	aircraftStorage *sqlite.AircraftStorage,
 	clearanceStorage *sqlite.ClearanceStorage,
 	templateRenderer transcription.TemplateRenderer,
+	fleet transcription.FleetProvider,
 ) *Service {
 	// EXPERIMENT: Reduce buffer size to see impact on perceived lag from "live"
 	bufferSize := 4 * 1024 // 4KB buffer, approx 2 seconds at 16kbps
@@ -573,6 +574,12 @@ func NewService(
 		ContextTranscriptions: config.PostProcessing.ContextTranscriptions,
 		SystemPromptPath:      config.PostProcessing.SystemPromptPath,
 		TimeoutSeconds:        config.PostProcessing.TimeoutSeconds,
+
+		Backend:              config.PostProcessing.Backend,
+		AirlinesDatPath:      config.PostProcessing.AirlinesDatPath,
+		MinScore:             config.PostProcessing.MinScore,
+		MinDigits:            config.PostProcessing.MinDigits,
+		FleetLastSeenMinutes: config.PostProcessing.FleetLastSeenMinutes,
 	}
 
 	// Convert frequency configs to the format expected by TranscriptionManager
@@ -595,6 +602,7 @@ func NewService(
 		postProcessingConfig,
 		templateRenderer,
 		frequencyConfigs,
+		fleet,
 	)
 
 	// Prepare the list of all available server ports for round-robin stream URL generation

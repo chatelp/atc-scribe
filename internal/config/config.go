@@ -147,6 +147,13 @@ type TranscriptionConfig struct {
 }
 
 // PostProcessingConfig contains settings for post-processing of transcriptions
+// Backends for the second stage of the transcription pipeline — the one that
+// assigns a speaker, a callsign and any clearance to a stored transcription.
+const (
+	PostProcessingBackendOpenAI = "openai"
+	PostProcessingBackendLocal  = "local"
+)
+
 type PostProcessingConfig struct {
 	Enabled               bool   `toml:"enabled"`                // Enable or disable post-processing
 	Model                 string `toml:"model"`                  // OpenAI model to use for post-processing
@@ -155,6 +162,15 @@ type PostProcessingConfig struct {
 	ContextTranscriptions int    `toml:"context_transcriptions"` // Number of previous processed transcriptions to include for context
 	SystemPromptPath      string `toml:"system_prompt_path"`     // Path to the system prompt file
 	TimeoutSeconds        int    `toml:"timeout_seconds"`        // HTTP timeout for OpenAI API requests in seconds
+
+	// Which implementation assigns speaker, callsign and clearances.
+	// "openai" is upstream's GPT-4o pass; "local" is the phraseology grammar
+	// matched against live ADS-B, which needs no key. See docs-fr/17-appariement.md.
+	Backend              string  `toml:"backend"`
+	AirlinesDatPath      string  `toml:"airlines_dat_path"`       // OpenFlights airlines.dat, shipped in assets/
+	MinScore             float64 `toml:"min_score"`               // below this, the matcher refuses rather than guesses
+	MinDigits            int     `toml:"min_digits"`              // shortest spoken number that may be a flight number
+	FleetLastSeenMinutes int     `toml:"fleet_last_seen_minutes"` // how stale an ADS-B target may be and still be a candidate
 }
 
 // FrequenciesConfig contains settings for radio frequency monitoring
@@ -360,6 +376,20 @@ func (c *Config) Validate() error {
 	// Validate post-processing config
 	if c.PostProcessing.Enabled && c.PostProcessing.ContextTranscriptions < 0 {
 		return fmt.Errorf("invalid context_transcriptions value: %d (must be >= 0)", c.PostProcessing.ContextTranscriptions)
+	}
+	switch c.PostProcessing.Backend {
+	case "", PostProcessingBackendOpenAI, PostProcessingBackendLocal:
+	default:
+		return fmt.Errorf("invalid post_processing.backend: %q (want %q or %q)",
+			c.PostProcessing.Backend, PostProcessingBackendOpenAI, PostProcessingBackendLocal)
+	}
+	if c.PostProcessing.Enabled && c.PostProcessing.Backend == PostProcessingBackendLocal {
+		if c.PostProcessing.AirlinesDatPath == "" {
+			return fmt.Errorf("post_processing.airlines_dat_path is required when backend = %q", PostProcessingBackendLocal)
+		}
+		if c.PostProcessing.MinScore < 0 {
+			return fmt.Errorf("invalid post_processing.min_score: %v (must be >= 0)", c.PostProcessing.MinScore)
+		}
 	}
 
 	// Validate server config
@@ -755,10 +785,9 @@ func (c *Config) ValidateOpenAIKeys() error {
 		fmt.Printf("WARN: ATC Chat is enabled but no OpenAI API key provided - ATC chat features will be disabled\n")
 	}
 
-	// Check post-processing API key if post-processing is enabled
-	if c.PostProcessing.Enabled {
-		// Post-processing still uses the OpenAI key, even with a local transcription
-		// backend. Replacing it is a separate piece of work.
+	// Check post-processing API key if post-processing is enabled.
+	// The local backend needs no key: it reads airlines.dat and live ADS-B.
+	if c.PostProcessing.Enabled && c.PostProcessing.Backend != PostProcessingBackendLocal {
 		if c.Transcription.OpenAIAPIKey == "" {
 			fmt.Printf("WARN: Post-processing is enabled but no OpenAI API key provided in transcription config - post-processing features will be disabled\n")
 		}

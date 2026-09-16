@@ -43,10 +43,12 @@ func main() {
 	offset := flag.Int("offset-hours", 2, "hours to subtract from capture times to reach UTC")
 	field := flag.String("field", "texte", "object key holding the text")
 	verbose := flag.Bool("v", false, "print every parsed transmission")
+	strict := flag.Bool("strict", false, "refuse a match when a second aircraft scores nearly as well")
+	minScore := flag.Float64("min-score", 0, "refuse a match below this score")
 	flag.Parse()
 
 	if *capture != "" {
-		if err := measureCapture(*capture, *adsb, *airlines, *window, *minDigits, *seeds, *offset, *verbose); err != nil {
+		if err := measureCapture(*capture, *adsb, *airlines, *window, *minDigits, *seeds, *offset, *verbose, *strict, *minScore); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
