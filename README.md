@@ -222,11 +222,25 @@ go build -o bin/co-atc ./cmd/server
 > path would touch every import in every Go file, and with it every future diff
 > against upstream.
 
-Start the transcription sidecar in its own terminal:
+Install the transcription sidecar's dependencies:
 
 ```bash
-cd sidecar && pip install -r requirements.txt && python whisper_server.py --preload
+pip install -r sidecar/requirements.txt
 ```
+
+You do not run it yourself. Set `[transcription.local] command` in the config and
+**co-atc starts the sidecar with it and stops it on exit** — a transcription
+service has no reason to outlive its only client. Measured: a cold sidecar
+answers in 1.6 s, and its first transcription costs 2.2 s more than the next, so
+there is nothing to gain by leaving one running.
+
+If you would rather run it yourself — in another terminal, on another machine,
+in a container — leave `command` empty and point `server_url` at it. Upstream's
+contract is a URL for exactly that reason.
+
+Either way co-atc probes `/health` before it serves anything and **refuses to
+start if nothing answers**. Without that it would start perfectly and transcribe
+nothing, one error line per transmission.
 
 Create an account. The command does not write anything: it reads a password
 without echoing it and prints a `[[auth.users]]` block for you to paste into
