@@ -105,3 +105,86 @@ cette répétition. Un lecteur de contexte — pas nécessairement un modèle de
 aurait vu la concordance et refusé l'appariement approximatif.
 
 C'est là qu'est le gain, et c'est mesurable avec l'instrument existant.
+
+
+---
+
+# Le contexte entre transmissions : plafonds mesurés
+
+Le résultat négatif ci-dessus désignait le contexte comme la vraie piste. **Mesuré
+avant d'être écrit, comme le reste. Le plafond est beaucoup plus bas que je ne l'avais
+laissé entendre.**
+
+## Deux formes, deux plafonds
+
+**A — la répétition à l'intérieur d'une transmission.** Le cas qui m'avait frappé,
+*« Air France Three Six Seven »* dit trois fois : **15 transmissions sur 1 415, soit
+1,1 %.** C'est une curiosité, pas un gisement.
+
+**B — l'échange entre transmissions.** Une instruction puis son collationnement
+partagent une valeur : *« descend FL100 »* / *« descending FL100 »*.
+
+| fenêtre | transmissions sans indicatif | voisine avec indicatif **et** valeur commune | voisine avec indicatif seulement |
+|---|---|---|---|
+| 30 s | 668 | **0** | 347 — 52 % |
+| 60 s | 668 | **0** | 484 — 73 % |
+| 120 s | 668 | **1** | 586 — 88 % |
+
+**Zéro.** La raison est mécanique : seules 4 % des transmissions portent un niveau, donc
+deux voisines portant *le même* niveau n'arrivent pour ainsi dire jamais.
+
+## La version qui rapporterait, et pourquoi je ne l'ai pas faite
+
+Entre 52 et 88 % des transmissions non identifiées ont une voisine qui porte un
+indicatif. Recopier cet indicatif attribuerait d'un coup la moitié du trafic.
+
+**Mais cette version n'est pas mesurable avec l'instrument de ce chantier.** Le témoin
+mélangé teste *« cet avion était-il dans le ciel ? »* — pas *« cette transmission
+parlait-elle de lui ? »*. Une propagation par proximité hérite de la justesse de son
+ancre : elle passe le témoin **même quand elle attribue au mauvais avion**. Le chiffre
+publié monterait sans que rien ne dise s'il est vrai.
+
+> C'est exactement le genre de gain que ce chantier refuse. La règle tient en une
+> ligne, et elle est écrite dans le code : *le contexte ne sert qu'à choisir entre des
+> avions que la transmission nomme déjà, jamais à en nommer un qu'elle ne nomme pas.*
+
+## Ce qui a été implémenté, et ce que ça donne
+
+Deux règles, toutes deux strictement conservatrices :
+
+1. **Un groupe de chiffres répété** dans la transmission vaut +0,15.
+2. **Une égalité entre deux candidats** est tranchée en faveur de celui que la
+   fréquence vient d'adresser — les deux étaient déjà nommés par les chiffres, le
+   contexte choisit seulement lequel.
+
+Mesure sur la captation, historique tenu séparément pour le tirage réel et pour chacun
+des huit témoins :
+
+| contexte | appariements | hasard | au-dessus | vrais |
+|---|---|---|---|---|
+| aucun | 144 | 40,8 | 72 % | 103,2 |
+| 60 s | 144 | 40,8 | 72 % | 103,2 |
+| 120 s | 144 | 40,8 | 72 % | 103,2 |
+| 300 s | 144 | 40,8 | 72 % | 103,2 |
+
+**Effet strictement nul.** Trois tests unitaires prouvent que les mécanismes
+fonctionnent quand les conditions existent — une égalité tranchée, une répétition
+valorisée, et le refus d'inventer un appariement à partir du seul contexte. Ce n'est
+donc pas un code mort : **c'est un corpus qui n'offre aucune occasion.**
+
+Le code reste en place et actif en production. Le trafic d'une captation de nuit sur
+cinq fréquences n'est pas celui d'une approche chargée, et les égalités y sont rares.
+Si elles deviennent fréquentes ailleurs, la règle sera là — et la mesure se refait en
+une commande.
+
+## Ce que ces deux résultats négatifs disent ensemble
+
+La correction lexicale et le contexte étaient les deux pistes « évidentes » pour
+rattraper GPT-4o. Mesurées, elles rapportent respectivement **+1 transmission** et
+**zéro**.
+
+La contrainte est ailleurs, et elle est simple : **668 transmissions sur 1 415 — 47 % —
+ne contiennent aucun indicatif à trois chiffres.** Ni la correction, ni le contexte, ni
+un modèle de langue ne créent une information que la transmission ne porte pas. Ce qui
+reste à gagner est dans la qualité de la transcription elle-même, et cela se mesure avec
+un taux d'erreur de mots — donc avec les annotations.

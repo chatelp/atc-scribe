@@ -44,7 +44,7 @@ func loadJSON[T any](path string) ([]T, error) {
 }
 
 // measureCapture cross-checks a capture against recovered ADS-B history.
-func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits, seeds, offsetHours int, verbose, strict bool, minScore float64, fuzzy bool) error {
+func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits, seeds, offsetHours int, verbose, strict bool, minScore float64, fuzzy bool, contextSec int) error {
 	txs, err := loadJSON[captureTx](txPath)
 	if err != nil {
 		return fmt.Errorf("transcripts: %w", err)
@@ -104,11 +104,44 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		return time.Unix(sky[(seed*7919+i*104729)%len(sky)].T, 0).UTC()
 	}
 
+	// Each run keeps its own memory of what it just matched on each frequency --
+	// the real run and every control alike. Sharing one history would give the
+	// controls the real run's answers, which is the one thing a control may not
+	// have.
+	type memory struct {
+		at time.Time
+		cs string
+	}
+	history := map[string][]memory{}
+	recent := func(key string, at time.Time) []string {
+		if contextSec <= 0 {
+			return nil
+		}
+		var out []string
+		w := time.Duration(contextSec) * time.Second
+		for _, m := range history[key] {
+			if at.Sub(m.at) <= w && at.Sub(m.at) >= 0 {
+				out = append(out, m.cs)
+			}
+		}
+		return out
+	}
+	remember := func(key string, at time.Time, cs string) {
+		if contextSec <= 0 || cs == "" {
+			return
+		}
+		h := append(history[key], memory{at, cs})
+		if len(h) > 40 {
+			h = h[len(h)-40:]
+		}
+		history[key] = h
+	}
+
 	// accept applies the same acceptance rule to the real fleet and to every
 	// control fleet. A rule that is only applied to one side would measure the
 	// rule instead of the signal.
-	accept := func(res phraseology.Result, fleet []phraseology.Aircraft) (phraseology.Match, bool) {
-		m, ok := matcher.Match(res, fleet)
+	accept := func(res phraseology.Result, fleet []phraseology.Aircraft, ctx []string) (phraseology.Match, bool) {
+		m, ok := matcher.MatchWithContext(res, fleet, ctx)
 		if !ok {
 			return m, false
 		}
@@ -145,7 +178,8 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		}
 		b.candidates++
 
-		if m, ok := accept(res, fleetAt(at)); ok {
+		if m, ok := accept(res, fleetAt(at), recent("real|"+key, at)); ok {
+			remember("real|"+key, at, m.Callsign)
 			b.matched++
 			if verbose {
 				fmt.Printf("  %s %s %-9s %.2f %-34s %s\n", tx.Freq, at.Format("15:04:05"),
@@ -157,7 +191,9 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 			if s == 1 {
 				cb.candidates++
 			}
-			if _, ok := accept(res, fleetAt(pick(s, i))); ok {
+			ck := fmt.Sprintf("ctrl%d|%s", s, key)
+			if m, ok := accept(res, fleetAt(pick(s, i)), recent(ck, at)); ok {
+				remember(ck, at, m.Callsign)
 				cb.matched++
 			}
 		}
