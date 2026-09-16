@@ -11,7 +11,7 @@ motif. Une question qui se pose s'ajoute à la seconde.*
 | D1 | **Le service tournera sur le Mac mini M4**, pas sur la station | 15/09 | Deux cœurs Haswell déjà chargés côté station ; la transcription locale demande de la puissance. L'ADS-B et l'audio traversent le réseau : quelques centaines de kbit/s, sans commune mesure avec le lien disponible. |
 | D2 | **Le mode de diffusion par canal s'ajoute au mélangeur, il ne le remplace pas** — et il est activable à la demande | 15/09 | Le flux mélangé `aero.mp3` est écouté tous les jours et ne doit pas changer. Le mode par canal rejoint la mécanique de bascule existante de `radio-ctl`. |
 | D3 | **Transcription entièrement locale**, l'API OpenAI est retirée | 15/09 | Coût récurrent, envoi de l'audio chez un tiers, dépendance réseau sur une station autonome. C'est la raison d'être du fork. |
-| D4 | **Nom du dépôt : `co-atc-local`** | 15/09 | Destiné à un dépôt public. C'est ce qu'on cherche quand on veut Co-ATC sans OpenAI. Whisper est le moyen, « local » est la promesse. |
+| D4 | ~~**Nom du dépôt : `co-atc-local`**~~ — **remplacée par D20 le 16/09** | 15/09 | Destiné à un dépôt public. C'est ce qu'on cherche quand on veut Co-ATC sans OpenAI. Whisper est le moyen, « local » est la promesse. |
 | D5 | **Le service reste sur le réseau local**, jamais exposé | 15/09 | Co-ATC n'a aucune authentification et son auteur déconseille l'exposition. |
 | D6 | **La licence amont est MIT — le fork est publiable** | 15/09 | Vérifié le 15/09 dans `LICENSE` sur la branche `main` du dépôt amont : « MIT License — Copyright (c) 2025 Yegor S ». MIT autorise la modification et la redistribution sans réciprocité et sans autorisation préalable. **Seule obligation : conserver la notice de copyright et le texte de la licence dans toute copie.** Concrètement : garder le fichier `LICENSE` amont tel quel, et signaler le fork dans le README. |
 | D7 | **Le fork est publié sous licence MIT**, comme l'amont | 15/09 | Décision du propriétaire. Un fork MIT d'un projet MIT n'ajoute aucune friction pour qui voudrait reprendre le travail et garde ouverte la possibilité de renvoyer des morceaux en amont (consigne « le fork reste rebasable »). Le fichier `LICENSE` amont est conservé tel quel ; la notice du fork s'ajoute, elle ne remplace pas. |
@@ -626,7 +626,7 @@ jamais à zéro tant que la chaîne tourne. **Tout test « personne n'écoute »
 raisonner sur `auditeurs − 1`.** Le piège a failli annuler la captation nocturne en
 silence.
 
-**Vérifié : notre code n'est pas concerné** — rien dans `co-atc-local` ne lit
+**Vérifié : notre code n'est pas concerné** — rien dans `atc-scribe` ne lit
 `/radio/etat`. À retenir tout de même pour D2, le mode de diffusion par canal : c'est
 exactement là qu'un test de ce genre serait tentant.
 
@@ -841,3 +841,55 @@ rebase qui n'a aucune raison d'arriver.
 
 **Ce que ça ne change pas** : D7 (licence MIT), D6 (obligation de conserver la notice
 amont), et le fait que `docs/` reste à eux.
+
+
+### D20 — Le dépôt s'appelle `atc-scribe` *(16/09)*
+
+D4 avait choisi `co-atc-local` le premier jour, avant qu'une ligne soit écrite, sur un
+raisonnement de découvrabilité : *« c'est ce qu'on cherche quand on veut Co-ATC sans
+OpenAI »*. Deux choses l'ont périmé.
+
+**Le nom ne discrimine pas.** La description GitHub de l'amont dit déjà *« leverages
+local SDRs »*, et son serveur est déjà cantonné au réseau local. « local » ne nomme donc
+pas notre différence, qui est **l'absence d'IA dans le nuage**.
+
+**Et la découvrabilité qu'il achetait est faible.** Mesuré le 16/09 sur l'API GitHub :
+une recherche `co-atc in:name` renvoie **huit résultats AtCoder sur neuf**. On n'est pas
+trouvé par le nom, on est trouvé par le réseau de forks — qui affiche le dépôt parent de
+toute façon, quel que soit notre nom.
+
+**Le motif décisif est ailleurs :** l'amont est muet depuis le 3 mai 2026 (D19) et le
+projet a vocation à continuer sans lui. Un nom construit comme un suffixe de l'amont
+dit le contraire de ce qu'on fait.
+
+**Pourquoi `atc-scribe`.** Un scribe écrit ce qui a été dit, fidèlement, **sans
+inventer** — et c'est l'axe de tout le dossier. La détection de voix existe parce qu'un
+modèle nourri de silence rend des phrases plausibles (Q1, doc 21). La grammaire est
+fermée pour la même raison. L'appariement se fait contre la flotte réellement vue,
+jamais contre une liste imaginée. « Scribe » nomme la vertu que ce projet passe son
+temps à défendre ; « hallucination » en est exactement le contraire. Et il dit ce que
+fait le produit à quelqu'un qui n'a jamais entendu parler de Co-ATC.
+
+Disponibilité vérifiée le 16/09 : **aucun dépôt GitHub nommé `atc-scribe` ni
+`atcscribe`**. Forme avec tiret retenue — `atcscribe` se casse à l'œil, et le tiret suit
+la convention de l'amont (`co-atc`).
+
+**Ce qui ne change pas :** le dépôt reste un fork (D19), la licence MIT et la notice de
+Yegor S restent (D6, D7), et l'attribution est portée par le README.
+
+**Deux choses volontairement non renommées, et il faut savoir pourquoi :**
+
+1. **Le binaire reste `co-atc`.** Q21 a établi que la permission « Réseau local » de
+   macOS est accordée **par exécutable**. Renommer le binaire crée une identité neuve,
+   donc une nouvelle demande d'autorisation — et si elle passe inaperçue, l'échec
+   ressemble trait pour trait à une coupure réseau, ce qui a déjà coûté deux
+   conclusions fausses en une journée. À faire le jour où le chemin du module Go
+   changera aussi, en une fois et devant le clavier.
+2. **Le chemin du module Go reste `github.com/yegors/co-atc`.** Le changer ferait
+   marcher `go install` depuis notre dépôt, mais c'est la seule modification qui
+   toucherait *chaque bloc d'import de chaque fichier Go* — et donc tout diff futur avec
+   l'amont, y compris les pull requests que D19 veut garder possibles.
+
+**Et deux documents gardent l'ancien nom à dessein** : `11-demande-station.md` et
+`20-captation-nuit.md` sont de la correspondance datée entre agents. On ne réécrit pas
+une lettre après coup.

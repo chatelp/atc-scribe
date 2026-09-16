@@ -32,7 +32,7 @@ donc la fin de la transmission.
 
 C'est un **jeu d'évaluation prêt à l'emploi et représentatif** : même antenne, même
 récepteur, même chaîne de démodulation, mêmes conditions de propagation que ce que
-co-atc-local devra transcrire en production. Aucun corpus public d'ATC ne peut en dire
+atc-scribe devra transcrire en production. Aucun corpus public d'ATC ne peut en dire
 autant pour cette station.
 
 Trois dossiers ont une langue **connue** et servent de vérité partielle :

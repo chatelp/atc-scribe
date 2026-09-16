@@ -1,4 +1,4 @@
-# Local speech-to-text sidecar for co-atc-local.
+# Local speech-to-text sidecar for atc-scribe.
 # Apple Silicon: mlx-whisper is roughly twice as fast as whisper.cpp and, unlike
 # CTranslate2/faster-whisper, has Metal acceleration.
 fastapi>=0.115

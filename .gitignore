@@ -40,7 +40,7 @@ Thumbs.db
 /configs/config.toml
 /configs/opensky_credentials.json
 config.toml
-# Local run logs (co-atc-local fork)
+# Local run logs (atc-scribe fork)
 /runs/
 
 # Python
@@ -48,7 +48,7 @@ __pycache__/
 *.py[cod]
 .venv/
 
-# --- co-atc-local fork ---------------------------------------------------
+# --- atc-scribe fork ---------------------------------------------------
 # Credentials and certificates. The server can be given a TLS certificate
 # (see [server] tls_cert / tls_key); nothing of the sort belongs here.
 *.pem

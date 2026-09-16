@@ -36,7 +36,7 @@ class Config:
 
 def from_args(argv: list[str] | None = None) -> Config:
     d = Config()
-    p = argparse.ArgumentParser(description="Local STT sidecar for co-atc-local")
+    p = argparse.ArgumentParser(description="Local STT sidecar for atc-scribe")
     p.add_argument("--host", default=d.host)
     p.add_argument("--port", type=int, default=d.port)
     p.add_argument("--model-en", default=d.model_en,

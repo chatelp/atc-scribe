@@ -1,4 +1,7 @@
-# co-atc-local
+# atc-scribe
+
+*A fork of [Co-ATC](https://github.com/yegors/co-atc) that does the listening on
+your own machine.*
 
 **Listen to the air traffic control radio above your house, and have a computer
 write down what was said — without sending a single second of audio to anyone.**
@@ -44,7 +47,7 @@ working notes that produced them are in [`docs-fr/`](docs-fr/) (in French).
 
 ## What is different from upstream
 
-| | upstream | co-atc-local |
+| | upstream | atc-scribe |
 |---|---|---|
 | Speech to text | OpenAI `gpt-4o-transcribe` | local Whisper via [MLX](https://github.com/ml-explore/mlx) in a Python sidecar |
 | Transcript post-processing | GPT-4o with a 90-line prompt | a closed-vocabulary **phraseology grammar**, no model |
@@ -206,11 +209,18 @@ adds enough to make that a choice rather than a fact.
 ## Getting started
 
 ```bash
-git clone https://github.com/<you>/co-atc-local.git
-cd co-atc-local
+git clone https://github.com/<you>/atc-scribe.git
+cd atc-scribe
 cp configs/config.toml.example configs/config.toml
 go build -o bin/co-atc ./cmd/server
 ```
+
+> The binary is still called `co-atc`, and the Go module path is still upstream's.
+> Both are deliberate: on macOS the Local Network permission is granted **per
+> executable**, so renaming the binary means re-granting it — and a permission that
+> was silently not granted looks exactly like a network outage. Changing the module
+> path would touch every import in every Go file, and with it every future diff
+> against upstream.
 
 Start the transcription sidecar in its own terminal:
 
