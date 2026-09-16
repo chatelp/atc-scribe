@@ -567,10 +567,32 @@ décident seuls. Observé en direct : *« Fraction Four Four Seven Lima »* a bi
 apparié à **NJE447L** — « Fraction » *est* l'indicatif radio de NetJets Europe —
 mais par les chiffres seuls, le mot n'ayant rien trouvé dans le lexique.
 
-**Non résolu, et à ne pas résoudre en inventant.** Compléter le fichier à la main
-reviendrait à écrire des indicatifs radio de mémoire, ce que la méthode du projet
-interdit. Il faut une source vérifiable et republiable — la question est laquelle,
-compte tenu du fait que le dépôt est destiné à être public.
+**Résolu autrement, le 16/09 : on ne complète pas de mémoire, on relève.**
+
+Quand une transmission a déjà été appariée à un avion **par les chiffres et les
+lettres seuls**, le mot qui précède ses chiffres *est* l'indicatif radio prononcé.
+Il suffit de le lire. `assets/spoken-operators.csv` est donc une **table de formes
+entendues sur cette station**, pas une référence aéronautique — et les formes
+déformées y ont leur place, « mazda » pour Malta Air étant utile précisément parce
+que c'est ce que le modèle produit.
+
+Relevé du 16/09, avec le nombre d'avions distincts et de transmissions qui
+soutiennent chaque ligne : `fraction → NJE` (3 avions), `malta → WMT` (2
+transmissions), `alpine → EJU`, `benavis → PVD`, `skynet → KMM`, et une douzaine
+d'autres à une seule observation.
+
+**Effet mesuré : nul sur les appariements.** Avec ou sans le fichier, 20 / 42 / 44
+appariements sur les trois groupes — à l'identique. Il ne fait que monter les
+scores des appariements que les chiffres avaient déjà décidés, et il fait
+*légèrement monter le hasard*, parce que le bonus d'opérateur se déclenche aussi
+dans les témoins mélangés.
+
+Conservé malgré tout, pour deux raisons : il rend la trace honnête — `operator
+named` apparaît quand l'opérateur a bien été reconnu — et il devient décisif si
+`min_score` est un jour relevé, ce que `config.toml` documente comme option.
+
+Détail relevé au passage : le chargeur d'`airlines.dat` exige `active == "Y"`.
+C'est pour ça que **Ryanair** manquait — la ligne existe, elle est marquée inactive.
 
 
 ### Q24 — Le plancher d'auditeurs Icecast est 1, jamais 0 *(nouvelle, 16/09)*
@@ -616,3 +638,16 @@ l'architecture.
 `MapVisibilityRules.shouldShowAircraftOnMap` pour la carte. N'en modifier qu'un
 donne une liste filtrée et une carte qui ne l'est pas — c'est exactement ce qui est
 arrivé au premier essai, et seule la capture d'écran l'a montré.
+
+
+### Q25 — Le bonus d'opérateur discrimine-t-il vraiment ? *(nouvelle, 16/09)*
+
+La mesure du complément de lexique a montré autre chose que ce qu'elle cherchait :
+ajouter des opérateurs fait monter le **hasard** de 3,6 à 5,4 sur l'amas. Autrement
+dit, +0,40 pour « opérateur nommé » se déclenche aussi bien sur une flotte tirée au
+mauvais moment que sur la bonne.
+
+C'est logique — au-dessus de Paris, un Air France quelconque est presque toujours
+présent — et c'est le même défaut qui avait condamné la règle « chiffres à un près ».
+**Non mesuré directement.** Le test serait de retirer le bonus et de refaire les
+trois groupes, comme pour `-fuzzy`.

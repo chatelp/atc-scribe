@@ -1,0 +1,36 @@
+# Formes entendues sur cette station, relevees et non recopiees.
+#
+# Ce fichier n'est PAS une reference aeronautique. C'est une table de ce que les
+# modeles de transcription ecrivent reellement devant les chiffres d'un indicatif,
+# releve sur les transmissions deja appariees a un avion par les chiffres et les
+# lettres seuls. Les formes deformees y ont donc leur place -- "mazda" pour Malta
+# Air est utile precisement parce que c'est ce que le modele produit.
+#
+# Il complete assets/airlines.dat, la base OpenFlights figee vers 2014, a laquelle
+# manquent 23 des 77 operateurs vus au-dessus de la station (30 %, voir Q23) :
+# Malta Air date de 2019, ITA Airways de 2021, les filiales easyJet et Ryanair UK
+# leur sont posterieures.
+#
+# forme_entendue,code_oaci,avions_distincts,transmissions
+#
+# Releve du 16/09/2026, sur la base du jour. Les colonnes de comptage disent la
+# force de la preuve : une seule observation reste une observation, pas une
+# certitude, et l'effet de ce fichier est mesure -- voir docs-fr/19.
+fraction,NJE,3,3
+malta,WMT,1,2
+mazda,WMT,1,1
+manda,WMT,1,1
+alpine,EJU,1,1
+ryanair,RYR,1,1
+irish,IRL,1,1
+skynet,KMM,1,1
+nordic,NOZ,1,1
+convoy,CNV,1,1
+helmair,HRN,1,1
+airman,HRN,1,1
+frost,FRO,1,1
+guitar,ITY,1,1
+basma,DGX,1,1
+kreml,SZN,1,1
+pilato,PCH,1,1
+benavis,PVD,1,1
