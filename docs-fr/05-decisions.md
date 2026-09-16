@@ -784,6 +784,11 @@ dépôt était le bon choix, la règle de conception qui en avait été tirée n
 **+11 663 / −210 lignes**, 63 fichiers nouveaux contre 22 fichiers amont modifiés. Le
 `−210` est le chiffre qui compte : *nous ne supprimons presque rien chez eux.*
 
+> Relevé sur les **38 premiers commits** du fork, c'est-à-dire avant les commits de
+> publication qui suivent (D19 lui-même, le README anglais, la passe de sanitation).
+> Rejouer `git diff --shortstat` aujourd'hui donne un autre chiffre : c'est normal,
+> et le décompte ci-dessus est celui qui a motivé la décision.
+
 Profondeur de nos modifications sur les fichiers amont, rapportée à leur taille :
 
 | fichier amont | lignes | notre empreinte |
