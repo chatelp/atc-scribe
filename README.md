@@ -1,275 +1,269 @@
-> ## This is `co-atc-local` — a fork of [yegors/co-atc](https://github.com/yegors/co-atc)
->
-> **Goal: run Co-ATC entirely on-premises, with no cloud API, on a bilingual
-> French/English receiving station.** Upstream relies on the OpenAI API for
-> transcription, post-processing and the voice assistant; this fork replaces that with a
-> local Whisper pipeline.
->
-> **Status: work in progress.** Nothing is replaced yet. What works today is upstream's
-> own `tar1090` ADS-B path, pointed at a local receiver — see `docs-fr/`.
->
-> Upstream is MIT-licensed (`LICENSE`, Copyright (c) 2025 Yegor S) and this fork stays
-> MIT. Upstream history is preserved; the `docs/` directory is upstream's and is left
-> untouched. Working notes live in `docs-fr/` and are written in French.
->
-> Like upstream, this has **no authentication of any kind** and must never be exposed to
-> the internet.
+# co-atc-local
 
-# Co-ATC: Aircraft Monitoring System
+**Listen to the air traffic control radio above your house, and have a computer
+write down what was said — without sending a single second of audio to anyone.**
 
-Co-ATC is an AI-enhanced system designed to monitor airspace activity, supporting (imaginary) ATC operations. It integrates real-time ADSB data (local or remote), streams ATC communications (local VHF radio or LiveATC) while leveraging AI to transcribe and interpret communications, track ATC instructions, and generate alerts for potential conflicts or non-compliance.
+A small antenna on a rooftop can pick up two things at once: the position reports
+that airliners broadcast continuously, and the voices of the pilots and controllers
+talking to each other. The first is easy for a computer to read. The second is just
+sound.
 
-![Co-ATC Main Interface](docs/main_screen.png)
+This project joins the two. It shows the aircraft on a map, listens to the radio,
+turns the speech into text, and works out **which aircraft each transmission was
+about** — so that clicking a dot on the map shows you what that particular aeroplane
+just said, and what it was told to do.
 
-![Co-ATC Main Interface - Aircraft Info](docs/main_screen2.png)
+It is a fork of [Co-ATC](https://github.com/yegors/co-atc), which already did all of
+this beautifully — but by sending the audio to OpenAI. **This fork does the same work
+on the machine in the room**, on a receiving station in France where the radio is
+half French and half English.
 
-![Co-ATC Main Interface - Proximity Alerts](docs/main_screen3.png)
+> Everything here runs on one Mac mini. No API key, no subscription, no audio leaving
+> the house. The only thing the project needs from the internet is the weather.
 
-![Co-ATC Main Interface - AI ATC](docs/main_screen4.png)
+![Co-ATC main interface](docs/main_screen.png)
 
-![Co-ATC Main Interface - Map Styles](docs/main_screen5.png)
+---
 
-## What Co-ATC Does
+## Why a fork
 
-Co-ATC provides air traffic controllers and aviation enthusiasts with:
+Upstream Co-ATC calls the OpenAI API in three places: to transcribe the radio, to
+tidy up the transcript and extract clearances, and to run a voice assistant. For a
+station that runs continuously, that means a recurring bill, a dependency on the
+network, and every transmission the receiver hears being uploaded to a third party.
 
-- **Real-time Aircraft Tracking**: Live visualization of aircraft positions, flight paths, and telemetry data
-- **Interactive Map Interface**: Comprehensive airspace view with aircraft details, weather overlays, and runway information
-- **Use Local Data Sources**: Connects to your ADSB and [VHF band](https://github.com/rtl-airband/RTLSDR-Airband/pull/523) SDRs for mostly local (offline) tracking
-- **AI-Powered Voice Assistant**: Voice-based ATC assistant with comprehensive airspace knowledge and real-time context (OpenAI API key required)
-- **Audio Transcription**: Real-time transcription and analysis of ATC communications using AI (OpenAI API key required)
-- **Flight Phase Detection**: Automatic detection and tracking of aircraft flight phases (taxi, takeoff, departure, cruise, arrival, approach, touchdown)
-- **ATC Clearance Extraction**: AI-powered extraction and tracking of takeoff, landing, and approach clearances (OpenAI API key required)
-- **Aircraft Simulation**: Create and control simulated aircraft for training and testing scenarios
-- **Weather Integration**: Live METAR, TAF, and NOTAM data integration (using "stolen" Windy APIs - sorry!)
-- **Alert System**: Real-time notifications for aircraft status changes and potential issues (incomplete)
+It is also, for this station, the wrong tool: the radio here is **bilingual**. French
+and English alternate on the same frequency, sometimes in the same exchange, and the
+models that are good at air-traffic English are good at it precisely because they
+were fine-tuned on English-only corpora.
 
-## Current State
+So this fork replaces the cloud pieces with local ones, and — because the local
+pieces are worse in some ways and better in others — **measures the difference
+instead of assuming it**. Every number below was recorded on a real receiver, and the
+working notes that produced them are in [`docs-fr/`](docs-fr/) (in French).
 
-Co-ATC is in semi-active development with core functionality implemented and operational. The system successfully processes real-time ADS-B data, provides interactive map visualization, transcribes ATC communications, and offers AI-powered assistance (airport advisory services). 
+## What is different from upstream
 
-For detailed progress and implementation specifics, see [Project Specification and Progress](docs/project_progress.md).
+| | upstream | co-atc-local |
+|---|---|---|
+| Speech to text | OpenAI `gpt-4o-transcribe` | local Whisper via [MLX](https://github.com/ml-explore/mlx) in a Python sidecar |
+| Transcript post-processing | GPT-4o with a 90-line prompt | a closed-vocabulary **phraseology grammar**, no model |
+| Callsign → aircraft matching | GPT-4o, given the live ADS-B list | weighted edit distance against the same list |
+| Authentication | none | Argon2id + server-side sessions |
+| Operational state | not exposed | `GET /api/v1/server` — database growth, disk, retention |
+| Voice assistant | OpenAI Realtime | untouched, and off unless you supply a key |
+| Weather | Windy | unchanged so far — see `Q7` in the working notes |
 
-### ⚠️ SECURITY WARNING
+Upstream's map, ADS-B ingestion, flight-phase detection and web interface are used
+**as they are**. They are the larger and better half of this program, and nothing
+here improves on them.
 
-**DO NOT EXPOSE THIS APPLICATION TO THE INTERNET**
+## Status, honestly
 
-This application is designed for local use only and should never be made accessible from the internet. It has:
+**Running in production on one station since September 2026**, and incomplete.
 
-- **No authentication system** - Anyone with access can use all features
-- **No authorization controls** - All functionality is available to any user
-- **No security hardening** - Built for development and local use
-- **AI-generated codebase** - Has not undergone professional security review or testing
+What works, with the number that says so:
+
+- **Local transcription end to end.** English model
+  `sfabriece/whisper-large-v3-atco2-asr-mlx`, chosen not by listening to it but by
+  ADS-B arbitration: on 1 468 real transmissions it produced **94 true callsign
+  matches against 62.6** for the English-only alternative, and won on all five
+  frequencies.
+- **Callsign matching in production.** 138 matches on a day's traffic, against
+  **43.3 expected by chance** — 69 % above chance, 94.7 of them true. The control is
+  not a guess: control fleets are drawn from the sightings themselves and the
+  acceptance rule is applied identically to the real draw and to the eight shuffled
+  ones.
+- **A voice activity gate that is a correctness requirement, not an optimisation.**
+  On four of this station's seven night-time channels, **up to 98 % of squelch
+  openings carry no speech at all** — and a Whisper model fed silence does not return
+  silence, it returns plausible sentences. Silero VAD in front of the model.
+- **Authentication**, because the fork made the server worth reaching from outside
+  the LAN. 13 tests.
+
+What does not work yet, and is known:
+
+- **French.** The English branch is settled; the French one is not. A model
+  fine-tuned on air-traffic English will happily render French speech as confident,
+  well-formed, entirely invented English — a failure indistinguishable from success
+  for everything downstream. This is the open question of the project (`Q1`).
+- **The database never rotates.** Inherited from upstream and confirmed in its code:
+  the daily SQLite file is opened once at startup and never reopened, so a
+  long-running process writes one file that retention never touches — measured at
+  **1.49 GB in 4 h 15**, 54 % of it a JSON copy of columns already parsed. Fix
+  pending (`Q26`).
+- **Weather** still goes to Windy, and Windy returns 404 for the nearest airfield.
+
+## How it works
+
+```
+  VHF antenna ──► RTLSDR-Airband ──► Icecast ──┐
+                                               │
+  ADS-B antenna ──► readsb/tar1090 ────────┐   │
+                                           ▼   ▼
+                                     ┌───────────────┐
+                                     │    co-atc     │  Go, chi, SQLite
+                                     │               │
+                     squelch-split   │  ┌─────────┐  │
+                     audio ──────────┼─►│ sidecar │  │  Python, FastAPI
+                                     │  │ Silero  │  │
+                                     │  │ +Whisper│  │
+                     text ◄──────────┼──└─────────┘  │
+                                     │       │       │
+                                     │       ▼       │
+                                     │  ┌─────────┐  │
+                                     │  │ grammar │  │  Go, no model
+                                     │  └─────────┘  │
+                                     └───────┬───────┘
+                                             ▼
+                                  browser: map + radio panel
+```
+
+### The sidecar
+
+A ~350-line FastAPI service (`sidecar/`) that upstream itself specified but never
+built — the contract is written down in **upstream's own**
+[`docs/LOCAL-STT.md`](docs/LOCAL-STT.md), and this implements it. It holds the MLX
+Whisper models in memory, runs Silero VAD in front of them, and refuses anything that
+is not speech.
+
+Two settings there are counter-intuitive and both were measured:
+
+- **The upstream transcription prompt is removed, not translated.** It multiplies
+  degeneration loops sevenfold on French audio, doubles decoding time, and leaks into
+  the output (`"Aircraft are at cruise level and use ICA-7, Yankee Papa…"`). It was
+  written for a continuous realtime stream; on a 3-second transmission it outweighs
+  the audio.
+- **The language is chosen per frequency, not detected.** Detection fails mostly on
+  files that are already lost, so the per-frequency prior is both cheaper and safer.
+
+### The phraseology grammar
+
+Upstream's second stage asks GPT-4o for five things. Four of them are not language
+problems at all:
+
+| | what the prompt asks for | grammar? |
+|---|---|---|
+| 1 | freely correct transcription errors | **no** — the only real need for a language model |
+| 2 | write numbers, headings, levels and frequencies as digits | yes |
+| 3 | decide whether the speaker is ATC or a pilot | yes, from verb mood and callsign position |
+| 4 | attach the transmission to a callsign **from the live ADS-B list** | yes — weighted edit distance over a short, known list |
+| 5 | extract clearances and the runway | yes, closed patterns |
+
+Point 4 is the trick that makes the whole product work, and it is not magic: the
+model is handed the aircraft the receiver can currently see and forbidden to invent
+others. Matching `"nonsense three five three"` against 128 known callsigns is
+arithmetic.
+
+Point 1 is the one we do without — and we measured what that costs before giving up
+on it. A dictionary-based text corrector gained **one transmission and lost four
+candidates**. It was deleted.
+
+The grammar plugs in at **upstream's own seam** (`post_processing.backend = "local"`)
+and writes into upstream's tables with upstream's vocabulary. Zero schema migration,
+and you can switch back to GPT-4o with one config key to compare them on the same
+traffic.
+
+Its settings come from a sweep, not from taste — 3 digits minimum, 60-second fleet
+window, ambiguous matches refused, no additional score floor. The full table is in
+`docs-fr/19-appariement-en-ligne.md` and repeated as a comment in
+`configs/config.toml.example`, so that the trade-off stays the operator's.
+
+One rule that looks obviously good and is not: accepting callsigns whose digits are
+**off by one** was measured to be **81 % noise**. It is off by default.
+
+### Authentication
+
+Upstream says, correctly, that it must never be exposed to the internet. This fork
+adds enough to make that a choice rather than a fact.
+
+- **Argon2id** (m = 64 MiB, t = 3, p = 2), PHC-encoded. Passwords are never written
+  to a file by a human: `co-atc -add-user <name>` reads one without echoing it and
+  prints the block to paste into the config.
+- **Server-side sessions**, 256 bits of randomness, sliding expiry, revocable. No
+  JWT — a token you cannot revoke is not an improvement.
+- **Cookies** are `HttpOnly` and `SameSite=Strict`, and `Secure` as soon as the
+  request is HTTPS.
+- **`X-Forwarded-Proto` and `X-Forwarded-For` are trusted from nothing by default.**
+  You list the proxy CIDRs explicitly. A reverse proxy is supported, not required:
+  the server will terminate TLS itself if you give it a certificate, and will run
+  plain HTTP on a LAN if you do not.
+- An unknown username is verified against a **decoy hash**, so it costs the same as a
+  known one and cannot be told apart.
 
 ## Requirements
 
-- **Go 1.21 or higher** - To build the project
-- **ADS-B Data Source** - Access to ADS-B data (e.g., local `tar1090` server or external API)
-- **FFmpeg** - Audio processing for radio frequency streams (see installation instructions below)
-- **Modern Web Browser** - Chrome, Firefox, Safari, or Edge for the web interface
-- **OpenAI API Key** - Only needed for AI Advisory, radio transcriptions, and clearance extraction
+- **Go 1.23** or later
+- **FFmpeg** — audio ingestion (upstream's installation notes still apply, see
+  [`README-upstream.md`](README-upstream.md))
+- **An ADS-B source** — a local `tar1090`/`readsb` is what this is built against
+- **An audio source** — an Icecast mount, or any stream FFmpeg can read
+- **Python 3.11+ and Apple Silicon** for the transcription sidecar. MLX is
+  Apple-only; on other hardware, point `[transcription.local] server_url` at any service
+  that honours the `docs/LOCAL-STT.md` contract.
+- **No OpenAI key**, unless you want the voice assistant, which is untouched.
 
-### Installing FFmpeg
+## Getting started
 
-#### Windows
-1. **Using Chocolatey** (recommended):
-   ```powershell
-   # Install Chocolatey if not already installed
-   Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-   
-   # Install FFmpeg
-   choco install ffmpeg
-   ```
-
-2. **Manual Installation**:
-   - Download FFmpeg from [https://ffmpeg.org/download.html#build-windows](https://ffmpeg.org/download.html#build-windows)
-   - Extract the archive to `C:\ffmpeg`
-   - Add `C:\ffmpeg\bin` to your system PATH environment variable
-   - Restart your command prompt/PowerShell
-
-#### Mac
-1. **Using Homebrew** (recommended):
-   ```bash
-   # Install Homebrew if not already installed
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   
-   # Install FFmpeg
-   brew install ffmpeg
-   ```
-
-2. **Using MacPorts**:
-   ```bash
-   sudo port install ffmpeg
-   ```
-
-#### Verify Installation
-After installation, verify FFmpeg is working:
 ```bash
-ffmpeg -version
-```
-
-## Installation and Setup
-
-### Option 1: Download Pre-compiled Binaries
-
-The quickest way to get Co-ATC running is to download pre-compiled binaries from the releases page.
-
-1. **Download the latest release** from [GitHub Releases](https://github.com/yegors/co-atc/releases)
-2. **Clone the repository** (required for assets and www folders):
-   ```bash
-   git clone https://github.com/yegors/co-atc.git
-   cd co-atc
-   ```
-3. **Extract the binary** to the project root directory
-4. **Proceed to Configuration** section below
-
-### Option 2: Build from Source
-
-If you prefer to build from source or need to modify the code:
-
-#### Windows
-```powershell
-# Clone the repository
-git clone https://github.com/yegors/co-atc.git
-cd co-atc
-
-# Install dependencies
-go mod download
-
-# Build the application using the build script
-.\build_windows.ps1
-```
-
-#### Mac
-```bash
-# Clone the repository
-git clone https://github.com/yegors/co-atc.git
-cd co-atc
-
-# Install dependencies
-go mod download
-
-# Build the application using the build script (for macOS)
-./build_mac.sh
-```
-
-#### Linux
-```bash
-# Clone the repository
-git clone https://github.com/yegors/co-atc.git
-cd co-atc
-
-# Install dependencies
-go mod download
-
-# Build the application using the build script (auto-detects architecture)
-chmod +x ./build_linux.sh
-./build_linux.sh
-```
-
-### 2. Configuration
-
-Copy the example configuration and customize for your environment:
-
-#### Windows
-```powershell
-# Copy example configuration
-copy configs\config.toml.example configs\config.toml
-
-# Edit configuration file
-notepad configs\config.toml
-```
-
-#### Mac/Linux
-```bash
-# Copy example configuration
+git clone https://github.com/<you>/co-atc-local.git
+cd co-atc-local
 cp configs/config.toml.example configs/config.toml
-
-# Edit configuration file
-nano configs/config.toml
+go build -o bin/co-atc ./cmd/server
 ```
 
-#### Essential Configuration Settings
+Start the transcription sidecar in its own terminal:
 
-**Mandatory:**
-- `[adsb].source_type` - Choose one source mode:
-   - `tar1090` - base URL serving `aircraft.json`, `receiver.json`, `stats.json`
-   - `readsb-api` - readsb HTTP API endpoint (e.g. `http://host:30152/?all`)
-   - `readsb-file` - local readsb runtime files (auto-detected, optional `readsb_data_dir` override)
-   - `external-rapidapi` - external ADS-B API using `external_source_url` + API host/key
-   - `external-opensky` - OpenSky `/states/all` with optional OAuth2 client-credentials
-
-- For `external-opensky` + OAuth2:
-   - Set `opensky_auth_mode = "oauth2"`
-   - Set `opensky_oauth2_credentials_path` to a JSON file shaped as `{"clientId":"...","clientSecret":"..."}`
-
-**Optional but Recommended:**
-- `[station]` - Configure your airport/station location (Toronto CYYZ example provided)
-- `[[frequencies.sources]]` - Add your local radio frequencies for transcription (Toronto examples provided)
-- `transcription.openai_api_key` - Enable AI transcription features (features disabled if not provided)
-- `atc_chat.openai_api_key` - Enable AI voice assistant (features disabled if not provided)
-
-The configuration file contains comprehensive documentation for all settings with examples for Toronto Pearson (CYYZ). You can use these as templates for your own location and frequencies.
-
-**Note**: If OpenAI API keys are not provided, the application will start successfully but AI-powered features (transcription, post-processing, and voice assistant) will be disabled. Warning messages will be displayed during startup to indicate which features are unavailable.
-
-### 3. Run the Application
-
-```powershell
-# Run the built executable
-.\bin\co-atc.exe
+```bash
+cd sidecar && pip install -r requirements.txt && python whisper_server.py --preload
 ```
 
-The application will:
-- Start the web server (default: http://localhost:8080)
-- Begin processing ADS-B data
-- Initialize audio streaming and transcription services
-- Create daily SQLite database files automatically
+Create an account. The command does not write anything: it reads a password
+without echoing it and prints a `[[auth.users]]` block for you to paste into
+`configs/config.toml`.
 
-### 4. Access the Interface
+```bash
+./bin/co-atc -add-user alice
+./bin/co-atc -config configs/config.toml
+```
 
-Open your web browser and navigate to `http://localhost:8080` to access the Co-ATC interface.
+Then open `http://localhost:8000`.
 
-## Key Features
+> **The shipped example still defaults to `backend = "openai"`** for both
+> transcription and post-processing, so that a checkout behaves like upstream. To get
+> what this fork is for, set `backend = "local"` in both
+> `[transcription]` and `[transcription.post_processing]`.
 
-### Interactive Map (OpenLayers)
-- OpenLayers map engine with real-time aircraft rendering
-- Modular map architecture under `www/map/` (core, renderers, features, telemetry)
-- Aircraft, trails, labels, selection/hover, proximity, and mini-map
-- Basemap/chart styles: dark, light, OpenStreetMap, VFR sectional, terminal, IFR low, IFR high
-- Supported overlays/layers: airports, runways, navaids, distance rings, weather radar/cloud, airspace overlays, and aviation chart overlay
-- In-map controls for layer toggles/opacities and aircraft display behavior
-- Overlay failure isolation and stable behavior under high aircraft load
+## Also in here
 
-### Aircraft Monitoring & ADS-B Sources
-- Real-time aircraft telemetry with historical, hindcast, and future trajectories
-- Flight phase tracking with trajectory-aware transitions and signal-loss handling
-- Active runway detection from live approach/landing/departure evidence
-- Data enrichment from local asset datasets (`assets/aircraft.csv`, `assets/airlines.dat`, `assets/airports.csv`, `assets/runways.csv`, `assets/navaids.csv`)
-- Multiple source modes: `tar1090`, `readsb-api`, `readsb-file`, `external-rapidapi`, `external-opensky`
+- **`cmd/phraseology`** — the measurement tool. It replays a capture or a database
+  through the exact production rules and reports matches against shuffled controls.
+  Most of the numbers in this README came out of it.
+- **`assets/spoken-operators.csv`** — radio operator names **as this station hears
+  them**, including the mangled ones (`mazda` → Malta Air), with the evidence count
+  behind each line. Not an aeronautical reference; a record of observations.
+- **`tools/annotate`** — a small annotation UI for building ground truth.
 
-### AI + Audio Workflow
-- Multi-frequency ATC stream ingestion and low-latency browser audio delivery
-- Real-time transcription + optional AI post-processing and clearance extraction
-- Voice ATC assistant with live airspace/context updates
-- Transcription history and operational data exposed through REST + WebSocket
+## The working notes
 
-### Simulation & Operations
-- Simulated aircraft with real-time control (heading/speed/vertical rate)
-- Integration of simulation traffic into the same monitoring and alert pipelines
-- Settings panel includes ADS-B source health and concise decoder metrics
+`docs-fr/` is the project's memory, in French, and it is the honest part: it records
+what was measured, what was eliminated, and **what was concluded wrongly and
+withdrawn**. `docs-fr/05-decisions.md` in particular carries decisions on one side
+and open questions on the other, and is kept current as a rule rather than a habit.
 
-## API Documentation
+`docs/` belongs to upstream and is left as it is.
 
-Co-ATC provides a comprehensive RESTful API for accessing aircraft data, frequency information, and transcriptions. For detailed API documentation, including endpoints, request parameters, and response formats, see the [API Specification](docs/api_spec.md).
+## Credits and licence
 
-## Technical Documentation
+This is a fork of **[yegors/co-atc](https://github.com/yegors/co-atc)** by Yegor S,
+MIT licensed, and it stays MIT. Upstream's `LICENSE` and copyright notice are
+preserved unchanged; upstream's git history is preserved and reachable through the
+`upstream` remote.
 
-For detailed technical information about the system architecture, implementation details, and internal workings, see the [Technical Documentation](docs/technical_docs.md).
+The map, the ADS-B pipeline, the flight-phase detection and the entire web interface
+are upstream's work.
 
-## Configuration Notes
-
-- **Database**: SQLite databases are created daily as `co-atc-YYYY-MM-DD.db`
-- **Static Files**: Web interface files served from configurable directory (default: `www`)
-- **Audio Latency**: Optimized for low-latency streaming with configurable buffer sizes
-- **Performance**: Supports high-frequency data updates with intelligent filtering and caching
+Several pieces here are meant to be useful back to upstream and are kept separable
+for that: the transcription sidecar (which implements upstream's own documented
+contract), the database rotation fix, the authentication package, and the operational
+state endpoint.

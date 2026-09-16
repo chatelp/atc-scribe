@@ -47,3 +47,38 @@ config.toml
 __pycache__/
 *.py[cod]
 .venv/
+
+# --- co-atc-local fork ---------------------------------------------------
+# Credentials and certificates. The server can be given a TLS certificate
+# (see [server] tls_cert / tls_key); nothing of the sort belongs here.
+*.pem
+*.key
+*.crt
+*.p12
+.env
+.env.*
+
+# Written by the running server next to its config file: log level,
+# retention, and anything else changed from the settings panel.
+/configs/runtime-settings.json
+
+# Build outputs of the extra commands this fork adds.
+/co-atc
+/phraseology
+/cmd/phraseology/phraseology
+
+# Databases. D13: the daily SQLite files are the only local trace of the
+# radio/ADS-B cross-reference and they never go in git.
+*.sqlite
+*.sqlite-*
+*.db
+
+# Captured audio and measurement runs. The 120-transmission evaluation set is
+# deliberately kept out of the repository -- see Q16 in docs-fr/05-decisions.md.
+/whisper-lab/
+/corpus/
+*.mp3.json
+
+# Personal editor and agent settings.
+.claude/settings.local.json
+/.trash/

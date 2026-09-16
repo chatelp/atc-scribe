@@ -546,6 +546,9 @@ contient la station **sur les deux interfaces**.
 ? (192.168.1.10) at <mac de la station> on en1 ifscope [ethernet]
 ```
 
+*(La même adresse matérielle sur les deux lignes — c'est le fait ; l'adresse
+elle-même est retirée du dépôt public, elle n'apporte rien à la lecture.)*
+
 Un paquet peut partir par une interface et revenir par l'autre. Ça n'est pas la cause
 de Q21 — le forçage de source l'a écarté — mais c'est une source d'intermittence
 gratuite. **À voir avec le propriétaire** : couper le Wi-Fi quand la station est
