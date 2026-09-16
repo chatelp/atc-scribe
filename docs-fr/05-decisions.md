@@ -504,16 +504,26 @@ recompilé est une identité neuve, et le refus remonte précisément en `EHOSTU
 l'entrée n'y est pas, lancer `./bin/co-atc -config configs/config.toml` depuis votre
 propre Terminal fait apparaître la demande.
 
-Pour que l'autorisation ne soit pas à refaire à chaque compilation, le binaire est
-maintenant signé avec une identité stable :
-
-```bash
-codesign --force --sign - --identifier com.co-atc.server bin/co-atc
-```
-
-Sans cette signature, chaque `go build` produit une identité différente et
-l'autorisation est perdue — ce qui explique pourquoi co-atc fonctionnait hier et
-plus aujourd'hui, sans qu'une ligne du réseau ait changé.
+> **Correction du 16/09, 15 h 55.** J'avais écrit ici que signer le binaire avec une
+> identité stable ferait survivre l'autorisation aux recompilations :
+>
+> ```bash
+> codesign --force --sign - --identifier com.co-atc.server bin/co-atc
+> ```
+>
+> **C'est faux, et mesuré comme tel.** Après une recompilation suivie de cette
+> signature, le test apparié redonne exactement le même verdict : `curl` 3 fois sur 3,
+> Go 0 fois sur 3, station répondant au ping. La raison est que la signature ad-hoc
+> (`-`) ne porte **aucune identité d'équipe** : macOS retombe alors sur l'empreinte du
+> binaire, que chaque `go build` modifie. L'identifiant stable ne sert à rien tant que
+> la signature n'est pas rattachée à un certificat de développeur.
+>
+> **Conséquence pratique, à connaître** : *chaque recompilation de `bin/co-atc` exige
+> de réautoriser le binaire* dans *Réglages Système → Confidentialité et sécurité →
+> Réseau local*. C'est une friction réelle du développement sur ce Mac, pas un
+> incident. Les pistes non explorées : signer avec un vrai certificat de développeur,
+> ou lancer co-atc depuis un terminal déjà autorisé si l'autorisation s'hérite du
+> processus parent — non vérifié.
 
 ### Q22 — Le Mac est sur le même sous-réseau deux fois *(nouvelle, 16/09)*
 

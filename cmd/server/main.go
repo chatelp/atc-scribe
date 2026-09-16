@@ -136,6 +136,9 @@ func main() {
 
 	log.Info("Using daily database", logger.String("path", dbPath))
 
+	// Values that can be changed while the server runs, from the settings panel.
+	runtimeSettings := config.NewRuntime(cfg, *configPath, log)
+
 	// Create SQLite storage with no retention settings
 	sqliteStorage, err := sqlite.NewAircraftStorage(
 		dbPath,
@@ -208,7 +211,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go runDatabaseRetentionCleanup(ctx, dbDir, dbPath, cfg.Storage.DBRetentionDays, log)
+	go runDatabaseRetentionCleanup(ctx, dbDir, dbPath, runtimeSettings, log)
 
 	if err := adsbService.Start(ctx); err != nil {
 		log.Error("Failed to start ADS-B service", logger.Error(err))
@@ -292,6 +295,7 @@ func main() {
 
 	// Create API router
 	router := api.NewRouter(adsbService, frequenciesService, weatherService, atcChatService, simulationService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
+	router.Handler().AttachRuntime(runtimeSettings, dbPath)
 
 	// --- Setup for multiple HTTP servers ---
 	var servers []*http.Server
@@ -387,7 +391,7 @@ func main() {
 	log.Info("Server fully stopped")
 }
 
-func runDatabaseRetentionCleanup(ctx context.Context, dbDir, activeDBPath string, keepDays int, log *logger.Logger) {
+func runDatabaseRetentionCleanup(ctx context.Context, dbDir, activeDBPath string, rt *config.Runtime, log *logger.Logger) {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
@@ -402,6 +406,10 @@ func runDatabaseRetentionCleanup(ctx context.Context, dbDir, activeDBPath string
 					logger.String("path", dbDir))
 			}
 
+			// Read on every tick, not captured once: a retention changed from the
+			// settings panel takes effect on the next pass rather than at the next
+			// restart.
+			keepDays := rt.DBRetentionDays()
 			if err := cleanupOldDailyDatabases(dbDir, activeDBPath, keepDays, time.Now().UTC(), log); err != nil {
 				log.Warn("Periodic database retention cleanup failed",
 					logger.Error(err),
