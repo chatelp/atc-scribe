@@ -504,26 +504,32 @@ recompilé est une identité neuve, et le refus remonte précisément en `EHOSTU
 l'entrée n'y est pas, lancer `./bin/co-atc -config configs/config.toml` depuis votre
 propre Terminal fait apparaître la demande.
 
-> **Correction du 16/09, 15 h 55.** J'avais écrit ici que signer le binaire avec une
-> identité stable ferait survivre l'autorisation aux recompilations :
+> **Deux corrections successives, 16/09 — et la seconde annule la première.**
 >
-> ```bash
-> codesign --force --sign - --identifier com.co-atc.server bin/co-atc
-> ```
+> À 15 h 55 j'ai écrit ici que la signature ad-hoc ne préservait pas l'autorisation,
+> « mesuré » par un test apparié `curl` contre Go. **Ce test ne pouvait rien mesurer.**
+> Il passait par `go run` et `go build -o /tmp/probe`, qui produisent un binaire neuf
+> à chaque appel : une identité neuve est refusée par construction, quelle que soit
+> l'autorisation accordée à `bin/co-atc`. J'ai confondu « un binaire Go est refusé »
+> avec « ce binaire-ci est refusé ».
 >
-> **C'est faux, et mesuré comme tel.** Après une recompilation suivie de cette
-> signature, le test apparié redonne exactement le même verdict : `curl` 3 fois sur 3,
-> Go 0 fois sur 3, station répondant au ping. La raison est que la signature ad-hoc
-> (`-`) ne porte **aucune identité d'équipe** : macOS retombe alors sur l'empreinte du
-> binaire, que chaque `go build` modifie. L'identifiant stable ne sert à rien tant que
-> la signature n'est pas rattachée à un certificat de développeur.
+> **Testé correctement à 16 h 00, sur `bin/co-atc` lui-même, trois lancements
+> successifs : `ADS-B source validation succeeded` trois fois sur trois**, avec `curl`
+> à 200 aux mêmes instants. Le binaire recompilé et signé fonctionne. La panne de
+> 15 h 52 était un incident passager — cohérent avec les dix chutes du lien Ethernet
+> relevées par l'agent de la station en une nuit (`20-captation-nuit.md`).
 >
-> **Conséquence pratique, à connaître** : *chaque recompilation de `bin/co-atc` exige
-> de réautoriser le binaire* dans *Réglages Système → Confidentialité et sécurité →
-> Réseau local*. C'est une friction réelle du développement sur ce Mac, pas un
-> incident. Les pistes non explorées : signer avec un vrai certificat de développeur,
-> ou lancer co-atc depuis un terminal déjà autorisé si l'autorisation s'hérite du
-> processus parent — non vérifié.
+> **Ce qui reste établi** : la permission « Réseau local » de macOS existe, elle est
+> accordée par exécutable, et un binaire fraîchement compilé y est soumis.
+>
+> **Ce qui n'est PAS établi, contrairement à ce que ce document a affirmé deux fois** :
+> que `bin/co-atc` perde son autorisation à chaque recompilation. Aucun test propre ne
+> l'a montré, et le seul test propre disponible montre l'inverse.
+>
+> **La leçon, et elle est coûteuse** : sur cette machine, une panne réseau passagère et
+> un refus de permission produisent *le même message d'erreur*. Un échec unique ne
+> distingue pas les deux. **Relancer trois fois avant de diagnostiquer** coûte trente
+> secondes ; j'ai écrit deux conclusions fausses pour les avoir économisées.
 
 ### Q22 — Le Mac est sur le même sous-réseau deux fois *(nouvelle, 16/09)*
 
