@@ -481,3 +481,59 @@ d'annotations : un collationnement suit son instruction, donc les étiquettes do
 alterner sur deux transmissions proches partageant un nombre. Résultat **61 % et
 59 % contre 50 % au hasard — sur 35 paires seulement, ce n'est pas concluant.**
 Le contrôle est rejouable ; il demande un corpus plus long.
+
+### Q21 — macOS refuse le réseau local aux binaires fraîchement compilés *(nouvelle, 16/09)*
+
+co-atc ne démarre plus : `connect: no route to host` sur la station, alors que
+`curl` sur la même URL répond 200 **au même instant, cinq fois sur cinq**.
+
+Trois tests qui *opposent* les hypothèses, et non un seul qui confirme la première :
+
+| test | résultat | ce qu'il élimine |
+|---|---|---|
+| Go vers `1.1.1.1` contre Go vers `192.168.1.x` | public OK, local en échec | ce n'est pas une panne réseau générale |
+| `curl` et Go lancés au même instant, 5 fois | curl 5/5, Go 0/5 | ce n'est pas la station, ni le moment |
+| Go forcé sur `en0` puis sur `en1` | les deux en échec | ce n'est pas le choix d'interface |
+
+Reste une seule explication : **la permission « Réseau local » de macOS, accordée par
+exécutable.** `curl` et `ssh` sont des binaires système déjà autorisés ; un binaire Go
+recompilé est une identité neuve, et le refus remonte précisément en `EHOSTUNREACH`.
+
+**Ce qu'il faut faire, et que je ne peux pas faire à votre place** : autoriser
+`bin/co-atc` dans *Réglages Système → Confidentialité et sécurité → Réseau local*. Si
+l'entrée n'y est pas, lancer `./bin/co-atc -config configs/config.toml` depuis votre
+propre Terminal fait apparaître la demande.
+
+Pour que l'autorisation ne soit pas à refaire à chaque compilation, le binaire est
+maintenant signé avec une identité stable :
+
+```bash
+codesign --force --sign - --identifier com.co-atc.server bin/co-atc
+```
+
+Sans cette signature, chaque `go build` produit une identité différente et
+l'autorisation est perdue — ce qui explique pourquoi co-atc fonctionnait hier et
+plus aujourd'hui, sans qu'une ligne du réseau ait changé.
+
+### Q22 — Le Mac est sur le même sous-réseau deux fois *(nouvelle, 16/09)*
+
+Relevé au passage, sans lien avec Q21 mais à corriger : le Mac porte **deux adresses
+sur 192.168.1.0/24**, `en0` Ethernet en `.28` et `en1` Wi-Fi en `.48`, et le cache ARP
+contient la station **sur les deux interfaces**.
+
+```
+? (192.168.1.10) at <mac de la station> on en0 ifscope [ethernet]
+? (192.168.1.10) at <mac de la station> on en1 ifscope [ethernet]
+```
+
+Un paquet peut partir par une interface et revenir par l'autre. Ça n'est pas la cause
+de Q21 — le forçage de source l'a écarté — mais c'est une source d'intermittence
+gratuite. **À voir avec le propriétaire** : couper le Wi-Fi quand la station est
+utilisée par câble.
+
+> **Piège de diagnostic, noté pour la prochaine fois.** J'ai conclu deux fois trop vite
+> sur cette panne : au bac à sable de la session, puis au double adressage — les deux
+> plausibles, les deux fausses. Pire, une coupure réelle de la station est survenue
+> pendant le diagnostic et a fait échouer `curl` aussi, ce qui m'a fait *abandonner la
+> bonne hypothèse* au moment où je la tenais. Une hypothèse qui explique l'observation
+> ne vaut rien tant qu'un test ne l'a pas opposée aux autres.
