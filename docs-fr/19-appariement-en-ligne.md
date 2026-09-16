@@ -421,7 +421,24 @@ Deux détails qui valent d'être notés :
   de l'Ouest. La nuit avait placé cet amas dans l'espace supérieur par les niveaux
   entendus, FL160 à FL390 ; le jour le confirme en le nommant.
 
-> **Réserve sur le volume.** Les 175 transmissions de l'amas sont sous-estimées : co-atc
-> a été redémarré quatre fois pendant cette fenêtre, pour brancher le panneau Radio et
-> le contexte. Les *taux* sont bons, le *compte* ne l'est pas. À refaire sans
-> interruption avant d'en tirer une conclusion sur le débit.
+> **Réserve sur le volume, levée par une fenêtre propre.** Les 175 transmissions de la
+> fenêtre 10:48 étaient sous-estimées : co-atc a été redémarré quatre fois pendant
+> qu'on branchait le panneau Radio et le contexte. Refait de **12:34 à 13:25, un seul
+> démarrage, zéro erreur** :
+>
+> | | amas, 10:48 (interrompue) | **amas, 12:34 (propre)** |
+> |---|---|---|
+> | transmissions couvertes | 175 | **214** — 4,2 par minute |
+> | avec un indicatif candidat | 127 — 73 % | 152 — 71 % |
+> | appariés | 44 | 36 — **0 ambigu** |
+> | hasard, 8 témoins | 3,5 | 5,1 |
+> | appariements vrais | 40,5 | **30,9** |
+> | au-dessus du hasard | 93 % | **90 %** |
+> | avions dans la fenêtre | 95 | 100 |
+>
+> Le débit était bien sous-estimé, mais les appariements vrais **baissent** : ce n'était
+> pas seulement l'interruption, c'était aussi l'heure. L'écart entre deux fenêtres du
+> même groupe (40,5 contre 30,9) est du même ordre que l'écart entre groupes. Une
+> fenêtre de 51 minutes classe les groupes grossièrement, pas finement. Ce qui tient :
+> les tours rapportent moitié moins ; gros-porteurs et amas se valent en volume ; l'amas
+> reste nettement plus précis, 90–93 % contre 80 %.
