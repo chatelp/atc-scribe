@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
@@ -165,12 +166,28 @@ func (h *Handler) GetTranscriptionsByCallsign(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Attach what the grammar recovered from each of them -- levels, headings,
+	// runways, squawks. One query for the page, not one per transcription.
+	values := map[int64][]sqlite.PhraseologyValue{}
+	if h.valueStorage != nil && len(transcriptions) > 0 {
+		ids := make([]int64, 0, len(transcriptions))
+		for _, t := range transcriptions {
+			ids = append(ids, t.ID)
+		}
+		var err error
+		if values, err = h.valueStorage.ValuesByTranscription(ids); err != nil {
+			h.logger.Error("Failed to read phraseology values", logger.Error(err))
+			values = map[int64][]sqlite.PhraseologyValue{}
+		}
+	}
+
 	// Create response
 	response := map[string]interface{}{
 		"timestamp":      time.Now(),
 		"callsign":       callsign,
 		"count":          len(transcriptions),
 		"transcriptions": transcriptions,
+		"values":         values,
 	}
 
 	// Write response
