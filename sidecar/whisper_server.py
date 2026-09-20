@@ -24,6 +24,7 @@ Run:
 from __future__ import annotations
 
 import io
+import json
 import logging
 import sys
 import os
@@ -47,7 +48,9 @@ app = FastAPI(title="atc-scribe STT sidecar")
 
 _models: dict[str, object] = {}
 _vad = None
-_counters = {"second_opinion_ok": 0, "second_opinion_failed": 0}
+_counters = {"second_opinion_ok": 0, "second_opinion_failed": 0,
+             "transcribed": 0, "rejected_no_speech": 0, "audio_save_failed": 0,
+             "archiving_stopped": 0}
 
 
 # --------------------------------------------------------------------------- audio
@@ -124,6 +127,79 @@ def model_status(model: str) -> dict:
     return {"id": model, "kind": "hub", "available": True, "detail": "not verified"}
 
 
+_disk = {"checked": 0.0, "ok": True}
+
+
+def _disk_has_room() -> bool:
+    """Free space, rechecked at most once a minute.
+
+    The archive is the expendable half: transcription and the database must
+    survive a full disk, so archiving is what stops. It says so once rather than
+    on every transmission -- a log line per clip would itself be a problem.
+    """
+    now = time.time()
+    if now - _disk["checked"] < 60:
+        return _disk["ok"]
+    _disk["checked"] = now
+    try:
+        # The archive directory does not exist until the first clip is written,
+        # and statvfs on a missing path raises. Walking up to an existing parent
+        # is the difference between a guard and a guard that fails open -- which
+        # is what this did on its first test.
+        probe = os.path.abspath(cfg.save_audio or "/")
+        while probe != "/" and not os.path.isdir(probe):
+            probe = os.path.dirname(probe)
+        st = os.statvfs(probe)
+        free_gb = st.f_bavail * st.f_frsize / 1073741824
+    except Exception as e:
+        if _disk["ok"]:
+            log.warning("cannot read free space, archiving continues: %s", e)
+        return _disk["ok"]
+    ok = free_gb >= cfg.save_audio_min_free_gb
+    if ok != _disk["ok"]:
+        if ok:
+            log.info("audio archiving resumed, %.1f GB free", free_gb)
+        else:
+            log.warning("audio archiving STOPPED: %.1f GB free, floor is %.1f -- "
+                        "transcription continues", free_gb, cfg.save_audio_min_free_gb)
+        _counters["archiving_stopped"] = 0 if ok else 1
+    _disk["ok"] = ok
+    return ok
+
+
+def keep_audio(raw: bytes, rate: int, channels: int, record: dict) -> str:
+    """Write one transmission's audio and append its manifest line.
+
+    The audio is written exactly as it arrived, before resampling: a transcript
+    can always be recomputed from the audio, never the reverse, so the archive
+    has to hold the thing that cannot be rebuilt.
+    """
+    if not cfg.save_audio:
+        return ""
+    if not _disk_has_room():
+        return ""
+    day = time.strftime("%Y%m%d")
+    folder = os.path.join(cfg.save_audio, day, record.get("frequency_id") or "unknown")
+    os.makedirs(folder, exist_ok=True)
+    name = time.strftime("t_%Y%m%d_%H%M%S") + f"_{int(time.time()*1000) % 1000:03d}.wav"
+    path = os.path.join(folder, name)
+    try:
+        with wave.open(path, "wb") as w:
+            w.setnchannels(channels)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            w.writeframes(raw)
+        record["fichier"] = os.path.relpath(path, cfg.save_audio)
+        with open(os.path.join(cfg.save_audio, "manifeste.jsonl"), "a") as m:
+            m.write(json.dumps(record, ensure_ascii=False) + "\n")
+        return path
+    except Exception as e:
+        # Losing the archive must never lose the transmission.
+        _counters["audio_save_failed"] += 1
+        log.warning("could not keep audio: %s", e)
+        return ""
+
+
 def load(path: str):
     if path not in _models:
         t0 = time.time()
@@ -151,6 +227,14 @@ def health():
         "second_opinion": cfg.second_opinion,
         "second_opinion_ok": _counters["second_opinion_ok"],
         "second_opinion_failed": _counters["second_opinion_failed"],
+        # Q27 asked for this and nothing answered it: the voice gate's rejection
+        # rate in production was logged only at Debug, so "is the night-time
+        # parasite absent in daylight?" had no instrument.
+        "transcribed": _counters["transcribed"],
+        "rejected_no_speech": _counters["rejected_no_speech"],
+        "archiving": bool(cfg.save_audio) and _disk["ok"],
+        "archiving_stopped_low_disk": bool(_counters["archiving_stopped"]),
+        "audio_save_failed": _counters["audio_save_failed"],
         # kept for callers written against the earlier shape
         "model_en": cfg.model_en,
         "model_fr": cfg.model_fr or None,
@@ -210,6 +294,15 @@ async def transcribe(
     if cfg.vad_enabled:
         speech = measure_speech(audio)
         if speech.seconds < cfg.min_speech_seconds:
+            _counters["rejected_no_speech"] += 1
+            keep_audio(raw, x_sample_rate, x_channels, {
+                "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "frequency_id": x_frequency_id,
+                "duree": round(duration, 3),
+                "speech_seconds": round(speech.seconds, 3),
+                "rejected": "no_speech",
+                "texte": "",
+            })
             return {
                 "text": "", "segments": [], "language": None,
                 "duration": round(duration, 3),
@@ -273,6 +366,19 @@ async def transcribe(
             _counters["second_opinion_failed"] += 1
             log.warning("second opinion failed (%d so far): %s",
                         _counters["second_opinion_failed"], e)
+
+    _counters["transcribed"] += 1
+    keep_audio(raw, x_sample_rate, x_channels, {
+        "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "frequency_id": x_frequency_id,
+        "duree": round(duration, 3),
+        "speech_seconds": round(speech.seconds, 3),
+        "langue": language,
+        "modele": model,
+        "texte": text,
+        "texte_second": (second or {}).get("text", ""),
+        "modele_second": (second or {}).get("model", ""),
+    })
 
     elapsed = time.time() - started
     log.info("%s %.1fs speech=%.1fs %s %.2fs %r",
