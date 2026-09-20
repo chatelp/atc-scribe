@@ -1158,3 +1158,22 @@ c'est une dégradation silencieuse, et c'est le genre de chose que ce dossier n'
 >    que rien ne relit. La retirer diviserait la croissance par deux ; c'est du code
 >    borné et le prolongement naturel de D22. **Non fait, non demandé.**
 
+**La panne est rendue visible *(20/09, à la demande du propriétaire)*.** Puisque la
+chaîne dépend d'un disque amovible, le silence devenait le vrai risque : débranché, la
+transcription continue, le serveur tourne, et le seul symptôme est *moins d'avions
+identifiés sans cause énoncée*.
+
+- `/health` du sidecar déclare chaque modèle configuré, si un chemin local résout encore,
+  et les compteurs de secondes lectures réussies et échouées.
+- co-atc le lit au démarrage et **avertit modèle par modèle** — sans refuser de démarrer :
+  la transcription marche, c'est une capacité qui manque, pas le service.
+- `GET /api/v1/server` porte un bloc `transcription` pour qui regarde plus tard.
+
+Deux choix de conception qui méritent d'être dits : une sonde qui expire **n'invente pas
+une panne** — la dernière lecture tient, marquée `stale` ; et le plafond est à **deux
+secondes**, parce que le sidecar décode pendant des secondes entières et qu'un point de
+mesure opérationnel ne doit pas bloquer derrière lui.
+
+Vérifié dans les deux sens le 20/09 : chemin absent → avertissement au démarrage et
+`status: degraded` avec le motif ; chemin présent → `status: ok` et le second avis annoncé.
+
