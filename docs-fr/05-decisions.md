@@ -1217,3 +1217,66 @@ tableau ci-dessus et dans `14-mesure-modeles-francais.md`.
 ce que ces 3,5 Go rendraient possible pour un coût net de 2,2 Go. La dépendance au disque
 amovible subsiste — elle est au moins visible depuis D24.
 
+### Q30 — 8 % de vrais appariements : où part le reste ? *(nouvelle, 20/09)*
+
+Question du propriétaire après avoir vu le filtre « entendu à la radio » monter lentement :
+**après tout ce travail, on est à 8 %.** Le chiffre est juste et mérite d'être regardé en face.
+
+**L'entonnoir, capture du 15/09, règle de production, 40 témoins :**
+
+| | | |
+|---|---|---|
+| transmissions transcrites | 1 332 | 100 % |
+| portant un indicatif plausible | 888 | **67 %** |
+| appariées à un avion visible | 139 | **10 %** |
+| vraies, hasard déduit | 100 | **8 %** |
+
+**84 % des candidats ne trouvent aucun avion.** Tout est là.
+
+**Ce qui n'est PAS en cause**, mesuré et non supposé :
+
+| variante | appariés | vrais | précision |
+|---|---|---|---|
+| **production** — 3 chiffres, ambigus refusés | 139 | **99,8** | **72 %** |
+| ambigus acceptés | 139 | 98,8 | 72 % |
+| fenêtre 120 s | 143 | 98,1 | 69 % |
+| fenêtre 300 s | 152 | 96,0 | 63 % |
+
+Élargir la fenêtre **fait perdre** : plus d'appariements, plus de hasard, moins de vrais.
+Le refus des ambigus est gratuit. Les réglages de D14 tiennent.
+
+**Ce qui est en cause**, d'après un échantillon au hasard des 1 193 non appariées —
+trois familles, et une seule est un échec de notre chaîne :
+
+1. **Rien à apparier.** *« okay »*, *« two eight zero »*, *« definite refer »* — un
+   collationnement partiel, un accusé de réception. Les compter comme des échecs fausse
+   le dénominateur.
+2. **La transcription est fausse sur les chiffres.** *« Franske Trone Tango Zulu »*,
+   *« Rotter Air Two Cent One Two »*, *« trait mole base five three four »*. Aucune règle
+   d'appariement ne rattrape ça : c'est le modèle acoustique.
+3. **Le seuil de trois chiffres** écarte le reste.
+
+**Un angle mort du doc 19, trouvé le 20/09 :** le balayage n'a testé que **3 et
+4 chiffres**, jamais 2. Mesuré maintenant :
+
+| seuil | appariés | vrais | précision |
+|---|---|---|---|
+| 3 chiffres *(production)* | 139 | 99,8 | **72 %** |
+| **2 chiffres** | **246** | **128,2** | **52 %** |
+
+**+28 % de vrais, et vingt points de précision perdus** — près d'un indicatif affiché sur
+deux serait faux. C'est le contraire de ce que ce dossier défend depuis le début : un
+manque se voit, une erreur plausible non. **Non retenu, mais désormais mesuré.**
+
+**Les trois voies, par ordre de ce que la mesure suggère :**
+
+1. **Un meilleur modèle acoustique sur les chiffres.** Seule voie qui attaque la cause.
+   C'est la stratégie C de Q1 — un affinage maison sur de la phraséologie — jamais tentée.
+   Et ça recoupe D24 : le second avis français gagne +8,5 % non pas en corrigeant la
+   règle, mais en corrigeant **les chiffres** (*« Zero Seven Two »* contre *« 062 »*).
+2. **Un dénominateur honnête.** On ne sait pas combien de transmissions *contiennent
+   réellement* un indicatif. Si c'est 40 %, alors 10 % d'appariés vaut 25 % du possible,
+   pas 10 %. **C'est le seul usage qui justifie vraiment les 120 annotations** — et il
+   les justifie complètement.
+3. **Pas le seuil à deux chiffres**, sauf changement de doctrine assumé.
+
