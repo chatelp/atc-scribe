@@ -157,7 +157,7 @@ passent par le SIA. À arbitrer selon les conditions d'utilisation.
 Voir D6 (la licence amont est MIT, le fork est publiable) et D7 (le fork est publié
 sous MIT). Plus rien d'ouvert ici.
 
-### Q9 — Transcrire les ATIS : **oui, mais pour une seule fréquence**
+### Q9 — Transcrire les ATIS : **oui, mais pour une seule fréquence** *(prémisse remise en cause le 20/09, voir Q32)*
 
 La question posée était : à quoi bon, si le METAR est gratuit en ligne ? Vérifié le
 15 septembre auprès d'Aviation Weather Center, requête sur les terrains de la zone :
@@ -1316,4 +1316,51 @@ avion**, et on l'écrit sur toutes. À 82 lignes/s, c'est du redondant, pas du m
 ne garder `raw_data` que sur la dernière ligne demande du code et un choix de schéma
 (table séparée, ou effacement périodique des lignes anciennes). **À décider avant toute
 marche continue de plus de quatre jours.**
+
+### Q32 — L'ATIS sature-t-il vraiment, ou est-ce le pic DC du tuner ? *(nouvelle, 20/09)*
+
+**Trouvé par l'agent de la station, pas par nous, et ça aurait invalidé la mesure.**
+
+Q9 tient depuis le 15/09 que l'ATIS de Saint-Cyr *« sature le récepteur »* — un souffle
+continu par-dessus la voix, à +49,4 dB. La demande envoyée le 20/09 en découlait : une
+échelle de gain pour trouver le réglage qui le rend intelligible.
+
+**L'agent a relevé ce que la demande ne disait pas : la fréquence centrale.** La station
+a une convention, écrite en commentaire dans `fixe136.tmpl` :
+
+```
+centerfreq = 135.800;   # decale de 475 kHz : le pic DC du tuner ne tombe pas sur le canal
+```
+
+Un gabarit centré **sur** 131,025 place le pic DC du tuner exactement sur la porteuse de
+l'ATIS — et *« un souffle continu par-dessus la voix »* est précisément ce que ça produit.
+
+**Ce que ça aurait coûté sans lui.** Quatre prises à quatre gains, toutes centrées sur la
+porteuse, toutes également mauvaises — et la conclusion « l'ATIS est irrécupérable, même
+à gain réduit ». Fausse, bien formée, indistinguable d'une vraie. C'est la faute que ce
+dossier a déjà payée en Q21 et Q22 : **une hypothèse qui explique l'observation ne vaut
+rien tant qu'un test ne l'a pas opposée aux autres**, et j'ai écrit une demande entière
+sans en opposer aucune.
+
+**Protocole retenu**, cinq prises de 4 min dont 3 analysées, avant 22 h pour éviter le
+parasite secteur :
+
+| prise | centre | gain | rôle |
+|---|---|---|---|
+| A | 130,550 (−475 kHz) | 40,2 dB | témoin propre |
+| B · C · D | 130,550 | 32,8 · 25,4 · 16,6 dB | l'échelle de gain |
+| **E** | **131,025 (sur la porteuse)** | 40,2 dB | **témoin de confondant** |
+
+Et un second amendement, également juste : **`salves.py` ne peut pas départager une
+porteuse permanente** — elle ne ferme jamais le squelch, il rapporterait une salve unique
+sur les cinq prises. Remplacé par `ffmpeg -af volumedetect` (RMS et crête, la crête
+montrant l'écrêtage) plus une transcription de chaque prise.
+
+**Conséquence déjà acquise, quel que soit le résultat** : le gain est un réglage **du
+tuner**, appliqué à toute la fenêtre de 2,56 MHz. Si l'ATIS n'est lisible qu'à gain
+réduit, il ne pourra pas cohabiter avec des canaux faibles — le livrable serait un **mode
+dédié `atis-131025`** déclenché à la demande, pas un canal ajouté à un groupe existant.
+
+> **Le garde de `salves.py` était déjà en place** depuis la nuit du 15 au 16 ; notre
+> demande le réclamait comme une tâche à faire. Document périmé, corrigé.
 
