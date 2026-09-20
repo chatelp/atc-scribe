@@ -1034,7 +1034,7 @@ n'apparaissent pas dans la recherche et leurs issues sont fermées par défaut �
 À retenir : un scan de secrets sur préfixe seul lève des faux positifs sur des données
 géographiques ; c'est la longueur qui discrimine.
 
-### Q29 — La porte française : mesurée, décision non prise *(20/09)*
+### Q29 — La porte française : mesurée *(20/09)* — **décidée et en service, voir D24**
 
 Q1 posait A (aiguillage par langue), B (un seul multilingue) ou C (affinage maison).
 **Le cadre était faux** : le français de cette station n'est pas sur des fréquences
@@ -1088,4 +1088,57 @@ inchangée à 72 %, coût ×1,15**. Elle capte 62 % du gain pour 10 % du surcoû
    résultat (elle est dans `q1-francais.py`), mais le *recours* aux marqueurs, lui, vient
    d'avoir regardé les données. Une validation sur un corpus tenu à l'écart serait plus
    propre.
+
+### D24 — Le second avis français est en service *(20/09)*
+
+Q29 mesurée, décision prise : **la porte est implémentée et activée**. Q1 est close par
+la même occasion, et pas dans le sens où elle était posée.
+
+**Ce que Q1 demandait mal.** A (aiguillage par langue), B (un seul multilingue) ou C
+(affinage maison) supposaient tous qu'on choisit *un* modèle. La mesure dit que les deux
+échouent sur des enregistrements différents — 8 accords sur 34 appariements — donc la
+bonne question était « un ou deux », et la réponse est deux, **mais pas tout le temps**.
+
+**Comment ça marche.** Le sidecar transcrit avec le modèle anglais, comme avant. Si le
+texte obtenu contient des mots français, il relit le même son avec le modèle français et
+renvoie les deux. La porte s'ouvre sur 12,5 % des transmissions.
+
+**Ce qui est stocké**, et pourquoi c'est important :
+
+| colonne | contenu |
+|---|---|
+| `content` | **toujours** la lecture principale — le corpus reste comparable de bout en bout |
+| `content_second` | la seconde lecture, quand la porte s'est ouverte |
+| `callsign` | l'indicatif retenu |
+| `callsign_source` | `en`, `fr`, ou **`en>fr`** quand les deux ont nommé des avions différents |
+
+Le choix de toujours stocker la lecture principale n'est pas cosmétique : stocker
+« celle qui a apparié » rendrait le corpus hétérogène — deux modèles selon la ligne — et
+toute remesure ultérieure impossible. Sur les douze appariements que la porte fait
+gagner, **un vient d'une boucle de dégénérescence** (*« 104, Alain, 8, 7, 11, 14, 15… »*
+apparié à KLM1920 sur « 19, 20 ») : c'est exactement le texte qu'on ne veut pas voir
+s'installer dans la base comme transcription.
+
+**La règle d'arbitrage : la lecture principale gagne.** Elle tourne sur tout, et c'est sa
+précision qui est mesurée — 72 % contre 65 %. Les deux n'ont jamais nommé d'avions
+différents à l'intérieur de la porte sur la capture du 15/09 (8 accords sur 8), mais
+**0 sur 8 ne borne rien** — la borne haute à 95 % est de 31 %. La règle existe donc, elle
+est testée, et le désaccord est enregistré pour être remesuré quand le corpus aura grossi.
+
+**Vérifié en service le 20/09** : porte fermée sur l'anglais (1,88 s pour 4,9 s d'audio),
+ouverte sur le français, et sur le cas exact de la mesure —
+
+```
+principal : "rehear les niveaux unité nine zero Air France Zero Seven Two"
+second    : "Enchire les niveaux, unité, 90, Air France, 062."
+ADS-B     : AFR062
+```
+
+Sur le trafic réel, 1 transmission sur 7 a ouvert la porte dans les premières minutes.
+
+**Ce qui reste fragile**, et qui n'est pas du code : le modèle français est un lien
+symbolique vers un disque USB externe (`/Volumes/Crucial X8/`, 5,7 Go). La chaîne en
+dépend désormais — un disque débranché fera échouer la seconde lecture. Le sidecar
+journalise l'échec et la lecture principale tient, donc ce n'est pas une panne ; mais
+c'est une dégradation silencieuse, et c'est le genre de chose que ce dossier n'aime pas.
 
