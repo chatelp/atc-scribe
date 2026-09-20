@@ -1142,3 +1142,19 @@ dépend désormais — un disque débranché fera échouer la seconde lecture. L
 journalise l'échec et la lecture principale tient, donc ce n'est pas une panne ; mais
 c'est une dégradation silencieuse, et c'est le genre de chose que ce dossier n'aime pas.
 
+> **Décision du propriétaire, 20/09 : le modèle reste sur le disque externe**, faute de
+> place sur l'interne. Relevé au même moment : 38 Gio libres sur 460, `data/` à 2,9 Go
+> et `whisper-lab/` à 4,9 Go.
+>
+> **Trois gisements de place, par ordre de rapport :**
+>
+> 1. **3,5 Go de modèles éliminés par la mesure** dorment sur le disque *interne* —
+>    `mlx-fr-distil` (2,1 Go, 11,0 vrais) et `mlx-fr-pierreguillou` (1,4 Go, 5,5 vrais).
+>    Leurs transcriptions sont conservées en JSON, donc Q29 reste rejouable sans eux.
+>    Les supprimer suffirait à rapatrier bofenghuang pour un coût net de 2,2 Go.
+> 2. **`data/co-atc-2026-09-16.db`, 1 847 Mo** : le fichier gonflé par le défaut corrigé
+>    en D22. La rétention à 7 jours l'efface le 23/09 sans rien faire.
+> 3. **`raw_data` pèse 54 % de chaque base** — une copie JSON de colonnes déjà analysées,
+>    que rien ne relit. La retirer diviserait la croissance par deux ; c'est du code
+>    borné et le prolongement naturel de D22. **Non fait, non demandé.**
+
