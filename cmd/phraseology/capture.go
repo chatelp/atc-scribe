@@ -44,7 +44,7 @@ func loadJSON[T any](path string) ([]T, error) {
 }
 
 // measureCapture cross-checks a capture against recovered ADS-B history.
-func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits, seeds, offsetHours int, verbose, strict bool, minScore float64, fuzzy bool, contextSec int) error {
+func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits, seeds, offsetHours int, verbose, strict bool, minScore float64, fuzzy bool, contextSec int, union bool) error {
 	txs, err := loadJSON[captureTx](txPath)
 	if err != nil {
 		return fmt.Errorf("transcripts: %w", err)
@@ -154,46 +154,109 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		return m, true
 	}
 
-	for i, tx := range txs {
-		if tx.Texte == "" {
-			continue
-		}
-		at, ok := toUTC(tx.Debut)
-		if !ok {
-			continue
-		}
-		key := tx.Passe + "|" + tx.Freq
-		b := get(real, key)
-		b.total++
+	// A unit is what gets one shot at the fleet. Normally that is one
+	// transmission of one pass. Under -union it is one recording, carrying every
+	// pass's attempt at it: the question stops being "which model is better" and
+	// becomes "does a second model reach transmissions the first one misses".
+	//
+	// Uniting only the real run would measure the rule, not the signal: two texts
+	// are two chances to hit a callsign by accident, so the controls are given
+	// exactly the same two chances, at the same wrong moment.
+	type unit struct {
+		key   string // bucket: pass|freq, or union|freq
+		freq  string
+		at    time.Time
+		texts []string
+	}
+	var units []unit
 
-		res := phraseology.Parse(tx.Texte)
-		has := false
-		for _, v := range res.Values {
-			if v.Role == phraseology.RoleCallsign {
-				has = true
+	if union {
+		// Group by recording. Order is kept so the context window, which looks
+		// backwards in time, still sees a sane sequence.
+		index := map[string]int{}
+		for _, tx := range txs {
+			if tx.Texte == "" {
+				continue
+			}
+			at, ok := toUTC(tx.Debut)
+			if !ok {
+				continue
+			}
+			id := tx.Freq + "|" + tx.Fichier
+			if i, seen := index[id]; seen {
+				units[i].texts = append(units[i].texts, tx.Texte)
+				continue
+			}
+			index[id] = len(units)
+			units = append(units, unit{key: "union|" + tx.Freq, freq: tx.Freq, at: at,
+				texts: []string{tx.Texte}})
+		}
+		sort.SliceStable(units, func(i, j int) bool { return units[i].at.Before(units[j].at) })
+	} else {
+		for _, tx := range txs {
+			if tx.Texte == "" {
+				continue
+			}
+			at, ok := toUTC(tx.Debut)
+			if !ok {
+				continue
+			}
+			units = append(units, unit{key: tx.Passe + "|" + tx.Freq, freq: tx.Freq, at: at,
+				texts: []string{tx.Texte}})
+		}
+	}
+
+	// tryAll returns the first accepted match among a unit's texts. First, not
+	// best: a rule that picked the highest score would need a way to arbitrate
+	// between models, which is a product decision and not a measurement.
+	tryAll := func(texts []string, fleet []phraseology.Aircraft, ctx []string) (phraseology.Match, string, bool, bool) {
+		candidate := false
+		for _, t := range texts {
+			res := phraseology.Parse(t)
+			here := false
+			for _, v := range res.Values {
+				if v.Role == phraseology.RoleCallsign {
+					here, candidate = true, true
+					break
+				}
+			}
+			if !here {
+				continue
+			}
+			if m, ok := accept(res, fleet, ctx); ok {
+				return m, t, true, true
 			}
 		}
-		if !has {
+		return phraseology.Match{}, "", candidate, false
+	}
+
+	for i, u := range units {
+		b := get(real, u.key)
+		b.total++
+
+		m, text, candidate, matched := tryAll(u.texts, fleetAt(u.at), recent("real|"+u.key, u.at))
+		if !candidate {
 			continue
 		}
 		b.candidates++
 
-		if m, ok := accept(res, fleetAt(at), recent("real|"+key, at)); ok {
-			remember("real|"+key, at, m.Callsign)
+		if matched {
+			remember("real|"+u.key, u.at, m.Callsign)
 			b.matched++
 			if verbose {
-				fmt.Printf("  %s %s %-9s %.2f %-34s %s\n", tx.Freq, at.Format("15:04:05"),
-					m.Callsign, m.Score, m.Reason, trunc(tx.Texte, 58))
+				fmt.Printf("  %s %s %-9s %.2f %-34s %s\n", u.freq, u.at.Format("15:04:05"),
+					m.Callsign, m.Score, m.Reason, trunc(text, 58))
 			}
 		}
 		for s := 1; s <= seeds; s++ {
-			cb := get(ctrl, key)
+			cb := get(ctrl, u.key)
 			if s == 1 {
 				cb.candidates++
 			}
-			ck := fmt.Sprintf("ctrl%d|%s", s, key)
-			if m, ok := accept(res, fleetAt(pick(s, i)), recent(ck, at)); ok {
-				remember(ck, at, m.Callsign)
+			ck := fmt.Sprintf("ctrl%d|%s", s, u.key)
+			cm, _, _, cok := tryAll(u.texts, fleetAt(pick(s, i)), recent(ck, u.at))
+			if cok {
+				remember(ck, u.at, cm.Callsign)
 				cb.matched++
 			}
 		}

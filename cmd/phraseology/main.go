@@ -48,11 +48,12 @@ func main() {
 	fuzzy := flag.Bool("fuzzy", false, "accept a spoken number one digit off (measured 81% noise)")
 	from := flag.String("from", "", "with -db: only transmissions at or after this RFC3339 time")
 	to := flag.String("to", "", "with -db: only transmissions before this RFC3339 time")
+	union := flag.Bool("union", false, "with -capture: group passes by recording and accept a match from any of them — measures two models together, controls included")
 	contextSec := flag.Int("context", 0, "seconds of recent matches on the same frequency used to break ties; 0 = none")
 	flag.Parse()
 
 	if *capture != "" {
-		if err := measureCapture(*capture, *adsb, *airlines, *window, *minDigits, *seeds, *offset, *verbose, *strict, *minScore, *fuzzy, *contextSec); err != nil {
+		if err := measureCapture(*capture, *adsb, *airlines, *window, *minDigits, *seeds, *offset, *verbose, *strict, *minScore, *fuzzy, *contextSec, *union); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
