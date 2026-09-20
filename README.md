@@ -83,6 +83,11 @@ What works, with the number that says so:
   silence, it returns plausible sentences. Silero VAD in front of the model.
 - **Authentication**, because the fork made the server worth reaching from outside
   the LAN. 13 tests.
+- **A daily database that actually rotates.** Upstream opens the daily SQLite file
+  once at startup and never reopens it, so a long-running server writes one
+  unbounded file that retention skips as the active one — measured here at
+  **1.49 GB in 4 h 15**, about 8.4 GB a day, six days to a full disk. Fixed, and
+  `GET /api/v1/server` reports which behaviour you are getting.
 
 What does not work yet, and is known:
 
@@ -90,12 +95,10 @@ What does not work yet, and is known:
   fine-tuned on air-traffic English will happily render French speech as confident,
   well-formed, entirely invented English — a failure indistinguishable from success
   for everything downstream. This is the open question of the project (`Q1`).
-- **The database never rotates.** Inherited from upstream and confirmed in its code:
-  the daily SQLite file is opened once at startup and never reopened, so a
-  long-running process writes one file that retention never touches — measured at
-  **1.49 GB in 4 h 15**, 54 % of it a JSON copy of columns already parsed. Fix
-  pending (`Q26`).
 - **Weather** still goes to Windy, and Windy returns 404 for the nearest airfield.
+- **`raw_data` is still stored**: 54 % of the database is a JSON copy of columns
+  that were already parsed out of it. Dropping it would roughly halve the growth,
+  and nothing reads it back.
 
 ## How it works
 
