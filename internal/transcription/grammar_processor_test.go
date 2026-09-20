@@ -2,7 +2,6 @@ package transcription
 
 import (
 	"context"
-	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
@@ -29,7 +28,7 @@ func newTestProcessor(t *testing.T, fleet FleetProvider) (*GrammarProcessor, *sq
 		t.Fatalf("logger: %v", err)
 	}
 
-	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "test.db"))
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "test.db"), log)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

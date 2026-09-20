@@ -47,7 +47,7 @@ type Handler struct {
 
 	// Operational state for the settings panel. See server_handlers.go.
 	runtime       *config.Runtime
-	activeDBPath  string
+	db            *sqlite.DB
 	startedAt     time.Time
 	dbSampleAt    time.Time
 	dbSampleBytes int64

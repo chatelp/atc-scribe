@@ -21,7 +21,7 @@ type AircraftRecord struct {
 
 // AircraftStorage is a SQLite-based storage for aircraft data
 type AircraftStorage struct {
-	db     *sql.DB
+	db     *DB
 	logger *logger.Logger
 }
 
@@ -32,31 +32,15 @@ func NewAircraftStorage(dbPath string, log *logger.Logger) (*AircraftStorage, er
 	storageLogger.Info("Initializing SQLite storage",
 		logger.String("path", dbPath))
 
-	// Open the database with pragmas in the connection string so every pooled connection gets them
-	connStr := fmt.Sprintf("%s?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_pragma=cache_size(10000)",
-		dbPath,
-	)
-	db, err := sql.Open("sqlite", connStr)
+	db, err := Open(dbPath, storageLogger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
-
-	// Allow multiple concurrent readers; writes are serialized by package-level sqliteWriteMu
-	db.SetMaxOpenConns(4)
-	db.SetMaxIdleConns(4)
-
-	// Create tables if they don't exist
-	if err := initDatabase(db, storageLogger); err != nil {
-		db.Close()
 		return nil, err
 	}
 
-	storage := &AircraftStorage{
+	return &AircraftStorage{
 		db:     db,
 		logger: storageLogger,
-	}
-
-	return storage, nil
+	}, nil
 }
 
 // Close closes the database connection
@@ -67,8 +51,9 @@ func (s *AircraftStorage) Close() error {
 	return nil
 }
 
-// GetDB returns the database connection
-func (s *AircraftStorage) GetDB() *sql.DB {
+// GetDB returns the database connection. It is the rotating handle, so a
+// caller that keeps it keeps working across midnight.
+func (s *AircraftStorage) GetDB() *DB {
 	return s.db
 }
 

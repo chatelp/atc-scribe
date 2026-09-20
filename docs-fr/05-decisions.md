@@ -703,7 +703,7 @@ appariements de 125,825 reposent sur le seul palier « suffixe » (18 % ailleurs
 L'occupation instantanée suggérée ici n'est pas calculable depuis la base :
 `transcriptions` ne porte ni durée ni occupation. Ouverte.
 
-### Q26 — La base de données ne tourne jamais *(nouvelle, 16/09)*
+### Q26 — La base de données ne tourne jamais *(16/09 — **corrigée le 20/09, voir D22**)*
 
 Vérifié dans le code par le panel puis par moi : le stockage est ouvert **une fois** au
 démarrage et jamais rouvert ; `ensureTodayDatabaseFile` (`cmd/server/main.go:415`)
@@ -973,4 +973,47 @@ après le démarrage du sidecar** dans `main.go` (vérifié), donc le chemin d'a
 et tous les échecs de démarrage sont couverts.
 
 **Contribuable en amont tel quel** (D19) : c'est leur contrat, leur seam, et leur manque.
+
+### D22 — La base du jour tourne à minuit *(20/09)*
+
+Q26 est corrigée. C'était le seul défaut qui empêchait une marche sans surveillance :
+**~8,4 Go par jour, disque plein en six jours**, et rien dans le programme ne le disait.
+
+**Pourquoi c'était plus qu'un `if` à ajouter.** Le fichier du jour était ouvert une fois
+au démarrage, et **quatre types de stockage plus plusieurs services avaient chacun copié
+le même pointeur `*sql.DB`**. Remplacer la connexion dans l'un ne changeait rien chez les
+autres. `ensureTodayDatabaseFile` créait bien le fichier du lendemain — et personne n'y
+écrivait jamais.
+
+**La forme retenue : une poignée qui porte le même jeu de méthodes.**
+`sqlite.DB` expose `Query`, `QueryRow`, `Exec`, `Begin` — exactement ce que le projet
+utilise, mesuré avant d'écrire : 32 `Query`, 26 `Exec`, 7 `QueryRow`, 3 `Begin`, aucune
+variante `Context`. Changer le type d'un champ de `*sql.DB` à `*DB` a donc suffi :
+**zéro site d'appel modifié** dans toute la couche de stockage.
+
+Trois détails qui comptent :
+
+- **La fermeture de l'ancienne connexion part sur sa propre goroutine.**
+  `sql.DB.Close` attend les requêtes déjà commencées, y compris un `*sql.Rows` qu'un
+  lecteur parcourt encore ; fermer sur place rendrait la rotation aussi lente que le
+  plus lent des lecteurs.
+- **Une rotation qui échoue ne déplace pas la poignée** et ne tue pas le serveur : on
+  continue d'écrire dans le fichier courant, l'erreur est journalisée, la minute
+  suivante réessaiera.
+- **Deux cadences** : la rotation est vérifiée chaque minute pour tomber près de minuit,
+  la rétention reste horaire — et passe immédiatement après une rotation, puisque le
+  fichier de la veille vient d'être relâché.
+
+**Cinq tests**, dont les deux qui portent le sens : des stockages construits *avant* la
+rotation écrivent bien dans le fichier d'après (c'est tout l'enjeu du pointeur copié), et
+le fichier de la veille est réellement relâché, donc supprimable.
+
+`GET /api/v1/server` annonçait `rotates: false` — un aveu honnête tant que c'était vrai.
+Il annonce `rotates: true`.
+
+**Non observé** : un vrai passage de minuit en production. Le mécanisme est testé, le
+câblage est vérifié au démarrage ; la première rotation réelle reste à constater.
+
+**Candidat à une pull request amont** (D19) : le défaut est le leur, le correctif ne
+touche que leur couche de stockage, et il n'ajoute aucune dépendance.
 

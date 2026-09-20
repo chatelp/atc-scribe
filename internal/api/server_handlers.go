@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yegors/co-atc/internal/config"
+	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
@@ -70,13 +71,14 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 	dir := h.config.Storage.SQLiteBasePath
 	st.Storage = StorageState{
 		Dir:           dir,
-		ActiveDB:      h.activeDBPath,
+		ActiveDB:      h.db.Path(),
 		RetentionDays: h.runtime.DBRetentionDays(),
-		// co-atc opens the daily database once at start and never reopens it, so
-		// the file it is writing to is the one for the day it started, whatever
-		// the date is now. Reported rather than hidden: it is the difference
-		// between a database that is bounded and one that is not.
-		Rotates:            false,
+		// True since the daily database began rotating at midnight. It used to be
+		// opened once at startup and never reopened, so a long-running server
+		// wrote one unbounded file that retention skipped as the active one. The
+		// field stays because it is the difference between a database that is
+		// bounded and one that is not, and a reader deserves to see which.
+		Rotates:            true,
 		GrowthBytesPerHour: -1,
 		DaysUntilFull:      -1,
 	}
@@ -91,7 +93,7 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			active := filepath.Base(h.activeDBPath) == e.Name()
+			active := filepath.Base(h.db.Path()) == e.Name()
 			st.Storage.DailyFiles = append(st.Storage.DailyFiles, DailyFile{e.Name(), info.Size(), active})
 			st.Storage.TotalBytes += info.Size()
 			if active {
@@ -123,13 +125,16 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, st)
 }
 
-// AttachRuntime gives the handler the live settings and the database it is writing
-// to. Kept out of NewHandler so the two upstream constructors it sits between do
+// AttachRuntime gives the handler the live settings and the database handle.
+// Kept out of NewHandler so the two upstream constructors it sits between do
 // not have to grow another parameter.
-func (h *Handler) AttachRuntime(rt *config.Runtime, activeDBPath string) {
+//
+// It takes the handle rather than a path because the file changes: the daily
+// database rotates at midnight, and a path captured here would name yesterday's.
+func (h *Handler) AttachRuntime(rt *config.Runtime, db *sqlite.DB) {
 	h.runtime = rt
-	h.activeDBPath = activeDBPath
-	if info, err := os.Stat(activeDBPath); err == nil {
+	h.db = db
+	if info, err := os.Stat(db.Path()); err == nil {
 		h.dbSampleBytes = info.Size()
 		h.dbSampleAt = time.Now()
 	}
