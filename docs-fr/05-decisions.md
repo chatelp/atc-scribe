@@ -1148,10 +1148,7 @@ c'est une dégradation silencieuse, et c'est le genre de chose que ce dossier n'
 >
 > **Trois gisements de place, par ordre de rapport :**
 >
-> 1. **3,5 Go de modèles éliminés par la mesure** dorment sur le disque *interne* —
->    `mlx-fr-distil` (2,1 Go, 11,0 vrais) et `mlx-fr-pierreguillou` (1,4 Go, 5,5 vrais).
->    Leurs transcriptions sont conservées en JSON, donc Q29 reste rejouable sans eux.
->    Les supprimer suffirait à rapatrier bofenghuang pour un coût net de 2,2 Go.
+> 1. ~~3,5 Go de modèles éliminés~~ — **supprimés le 20/09**, voir ci-dessous.
 > 2. **`data/co-atc-2026-09-16.db`, 1 847 Mo** : le fichier gonflé par le défaut corrigé
 >    en D22. La rétention à 7 jours l'efface le 23/09 sans rien faire.
 > 3. **`raw_data` pèse 54 % de chaque base** — une copie JSON de colonnes déjà analysées,
@@ -1176,4 +1173,47 @@ mesure opérationnel ne doit pas bloquer derrière lui.
 
 Vérifié dans les deux sens le 20/09 : chemin absent → avertissement au démarrage et
 `status: degraded` avec le motif ; chemin présent → `status: ok` et le second avis annoncé.
+
+### D25 — Deux des trois modèles français sont supprimés *(20/09)*
+
+**Ce qui a failli être une erreur.** J'allais conclure « les deux perdants sont
+supprimables » sur leur score *isolé*. Or le gain de la porte vient de la
+**complémentarité**, pas de la qualité isolée : un modèle plus faible pourrait très bien
+être plus complémentaire. Il fallait mesurer l'union avec chacun, pas leur score seul.
+
+**Mesure, union filtrée, capture du 15/09, 40 témoins :**
+
+| second avis fourni par | appariés | hasard | **vrais** | précision | gain |
+|---|---|---|---|---|---|
+| *(aucun — anglais seul)* | 139 | 39,1 | 99,9 | 72 % | — |
+| **`bofenghuang/whisper-large-v3-french`** | 150 | 42,6 | **107,4** | **72 %** | **+7,5** |
+| `bofenghuang/…-distil-dec16` | 148 | 43,5 | 104,6 | 71 % | +4,7 |
+| `pierreguillou/whisper-medium-french` | 139 | 39,5 | 99,4 | 72 % | **−0,5** |
+
+**Et une troisième lecture fait perdre :**
+
+| lectures | appariés | hasard | vrais | précision |
+|---|---|---|---|---|
+| anglais + bofenghuang | 150 | 42,6 | **107,4** | **72 %** |
+| anglais + bofenghuang + distil | 151 | 45,5 | 105,5 | 70 % |
+
+Un appariement de plus, **2,9 de hasard en plus**. C'est la leçon de l'union complète en
+plus petit : chaque lecture supplémentaire est une chance de plus de tomber juste par
+accident, et passé un point le hasard monte plus vite que le signal.
+
+**Supprimés** : `mlx-fr-distil` (2,1 Go) et `mlx-fr-pierreguillou` (1,4 Go). Le premier
+n'est pas nul — il apporte 63 % de ce qu'apporte le retenu — mais il est **dominé** :
+moins bon partout, et ajouté par-dessus il dégrade. Aucune configuration mesurée ne
+justifie de le garder.
+
+**37 Gio → 40 Gio libres**, `whisper-lab/` de 4,9 à 1,4 Go.
+
+**Rejouable sans eux** : leurs 172 transcriptions et les unions construites avec elles
+sont conservées en JSON dans `whisper-lab/q1-francais/`. Et leur provenance est notée
+ici, donc un retéléchargement est possible — les identifiants Hugging Face sont dans le
+tableau ci-dessus et dans `14-mesure-modeles-francais.md`.
+
+**Non fait** : rapatrier `mlx-fr-bofenghuang` (5,7 Go) du disque externe vers l'interne,
+ce que ces 3,5 Go rendraient possible pour un coût net de 2,2 Go. La dépendance au disque
+amovible subsiste — elle est au moins visible depuis D24.
 
