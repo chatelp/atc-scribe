@@ -1017,3 +1017,20 @@ câblage est vérifié au démarrage ; la première rotation réelle reste à co
 **Candidat à une pull request amont** (D19) : le défaut est le leur, le correctif ne
 touche que leur couche de stockage, et il n'ajoute aucune dépendance.
 
+### D23 — Le dépôt est publié *(20/09)*
+
+**https://github.com/chatelp/atc-scribe**, public, 94 commits (l'historique amont
+compris), branche par défaut `main` alimentée par notre `local`.
+
+Dépôt autonome plutôt que fork GitHub : la relation est portée par l'historique, le
+remote `upstream`, le `LICENSE` de Yegor S conservé tel quel et le README qui l'annonce
+en sous-titre. Un fork GitHub aurait ajouté le bandeau « forked from », mais les forks
+n'apparaissent pas dans la recherche et leurs issues sont fermées par défaut — mauvais
+échange pour un projet qu'on veut voir trouvé et repris (D19, D20).
+
+**Contrôle avant publication**, sur *tous* les commits : `gho_`, `ghp_`, `github_pat_`,
+`sk-` sous leur forme réelle (préfixe + longueur) — **zéro**. Un seul signal, et c'était
+`Barsalogho_Airport`, un aérodrome du Burkina Faso dans le CSV OurAirports de l'amont.
+À retenir : un scan de secrets sur préfixe seul lève des faux positifs sur des données
+géographiques ; c'est la longueur qui discrimine.
+

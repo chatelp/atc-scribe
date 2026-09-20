@@ -4,6 +4,11 @@
 > est celui de l'amont, qui reste accessible via le remote `upstream`. Le travail se fait
 > sur la branche `local`.
 >
+> Publié depuis le 20/09 : **https://github.com/chatelp/atc-scribe**, public. La branche
+> `local` pousse vers `origin/main` — `main` est ce que voit un visiteur, `local` est le
+> nom de travail. Attention en lançant `gh` : sans `-R chatelp/atc-scribe` il résout
+> parfois sur le remote `upstream` et échoue en 404.
+>
 > - `docs/` appartient à l'amont — **on n'y touche pas**. `docs/LOCAL-STT.md` en particulier
 >   est le plan de transcription locale écrit par l'auteur amont, et il nous sert de référence.
 > - `docs-fr/` est **notre dossier de chantier**, en français. Voir `docs-fr/README.md`.
