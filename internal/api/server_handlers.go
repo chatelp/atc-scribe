@@ -9,8 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"context"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
+	"github.com/yegors/co-atc/internal/transcription"
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
@@ -27,6 +29,24 @@ type ServerState struct {
 	Logging       LoggingState           `json:"logging"`
 	Settings      config.RuntimeSettings `json:"settings"`
 	Writable      bool                   `json:"writable"`
+
+	// Absent when the transcription backend is not the local sidecar.
+	Transcription *TranscriptionState `json:"transcription,omitempty"`
+}
+
+// TranscriptionState is the half of the product that used to have no operational
+// state at all. Degraded is the field worth reading: a model that has become
+// unreachable does not stop the server, it stops one of its capabilities, and
+// the only other symptom is fewer aircraft identified with no stated cause.
+type TranscriptionState struct {
+	Reachable           bool     `json:"reachable"`
+	Stale               bool     `json:"stale,omitempty"` // the reading is the last one, not a fresh probe
+	Status              string   `json:"status"`          // "ok", "degraded", "unknown"
+	Degraded            []string `json:"degraded,omitempty"`
+	Detail              string   `json:"detail,omitempty"`
+	SecondOpinion       bool     `json:"second_opinion"`
+	SecondOpinionOK     int      `json:"second_opinion_ok"`
+	SecondOpinionFailed int      `json:"second_opinion_failed"`
 }
 
 type StorageState struct {
@@ -66,6 +86,39 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 		Logging:       LoggingState{Level: logger.Level()},
 		Settings:      h.runtime.Settings(),
 		Writable:      false, // flips once authentication is in place
+	}
+
+	if h.sttSidecar != nil {
+		// A short timeout on purpose: the sidecar is busy decoding for seconds at
+		// a time, and an operational endpoint must not block behind it. Failing
+		// to reach it in two seconds does not mean it is down, so we fall back to
+		// what it last said and mark the reading stale rather than inventing an
+		// outage.
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		health, err := h.sttSidecar.Refresh(ctx)
+		cancel()
+
+		ts := &TranscriptionState{
+			Reachable:           err == nil,
+			Stale:               err != nil,
+			Status:              health.Status,
+			Degraded:            health.Degraded,
+			SecondOpinion:       health.SecondOpinion,
+			SecondOpinionOK:     health.SecondOpinionOK,
+			SecondOpinionFailed: health.SecondOpinionFailed,
+		}
+		if ts.Status == "" {
+			ts.Status = "unknown"
+		}
+		for _, lang := range health.Degraded {
+			if m, ok := health.Models[lang]; ok {
+				ts.Detail = m.ID + ": " + m.Detail
+			}
+		}
+		if err != nil {
+			ts.Detail = strings.TrimSpace(ts.Detail + " (not reached just now: " + err.Error() + ")")
+		}
+		st.Transcription = ts
 	}
 
 	dir := h.config.Storage.SQLiteBasePath
@@ -131,9 +184,10 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 //
 // It takes the handle rather than a path because the file changes: the daily
 // database rotates at midnight, and a path captured here would name yesterday's.
-func (h *Handler) AttachRuntime(rt *config.Runtime, db *sqlite.DB) {
+func (h *Handler) AttachRuntime(rt *config.Runtime, db *sqlite.DB, stt *transcription.Sidecar) {
 	h.runtime = rt
 	h.db = db
+	h.sttSidecar = stt
 	if info, err := os.Stat(db.Path()); err == nil {
 		h.dbSampleBytes = info.Size()
 		h.dbSampleAt = time.Now()

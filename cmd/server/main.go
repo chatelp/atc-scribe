@@ -343,7 +343,7 @@ func main() {
 
 	// Create API router
 	router := api.NewRouter(adsbService, frequenciesService, weatherService, atcChatService, simulationService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
-	router.Handler().AttachRuntime(runtimeSettings, sqliteStorage.GetDB())
+	router.Handler().AttachRuntime(runtimeSettings, sqliteStorage.GetDB(), sttSidecar)
 
 	// --- Setup for multiple HTTP servers ---
 	var servers []*http.Server
