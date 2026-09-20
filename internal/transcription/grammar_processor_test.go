@@ -179,3 +179,116 @@ func TestGrammarProcessorWorksWithoutADSB(t *testing.T) {
 		t.Error("content_processed is empty, which the UI renders as a blank line")
 	}
 }
+
+// storeTwo records a transmission with two readings of the same audio, as the
+// sidecar produces when its French gate opens.
+func storeTwo(t *testing.T, s *sqlite.TranscriptionStorage, primary, second string) int64 {
+	t.Helper()
+	id, err := s.StoreTranscription(&sqlite.TranscriptionRecord{
+		FrequencyID:   "124350",
+		CreatedAt:     time.Now().UTC(),
+		Content:       primary,
+		ContentSecond: second,
+		IsComplete:    true,
+	})
+	if err != nil {
+		t.Fatalf("StoreTranscription: %v", err)
+	}
+	return id
+}
+
+// The case the whole second reading exists for, taken from the 15/09 capture:
+// the English model heard "zero seven two" and the French one "062". ADS-B had
+// AFR062, so without the second reading this transmission stays anonymous.
+func TestSecondReadingRescuesAMatchThePrimaryMissed(t *testing.T) {
+	proc, txStore, _ := newTestProcessor(t, fixedFleet{
+		{Callsign: "AFR062", Hex: "39a1b2", AltitudeFt: 24000, Phase: "CRZ"},
+	})
+
+	id := storeTwo(t, txStore,
+		"rehear les niveaux unite nine zero air france zero seven two",
+		"enchire les niveaux unite ninety air france zero six two")
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+
+	r := reread(t, txStore, id)
+	if r.Callsign != "AFR062" {
+		t.Errorf("callsign: got %q, want AFR062", r.Callsign)
+	}
+	if r.CallsignSource != "fr" {
+		t.Errorf("source: got %q, want fr", r.CallsignSource)
+	}
+	// The text a reader sees still comes from the primary model, so the corpus
+	// stays comparable from end to end.
+	if r.Content != "rehear les niveaux unite nine zero air france zero seven two" {
+		t.Errorf("the stored text should be the primary reading, got %q", r.Content)
+	}
+}
+
+func TestPrimaryReadingWinsWhenBothMatchTheSameAircraft(t *testing.T) {
+	proc, txStore, _ := newTestProcessor(t, fixedFleet{
+		{Callsign: "AFR1081", Hex: "39c1a2", AltitudeFt: 10000, Phase: "ARR"},
+	})
+
+	id := storeTwo(t, txStore,
+		"air france one zero eight one descend flight level one zero zero",
+		"air france one zero eight one descendez niveau cent")
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+
+	r := reread(t, txStore, id)
+	if r.Callsign != "AFR1081" {
+		t.Errorf("callsign: got %q, want AFR1081", r.Callsign)
+	}
+	if r.CallsignSource != "en" {
+		t.Errorf("agreement must be recorded as the primary's, got %q", r.CallsignSource)
+	}
+}
+
+// Measured on the 15/09 capture, the two readings never named different
+// aircraft inside the gate -- 8 agreements out of 8. But 0 of 8 bounds nothing,
+// so the rule exists and is tested: the primary wins, because it runs on every
+// transmission and its 72% precision is the one that was measured.
+func TestPrimaryWinsAndTheDisagreementIsRecorded(t *testing.T) {
+	proc, txStore, _ := newTestProcessor(t, fixedFleet{
+		{Callsign: "AFR1081", Hex: "39c1a2", AltitudeFt: 10000, Phase: "ARR"},
+		{Callsign: "AFR2043", Hex: "39d4e5", AltitudeFt: 12000, Phase: "ARR"},
+	})
+
+	id := storeTwo(t, txStore,
+		"air france one zero eight one descend flight level one zero zero",
+		"air france two zero four three descendez niveau cent")
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+
+	r := reread(t, txStore, id)
+	if r.Callsign != "AFR1081" {
+		t.Errorf("the primary reading must win: got %q, want AFR1081", r.Callsign)
+	}
+	if r.CallsignSource != "en>fr" {
+		t.Errorf("a disagreement must be recorded so it can be remeasured later, got %q", r.CallsignSource)
+	}
+}
+
+// With no gate, nothing changes: this is the 87.5% of transmissions.
+func TestASingleReadingBehavesExactlyAsBefore(t *testing.T) {
+	proc, txStore, _ := newTestProcessor(t, fixedFleet{
+		{Callsign: "AFR1081", Hex: "39c1a2", AltitudeFt: 10000, Phase: "ARR"},
+	})
+
+	id := store(t, txStore, "air france one zero eight one descend flight level one zero zero")
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+
+	r := reread(t, txStore, id)
+	if r.Callsign != "AFR1081" || r.CallsignSource != "en" {
+		t.Errorf("got callsign %q from %q, want AFR1081 from en", r.Callsign, r.CallsignSource)
+	}
+	if r.ContentSecond != "" {
+		t.Errorf("no gate means no second reading, got %q", r.ContentSecond)
+	}
+}

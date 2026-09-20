@@ -27,6 +27,7 @@ import io
 import logging
 import sys
 import time
+import unicodedata
 import wave
 from dataclasses import dataclass
 
@@ -128,6 +129,29 @@ def health():
     }
 
 
+# Words that do not exist in air-traffic English, so an English model only writes
+# them when it actually heard French. Deliberately short and common: this opens a
+# gate, it does not measure a proportion. The same list produced the Q29 figures;
+# keep it in step with whisper-lab/q1-francais.py or the measurement stops
+# describing what runs.
+FRENCH_MARKERS = (
+    "bonjour", "bonsoir", "au revoir", "aurevoir", "merci", "monsieur",
+    "autoris", "niveau", "descendez", "montez", "contactez", "rappelez",
+    "piste", "vent", "quittez", "maintenez", "approche", "tour de",
+    "s'il vous", "bien recu", "bien recu", "roger merci",
+)
+
+
+def _fold(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", s.lower())
+                   if unicodedata.category(c) != "Mn")
+
+
+def looks_french(text: str) -> bool:
+    folded = _fold(text)
+    return any(_fold(m) in folded for m in FRENCH_MARKERS)
+
+
 @app.post("/transcribe")
 async def transcribe(
     request: Request,
@@ -192,6 +216,29 @@ async def transcribe(
          "no_speech_prob": round(s.get("no_speech_prob", 0.0), 4)}
         for s in result.get("segments", [])
     ]
+    # Second opinion. The two models fail on different recordings -- on French
+    # transmissions they agreed on only 8 of the 34 they matched -- so a second
+    # reading of the same audio reaches transmissions the first one misses. The
+    # gate matters: asked on every transmission the French model also answers
+    # where it has nothing to say, and invents callsigns on English audio.
+    second = None
+    if (cfg.second_opinion and language == "en" and cfg.model_fr
+            and text and looks_french(text)):
+        try:
+            t1 = time.time()
+            r2 = mlx_whisper.transcribe(audio, path_or_hf_repo=cfg.model_fr, language="fr")
+            second = {
+                "text": " ".join(r2["text"].split()),
+                "language": "fr",
+                "model": cfg.model_fr,
+                "elapsed": round(time.time() - t1, 3),
+            }
+            log.info("%s second opinion (fr) %r", x_frequency_id or "-", second["text"][:80])
+        except Exception as e:
+            # A failed second opinion is not a failed transcription: the primary
+            # text stands and the caller is told nothing was added.
+            log.warning("second opinion failed: %s", e)
+
     elapsed = time.time() - started
     log.info("%s %.1fs speech=%.1fs %s %.2fs %r",
              x_frequency_id or "-", duration, speech.seconds, language, elapsed, text[:80])
@@ -199,6 +246,9 @@ async def transcribe(
         "text": text,
         "segments": segments,
         "language": language,
+        "second_text": (second or {}).get("text", ""),
+        "second_language": (second or {}).get("language", ""),
+        "second_model": (second or {}).get("model", ""),
         "duration": round(duration, 3),
         "speech_seconds": round(speech.seconds, 3),
         "speech_fraction": round(speech.fraction, 3),

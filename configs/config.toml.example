@@ -304,7 +304,15 @@ timeout_seconds = 60
 # first transcription costs 2.2 s more than the next one -- under four seconds
 # in total, which is why there is no reason to leave it running permanently.
 #
-# command = ["python3", "sidecar/whisper_server.py", "--preload"]
+# Add --second-opinion to have the sidecar read a transmission twice when the
+# first transcript carries French words, and return both. Measured on 1 378 real
+# transmissions (docs-fr/05-decisions.md, Q29): +8.5% true callsign matches,
+# precision unchanged at 72%, +15% compute -- the gate only opens on 12.5% of
+# transmissions. Asking both models every time was measured too, and is worse:
+# more matches but precision falls to 66%, which means words put in the mouth of
+# the wrong aircraft.
+#
+# command = ["python3", "sidecar/whisper_server.py", "--preload", "--second-opinion"]
 command = []
 startup_timeout_seconds = 60
 segment_silence_ms = 600      # silence that ends a transmission
