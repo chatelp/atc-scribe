@@ -34,6 +34,7 @@ func (s *transcriptionSink) emit(text string, at time.Time, language string) err
 		IsComplete:       true,
 		IsProcessed:      false,
 		ContentProcessed: "",
+		Language:         language,
 	}
 
 	id, err := s.storage.StoreTranscription(record)
