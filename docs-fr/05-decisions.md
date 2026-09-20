@@ -712,7 +712,7 @@ crée un fichier vide pour le nouveau jour et le referme ; `cleanupOldDailyDatab
 sans limite, que la rétention ne touche pas.
 
 Mesuré le 16/09 : `adsb_targets` à 64,7 lignes/s, **1,49 Go en 4 h 15** (~8,4 Go par
-jour pleine), dont 54 % de `raw_data` — une copie JSON de colonnes déjà analysées. À
+jour pleine), dont 54 % de `raw_data` — une copie JSON de l'objet ADS-B complet. À
 48 Gio libres : **disque plein en ~6 jours** de marche continue.
 
 C'est un défaut de l'amont et **un bloqueur pour toute marche sans surveillance**. Le
@@ -1151,9 +1151,8 @@ c'est une dégradation silencieuse, et c'est le genre de chose que ce dossier n'
 > 1. ~~3,5 Go de modèles éliminés~~ — **supprimés le 20/09**, voir ci-dessous.
 > 2. **`data/co-atc-2026-09-16.db`, 1 847 Mo** : le fichier gonflé par le défaut corrigé
 >    en D22. La rétention à 7 jours l'efface le 23/09 sans rien faire.
-> 3. **`raw_data` pèse 54 % de chaque base** — une copie JSON de colonnes déjà analysées,
->    que rien ne relit. La retirer diviserait la croissance par deux ; c'est du code
->    borné et le prolongement naturel de D22. **Non fait, non demandé.**
+> 3. **`raw_data` pèse 57 % de chaque base** (remesuré le 20/09). Voir Q31 : ce n'est
+>    **pas** du mort — j'ai écrit le contraire ici et c'était faux — mais du redondant.
 
 **La panne est rendue visible *(20/09, à la demande du propriétaire)*.** Puisque la
 chaîne dépend d'un disque amovible, le silence devenait le vrai risque : débranché, la
@@ -1279,4 +1278,42 @@ manque se voit, une erreur plausible non. **Non retenu, mais désormais mesuré.
    pas 10 %. **C'est le seul usage qui justifie vraiment les 120 annotations** — et il
    les justifie complètement.
 3. **Pas le seuil à deux chiffres**, sauf changement de doctrine assumé.
+
+### Q31 — `raw_data` : redondant, pas mort *(nouvelle, 20/09, et elle corrige Q26 et D24)*
+
+**Correction d'abord.** Q26 puis D24 affirmaient que `raw_data` était *« une copie JSON de
+colonnes déjà analysées, que rien ne relit »*. **C'est faux, vérifié dans le code le
+20/09** : `getLatestADSBData` (`internal/storage/sqlite/aircraft.go:445`) le désérialise
+pour reconstituer l'objet `ADSBTarget` complet. J'ai repris l'affirmation d'un document à
+l'autre sans la vérifier dans les sources — exactement ce que `CLAUDE.md` interdit au
+point 4.
+
+**Mais le gisement existe, sous une autre forme.** La requête qui le lit porte
+`ORDER BY timestamp DESC LIMIT 1` : **on ne lit jamais que la dernière ligne de chaque
+avion**, et on l'écrit sur toutes. À 82 lignes/s, c'est du redondant, pas du mort.
+
+**Le coût, mesuré le 20/09 sur une fenêtre de dix minutes en marche continue :**
+
+| | |
+|---|---|
+| `adsb_targets` | **82,2 lignes/s** (cohérent avec les 64,7/s du 16/09) |
+| poids moyen | ~1 441 octets/ligne |
+| croissance | **407 Mo/h, soit 9,5 Go/jour** |
+| dont `raw_data` | **57 %** |
+
+**Et c'est un mur, pas une gêne.** À 7 jours de rétention : **66 Go au régime établi pour
+39 Go libres** — le disque se remplit en **~4 jours**. La rotation de D22 a borné chaque
+*fichier* ; c'est la *fenêtre de rétention* qui est maintenant la contrainte.
+
+| | volume au régime établi |
+|---|---|
+| tel quel, 7 jours | **66 Go** ❌ |
+| rétention 3 jours | 28 Go |
+| `raw_data` sur la dernière ligne seulement, 7 jours | ~29 Go |
+| les deux | ~12 Go |
+
+**Non tranché.** Réduire la rétention est gratuit et immédiat mais perd de l'historique ;
+ne garder `raw_data` que sur la dernière ligne demande du code et un choix de schéma
+(table séparée, ou effacement périodique des lignes anciennes). **À décider avant toute
+marche continue de plus de quatre jours.**
 
