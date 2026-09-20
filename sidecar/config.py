@@ -40,6 +40,22 @@ class Config:
     # attributed to the wrong aircraft.
     second_opinion: bool = False
 
+    # Keep every transmission's audio, with a manifest line beside it. The whole
+    # dossier rests on a single afternoon's capture: every model comparison, every
+    # threshold, every control. A second corpus on different frequencies is what
+    # lets any of it be checked against independent data, and the audio is the one
+    # thing that cannot be recovered afterwards -- the transcript can always be
+    # recomputed from it, never the reverse.
+    #
+    # Rejected clips are kept too, on purpose: whether the voice gate was right
+    # to drop them is an open question (Q27) and it cannot be answered from
+    # clips that were thrown away.
+    save_audio: str = ""
+    # Archiving stops on its own below this much free space. An archive that
+    # fills the disk takes the database down with it, and the database is the
+    # thing that cannot be rebuilt from anything else.
+    save_audio_min_free_gb: float = 8.0
+
     log_level: str = "info"
 
 
@@ -59,8 +75,13 @@ def from_args(argv: list[str] | None = None) -> Config:
     p.add_argument("--log-level", default=d.log_level)
     p.add_argument("--second-opinion", dest="second", action="store_true",
                    help="on a transcript that looks French, transcribe again with the French model")
+    p.add_argument("--save-audio", default=d.save_audio, metavar="DIR",
+                   help="keep every transmission's audio and a manifest line, rejected ones included")
+    p.add_argument("--save-audio-min-free-gb", type=float, default=d.save_audio_min_free_gb,
+                   help="stop archiving below this much free disk space (default 8)")
     a = p.parse_args(argv)
     return Config(host=a.host, port=a.port, model_en=a.model_en, model_fr=a.model_fr,
                   preload=a.preload, vad_enabled=a.vad,
                   min_speech_seconds=a.min_speech_seconds, log_level=a.log_level,
-                  second_opinion=a.second)
+                  second_opinion=a.second, save_audio=a.save_audio,
+                  save_audio_min_free_gb=a.save_audio_min_free_gb)
