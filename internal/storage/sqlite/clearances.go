@@ -10,12 +10,12 @@ import (
 
 // ClearanceStorage handles storage of clearance records
 type ClearanceStorage struct {
-	db     *sql.DB
+	db     *DB
 	logger *logger.Logger
 }
 
 // NewClearanceStorage creates a new SQLite clearance storage
-func NewClearanceStorage(db *sql.DB, logger *logger.Logger) *ClearanceStorage {
+func NewClearanceStorage(db *DB, logger *logger.Logger) *ClearanceStorage {
 	storage := &ClearanceStorage{
 		db:     db,
 		logger: logger.Named("sqlite-clearances"),

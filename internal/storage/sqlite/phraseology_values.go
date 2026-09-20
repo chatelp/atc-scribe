@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -31,10 +30,10 @@ type PhraseologyValue struct {
 // PhraseologyStorage holds what the grammar extracted, next to the transcriptions
 // it came from.
 type PhraseologyStorage struct {
-	db *sql.DB
+	db *DB
 }
 
-func NewPhraseologyStorage(db *sql.DB) (*PhraseologyStorage, error) {
+func NewPhraseologyStorage(db *DB) (*PhraseologyStorage, error) {
 	s := &PhraseologyStorage{db: db}
 	if err := s.initDB(); err != nil {
 		return nil, err
@@ -137,7 +136,7 @@ func (s *PhraseologyStorage) ValuesByTranscription(ids []int64) (map[int64][]Phr
 // phraseology storage can be opened on the same daily database without threading
 // a fourth storage through three upstream constructors. They are always the same
 // file: the values belong to the transcriptions they were parsed from.
-func DBOf(s *TranscriptionStorage) *sql.DB { return s.db }
+func DBOf(s *TranscriptionStorage) *DB { return s.db }
 
 // TranscriptionsWithoutValues returns transcriptions that have been annotated but
 // whose values were never recorded, oldest first.

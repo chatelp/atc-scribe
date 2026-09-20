@@ -259,7 +259,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go runDatabaseRetentionCleanup(ctx, dbDir, dbPath, runtimeSettings, log)
+	go runDatabaseRetentionCleanup(ctx, dbDir, sqliteStorage.GetDB(), runtimeSettings, log)
 
 	if err := adsbService.Start(ctx); err != nil {
 		log.Error("Failed to start ADS-B service", logger.Error(err))
@@ -343,7 +343,7 @@ func main() {
 
 	// Create API router
 	router := api.NewRouter(adsbService, frequenciesService, weatherService, atcChatService, simulationService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
-	router.Handler().AttachRuntime(runtimeSettings, dbPath)
+	router.Handler().AttachRuntime(runtimeSettings, sqliteStorage.GetDB())
 
 	// --- Setup for multiple HTTP servers ---
 	var servers []*http.Server
@@ -453,55 +453,54 @@ func main() {
 	log.Info("Server fully stopped")
 }
 
-func runDatabaseRetentionCleanup(ctx context.Context, dbDir, activeDBPath string, rt *config.Runtime, log *logger.Logger) {
-	ticker := time.NewTicker(1 * time.Hour)
-	defer ticker.Stop()
+func runDatabaseRetentionCleanup(ctx context.Context, dbDir string, db *sqlite.DB, rt *config.Runtime, log *logger.Logger) {
+	// Two cadences. Rotation is checked every minute so the switch lands close
+	// to midnight; retention is an hourly sweep, which is as often as it can
+	// possibly matter.
+	rotateTicker := time.NewTicker(1 * time.Minute)
+	defer rotateTicker.Stop()
+	retentionTicker := time.NewTicker(1 * time.Hour)
+	defer retentionTicker.Stop()
+
+	sweep := func() {
+		// Read on every pass, not captured once: a retention changed from the
+		// settings panel takes effect on the next sweep rather than at the next
+		// restart.
+		keepDays := rt.DBRetentionDays()
+		if err := cleanupOldDailyDatabases(dbDir, db.Path(), keepDays, time.Now().UTC(), log); err != nil {
+			log.Warn("Periodic database retention cleanup failed",
+				logger.Error(err),
+				logger.String("path", dbDir),
+				logger.Int("retention_days", keepDays))
+		}
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			if err := ensureTodayDatabaseFile(dbDir, log); err != nil {
-				log.Warn("Failed to create today's database file",
-					logger.Error(err),
-					logger.String("path", dbDir))
+
+		case <-rotateTicker.C:
+			// The whole point of the loop. Before this, the file opened at
+			// startup was written to for the life of the process and retention
+			// skipped it as the active one, so a server left running simply grew
+			// one database without limit.
+			rotated, err := db.RotateIfNewDay(dbDir, time.Now())
+			if err != nil {
+				log.Error("Failed to rotate to today's database",
+					logger.Error(err), logger.String("dir", dbDir))
+				continue
+			}
+			if rotated {
+				// Yesterday's file is closed now, so it is eligible for deletion
+				// without waiting for the hourly sweep.
+				sweep()
 			}
 
-			// Read on every tick, not captured once: a retention changed from the
-			// settings panel takes effect on the next pass rather than at the next
-			// restart.
-			keepDays := rt.DBRetentionDays()
-			if err := cleanupOldDailyDatabases(dbDir, activeDBPath, keepDays, time.Now().UTC(), log); err != nil {
-				log.Warn("Periodic database retention cleanup failed",
-					logger.Error(err),
-					logger.String("path", dbDir),
-					logger.Int("retention_days", keepDays))
-			}
+		case <-retentionTicker.C:
+			sweep()
 		}
 	}
-}
-
-func ensureTodayDatabaseFile(dbDir string, log *logger.Logger) error {
-	today := time.Now().Format("2006-01-02")
-	todayDBPath := filepath.Join(dbDir, fmt.Sprintf("co-atc-%s.db", today))
-
-	if _, err := os.Stat(todayDBPath); err == nil {
-		return nil
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("stat today's db: %w", err)
-	}
-
-	storage, err := sqlite.NewAircraftStorage(todayDBPath, log)
-	if err != nil {
-		return fmt.Errorf("initialize today's db: %w", err)
-	}
-	defer storage.Close()
-
-	log.Info("Created new daily database file",
-		logger.String("path", todayDBPath))
-
-	return nil
 }
 
 func cleanupOldDailyDatabases(dbDir, activeDBPath string, keepDays int, now time.Time, log *logger.Logger) error {

@@ -29,12 +29,12 @@ type TranscriptionRecord struct {
 
 // TranscriptionStorage handles storage of transcription records
 type TranscriptionStorage struct {
-	db     *sql.DB
+	db     *DB
 	logger *logger.Logger
 }
 
 // NewTranscriptionStorage creates a new SQLite transcription storage
-func NewTranscriptionStorage(db *sql.DB, logger *logger.Logger) *TranscriptionStorage {
+func NewTranscriptionStorage(db *DB, logger *logger.Logger) *TranscriptionStorage {
 	storage := &TranscriptionStorage{
 		db:     db,
 		logger: logger.Named("sqlite-tx"),
