@@ -1034,3 +1034,58 @@ n'apparaissent pas dans la recherche et leurs issues sont fermées par défaut �
 À retenir : un scan de secrets sur préfixe seul lève des faux positifs sur des données
 géographiques ; c'est la longueur qui discrimine.
 
+### Q29 — La porte française : mesurée, décision non prise *(20/09)*
+
+Q1 posait A (aiguillage par langue), B (un seul multilingue) ou C (affinage maison).
+**Le cadre était faux** : le français de cette station n'est pas sur des fréquences
+françaises, il est *entrelacé* sur les fréquences anglaises de Paris Contrôle — un a
+priori par fréquence ne peut donc pas l'attraper. Et la vraie question n'est pas « quel
+modèle » mais « un modèle ou deux ».
+
+**Pourquoi deux.** Sur les 172 transmissions francophones, l'anglais et bofenghuang
+apparient largement des enregistrements *différents* : 14 pour l'anglais seul, 12 pour
+bofenghuang seul, **8 en commun**. Ils n'échouent pas au même endroit.
+
+**Mesure, capture du 15/09, 1 378 clips, règle de production, 40 témoins.** Le mode
+`-union` de `cmd/phraseology` unit les passes par enregistrement — **et donne aux témoins
+les mêmes deux chances**, sans quoi on mesurerait la règle. Validé par un témoin
+en+en, qui redonne l'anglais seul à l'unité près.
+
+| cas | appariés | hasard | **vrais** | précision | calcul |
+|---|---|---|---|---|---|
+| anglais seul | 139 | 39,1 | 99,9 | **72 %** | ×1,00 |
+| bofenghuang seul | 93 | 32,1 | 60,9 | 65 % | ×2,50 |
+| union complète | 173 | 59,4 | 113,6 | **66 %** | ×2,50 |
+| **union filtrée** | **151** | **42,6** | **108,4** | **72 %** | **×1,15** |
+
+**L'union complète est un mauvais marché** : +13,7 vrais, mais la précision tombe de 72
+à 66 %. Sur 34 appariements gagnés, une vingtaine sont du hasard — c'est-à-dire des
+paroles attribuées au mauvais avion. Un manque se voit, une erreur plausible non.
+
+**L'union filtrée est un bon marché.** On ne lance le modèle français que sur les 12,5 %
+de transmissions dont la sortie anglaise *paraît* française : **+8,5 vrais, précision
+inchangée à 72 %, coût ×1,15**. Elle capte 62 % du gain pour 10 % du surcoût.
+
+**Le gain est réparti**, ce qui est le contrôle qui compte (doc 19) : +1,2 / +2,4 / +2,8
+/ +2,2 sur quatre fréquences, −0,1 sur la cinquième. Aucune ne le porte seule.
+
+> **Estimation contre mesure.** J'avais estimé le gain de l'union à +22 % en appliquant
+> la précision de bofenghuang à ses appariements exclusifs. La mesure donne +13,7 %.
+> L'erreur : **le hasard monte aussi** — deux textes, c'est deux chances de tomber juste
+> par accident, et le hasard passe de 39,1 à 59,4. Une estimation qui oublie son propre
+> témoin se trompe dans le sens qui arrange.
+
+**Ce qui reste à trancher, et qui n'est pas une mesure :**
+
+1. **Quel texte stocker ?** La mesure accepte un appariement venu de l'une *ou* l'autre
+   passe ; `transcriptions.content` n'a qu'une colonne. Garder l'anglais et n'emprunter
+   au français que l'indicatif ? Garder celui qui a apparié ? C'est une décision produit.
+2. **Le modèle français est un lien symbolique vers un disque USB externe**
+   (`/Volumes/Crucial X8/`, 5,7 Go). Aujourd'hui sans conséquence ; le jour où la chaîne
+   en dépend, un disque débranché devient une panne.
+3. **Une seule session** de mesure, celle du 15/09.
+4. **La liste de marqueurs** qui définit la porte a été écrite avant de voir le moindre
+   résultat (elle est dans `q1-francais.py`), mais le *recours* aux marqueurs, lui, vient
+   d'avoir regardé les données. Une validation sur un corpus tenu à l'écart serait plus
+   propre.
+
