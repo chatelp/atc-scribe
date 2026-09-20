@@ -3,6 +3,7 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/yegors/co-atc/pkg/logger"
@@ -25,6 +26,7 @@ type TranscriptionRecord struct {
 	ContentProcessed string    `json:"content_processed"`
 	SpeakerType      string    `json:"speaker_type,omitempty"` // "ATC" or "PILOT"
 	Callsign         string    `json:"callsign,omitempty"`     // Aircraft callsign if speaker is a pilot
+	Language         string    `json:"language,omitempty"`     // as decoded: "en", "fr", empty when unknown
 }
 
 // TranscriptionStorage handles storage of transcription records
@@ -61,11 +63,22 @@ func (s *TranscriptionStorage) initDB() error {
 			is_processed BOOLEAN NOT NULL,
 			content_processed TEXT,
 			speaker_type TEXT,
-			callsign TEXT
+			callsign TEXT,
+			language TEXT
 		)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create transcriptions table: %w", err)
+	}
+
+	// The band is bilingual, so which language a transmission was decoded as is
+	// a measurement in its own right -- it is how a French model gets compared
+	// with an English one, and how a wrong-language transcript gets found at all.
+	// Upstream's schema has no such column; databases written before this exist,
+	// so add it where it is missing rather than requiring a fresh file.
+	if _, err := s.db.Exec(`ALTER TABLE transcriptions ADD COLUMN language TEXT`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column name") {
+		return fmt.Errorf("failed to add transcriptions.language: %w", err)
 	}
 
 	// Create indexes
@@ -100,8 +113,8 @@ func (s *TranscriptionStorage) StoreTranscription(record *TranscriptionRecord) (
 	// Insert record
 	result, err := s.db.Exec(
 		`INSERT INTO transcriptions 
-		(frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		(frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.FrequencyID,
 		record.CreatedAt.Format(time.RFC3339),
 		record.Content,
@@ -110,6 +123,7 @@ func (s *TranscriptionStorage) StoreTranscription(record *TranscriptionRecord) (
 		record.ContentProcessed,
 		record.SpeakerType,
 		record.Callsign,
+		record.Language,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert transcription: %w", err)
