@@ -243,6 +243,7 @@ func (p *PostProcessor) processNextBatch() error {
 				"[TEMPLATE_RENDER_FAILED]",
 				"UNKNOWN",
 				"",
+				"",
 			); updateErr != nil {
 				p.logger.Error("Failed to mark transcription as failed",
 					logger.Int64("id", record.ID),
@@ -268,6 +269,7 @@ func (p *PostProcessor) processNextBatch() error {
 				"[PROCESSING_FAILED]",
 				"UNKNOWN",
 				"",
+				"",
 			); updateErr != nil {
 				p.logger.Error("Failed to mark transcription as failed",
 					logger.Int64("id", record.ID),
@@ -286,6 +288,7 @@ func (p *PostProcessor) processNextBatch() error {
 				record.ID,
 				"[NO_RESULTS_FROM_API]",
 				"UNKNOWN",
+				"",
 				"",
 			); updateErr != nil {
 				p.logger.Error("Failed to mark transcription as failed",
@@ -328,6 +331,8 @@ func (p *PostProcessor) processNextBatch() error {
 			result.ContentProcessed,
 			result.SpeakerType,
 			result.Callsign,
+			// Upstream's GPT-4o pass has a single reading, and it is its own.
+			"openai",
 		); err != nil {
 			p.logger.Error("Failed to update processed transcription",
 				logger.Int64("id", result.ID),

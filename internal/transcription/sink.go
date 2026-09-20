@@ -26,7 +26,7 @@ type transcriptionSink struct {
 // in the broadcast so the UI can tell a French transmission from an English one;
 // on a bilingual band that distinction matters, and a wrong-language transcript
 // must never be silently indistinguishable from a right one.
-func (s *transcriptionSink) emit(text string, at time.Time, language string) error {
+func (s *transcriptionSink) emit(text string, at time.Time, language, second string) error {
 	record := &sqlite.TranscriptionRecord{
 		FrequencyID:      s.frequencyID,
 		CreatedAt:        at,
@@ -35,6 +35,7 @@ func (s *transcriptionSink) emit(text string, at time.Time, language string) err
 		IsProcessed:      false,
 		ContentProcessed: "",
 		Language:         language,
+		ContentSecond:    second,
 	}
 
 	id, err := s.storage.StoreTranscription(record)

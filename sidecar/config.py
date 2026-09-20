@@ -31,6 +31,15 @@ class Config:
     initial_prompt_en: str = ""
     initial_prompt_fr: str = ""
 
+    # Second opinion. When the primary transcript carries French words, ask the
+    # French model too and return both. Measured on 1 378 real transmissions
+    # (docs-fr/05-decisions.md, Q29): +8.5% true callsign matches, precision
+    # unchanged at 72%, and 15% more compute -- because the gate only opens on
+    # 12.5% of transmissions. Asking both models every time was measured too and
+    # is worse: +13.7% matches but precision falls to 66%, which means words
+    # attributed to the wrong aircraft.
+    second_opinion: bool = False
+
     log_level: str = "info"
 
 
@@ -48,7 +57,10 @@ def from_args(argv: list[str] | None = None) -> Config:
     p.add_argument("--no-vad", dest="vad", action="store_false")
     p.add_argument("--min-speech-seconds", type=float, default=d.min_speech_seconds)
     p.add_argument("--log-level", default=d.log_level)
+    p.add_argument("--second-opinion", dest="second", action="store_true",
+                   help="on a transcript that looks French, transcribe again with the French model")
     a = p.parse_args(argv)
     return Config(host=a.host, port=a.port, model_en=a.model_en, model_fr=a.model_fr,
                   preload=a.preload, vad_enabled=a.vad,
-                  min_speech_seconds=a.min_speech_seconds, log_level=a.log_level)
+                  min_speech_seconds=a.min_speech_seconds, log_level=a.log_level,
+                  second_opinion=a.second)

@@ -243,24 +243,59 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 
 	speaker := string(result.Speaker)
 
-	callsign := ""
+	callsign, source := "", ""
 	var match phraseology.Match
 	if len(sky) > 0 {
 		ctx := p.recentlyHeard(record.FrequencyID, record.CreatedAt)
-		if m, ok := p.matcher.MatchWithContext(result, sky, ctx); ok && !m.Ambiguous && m.Score >= p.config.MinScore {
-			match = m
-			callsign = m.Callsign
-		} else if ok && m.Ambiguous {
-			p.logger.Debug("Refusing an ambiguous match",
+
+		try := func(res phraseology.Result, text string) (phraseology.Match, bool) {
+			m, ok := p.matcher.MatchWithContext(res, sky, ctx)
+			if !ok {
+				return m, false
+			}
+			if m.Ambiguous {
+				p.logger.Debug("Refusing an ambiguous match",
+					logger.Int64("id", record.ID),
+					logger.String("text", text),
+					logger.String("best", m.Callsign),
+					logger.Float64("score", m.Score))
+				return m, false
+			}
+			return m, m.Score >= p.config.MinScore
+		}
+
+		primary, okPrimary := try(result, record.Content)
+
+		// The second reading, when the sidecar's French gate opened. Both are
+		// tried even when the first succeeds: the match itself is arithmetic on
+		// a short list and costs nothing next to the decoding already paid for,
+		// and a disagreement recorded today is what lets the rule be remeasured
+		// on a bigger corpus tomorrow. Measured on the 15/09 capture (Q29): the
+		// two never disagreed inside the gate, 8 agreements out of 8.
+		var second phraseology.Match
+		okSecond := false
+		if record.ContentSecond != "" {
+			second, okSecond = try(phraseology.Parse(record.ContentSecond), record.ContentSecond)
+		}
+
+		switch {
+		case okPrimary && okSecond && primary.Callsign != second.Callsign:
+			// The primary model wins. It runs on every transmission, so its
+			// precision is the one that was measured -- 72% against 65%.
+			match, callsign, source = primary, primary.Callsign, "en>fr"
+			p.logger.Info("The two readings named different aircraft, keeping the primary",
 				logger.Int64("id", record.ID),
-				logger.String("text", record.Content),
-				logger.String("best", m.Callsign),
-				logger.Float64("score", m.Score))
+				logger.String("primary", primary.Callsign),
+				logger.String("second", second.Callsign))
+		case okPrimary:
+			match, callsign, source = primary, primary.Callsign, "en"
+		case okSecond:
+			match, callsign, source = second, second.Callsign, "fr"
 		}
 	}
 
 	if err := p.transcriptionStorage.UpdateProcessedTranscription(
-		record.ID, processed, speaker, callsign,
+		record.ID, processed, speaker, callsign, source,
 	); err != nil {
 		p.logger.Error("Failed to update annotated transcription",
 			logger.Int64("id", record.ID), logger.Error(err))
@@ -272,6 +307,7 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 		p.logger.Info("Attached a transmission to an aircraft",
 			logger.Int64("id", record.ID),
 			logger.String("callsign", callsign),
+			logger.String("from", source),
 			logger.String("hex", match.Hex),
 			logger.Float64("score", match.Score),
 			logger.String("why", match.Reason))

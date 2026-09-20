@@ -181,6 +181,10 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 		SpeechSeconds float64 `json:"speech_seconds"`
 		Rejected      string  `json:"rejected"`
 		Realtime      float64 `json:"realtime_factor"`
+		// A second reading of the same audio, present only when the sidecar's
+		// French gate opened. Empty the rest of the time, which is most of it.
+		SecondText     string `json:"second_text"`
+		SecondLanguage string `json:"second_language"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		p.logger.Error("Failed to decode sidecar response", Error(err))
@@ -207,7 +211,13 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 		String("realtime", fmt.Sprintf("%.1fx", out.Realtime)),
 		String("text", out.Text))
 
-	if err := p.sink.emit(out.Text, at, out.Language); err != nil {
+	if out.SecondText != "" {
+		p.logger.Info("Second opinion",
+			String("language", out.SecondLanguage),
+			String("text", out.SecondText))
+	}
+
+	if err := p.sink.emit(out.Text, at, out.Language, out.SecondText); err != nil {
 		p.logger.Error("Failed to store transcription", Error(err))
 	}
 }

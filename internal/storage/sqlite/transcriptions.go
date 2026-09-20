@@ -24,9 +24,11 @@ type TranscriptionRecord struct {
 	IsComplete       bool      `json:"is_complete"`
 	IsProcessed      bool      `json:"is_processed"`
 	ContentProcessed string    `json:"content_processed"`
-	SpeakerType      string    `json:"speaker_type,omitempty"` // "ATC" or "PILOT"
-	Callsign         string    `json:"callsign,omitempty"`     // Aircraft callsign if speaker is a pilot
-	Language         string    `json:"language,omitempty"`     // as decoded: "en", "fr", empty when unknown
+	SpeakerType      string    `json:"speaker_type,omitempty"`    // "ATC" or "PILOT"
+	Callsign         string    `json:"callsign,omitempty"`        // Aircraft callsign if speaker is a pilot
+	Language         string    `json:"language,omitempty"`        // as decoded: "en", "fr", empty when unknown
+	ContentSecond    string    `json:"content_second,omitempty"`  // a second model on the same audio, when the gate opened
+	CallsignSource   string    `json:"callsign_source,omitempty"` // which reading the callsign came from
 }
 
 // TranscriptionStorage handles storage of transcription records
@@ -64,7 +66,9 @@ func (s *TranscriptionStorage) initDB() error {
 			content_processed TEXT,
 			speaker_type TEXT,
 			callsign TEXT,
-			language TEXT
+			language TEXT,
+			content_second TEXT,
+			callsign_source TEXT
 		)
 	`)
 	if err != nil {
@@ -76,9 +80,20 @@ func (s *TranscriptionStorage) initDB() error {
 	// with an English one, and how a wrong-language transcript gets found at all.
 	// Upstream's schema has no such column; databases written before this exist,
 	// so add it where it is missing rather than requiring a fresh file.
-	if _, err := s.db.Exec(`ALTER TABLE transcriptions ADD COLUMN language TEXT`); err != nil &&
-		!strings.Contains(err.Error(), "duplicate column name") {
-		return fmt.Errorf("failed to add transcriptions.language: %w", err)
+	// content_second holds a second model's reading of the same audio, kept when
+	// the sidecar's French gate opened; callsign_source says which reading the
+	// callsign came from. Both exist so a disagreement stays inspectable: the
+	// text a human reads always comes from the primary model, and an error can
+	// still be traced to the model that produced it.
+	for column, ddl := range map[string]string{
+		"language":        "ALTER TABLE transcriptions ADD COLUMN language TEXT",
+		"content_second":  "ALTER TABLE transcriptions ADD COLUMN content_second TEXT",
+		"callsign_source": "ALTER TABLE transcriptions ADD COLUMN callsign_source TEXT",
+	} {
+		if _, err := s.db.Exec(ddl); err != nil &&
+			!strings.Contains(err.Error(), "duplicate column name") {
+			return fmt.Errorf("failed to add transcriptions.%s: %w", column, err)
+		}
 	}
 
 	// Create indexes
@@ -113,8 +128,8 @@ func (s *TranscriptionStorage) StoreTranscription(record *TranscriptionRecord) (
 	// Insert record
 	result, err := s.db.Exec(
 		`INSERT INTO transcriptions 
-		(frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language, content_second, callsign_source) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.FrequencyID,
 		record.CreatedAt.Format(time.RFC3339),
 		record.Content,
@@ -124,6 +139,8 @@ func (s *TranscriptionStorage) StoreTranscription(record *TranscriptionRecord) (
 		record.SpeakerType,
 		record.Callsign,
 		record.Language,
+		record.ContentSecond,
+		record.CallsignSource,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert transcription: %w", err)
@@ -142,7 +159,7 @@ func (s *TranscriptionStorage) StoreTranscription(record *TranscriptionRecord) (
 func (s *TranscriptionStorage) GetTranscriptions(limit, offset int) ([]*TranscriptionRecord, error) {
 	// Query records
 	rows, err := s.db.Query(
-		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign 
+		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language, content_second, callsign_source 
 		FROM transcriptions 
 		ORDER BY created_at DESC 
 		LIMIT ? OFFSET ?`,
@@ -159,7 +176,7 @@ func (s *TranscriptionStorage) GetTranscriptions(limit, offset int) ([]*Transcri
 		var record TranscriptionRecord
 		var createdAt string
 		var speakerType, callsign sql.NullString
-		var contentProcessed sql.NullString
+		var contentProcessed, language, contentSecond, callsignSource sql.NullString
 
 		if err := rows.Scan(
 			&record.ID,
@@ -171,6 +188,9 @@ func (s *TranscriptionStorage) GetTranscriptions(limit, offset int) ([]*Transcri
 			&contentProcessed,
 			&speakerType,
 			&callsign,
+			&language,
+			&contentSecond,
+			&callsignSource,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan transcription: %w", err)
 		}
@@ -182,6 +202,15 @@ func (s *TranscriptionStorage) GetTranscriptions(limit, offset int) ([]*Transcri
 		}
 
 		// Handle nullable fields
+		if language.Valid {
+			record.Language = language.String
+		}
+		if contentSecond.Valid {
+			record.ContentSecond = contentSecond.String
+		}
+		if callsignSource.Valid {
+			record.CallsignSource = callsignSource.String
+		}
 		if contentProcessed.Valid {
 			record.ContentProcessed = contentProcessed.String
 		}
@@ -202,7 +231,7 @@ func (s *TranscriptionStorage) GetTranscriptions(limit, offset int) ([]*Transcri
 func (s *TranscriptionStorage) GetTranscriptionsByFrequency(frequencyID string, limit, offset int) ([]*TranscriptionRecord, error) {
 	// Query records
 	rows, err := s.db.Query(
-		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign 
+		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language, content_second, callsign_source 
 		FROM transcriptions 
 		WHERE frequency_id = ? 
 		ORDER BY created_at DESC 
@@ -220,7 +249,7 @@ func (s *TranscriptionStorage) GetTranscriptionsByFrequency(frequencyID string, 
 		var record TranscriptionRecord
 		var createdAt string
 		var speakerType, callsign sql.NullString
-		var contentProcessed sql.NullString
+		var contentProcessed, language, contentSecond, callsignSource sql.NullString
 
 		if err := rows.Scan(
 			&record.ID,
@@ -232,6 +261,9 @@ func (s *TranscriptionStorage) GetTranscriptionsByFrequency(frequencyID string, 
 			&contentProcessed,
 			&speakerType,
 			&callsign,
+			&language,
+			&contentSecond,
+			&callsignSource,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan transcription: %w", err)
 		}
@@ -243,6 +275,15 @@ func (s *TranscriptionStorage) GetTranscriptionsByFrequency(frequencyID string, 
 		}
 
 		// Handle nullable fields
+		if language.Valid {
+			record.Language = language.String
+		}
+		if contentSecond.Valid {
+			record.ContentSecond = contentSecond.String
+		}
+		if callsignSource.Valid {
+			record.CallsignSource = callsignSource.String
+		}
 		if contentProcessed.Valid {
 			record.ContentProcessed = contentProcessed.String
 		}
@@ -263,7 +304,7 @@ func (s *TranscriptionStorage) GetTranscriptionsByFrequency(frequencyID string, 
 func (s *TranscriptionStorage) GetTranscriptionsByTimeRange(startTime, endTime time.Time, limit, offset int) ([]*TranscriptionRecord, error) {
 	// Query records
 	rows, err := s.db.Query(
-		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign 
+		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language, content_second, callsign_source 
 		FROM transcriptions 
 		WHERE created_at BETWEEN ? AND ? 
 		ORDER BY created_at DESC 
@@ -281,7 +322,7 @@ func (s *TranscriptionStorage) GetTranscriptionsByTimeRange(startTime, endTime t
 		var record TranscriptionRecord
 		var createdAt string
 		var speakerType, callsign sql.NullString
-		var contentProcessed sql.NullString
+		var contentProcessed, language, contentSecond, callsignSource sql.NullString
 
 		if err := rows.Scan(
 			&record.ID,
@@ -293,6 +334,9 @@ func (s *TranscriptionStorage) GetTranscriptionsByTimeRange(startTime, endTime t
 			&contentProcessed,
 			&speakerType,
 			&callsign,
+			&language,
+			&contentSecond,
+			&callsignSource,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan transcription: %w", err)
 		}
@@ -304,6 +348,15 @@ func (s *TranscriptionStorage) GetTranscriptionsByTimeRange(startTime, endTime t
 		}
 
 		// Handle nullable fields
+		if language.Valid {
+			record.Language = language.String
+		}
+		if contentSecond.Valid {
+			record.ContentSecond = contentSecond.String
+		}
+		if callsignSource.Valid {
+			record.CallsignSource = callsignSource.String
+		}
 		if contentProcessed.Valid {
 			record.ContentProcessed = contentProcessed.String
 		}
@@ -324,7 +377,7 @@ func (s *TranscriptionStorage) GetTranscriptionsByTimeRange(startTime, endTime t
 func (s *TranscriptionStorage) GetTranscriptionsBySpeaker(speakerType string, limit, offset int) ([]*TranscriptionRecord, error) {
 	// Query records
 	rows, err := s.db.Query(
-		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign 
+		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language, content_second, callsign_source 
 		FROM transcriptions 
 		WHERE speaker_type = ? 
 		ORDER BY created_at DESC 
@@ -342,7 +395,7 @@ func (s *TranscriptionStorage) GetTranscriptionsBySpeaker(speakerType string, li
 		var record TranscriptionRecord
 		var createdAt string
 		var speakerTypeDB, callsign sql.NullString
-		var contentProcessed sql.NullString
+		var contentProcessed, language, contentSecond, callsignSource sql.NullString
 
 		if err := rows.Scan(
 			&record.ID,
@@ -354,6 +407,9 @@ func (s *TranscriptionStorage) GetTranscriptionsBySpeaker(speakerType string, li
 			&contentProcessed,
 			&speakerTypeDB,
 			&callsign,
+			&language,
+			&contentSecond,
+			&callsignSource,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan transcription: %w", err)
 		}
@@ -365,6 +421,15 @@ func (s *TranscriptionStorage) GetTranscriptionsBySpeaker(speakerType string, li
 		}
 
 		// Handle nullable fields
+		if language.Valid {
+			record.Language = language.String
+		}
+		if contentSecond.Valid {
+			record.ContentSecond = contentSecond.String
+		}
+		if callsignSource.Valid {
+			record.CallsignSource = callsignSource.String
+		}
 		if contentProcessed.Valid {
 			record.ContentProcessed = contentProcessed.String
 		}
@@ -385,7 +450,7 @@ func (s *TranscriptionStorage) GetTranscriptionsBySpeaker(speakerType string, li
 func (s *TranscriptionStorage) GetTranscriptionsByCallsign(callsign string, limit, offset int) ([]*TranscriptionRecord, error) {
 	// Query records
 	rows, err := s.db.Query(
-		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign 
+		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language, content_second, callsign_source 
 		FROM transcriptions 
 		WHERE callsign = ? 
 		ORDER BY created_at DESC 
@@ -403,7 +468,7 @@ func (s *TranscriptionStorage) GetTranscriptionsByCallsign(callsign string, limi
 		var record TranscriptionRecord
 		var createdAt string
 		var speakerType, callsignDB sql.NullString
-		var contentProcessed sql.NullString
+		var contentProcessed, language, contentSecond, callsignSource sql.NullString
 
 		if err := rows.Scan(
 			&record.ID,
@@ -426,6 +491,15 @@ func (s *TranscriptionStorage) GetTranscriptionsByCallsign(callsign string, limi
 		}
 
 		// Handle nullable fields
+		if language.Valid {
+			record.Language = language.String
+		}
+		if contentSecond.Valid {
+			record.ContentSecond = contentSecond.String
+		}
+		if callsignSource.Valid {
+			record.CallsignSource = callsignSource.String
+		}
 		if contentProcessed.Valid {
 			record.ContentProcessed = contentProcessed.String
 		}
@@ -446,7 +520,7 @@ func (s *TranscriptionStorage) GetTranscriptionsByCallsign(callsign string, limi
 func (s *TranscriptionStorage) GetUnprocessedTranscriptions(batchSize int) ([]*TranscriptionRecord, error) {
 	// Query records
 	rows, err := s.db.Query(
-		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign
+		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language, content_second, callsign_source
 		FROM transcriptions
 		WHERE is_complete = 1 AND is_processed = 0
 		ORDER BY created_at ASC
@@ -464,7 +538,7 @@ func (s *TranscriptionStorage) GetUnprocessedTranscriptions(batchSize int) ([]*T
 		var record TranscriptionRecord
 		var createdAt string
 		var speakerType, callsign sql.NullString
-		var contentProcessed sql.NullString
+		var contentProcessed, language, contentSecond, callsignSource sql.NullString
 
 		if err := rows.Scan(
 			&record.ID,
@@ -476,6 +550,9 @@ func (s *TranscriptionStorage) GetUnprocessedTranscriptions(batchSize int) ([]*T
 			&contentProcessed,
 			&speakerType,
 			&callsign,
+			&language,
+			&contentSecond,
+			&callsignSource,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan transcription: %w", err)
 		}
@@ -487,6 +564,15 @@ func (s *TranscriptionStorage) GetUnprocessedTranscriptions(batchSize int) ([]*T
 		}
 
 		// Handle nullable fields
+		if language.Valid {
+			record.Language = language.String
+		}
+		if contentSecond.Valid {
+			record.ContentSecond = contentSecond.String
+		}
+		if callsignSource.Valid {
+			record.CallsignSource = callsignSource.String
+		}
 		if contentProcessed.Valid {
 			record.ContentProcessed = contentProcessed.String
 		}
@@ -504,18 +590,19 @@ func (s *TranscriptionStorage) GetUnprocessedTranscriptions(batchSize int) ([]*T
 }
 
 // UpdateProcessedTranscription updates a transcription with processed content
-func (s *TranscriptionStorage) UpdateProcessedTranscription(id int64, contentProcessed string, speakerType string, callsign string) error {
+func (s *TranscriptionStorage) UpdateProcessedTranscription(id int64, contentProcessed string, speakerType string, callsign string, callsignSource string) error {
 	lockSQLiteWrite()
 	defer unlockSQLiteWrite()
 
 	// Update record
 	_, err := s.db.Exec(
 		`UPDATE transcriptions
-		SET content_processed = ?, is_processed = 1, speaker_type = ?, callsign = ?
+		SET content_processed = ?, is_processed = 1, speaker_type = ?, callsign = ?, callsign_source = ?
 		WHERE id = ?`,
 		contentProcessed,
 		speakerType,
 		callsign,
+		callsignSource,
 		id,
 	)
 	if err != nil {
@@ -529,7 +616,7 @@ func (s *TranscriptionStorage) UpdateProcessedTranscription(id int64, contentPro
 func (s *TranscriptionStorage) GetLastProcessedTranscriptions(frequencyID string, limit int) ([]*TranscriptionRecord, error) {
 	// Query records
 	rows, err := s.db.Query(
-		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign
+		`SELECT id, frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language, content_second, callsign_source
 		FROM transcriptions
 		WHERE frequency_id = ? AND is_processed = 1
 		ORDER BY created_at DESC
@@ -547,7 +634,7 @@ func (s *TranscriptionStorage) GetLastProcessedTranscriptions(frequencyID string
 		var record TranscriptionRecord
 		var createdAt string
 		var speakerType, callsign sql.NullString
-		var contentProcessed sql.NullString
+		var contentProcessed, language, contentSecond, callsignSource sql.NullString
 
 		if err := rows.Scan(
 			&record.ID,
@@ -559,6 +646,9 @@ func (s *TranscriptionStorage) GetLastProcessedTranscriptions(frequencyID string
 			&contentProcessed,
 			&speakerType,
 			&callsign,
+			&language,
+			&contentSecond,
+			&callsignSource,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan transcription: %w", err)
 		}
@@ -570,6 +660,15 @@ func (s *TranscriptionStorage) GetLastProcessedTranscriptions(frequencyID string
 		}
 
 		// Handle nullable fields
+		if language.Valid {
+			record.Language = language.String
+		}
+		if contentSecond.Valid {
+			record.ContentSecond = contentSecond.String
+		}
+		if callsignSource.Valid {
+			record.CallsignSource = callsignSource.String
+		}
 		if contentProcessed.Valid {
 			record.ContentProcessed = contentProcessed.String
 		}
