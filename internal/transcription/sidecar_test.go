@@ -26,10 +26,15 @@ func testLogger(t *testing.T) *logger.Logger {
 
 func healthServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	return healthServerSaying(t, `{"status":"ok"}`)
+}
+
+func healthServerSaying(t *testing.T, body string) *httptest.Server {
+	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(body))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -185,5 +190,65 @@ func TestSpawnedButSilentSidecarTimesOut(t *testing.T) {
 			_ = syscall.Kill(-s.cmd.Process.Pid, syscall.SIGKILL)
 			t.Error("a sidecar that timed out should have been stopped")
 		}
+	}
+}
+
+const degradedBody = `{
+  "status": "degraded",
+  "degraded": ["fr"],
+  "second_opinion": true,
+  "second_opinion_ok": 12,
+  "second_opinion_failed": 3,
+  "models": {
+    "en": {"id":"sfabriece/x","kind":"hub","available":true},
+    "fr": {"id":"/Volumes/Crucial X8/m","kind":"path","available":false,
+           "detail":"path not found -- an external drive may be unplugged"}
+  }
+}`
+
+// The failure this reporting exists for: a model on an external drive goes away,
+// transcription keeps working, and without this nothing anywhere says the station
+// just lost its second opinion.
+func TestStartReadsAndKeepsADegradedHealth(t *testing.T) {
+	srv := healthServerSaying(t, degradedBody)
+	s := NewSidecar(SidecarConfig{ServerURL: srv.URL, StartupTimeoutSeconds: 5}, testLogger(t))
+
+	// A degraded sidecar must still start the server: the primary model answers.
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatalf("a degraded sidecar must not stop startup: %v", err)
+	}
+
+	h := s.LastHealth()
+	if h.Status != "degraded" {
+		t.Errorf("status: got %q, want degraded", h.Status)
+	}
+	if len(h.Degraded) != 1 || h.Degraded[0] != "fr" {
+		t.Errorf("degraded: got %v, want [fr]", h.Degraded)
+	}
+	if !h.SecondOpinion || h.SecondOpinionOK != 12 || h.SecondOpinionFailed != 3 {
+		t.Errorf("counters not carried: %+v", h)
+	}
+	if m := h.Models["fr"]; m.Available || m.Detail == "" {
+		t.Errorf("the unavailable model must carry its reason, got %+v", m)
+	}
+}
+
+// Refresh failing is not the same as the sidecar being broken: it is busy
+// decoding for seconds at a time. The last reading stands, and the caller is
+// told the probe failed rather than being handed an invented outage.
+func TestRefreshFailureKeepsTheLastReading(t *testing.T) {
+	srv := healthServerSaying(t, degradedBody)
+	s := NewSidecar(SidecarConfig{ServerURL: srv.URL, StartupTimeoutSeconds: 5}, testLogger(t))
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	srv.Close() // the sidecar stops answering
+
+	h, err := s.Refresh(context.Background())
+	if err == nil {
+		t.Error("Refresh should report that it could not reach the sidecar")
+	}
+	if h.Status != "degraded" || len(h.Degraded) != 1 {
+		t.Errorf("the last known reading must survive a failed probe, got %+v", h)
 	}
 }

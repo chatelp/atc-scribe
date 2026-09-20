@@ -22,6 +22,7 @@ import (
 	"github.com/yegors/co-atc/internal/reference"
 	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
+	"github.com/yegors/co-atc/internal/transcription"
 	"github.com/yegors/co-atc/internal/weather"
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
@@ -48,6 +49,7 @@ type Handler struct {
 	// Operational state for the settings panel. See server_handlers.go.
 	runtime       *config.Runtime
 	db            *sqlite.DB
+	sttSidecar    *transcription.Sidecar
 	startedAt     time.Time
 	dbSampleAt    time.Time
 	dbSampleBytes int64

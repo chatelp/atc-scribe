@@ -3,6 +3,7 @@ package transcription
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -49,6 +50,27 @@ type Sidecar struct {
 	// operator would wait out the whole timeout for a bare "did not answer".
 	done    chan struct{}
 	waitErr error
+
+	lastHealth Health
+}
+
+// Health is what the sidecar says about itself. The field that matters is
+// Degraded: the French model on this station is a symlink to an external drive,
+// and unplugging it does not stop transcription -- it silently stops the second
+// opinion, and with it 8.5% of callsign matches. Nothing else in the system
+// would say so.
+type Health struct {
+	Status              string   `json:"status"` // "ok" or "degraded"
+	Degraded            []string `json:"degraded"`
+	SecondOpinion       bool     `json:"second_opinion"`
+	SecondOpinionOK     int      `json:"second_opinion_ok"`
+	SecondOpinionFailed int      `json:"second_opinion_failed"`
+	Models              map[string]struct {
+		ID        string `json:"id"`
+		Kind      string `json:"kind"`
+		Available bool   `json:"available"`
+		Detail    string `json:"detail"`
+	} `json:"models"`
 }
 
 // SidecarConfig is what main needs to supply; it maps onto [transcription.local].
@@ -94,6 +116,7 @@ func (s *Sidecar) Start(ctx context.Context) error {
 			} else {
 				s.logger.Info("Local STT sidecar reached", logger.String("url", s.url))
 			}
+			s.warnIfDegraded()
 			return nil
 		} else {
 			lastErr = err
@@ -234,11 +257,34 @@ func (s *Sidecar) probe(ctx context.Context) error {
 		return err
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 16384))
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("health returned %d", resp.StatusCode)
 	}
+	var h Health
+	if err := json.Unmarshal(body, &h); err == nil {
+		s.mu.Lock()
+		s.lastHealth = h
+		s.mu.Unlock()
+	}
 	return nil
+}
+
+// LastHealth returns what the sidecar last said about itself. Callers that want
+// it current call Refresh first.
+func (s *Sidecar) LastHealth() Health {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastHealth
+}
+
+// Refresh re-reads the sidecar's health. Used by the operational state endpoint,
+// so an external drive pulled out an hour ago shows up the moment someone looks.
+func (s *Sidecar) Refresh(ctx context.Context) (Health, error) {
+	if err := s.probe(ctx); err != nil {
+		return s.LastHealth(), err
+	}
+	return s.LastHealth(), nil
 }
 
 // tailBuffer keeps the last `limit` bytes written to it, so a failure can be
@@ -266,4 +312,21 @@ func (t *tailBuffer) String() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return strings.TrimSpace(t.buf.String())
+}
+
+// warnIfDegraded says out loud what would otherwise be a silence. A missing
+// model does not stop the server -- the primary transcript still arrives -- so
+// without this the only symptom is fewer aircraft identified, with no cause.
+func (s *Sidecar) warnIfDegraded() {
+	h := s.LastHealth()
+	for _, lang := range h.Degraded {
+		m := h.Models[lang]
+		s.logger.Warn("A transcription model is unreachable -- the server will run without it",
+			logger.String("language", lang),
+			logger.String("model", m.ID),
+			logger.String("detail", m.Detail))
+	}
+	if h.SecondOpinion && len(h.Degraded) == 0 {
+		s.logger.Info("Second opinion is on", logger.String("url", s.url))
+	}
 }

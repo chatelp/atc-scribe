@@ -26,6 +26,7 @@ from __future__ import annotations
 import io
 import logging
 import sys
+import os
 import time
 import unicodedata
 import wave
@@ -46,6 +47,7 @@ app = FastAPI(title="atc-scribe STT sidecar")
 
 _models: dict[str, object] = {}
 _vad = None
+_counters = {"second_opinion_ok": 0, "second_opinion_failed": 0}
 
 
 # --------------------------------------------------------------------------- audio
@@ -104,6 +106,24 @@ def model_for(language: str) -> tuple[str | None, str]:
     return (cfg.model_en or None), "en"
 
 
+# The French model on this station is a symlink to an external drive. Unplug it
+# and the second opinion stops working, the primary transcript still arrives, and
+# nothing anywhere says the station just lost 8.5% of its callsign matches. That
+# is the failure this reports: not a crash, a silence.
+def model_status(model: str) -> dict:
+    if not model:
+        return {"id": "", "kind": "none", "available": False, "detail": "not configured"}
+    # A local path is a directory we can look at; anything else is a hub id we
+    # cannot check without reaching the network, so we do not claim to know.
+    if model.startswith("/") or model.startswith("./") or model.startswith("~"):
+        path = os.path.expanduser(model)
+        if os.path.isdir(path):
+            return {"id": model, "kind": "path", "available": True}
+        return {"id": model, "kind": "path", "available": False,
+                "detail": "path not found -- an external drive may be unplugged"}
+    return {"id": model, "kind": "hub", "available": True, "detail": "not verified"}
+
+
 def load(path: str):
     if path not in _models:
         t0 = time.time()
@@ -119,8 +139,19 @@ def load(path: str):
 
 @app.get("/health")
 def health():
+    models = {"en": model_status(cfg.model_en), "fr": model_status(cfg.model_fr)}
+    # degraded, not unhealthy: the primary model answers, so transcription works;
+    # what is lost is the second opinion, and losing it quietly is the problem.
+    degraded = [lang for lang, m in models.items()
+                if m["kind"] == "path" and not m["available"]]
     return {
-        "status": "ok",
+        "status": "degraded" if degraded else "ok",
+        "degraded": degraded,
+        "models": models,
+        "second_opinion": cfg.second_opinion,
+        "second_opinion_ok": _counters["second_opinion_ok"],
+        "second_opinion_failed": _counters["second_opinion_failed"],
+        # kept for callers written against the earlier shape
         "model_en": cfg.model_en,
         "model_fr": cfg.model_fr or None,
         "vad": cfg.vad_enabled,
@@ -233,11 +264,15 @@ async def transcribe(
                 "model": cfg.model_fr,
                 "elapsed": round(time.time() - t1, 3),
             }
+            _counters["second_opinion_ok"] += 1
             log.info("%s second opinion (fr) %r", x_frequency_id or "-", second["text"][:80])
         except Exception as e:
             # A failed second opinion is not a failed transcription: the primary
-            # text stands and the caller is told nothing was added.
-            log.warning("second opinion failed: %s", e)
+            # text stands and the caller is told nothing was added. But it is
+            # counted, so /health can say it is happening.
+            _counters["second_opinion_failed"] += 1
+            log.warning("second opinion failed (%d so far): %s",
+                        _counters["second_opinion_failed"], e)
 
     elapsed = time.time() - started
     log.info("%s %.1fs speech=%.1fs %s %.2fs %r",
