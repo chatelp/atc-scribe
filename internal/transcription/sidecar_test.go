@@ -26,6 +26,8 @@ func testLogger(t *testing.T) *logger.Logger {
 
 func healthServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	// No pid: a sidecar that does not report one is tolerated, so these tests
+	// exercise spawning and stopping without also asserting ownership.
 	return healthServerSaying(t, `{"status":"ok"}`)
 }
 
@@ -250,5 +252,45 @@ func TestRefreshFailureKeepsTheLastReading(t *testing.T) {
 	}
 	if h.Status != "degraded" || len(h.Degraded) != 1 {
 		t.Errorf("the last known reading must survive a failed probe, got %+v", h)
+	}
+}
+
+// How seventeen servers came to share one sidecar in a night: each spawned its
+// own, each failed to bind the port, and each was reassured by the first one's
+// answer to the health probe. A probe that succeeds says something is there --
+// not that it is ours.
+func TestRefusesToStartOnSomeoneElsesSidecar(t *testing.T) {
+	// pid 1 is launchd: a pid that is certainly not the child we are about to
+	// spawn. The real sidecar reports its own.
+	srv := healthServerSaying(t, `{"status":"ok","pid":1}`)
+	s := NewSidecar(SidecarConfig{
+		ServerURL: srv.URL,
+		// Our own child cannot bind, so it dies -- exactly what the sixteen did.
+		Command:               []string{"sh", "-c", "echo 'address already in use' >&2; exit 1"},
+		StartupTimeoutSeconds: 5,
+	}, testLogger(t))
+
+	err := s.Start(context.Background())
+	if err == nil {
+		t.Fatal("starting on a sidecar we did not spawn must be refused")
+	}
+	for _, want := range []string{"not the sidecar we started", "command empty"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error should say %q and what to do about it, got: %v", want, err)
+		}
+	}
+	// And it should carry the child's own reason, which is the actionable part.
+	if !strings.Contains(err.Error(), "address already in use") {
+		t.Errorf("the error should carry the child's output, got: %v", err)
+	}
+}
+
+// The deliberate case stays allowed: no command means the operator runs the
+// sidecar themselves, and a foreign one answering is the whole point.
+func TestAForeignSidecarIsFineWhenNoCommandIsSet(t *testing.T) {
+	srv := healthServer(t)
+	s := NewSidecar(SidecarConfig{ServerURL: srv.URL, StartupTimeoutSeconds: 5}, testLogger(t))
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatalf("an empty command means using someone else's sidecar on purpose: %v", err)
 	}
 }

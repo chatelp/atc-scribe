@@ -65,6 +65,7 @@ type Health struct {
 	SecondOpinion       bool     `json:"second_opinion"`
 	SecondOpinionOK     int      `json:"second_opinion_ok"`
 	SecondOpinionFailed int      `json:"second_opinion_failed"`
+	PID                 int      `json:"pid"`
 	Models              map[string]struct {
 		ID        string `json:"id"`
 		Kind      string `json:"kind"`
@@ -111,7 +112,30 @@ func (s *Sidecar) Start(ctx context.Context) error {
 	announced := false
 	for {
 		if err := s.probe(ctx); err == nil {
+			// Something answers -- but is it ours? When we spawned a child, a
+			// probe succeeding while that child is dead means another process
+			// already holds the port. Accepting it is how seventeen servers came
+			// to share one sidecar in a night: each spawned its own, each failed
+			// to bind, and each was reassured by the first one's answer.
+			//
+			// Using a sidecar someone else runs is legitimate -- that is what an
+			// empty command is for. Doing it by accident is not.
 			if len(s.command) > 0 {
+				if why, ok := s.notOurs(); !ok {
+					// About to fail: give the child the moment it needs to finish
+					// dying and flush its reason. "address already in use" is the
+					// actionable half of this error, and it arrives a few
+					// milliseconds after the probe that revealed the problem.
+					s.waitForChild(500 * time.Millisecond)
+					// And stop it if it is somehow still alive: refusing to start
+					// is no reason to leave a process behind. The timeout path
+					// does the same.
+					s.Stop()
+					return fmt.Errorf(
+						"something is already answering at %s/health, but it is not the sidecar we started: %s.\n"+
+							"Stop the other one, or leave transcription.local.command empty to use it on purpose.\n%s",
+						s.url, why, s.output.String())
+				}
 				s.logger.Info("Local STT sidecar is up", logger.String("url", s.url))
 			} else {
 				s.logger.Info("Local STT sidecar reached", logger.String("url", s.url))
@@ -328,5 +352,55 @@ func (s *Sidecar) warnIfDegraded() {
 	}
 	if h.SecondOpinion && len(h.Degraded) == 0 {
 		s.logger.Info("Second opinion is on", logger.String("url", s.url))
+	}
+}
+
+// notOurs decides whether the process answering /health is the child we started.
+//
+// Timing cannot answer this: a child that fails to bind the port dies in
+// milliseconds, and whether its death has been reaped by the time the first
+// probe returns is a race. So the sidecar reports its own pid and we compare
+// process groups -- ours runs in its own, set at spawn, and every descendant
+// shares it. That covers a command that is a wrapper script as well as one that
+// is the interpreter itself.
+func (s *Sidecar) notOurs() (string, bool) {
+	s.mu.Lock()
+	cmd := s.cmd
+	s.mu.Unlock()
+	if cmd == nil || cmd.Process == nil {
+		return "", true
+	}
+	if gone := s.exited(); gone != nil {
+		return fmt.Sprintf("ours %v", gone), false
+	}
+
+	reported := s.LastHealth().PID
+	if reported == 0 {
+		// An older sidecar that does not report its pid. Not a reason to refuse:
+		// it may well be ours, and refusing on an absent field would break an
+		// install that works.
+		return "", true
+	}
+	if reported == cmd.Process.Pid {
+		return "", true
+	}
+	if pgid, err := syscall.Getpgid(reported); err == nil && pgid == cmd.Process.Pid {
+		return "", true
+	}
+	return fmt.Sprintf("pid %d answered, ours is %d", reported, cmd.Process.Pid), false
+}
+
+// waitForChild gives a child that is on its way out the time to exit and flush,
+// so its own message reaches the error the operator reads.
+func (s *Sidecar) waitForChild(d time.Duration) {
+	s.mu.Lock()
+	done := s.done
+	s.mu.Unlock()
+	if done == nil {
+		return
+	}
+	select {
+	case <-done:
+	case <-time.After(d):
 	}
 }

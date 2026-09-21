@@ -222,6 +222,10 @@ def health():
                 if m["kind"] == "path" and not m["available"]]
     return {
         "status": "degraded" if degraded else "ok",
+        # So a caller that started this process can tell it apart from one that
+        # was already holding the port. A health probe answering says something
+        # is there, not that it is yours.
+        "pid": os.getpid(),
         "degraded": degraded,
         "models": models,
         "second_opinion": cfg.second_opinion,

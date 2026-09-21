@@ -1652,3 +1652,38 @@ schéma migre en place — 8 colonnes à 12, ligne préservée.
 **Contribuable en amont** : c'est leur schéma, leur défaut, et le correctif rend leurs
 deux requêtes plus simples et plus rapides.
 
+### D33 — Un co-atc refuse de démarrer sur le sidecar d'un autre *(21/09)*
+
+Le trou révélé par D26, et qui explique comment dix-sept serveurs ont partagé un sidecar :
+chacun lançait le sien, chacun échouait à prendre le port 8178, **et chacun était rassuré
+par la réponse du premier**. `Start()` sondait `/health` et concluait au succès sans
+vérifier que *son propre* enfant avait survécu.
+
+**Une sonde qui réussit dit que quelque chose est là, pas que c'est le vôtre.**
+
+**Le temps ne peut pas trancher.** Un enfant qui échoue à prendre le port meurt en
+quelques millisecondes, et savoir si sa mort a été moissonnée quand la première sonde
+revient est une course — vérifié : le premier essai du correctif échouait pour cette
+raison. Une temporisation n'aurait réglé le problème qu'en moyenne.
+
+**Donc le sidecar déclare son PID** dans `/health`, et le Go compare au **groupe de
+processus** de son enfant — `Setpgid` au lancement, donc tout descendant le partage, ce
+qui couvre aussi une commande qui serait un script d'enveloppe. C'est exact, pas
+statistique.
+
+Trois détails qui comptent :
+
+- **Un sidecar qui ne déclare pas de PID est toléré.** Refuser sur un champ absent
+  casserait une installation qui marche, et le champ est neuf.
+- **Le cas délibéré reste permis** : `command` vide signifie « je lance le sidecar
+  moi-même », et une réponse étrangère est alors exactement ce qu'on veut.
+- **Avant d'échouer, on laisse l'enfant finir de mourir** (500 ms) pour que son propre
+  message — *« address already in use »* — atteigne l'erreur que lit l'opérateur. Et on
+  l'arrête, parce que refuser de démarrer n'est pas une raison de laisser un processus
+  derrière soi.
+
+**Vérifié en conditions réelles**, exactement le scénario de la nuit : un co-atc tourne,
+un second est lancé, il sort en code 1 avec *« pid 72978 answered, ours is … »*, et il
+reste **un co-atc et un sidecar**. Plus deux tests : le refus, et le fait que le cas
+délibéré passe toujours.
+
