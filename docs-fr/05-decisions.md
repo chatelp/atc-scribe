@@ -2049,3 +2049,65 @@ mieux ce qu'il capte n'est pas un gain qui gagne** — il faudra compter les deu
 et taux d'appariement. Question posée à la station, qui seule connaît la sémantique de son
 seuil.
 
+#### Réponse de la station, le 21/09 : le confondant se dissout, deux amendements
+
+**Le seuil est relatif** (`squelch_snr_threshold`, un rapport signal/bruit au-dessus du
+plancher estimé), jamais le seuil absolu que RTLSDR-Airband expose par ailleurs. Baisser le
+gain baisse le signal **et** le plancher ensemble : la sélectivité est préservée, il ne
+faut **rien** décaler — décaler créerait le biais qu'on cherchait à éviter. 10 dB sur six
+canaux, 25 dB sur 132,783. Réserve datée : l'équivalence tient tant que le plancher de
+bruit reste au-dessus du plancher de quantification ; à 16,6 dB il n'y était plus, à
+32,8 dB on est encore linéaire.
+
+> L'agent précise **n'avoir pas pu faire imprimer au binaire son seuil effectif** : sa
+> réponse repose sur le nom du paramètre et le comportement observé, pas sur une valeur
+> lue. Et il fournit de quoi le vérifier — **compter les déclenchements par bloc avant de
+> regarder les transcriptions** : si le seuil était absolu, ils s'effondreraient à 32,8.
+
+**Amendement 1 — le vrai coût des bascules est le squelch, pas le trou.** Le trou audio
+fait 2 à 3 s (dérivé de la campagne ATIS : cycle 267 s, audio 264,10 s). Mais l'auto-squelch
+réestime son plancher à chaque redémarrage, deux minutes. Sur 18 bascules, **le biais va
+dans le même sens à chaque début de bloc : il ne se moyenne pas.** Écarter les deux
+premières minutes de chaque bloc (−6,7 %) plutôt qu'allonger les blocs, ce qui perdrait la
+décorrélation d'avec la courbe de trafic.
+
+**Amendement 2 — nous avions choisi la fenêtre et la bande du parasite secteur.** 22 h–07 h
+sur 132-133, c'est exactement là où il est caractérisé : 92 à 98 % de fichiers vides toute
+la nuit. L'alternance décorrèle, la comparaison tient — mais **le piège d'interprétation
+est sérieux et il nous rattrape** : entre 22 h et 7 h, l'émetteur le plus fort n'est
+peut-être pas un avion. *« Lisez l'écrêtage transmission par transmission, jamais sur le
+bloc entier. Sinon vous mesurerez le chauffe-eau. »* Nous aurions lu le bloc.
+
+#### Ce que la campagne peut détecter — et pourquoi ça change la mesure principale
+
+De ~1 040 transmissions porteuses de parole annoncées, moins l'exclusion : **~485 par
+bras.** Calculé le 21/09 :
+
+| Mesure | Base | Écart détectable |
+|---|---|---|
+| Appariement ADS-B | 10 % | **3,8 pts, soit 38 % en relatif** |
+| Transcription non vide | 50 % | 6,3 pts (13 %) |
+| **Écrêtage par transmission** *(continu)* | — | **0,13 écart-type** |
+
+**Le taux d'appariement, notre mesure habituelle, est ici sous-dimensionné** : il faudrait
+un effet de 38 % en relatif pour le voir. Mais la question principale n'en a pas besoin —
+« le gain quotidien écrête-t-il les avions ? » se répond en mesurant l'écrêtage sur les
+transmissions porteuses de parole, **sans transcrire**, sur tout le n, et sur une mesure
+continue. C'est exactement la lecture que le garde-fou de l'amendement 2 impose : **son
+piège était aussi la bonne mesure principale, et nous ne l'avions pas vu.**
+
+Une seule nuit suffit pour la question principale. Le volet transcription sera rapporté
+avec son incertitude, sans conclusion sous 38 %.
+
+#### Prédiction posée avant les données
+
+Le convertisseur est partagé par toute la fenêtre de 2,56 MHz, et le parasite est un peigne
+sur toute la tranche 132-133 — donc dedans. **Un parasite qui sature la conversion affame
+tous les canaux, avions compris.** Si ce mécanisme joue, baisser le gain aide les avions
+*parce que* ça empêche le parasite d'écrêter.
+
+- 32,8 gagne **et le gain est plus grand à 00 h–05 h qu'aux extrémités** → affamement du
+  convertisseur ;
+- gain **uniforme sur la nuit** → simple effet de gain.
+
+Écrit avant les données pour ne pas pouvoir raconter l'histoire après coup.
