@@ -106,6 +106,14 @@ type ADSBConfig struct {
 type LoggingConfig struct {
 	Level  string `toml:"level"`  // Log level: "debug", "info", "warn", or "error"
 	Format string `toml:"format"` // Log format: "json" (structured) or "console" (human-readable)
+
+	// Where to keep the log, and how much of it. Empty file means stdout only,
+	// which is upstream's behaviour and leaves the size unbounded. One file per
+	// day, a ceiling per file for the day that goes wrong, and a count so the
+	// whole thing stops growing. Measured here: one server writes 17 MB a day.
+	File      string `toml:"file"`
+	MaxSizeMB int    `toml:"max_size_mb"`
+	MaxFiles  int    `toml:"max_files"`
 }
 
 // StorageConfig contains data persistence configuration

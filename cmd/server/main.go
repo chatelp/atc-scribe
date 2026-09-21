@@ -92,8 +92,11 @@ func main() {
 
 	// Create logger
 	log, err := logger.New(logger.Config{
-		Level:  cfg.Logging.Level,
-		Format: cfg.Logging.Format,
+		Level:     cfg.Logging.Level,
+		Format:    cfg.Logging.Format,
+		File:      cfg.Logging.File,
+		MaxSizeMB: cfg.Logging.MaxSizeMB,
+		MaxFiles:  cfg.Logging.MaxFiles,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating logger: %v\n", err)
