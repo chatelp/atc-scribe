@@ -720,7 +720,7 @@ correctif est du code — rouvrir la base à minuit, ou ne plus stocker `raw_dat
 candidat naturel à une pull request amont. Pas de veilleur : il dirait au jour 5 ce que
 le code dit au jour 0.
 
-### Q27 — Ce que les instruments hors ligne ne mesurent pas *(nouvelle, 16/09)*
+### Q27 — Ce que les instruments hors ligne ne mesurent pas *(16/09 — **le compteur de rejet VAD existe et a répondu, voir D27**)*
 
 Trois écarts entre les deux outils de mesure et la production, relevés par le panel :
 
@@ -1363,4 +1363,97 @@ dédié `atis-131025`** déclenché à la demande, pas un canal ajouté à un gr
 
 > **Le garde de `salves.py` était déjà en place** depuis la nuit du 15 au 16 ; notre
 > demande le réclamait comme une tâche à faire. Document périmé, corrigé.
+
+### D26 — Le veilleur de mode a lancé 17 co-atc en une nuit *(21/09)*
+
+**Une panne que j'ai entièrement fabriquée**, et qui mérite d'être écrite en entier parce
+que la faute est structurelle, pas une coquille.
+
+**Ce que le veilleur devait faire.** Suivre `/radio/etat` et aligner co-atc dessus :
+pause quand la station quitte `gros-porteurs` pour la mesure ATIS, relance au retour.
+Écrit et lancé le 20/09 à 20 h 58.
+
+**Ce qu'il a fait.** Il a détecté la bascule en 12 secondes, laissé co-atc en pause
+correctement, puis, au retour à 21 h 20, **relancé une instance toutes les vingt secondes
+jusqu'à 9 h 34.** Dix-sept tournaient au réveil.
+
+**La cause, en une ligne :**
+
+```bash
+tourne() { pgrep -f "$PROJET/bin/co-atc"; }      # cherche /Users/.../atc-scribe/bin/co-atc
+demarre() { cd "$PROJET"; nohup ./bin/co-atc ... }   # la ligne de commande est ./bin/co-atc
+```
+
+Le motif absolu ne matche jamais une ligne de commande relative. **Le test « tourne-t-il
+déjà ? » répondait toujours non.**
+
+**La faute de méthode, qui est le vrai sujet.** J'ai vérifié que le veilleur *détectait*
+la bascule — et c'est tout ce que j'ai vérifié. **Je n'ai jamais testé qu'il ne
+relancerait pas un processus déjà vivant**, qui est la seule propriété qui définisse un
+superviseur. Un test aurait pris trente secondes : lancer, attendre un tour, compter.
+
+**La cascade.** 17 instances se disputant la même base SQLite ont produit des tempêtes de
+`SQLITE_BUSY` ; les écritures de transcription ont commencé à échouer vers 7 h. Et la
+charge a fait expirer les appels `curl` du veilleur lui-même, qui a conclu *« station
+injoignable »* pendant neuf heures — **mon bug a cassé mon propre instrument de mesure**,
+et `accord` valait `True` tout du long.
+
+**Un trou dans la supervision du sidecar, révélé par là.** Chaque nouvelle instance
+lançait son sidecar, qui échouait à prendre le port 8178 ; mais la sonde `/health`
+réussissait, parce que **le sidecar de la première instance répondait**. `Start()` sonde
+avant de vérifier que son propre enfant a survécu, donc co-atc démarrait en utilisant le
+sidecar d'un autre. À corriger : vérifier `exited()` avant de conclure au succès.
+
+**Le coût.** 21 Go de disque, une charge de 6,4 toute la nuit, une base contaminée
+(197 doublons exacts le 20, 652 le 21), et 13 Go d'archive dont l'essentiel est redondant.
+
+**Le veilleur est retiré.** Pas corrigé : la valeur qu'il apportait — éviter un relais
+humain de quelques minutes — ne justifie pas un processus qui lance des serveurs sans
+surveillance.
+
+### D27 — Le parasite secteur, mesuré depuis le Mac *(21/09)*
+
+Q27 demandait un compteur de rejet du détecteur de voix en production : *« Le parasite
+est-il absent le jour ? reste sans réponse tant qu'il n'existe pas. »* Il existe depuis
+le 20/09, et la nuit a répondu.
+
+**Taux de rejet du VAD, par heure, 66 860 clips archivés :**
+
+| | | | | |
+|---|---|---|---|---|
+| 20h **10 %** | 21h 16 % | 22h 61 % | 23h 61 % | |
+| 00h 86 % | 01h 88 % | 02h **96 %** | 03h **98 %** | 04h 95 % |
+| 05h 72 % | 06h 47 % | 07h 26 % | 08h **4 %** | 09h **5 %** |
+
+**C'est la courbe du parasite secteur**, que la station documentait comme montant dès
+17 h et saturant de 22 h à 7 h. **Première mesure côté Mac, et elle la confirme
+indépendamment.** Réponse à Q27 : oui, le parasite est absent le jour — 4 % à 8 h contre
+98 % à 3 h.
+
+> **Le contrôle qui rend le chiffre valide malgré D26** : à 8 h et 9 h, les 17 instances
+> tournaient toujours, et le taux est à 4-5 %. Le nombre d'instances ne pilote donc pas
+> le taux — c'est une propriété de l'audio, pas du nombre de lecteurs. Sans ce contrôle,
+> la courbe n'aurait rien valu.
+
+**Et ça chiffre ce que le VAD sauve.** À 3 h du matin, **98 % de ce qui franchit le
+squelch n'est pas de la parole**. Sans lui, la chaîne transcrirait 11 000 clips de bruit
+en une nuit — et un modèle nourri de bruit ne rend pas le silence, il rend des phrases
+plausibles. Le VAD n'est pas une optimisation, c'est ce qui empêche la base de se remplir
+de faux.
+
+### Q33 — Les deux lectures se contredisent plus que prévu *(nouvelle, 21/09)*
+
+D24 notait 8 accords sur 8 dans la porte, en soulignant que **0 sur 8 ne borne rien**.
+La nuit donne le premier vrai relevé, sur la base du 21 :
+
+| provenance de l'indicatif | nombre |
+|---|---|
+| `en` — la lecture principale | 116 |
+| `fr` — la seconde seule | 1 |
+| **`en>fr` — désaccord, principal retenu** | **3** |
+
+**Sur les quatre cas où la lecture française a aussi apparié, trois ont nommé un avion
+différent.** La règle d'arbitrage, que je prédisais quasi inutile, tranche donc
+régulièrement. Reste à savoir **qui a raison** — et ça, aucune mesure ne le dit encore :
+il faudrait écouter les trois clips, qui sont archivés.
 
