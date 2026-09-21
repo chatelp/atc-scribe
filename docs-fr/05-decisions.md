@@ -1582,3 +1582,33 @@ seront supprimés au prochain balayage. C'est exactement le conseil que j'ai don
 applique, « Saved. » s'affiche, le serveur bascule en `warn`, le fichier
 `runtime-settings.json` le garde, et le journal note qui l'a fait.
 
+### D31 — Q29 se réplique sur un corpus indépendant *(21/09)*
+
+La réserve numéro 3 de Q29 disait : *« une seule session de mesure, celle du 15/09 »*.
+Elle est levée. La nuit du 20 au 21 fournit un second corpus — autre nuit, autres
+fréquences (`gros-porteurs` au lieu de `orly-approche`), autre trafic, **11 474
+transmissions** contre 1 378.
+
+| | appariés | hasard | **vrais** | précision |
+|---|---|---|---|---|
+| lecture anglaise seule | 1 000 | 264,7 | **735,3** | **74 %** |
+| + second avis, porte | 1 122 | 300,5 | **821,5** | 73 % |
+
+**+86 appariements vrais, soit +11,7 %.** Q29 mesurait **+8,5 %** sur le corpus du 15/09.
+Deux corpus indépendants, même conclusion, magnitude du même ordre.
+
+**Et la porte s'ouvre sur 12,2 %** des transmissions ici, contre **12,5 %** mesuré hors
+ligne le 20/09. À trois dixièmes de point. Le détecteur de français n'était pas réglé sur
+ce corpus-ci et s'y comporte pareil.
+
+**Une nuance honnête** : Q29 annonçait « précision inchangée », ici elle passe de 74 à
+73 %. Un point, dans le sens attendu — deux lectures, deux chances de tomber juste par
+accident. La conclusion ne bouge pas ; la formulation « inchangée » était un peu large.
+
+**Ce que ça vaut.** C'est la première réplication indépendante du dossier. Toutes les
+autres mesures — le choix du modèle anglais (D12), les seuils (D14), la porte (D24) —
+reposent encore sur la seule après-midi du 15 septembre. Celle-ci ne repose plus.
+
+> **Et la précision de 74 % elle-même est une réplication** : 72 % sur le corpus du
+> 15/09, 74 % ici. Le chiffre n'était pas une propriété de cette après-midi-là.
+
