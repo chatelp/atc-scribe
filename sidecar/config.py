@@ -56,6 +56,19 @@ class Config:
     # thing that cannot be rebuilt from anything else.
     save_audio_min_free_gb: float = 8.0
 
+    # Stop when the process that started this one goes away.
+    #
+    # co-atc stops its sidecar on the way out, but it cannot do so when it is
+    # killed outright -- and a sidecar that outlives it holds port 8178, which is
+    # how seventeen servers came to share one in a night. Three orphans were
+    # observed on this machine in a single day. The parent cannot prevent this;
+    # the child can notice.
+    #
+    # Off when this process was already orphaned at startup, so `nohup ... &`
+    # followed by closing the terminal still works. --no-exit-with-parent turns
+    # it off outright.
+    exit_with_parent: bool = True
+
     log_level: str = "info"
 
 
@@ -79,9 +92,12 @@ def from_args(argv: list[str] | None = None) -> Config:
                    help="keep every transmission's audio and a manifest line, rejected ones included")
     p.add_argument("--save-audio-min-free-gb", type=float, default=d.save_audio_min_free_gb,
                    help="stop archiving below this much free disk space (default 8)")
+    p.add_argument("--no-exit-with-parent", dest="exit_with_parent", action="store_false",
+                   help="keep running after the process that started this one goes away")
     a = p.parse_args(argv)
     return Config(host=a.host, port=a.port, model_en=a.model_en, model_fr=a.model_fr,
                   preload=a.preload, vad_enabled=a.vad,
                   min_speech_seconds=a.min_speech_seconds, log_level=a.log_level,
                   second_opinion=a.second, save_audio=a.save_audio,
-                  save_audio_min_free_gb=a.save_audio_min_free_gb)
+                  save_audio_min_free_gb=a.save_audio_min_free_gb,
+                  exit_with_parent=a.exit_with_parent)
