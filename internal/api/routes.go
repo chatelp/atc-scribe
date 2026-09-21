@@ -91,6 +91,9 @@ func (r *Router) Routes() http.Handler {
 			// How the server is actually running: database growth, disk, retention,
 			// log level. See internal/api/server_handlers.go.
 			router.Get("/server", r.handler.GetServerState)
+			// Writing is behind the same group, so it needs a session whenever
+			// authentication is on -- retention decides when data is deleted.
+			router.Put("/server/settings", r.handler.PutServerSettings)
 			router.Get("/adsb/source", r.handler.GetADSBSourceStatus)
 
 			// Station Configuration

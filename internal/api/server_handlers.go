@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -232,4 +234,59 @@ func (h *Handler) loggingState() LoggingState {
 	}
 	st.TotalMB = total / (1024 * 1024)
 	return st
+}
+
+// PutServerSettings changes what can be changed while the server runs.
+//
+// Only two things can: the log level and the database retention. Everything else
+// on the settings page is reported and not editable, because changing it means
+// reopening something -- the log file, the audio pipeline, the listening port --
+// and a settings page that silently fails to apply half of what it shows is
+// worse than one that says which half it can.
+//
+// Behind authentication, unlike the read: retention decides when data is
+// deleted, and that is not a knob for anyone who can reach the port.
+func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
+	if h.runtime == nil {
+		http.Error(w, "runtime settings unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	var next config.RuntimeSettings
+	if err := json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&next); err != nil {
+		http.Error(w, "invalid settings: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Absent fields keep their current value rather than becoming zero, so a
+	// client that only wants to change the log level does not silently set the
+	// retention to nothing.
+	current := h.runtime.Settings()
+	if next.DBRetentionDays == 0 {
+		next.DBRetentionDays = current.DBRetentionDays
+	}
+	if next.LogLevel == "" {
+		next.LogLevel = current.LogLevel
+	}
+
+	if err := h.runtime.Apply(next); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Who changed it, when authentication is on. A retention that quietly halves
+	// one morning should be traceable to someone.
+	by := "anonymous"
+	if sess, ok := h.auth.SessionFrom(r); ok {
+		by = sess.User
+	}
+	h.logger.Info("Server settings changed from the panel",
+		logger.String("by", by),
+		logger.Int("db_retention_days", next.DBRetentionDays),
+		logger.String("log_level", next.LogLevel))
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(h.runtime.Settings()); err != nil {
+		h.logger.Error("Failed to encode settings response", logger.Error(err))
+	}
 }

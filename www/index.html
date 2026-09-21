@@ -532,6 +532,98 @@
                                     </div>
                                 </div>
                             </section>
+                            
+                            <!-- Server. Everything above this line is a browser preference kept in
+                                 localStorage; everything below it is the server's own state, read from
+                                 /api/v1/server. Worth separating: one follows you between machines, the
+                                 other decides when data is deleted. -->
+                            <section class="mb-5" x-data="serverSettings()" x-init="load()">
+                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5 flex items-center justify-between">
+                                    <span>Server</span>
+                                    <button @click="load()" :disabled="busy" class="text-xs opacity-60 hover:opacity-100 disabled:opacity-30">
+                                        <i class="fas fa-rotate" :class="{ 'fa-spin': busy }"></i>
+                                    </button>
+                                </h3>
+                            
+                                <template x-if="error">
+                                    <div class="text-xs text-red-400 mb-2" x-text="error"></div>
+                                </template>
+                            
+                                <template x-if="state">
+                                    <div class="grid gap-2.5">
+                                        <!-- Editable: the only two things that change without a restart. -->
+                                        <div class="flex items-center justify-between gap-2.5">
+                                            <span class="text-sm">Log level</span>
+                                            <select x-model="draft.log_level" @change="save()"
+                                                    class="bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                <option value="debug">debug</option>
+                                                <option value="info">info</option>
+                                                <option value="warn">warn</option>
+                                                <option value="error">error</option>
+                                            </select>
+                                        </div>
+                            
+                                        <div class="flex items-center justify-between gap-2.5">
+                                            <span class="text-sm">Keep databases for</span>
+                                            <div class="flex items-center gap-2">
+                                                <input type="number" min="1" max="365"
+                                                       x-model.number="draft.db_retention_days" @change="save()"
+                                                       class="w-16 bg-background border border-border rounded px-2 py-0.5 text-sm text-right">
+                                                <span class="text-xs opacity-60">days</span>
+                                            </div>
+                                        </div>
+                            
+                                        <template x-if="note">
+                                            <div class="text-xs" :class="noteBad ? 'text-red-400' : 'text-green-400'" x-text="note"></div>
+                                        </template>
+                            
+                                        <!-- Reported, not editable: changing any of these means reopening
+                                             something, and a panel that silently fails to apply what it
+                                             shows is worse than one that says which half it can. -->
+                                        <div class="border-t border-border pt-2 mt-1 grid gap-1.5 text-xs">
+                                            <div class="flex justify-between gap-2">
+                                                <span class="opacity-60">Database</span>
+                                                <span class="text-right" :class="state.storage.rotates ? '' : 'text-red-400'"
+                                                      x-text="fmtBytes(state.storage.active_db_bytes) + (state.storage.rotates ? ' · rotates daily' : ' · NEVER ROTATES')"></span>
+                                            </div>
+                                            <div class="flex justify-between gap-2" x-show="state.storage.growth_bytes_per_hour > 0">
+                                                <span class="opacity-60">Growing</span>
+                                                <span x-text="fmtBytes(state.storage.growth_bytes_per_hour) + '/h'"></span>
+                                            </div>
+                                            <div class="flex justify-between gap-2" x-show="state.storage.days_until_full > 0">
+                                                <span class="opacity-60">Disk full in</span>
+                                                <span :class="state.storage.days_until_full < 7 ? 'text-red-400' : ''"
+                                                      x-text="state.storage.days_until_full.toFixed(1) + ' days'"></span>
+                                            </div>
+                                            <div class="flex justify-between gap-2">
+                                                <span class="opacity-60">Disk free</span>
+                                                <span x-text="fmtBytes(state.storage.disk_free_bytes)"></span>
+                                            </div>
+                                            <div class="flex justify-between gap-2">
+                                                <span class="opacity-60">Log</span>
+                                                <span class="text-right" :class="state.logging.bounded ? '' : 'text-yellow-400'"
+                                                      x-text="state.logging.bounded
+                                                              ? (state.logging.max_size_mb + ' MB × ' + state.logging.max_files + ' files')
+                                                              : 'stdout only · UNBOUNDED'"></span>
+                                            </div>
+                                            <template x-if="state.transcription">
+                                                <div class="flex justify-between gap-2">
+                                                    <span class="opacity-60">Transcription</span>
+                                                    <span class="text-right" :class="state.transcription.status === 'ok' ? '' : 'text-red-400'"
+                                                          x-text="state.transcription.status + (state.transcription.second_opinion ? ' · second opinion' : '')"></span>
+                                                </div>
+                                            </template>
+                                            <template x-if="state.transcription && state.transcription.detail">
+                                                <div class="text-red-400 leading-snug" x-text="state.transcription.detail"></div>
+                                            </template>
+                                            <div class="flex justify-between gap-2">
+                                                <span class="opacity-60">Uptime</span>
+                                                <span x-text="fmtUptime(state.uptime_seconds)"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </section>
                         </div>
                     </aside>
                     

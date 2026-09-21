@@ -5602,3 +5602,110 @@ async initAircraftDataSource() {
         }
     });
 });
+
+// ---------------------------------------------------------------- server panel
+//
+// The Server section of the settings panel. Everything else in that panel is a
+// browser preference kept in localStorage; this one is the server's own state,
+// and the two were worth separating -- one follows you between machines, the
+// other decides when data is deleted.
+//
+// Only two settings are writable while the server runs: the log level and the
+// database retention. The rest is reported and not editable, because changing it
+// means reopening the log file or the audio pipeline. A panel that silently
+// fails to apply half of what it shows is worse than one that says which half.
+function serverSettings() {
+    return {
+        state: null,
+        draft: { log_level: 'info', db_retention_days: 7 },
+        busy: false,
+        error: '',
+        note: '',
+        noteBad: false,
+
+        async load() {
+            this.busy = true;
+            this.error = '';
+            try {
+                const r = await fetch('/api/v1/server', { credentials: 'same-origin' });
+                if (r.status === 401) { this.error = 'Sign in to see the server state.'; return; }
+                if (!r.ok) { this.error = 'Server state unavailable (' + r.status + ')'; return; }
+                this.state = await r.json();
+                this.draft = {
+                    log_level: this.state.settings.log_level,
+                    db_retention_days: this.state.settings.db_retention_days,
+                };
+            } catch (e) {
+                this.error = 'Server state unreachable: ' + e.message;
+            } finally {
+                this.busy = false;
+            }
+        },
+
+        async save() {
+            // Retention decides when data is deleted, so the panel says what it
+            // is about to do rather than doing it silently.
+            const days = Number(this.draft.db_retention_days);
+            if (!Number.isFinite(days) || days < 1 || days > 365) {
+                this.flash('Retention must be between 1 and 365 days.', true);
+                return;
+            }
+            if (this.state && days < this.state.settings.db_retention_days) {
+                const kept = this.state.storage.daily_files || [];
+                const doomed = kept.length - days;
+                if (doomed > 0 && !confirm(
+                    'Lowering retention to ' + days + ' days will delete ' + doomed +
+                    ' older database file(s) at the next hourly sweep. Continue?')) {
+                    this.draft.db_retention_days = this.state.settings.db_retention_days;
+                    return;
+                }
+            }
+
+            this.busy = true;
+            try {
+                const r = await fetch('/api/v1/server/settings', {
+                    method: 'PUT',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        log_level: this.draft.log_level,
+                        db_retention_days: days,
+                    }),
+                });
+                if (r.status === 401) { this.flash('Sign in to change server settings.', true); return; }
+                if (!r.ok) { this.flash((await r.text()).trim() || ('Refused (' + r.status + ')'), true); return; }
+                this.state.settings = await r.json();
+                this.flash('Saved.', false);
+                // Reread rather than trust: the figures downstream -- retention,
+                // days until full -- move with what was just changed.
+                await this.load();
+            } catch (e) {
+                this.flash('Could not save: ' + e.message, true);
+            } finally {
+                this.busy = false;
+            }
+        },
+
+        flash(msg, bad) {
+            this.note = msg;
+            this.noteBad = bad;
+            setTimeout(() => { this.note = ''; }, bad ? 8000 : 3000);
+        },
+
+        fmtBytes(n) {
+            if (!n && n !== 0) return '—';
+            const u = ['B', 'kB', 'MB', 'GB', 'TB'];
+            let i = 0;
+            while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+            return (i === 0 ? n : n.toFixed(1)) + ' ' + u[i];
+        },
+
+        fmtUptime(s) {
+            if (!s && s !== 0) return '—';
+            const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+            if (d) return d + 'd ' + h + 'h';
+            if (h) return h + 'h ' + m + 'm';
+            return m + 'm';
+        },
+    };
+}

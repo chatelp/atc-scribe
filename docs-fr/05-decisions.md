@@ -1532,3 +1532,53 @@ en base, à l'unité près, et les douze fichiers relus sans erreur.
 résumé ADS-B**. La base brute, elle, est un format de travail — et l'historique ADS-B est
 de toute façon reconstituable depuis `globe_history` sur la station (Q18).
 
+### D30 — Le panneau de réglages serveur, et la borne du journal *(21/09)*
+
+Deux pièces qui attendaient depuis le 16/09, dans l'ordre convenu alors —
+*« réglages serveur → auth → écriture »*. L'écriture existe enfin.
+
+**La borne du journal.** L'amont écrit sur la sortie standard : la taille de ce dans quoi
+on la redirige n'est bornée par rien. Mesuré ici, ce n'est **pas** un problème de place en
+régime normal — 0,7 Mo/h, **17 Mo par jour**, trois ordres de grandeur sous la base. La
+borne est pour le cas qui est arrivé : D26 a mis **103 Mo dans un fichier en une nuit**.
+
+Trois bornes, parce qu'elles attrapent des choses différentes — **un fichier par jour**
+(« que s'est-il passé la nuit du 20 ? » est une question qu'on pose à un fichier), un
+**plafond de taille** pour le jour qui déraille, un **nombre de fichiers** pour que le
+dossier cesse de grossir. Défauts : 100 Mo × 7, soit ~120 Mo en régime normal.
+
+Quatre-vingts lignes plutôt qu'une dépendance, et **sept tests** — dont : un redémarrage
+en cours de journée *ajoute* au journal du jour au lieu de le tronquer (c'est justement
+la partie qu'on va chercher après un plantage), un fichier plein est *sauté* et non
+rouvert (sinon le plafond n'en est plus un), et l'élagage ne supprime jamais le fichier
+en cours d'écriture.
+
+**L'écriture des réglages.** `PUT /api/v1/server/settings`, derrière le même groupe
+authentifié que le reste — la rétention décide quand des données sont supprimées, ce
+n'est pas un bouton pour qui atteint le port. Un champ absent **garde sa valeur** plutôt
+que de devenir zéro : un client qui ne veut changer que le niveau de journal ne doit pas
+mettre la rétention à rien sans le savoir.
+
+**Le panneau.** Une section « Server » dans le panneau existant de l'amont, et la
+séparation est délibérée : **tout ce qui est au-dessus est une préférence de navigateur**
+gardée en `localStorage`, tout ce qui est en dessous appartient au serveur. L'un vous
+suit d'une machine à l'autre, l'autre décide quand des données disparaissent.
+
+**Deux réglages modifiables, le reste rapporté.** Niveau de journal et rétention changent
+à chaud ; le chemin du journal, le plafond, le nombre de fichiers demandent un
+redémarrage et sont donc affichés sans être éditables. **Un panneau qui échoue en silence
+à appliquer la moitié de ce qu'il montre est pire qu'un panneau qui dit laquelle.**
+
+Et il dit ce qui ne va pas plutôt que de l'enjoliver : `NEVER ROTATES` en rouge si la
+base ne tourne pas, `UNBOUNDED` en jaune si le journal n'est pas borné, le détail de
+l'erreur si un modèle de transcription est injoignable, et le nombre de jours avant
+disque plein en rouge sous sept jours.
+
+**Baisser la rétention demande une confirmation** qui nomme le nombre de fichiers qui
+seront supprimés au prochain balayage. C'est exactement le conseil que j'ai donné le
+20/09 sans en mesurer la conséquence, et qui aurait détruit les bases du 15, 16 et 17.
+
+**Vérifié dans le navigateur, pas seulement par `curl`** : la section rend, le sélecteur
+applique, « Saved. » s'affiche, le serveur bascule en `warn`, le fichier
+`runtime-settings.json` le garde, et le journal note qui l'a fait.
+
