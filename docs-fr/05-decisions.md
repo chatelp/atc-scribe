@@ -1457,3 +1457,35 @@ différent.** La règle d'arbitrage, que je prédisais quasi inutile, tranche do
 régulièrement. Reste à savoir **qui a raison** — et ça, aucune mesure ne le dit encore :
 il faudrait écouter les trois clips, qui sont archivés.
 
+### D28 — Le corpus de la nuit, compacté *(21/09)*
+
+Le sidecar écrivait du **WAV non compressé** : 12,6 Go pour 13 heures, quand le corpus du
+15/09 tient en 24 Mo pour 1 468 clips parce qu'il est en MP3. Erreur de conception de
+l'archivage, corrigée après coup.
+
+**Le débit a été mesuré, pas choisi.** Dix clips tirés au hasard, transcription du WAV
+comparée à celle du MP3 :
+
+| débit | compression | transcriptions identiques |
+|---|---|---|
+| 32 kbit/s | 11,8× | **3/10** |
+| **64 kbit/s** | **5,9×** | **9/10** |
+| 96 kbit/s | 4,0× | 8/10 |
+| 128 kbit/s | 3,0× | 9/10 |
+
+**À 32 kbit/s la compression change le texte** — un corpus dont la transcription dépend
+du codec ne vaut rien comme référence. À 64 le palier est atteint et monter n'améliore
+plus : le 1/10 restant n'est pas un problème de débit mais la sensibilité du modèle sur
+des clips marginaux.
+
+**Deux sorts.** Les **13 122 clips transcrits** sont le corpus : tous convertis, aucun
+perdu. Les **53 738 rejetés par le VAD** sont du bruit et avaient déjà produit la courbe
+de D27 ; il en reste **402, trente par heure**, stratifiés — parce que *« le VAD avait-il
+raison de les jeter ? »* reste ouvert et ne se répond pas sur des clips supprimés.
+
+**12,6 Go → 1,04 Go, zéro échec, zéro fichier manquant**, les 28 marqueurs conservés. Le
+WAV n'était supprimé qu'après vérification que le MP3 existait et n'était pas vide.
+
+> **Ce qu'il faut changer dans le sidecar** : écrire directement en MP3 64 kbit/s à
+> 16 kHz. Le WAV n'a servi à rien qu'à occuper douze fois la place.
+
