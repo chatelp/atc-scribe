@@ -2111,3 +2111,57 @@ tous les canaux, avions compris.** Si ce mécanisme joue, baisser le gain aide l
 - gain **uniforme sur la nuit** → simple effet de gain.
 
 Écrit avant les données pour ne pas pouvoir raconter l'histoire après coup.
+
+#### Lancée le 21/09 à 22 h — et notre prédiction n'était pas testable
+
+Bloc 01/18 à **22 h 00 min 00,54**, gabarit sauvegardé avant modification, restauration du
+matin par **copie de la sauvegarde** et non réécriture de la ligne de gain. Deux échecs
+consécutifs d'`aero-mode` arrêtent la campagne et restaurent — on récupère une nuit
+partielle plutôt qu'une station dans un état intermédiaire. Les 18 bascules sont alignées
+**sur l'horloge murale et non sur des sommeils cumulés** : enchaînées naïvement, les 27 s
+de chaque bascule auraient décalé le dernier bloc de huit minutes.
+
+**Quatrième rattrapage de la station en trois échanges, et celui-ci porte sur la
+prédiction elle-même.** Ils ont ajouté un **témoin continu sur 132,275**, non demandé :
+
+> *« Vos fichiers par transmission ne s'ouvrent que quand le squelch s'ouvre — ils ne
+> peuvent pas, par construction, montrer le bruit entre les transmissions. Or votre
+> prédiction en a besoin. »*
+
+C'est exact. Distinguer « 32,8 gagne davantage aux heures chargées en parasite » d'un
+simple effet de gain suppose une mesure de l'intensité du parasite **indépendante des
+déclenchements**. Le matériau que nous avions demandé ne pouvait pas la fournir. **Une
+prédiction non testable avec les données qu'on a soi-même demandées n'est pas une
+prédiction.**
+
+#### Validation de l'outil contre les chiffres publiés, avant les données
+
+Fait dans la nuit plutôt que d'attendre 7 h. Les cinq prises ATIS sont encore servies par
+la station ; on remesure et on compare à leur rapport.
+
+| Prise | RMS publié / mesuré | Crête | Somme histogramme, publiée → mesurée | rapport |
+|---|---|---|---|---|
+| A | −15,1 / −15,1 | −0,1 / −0,0 | 8 019 → 9 670 | **×1,21** |
+| B | −15,5 / −15,5 | −0,7 / −0,7 | 4 498 → 5 421 | **×1,21** |
+| C | −16,4 / −16,3 | −1,0 / −1,0 | 1 284 → 1 578 | **×1,23** |
+| E | −15,1 / −15,1 | −0,2 / −0,2 | 8 273 → 9 964 | **×1,20** |
+
+**Deux règles opératoires, vérifiées et non supposées :**
+
+1. **Un seul décodeur pour tout.** RMS et crête se reproduisent au dixième de dB, mais les
+   comptes près de la butée portent un **décalage systématique de ×1,21** entre notre
+   chaîne et la leur. La comparaison entre bras est intacte — les deux bras passent par le
+   même décodeur. La comparaison d'un chiffre absolu avec un autre outil ne l'est pas.
+2. **Jamais de ré-encodage avant mesure.** Première tentative : les deux fichiers de la
+   prise A concaténés en repassant par LAME donnaient **×0,64 et 0,5 dB d'erreur de RMS**.
+   Mesurés séparément sans ré-encodage, ils redonnent ×1,21. L'anomalie s'allume et
+   s'éteint avec le ré-encodage — **c'était ma faute, et c'est la démonstration.**
+
+#### Un défaut trouvé par un test, pas par une relecture
+
+`campagne-gain.py` + 19 tests. La garde de fin de bloc écartait une transmission
+**terminée avant la bascule** : le trou audio suit la bascule, ce qui s'est achevé avant
+n'a rien subi. Ce qui compte en fin de bloc n'est pas un délai fixe mais **le chevauchement**
+— exact dès qu'on connaît la durée de la transmission, et une garde de 10 s aurait de
+toute façon raté les transmissions longues (43,8 s existe dans le jeu de test). Corrigé,
+et le test qui l'a trouvé était écrit pour ça.
