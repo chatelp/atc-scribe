@@ -92,6 +92,22 @@ level = "info"
 # Options: "json" (machine-readable), "console" (human-readable)
 format = "console"
 
+# Where to keep the log, and what bounds it.
+#
+# Empty file = stdout only, which is upstream's behaviour: whatever you redirect
+# it into grows without limit. Measured on this station, one server writes
+# 0.7 MB an hour -- 17 MB a day, nothing next to the database. The bound is not
+# for that case. It is for the one that happened here: a supervision bug started
+# seventeen servers and they put 103 MB into one file in a night.
+#
+# Three bounds, because they catch different things. One file per day keeps the
+# log readable -- "what happened on the night of the 20th" is a question you ask
+# of a file. max_size_mb catches the day that goes wrong. max_files stops the
+# directory growing for ever. Normal use: 17 MB a day, 7 files, ~120 MB.
+file = "runs/co-atc.log"
+max_size_mb = 100
+max_files = 7
+
 #######################################################
 # Storage Configuration
 #######################################################

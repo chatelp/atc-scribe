@@ -71,6 +71,13 @@ type DailyFile struct {
 
 type LoggingState struct {
 	Level string `json:"level"`
+	// Where the log goes and what bounds it. Empty File means stdout only, which
+	// is upstream's behaviour and leaves whatever it is redirected into unbounded.
+	File      string `json:"file,omitempty"`
+	MaxSizeMB int    `json:"max_size_mb,omitempty"`
+	MaxFiles  int    `json:"max_files,omitempty"`
+	Bounded   bool   `json:"bounded"`
+	TotalMB   int64  `json:"total_mb,omitempty"`
 }
 
 // GetServerState reports how the server is actually running.
@@ -83,7 +90,7 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 	st := ServerState{
 		Version:       "0.1.0",
 		UptimeSeconds: int64(time.Since(h.startedAt).Seconds()),
-		Logging:       LoggingState{Level: logger.Level()},
+		Logging:       h.loggingState(),
 		Settings:      h.runtime.Settings(),
 		Writable:      false, // flips once authentication is in place
 	}
@@ -192,4 +199,37 @@ func (h *Handler) AttachRuntime(rt *config.Runtime, db *sqlite.DB, stt *transcri
 		h.dbSampleBytes = info.Size()
 		h.dbSampleAt = time.Now()
 	}
+}
+
+// loggingState reports where the log goes and whether anything bounds it. The
+// question it answers is the one nobody asks until a disk is full: is this
+// growing for ever?
+func (h *Handler) loggingState() LoggingState {
+	st := LoggingState{
+		Level:     logger.Level(),
+		File:      h.config.Logging.File,
+		MaxSizeMB: h.config.Logging.MaxSizeMB,
+		MaxFiles:  h.config.Logging.MaxFiles,
+		Bounded:   h.config.Logging.File != "",
+	}
+	if st.File == "" {
+		return st
+	}
+	dir := filepath.Dir(st.File)
+	base := strings.TrimSuffix(filepath.Base(st.File), filepath.Ext(st.File))
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return st
+	}
+	var total int64
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), base+"-") {
+			continue
+		}
+		if info, err := e.Info(); err == nil {
+			total += info.Size()
+		}
+	}
+	st.TotalMB = total / (1024 * 1024)
+	return st
 }

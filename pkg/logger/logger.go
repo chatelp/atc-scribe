@@ -44,6 +44,13 @@ type Logger struct {
 type Config struct {
 	Level  string // debug, info, warn, error
 	Format string // json, console
+
+	// File, when set, sends the log to a rotating file as well as to stdout.
+	// Upstream logs to stdout only, which leaves the size of whatever it is
+	// redirected into entirely unbounded. See rotating.go.
+	File      string
+	MaxSizeMB int // ceiling per file; 0 means 100
+	MaxFiles  int // files kept, oldest deleted first; 0 means 7
 }
 
 // Custom level encoder that adds colors for console output
@@ -134,10 +141,21 @@ func New(config Config) (*Logger, error) {
 	atomic := zap.NewAtomicLevelAt(level)
 	setLevel(atomic)
 
+	// Stdout always: a server run from a terminal must still print. The file is
+	// added beside it, never instead of it.
+	sink := zapcore.AddSync(os.Stdout)
+	if config.File != "" {
+		rot, err := newRotatingFile(config.File, config.MaxSizeMB, config.MaxFiles)
+		if err != nil {
+			return nil, err
+		}
+		sink = zapcore.NewMultiWriteSyncer(sink, zapcore.AddSync(rot))
+	}
+
 	// Create core
 	core := zapcore.NewCore(
 		encoder,
-		zapcore.AddSync(os.Stdout),
+		sink,
 		atomic,
 	)
 
