@@ -1437,13 +1437,18 @@ pas. **La mesure ne se transporte pas d'un émetteur fort à un émetteur faible
 si le gain quotidien écrête les *avions* demande de le mesurer sur des avions, ce qui n'a
 pas été fait.
 
-### Q33 — La boucle de jour contient-elle la météo ? *(nouvelle, 21/09)*
+### Q33 — La boucle de jour contient-elle la météo ? *(en attente, décidé le 21/09)*
 
 La séance a eu lieu à 21 h, aérodrome fermé. **La boucle diurne d'un terrain ouvert est
 une autre boucle** et peut porter le vent, le QNH et la piste en service — c'est-à-dire
 exactement ce que Q9 cherchait. Une séance, vingt minutes de jour, mode `atis-131025` déjà
 en place au point recommandé (`gain = 32.8`, `centerfreq = 130.550`, déclenchable par
 `aero-mode atis-131025`).
+
+**Mise en attente le 21/09.** La question est propre et sa réponse vaut pour Q7, mais le
+coût a changé de nature : la nuit la bascule ne dérangeait personne ; **de jour elle coupe
+`gros-porteurs` vingt minutes à l'heure où le propriétaire écoute**. Et ce n'est pas sur
+le chemin critique — ce qui bloque la reconnaissance vocale, ce sont les 120 annotations.
 
 **Ce qu'on ne saura toujours pas** : la stabilité d'un jour à l'autre. Une prise par gain,
 une séance. Et whisper n'est pas parfaitement reproductible — la transcription de E est un
