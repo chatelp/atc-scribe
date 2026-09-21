@@ -27,6 +27,15 @@
   .pill.en{border-color:#3f7fb8;color:#9fc7ea}
   .done{color:var(--ok)}
   ol{padding-left:20px;margin:6px 0}
+  #readings{margin:14px 0;border:1px solid var(--warn);border-radius:6px;padding:12px 14px;background:#1a1710}
+  #readings h4{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--warn);text-transform:uppercase;letter-spacing:.04em}
+  #readings .why{color:var(--dim);font-size:12px;margin-bottom:10px}
+  #readings .r{margin:8px 0;padding-left:10px;border-left:2px solid var(--line)}
+  #readings .r b{display:block;font-size:11px;color:var(--dim);font-weight:600;margin-bottom:2px}
+  #readings .r span{font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace}
+  #readings .r.empty span{color:var(--dim);font-style:italic}
+  button.warn{border-color:var(--warn);color:var(--warn)}
+  .pill.assisted{border-color:var(--warn);color:var(--warn)}
 </style>
 
 <header>
@@ -61,7 +70,11 @@
     <button id="replay">Replay <kbd>space</kbd></button>
     <button id="next" class="primary">Save &amp; next <kbd>⌘↵</kbd></button>
     <button id="skip">Skip</button>
+    <button id="reveal" class="warn" hidden>Show model readings</button>
+    <span id="assistedMark" class="pill assisted" hidden>assisted</span>
   </div>
+
+  <div id="readings" hidden></div>
 
   <div class="hint">
     <b>Method — this is ground truth, so it must not be influenced by any model.</b>
@@ -70,6 +83,10 @@
       <li>Numbers as spoken: « flight level three five zero », not « FL350 ».</li>
       <li>Mark what you cannot make out as <code>[unclear]</code> rather than guessing.</li>
       <li>If French and English alternate in one transmission, tick « Both ».</li>
+      <li><b>Stuck?</b> Type what you can, then « Show model readings ». Order matters:
+          your blind attempt is kept, and the clip is marked <em>assisted</em> so that
+          assisted and unassisted clips can be scored apart. The readings are unlabelled
+          and shuffled — you cannot favour a model you cannot identify.</li>
     </ol>
     Saved automatically on every change. Close and reopen at will — progress is kept.
   </div>
@@ -78,11 +95,18 @@
 <script>
 const $ = s => document.querySelector(s);
 let items = [], ann = {}, i = 0, timer = null;
+// Per-clip reveal state. blindText is the snapshot taken the instant before the
+// readings appear -- once you have seen them you cannot un-see them, so what you
+// had written up to that point is the only unanchored version that will ever exist.
+let hasReadings = false, assisted = false, blindText = null;
+// Which clip the open panel belongs to. Without it, save() -> render() folds the
+// readings away the instant they appear, because every save re-renders.
+let shownFor = null;
 
 async function boot(){
   const r = await fetch('/api/items');
   const d = await r.json();
-  items = d.items; ann = d.annotations || {};
+  items = d.items; ann = d.annotations || {}; hasReadings = !!d.has_readings;
   i = Math.max(0, items.findIndex(it => !isDone(ann[it.id])));
   if (i === -1) i = 0;
   render();
@@ -104,6 +128,16 @@ function render(){
   $('#nospeech').checked = !!a.no_speech;
   $('#partial').checked = !!a.partial;
   document.querySelectorAll('[name=lang]').forEach(r => r.checked = (a.lang === r.value));
+
+  assisted = !!a.assisted;
+  // Never overwrite a blind attempt already recorded: it is taken once, on the
+  // first reveal, and coming back to the clip does not make it blind again.
+  blindText = (a.blind_text === undefined ? null : a.blind_text);
+  if (shownFor !== it.id){ $('#readings').hidden = true; $('#readings').innerHTML = ''; }
+  $('#reveal').hidden = !hasReadings;
+  $('#reveal').textContent = assisted ? 'Show model readings again' : 'Show model readings';
+  $('#assistedMark').hidden = !assisted;
+
   $('#text').focus();
 }
 
@@ -116,6 +150,8 @@ function collect(){
     lang: (document.querySelector('[name=lang]:checked')||{}).value || null,
     no_speech: $('#nospeech').checked,
     partial: $('#partial').checked,
+    assisted: assisted,
+    blind_text: blindText,
     at: new Date().toISOString()
   };
 }
@@ -137,6 +173,39 @@ $('#next').onclick = async () => { await save(); if(i < items.length-1){ i++; re
 $('#prev').onclick = () => { if(i > 0){ i--; render(); } };
 $('#skip').onclick = () => { if(i < items.length-1){ i++; render(); } };
 $('#replay').onclick = () => { $('#player').currentTime = 0; $('#player').play(); };
+
+$('#reveal').onclick = async () => {
+  const it = items[i]; if (!it) return;
+  // Snapshot BEFORE the request goes out, not after it comes back.
+  if (blindText === null) blindText = $('#text').value;
+  assisted = true;
+  shownFor = it.id;
+  const box = $('#readings');
+  box.hidden = false;
+  box.innerHTML = '<h4>Model readings</h4><div class="why">loading…</div>';
+  try {
+    const r = await fetch('/api/candidates?id=' + encodeURIComponent(it.id));
+    if (!r.ok) throw new Error('none');
+    const d = await r.json();
+    box.innerHTML = '<h4>Model readings</h4>'
+      + '<div class="why">Unlabelled and shuffled. Trust your ears over these — '
+      + 'they are candidates, not answers.</div>'
+      + d.readings.map((x, n) => {
+          const t = (x.texte || '').trim();
+          return '<div class="r' + (t ? '' : ' empty') + '"><b>Reading '
+            + String.fromCharCode(65 + n) + '</b><span>'
+            + (t ? t.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))
+                 : '(nothing)') + '</span></div>';
+        }).join('');
+  } catch (e) {
+    box.innerHTML = '<h4>Model readings</h4><div class="why">'
+      + 'No readings for this clip. It stays marked assisted — you asked, and the '
+      + 'record should say so.</div>';
+  }
+  $('#assistedMark').hidden = false;
+  $('#reveal').textContent = 'Show model readings again';
+  save();
+};
 
 addEventListener('keydown', e => {
   if (e.key === ' ' && e.target.tagName !== 'TEXTAREA'){ e.preventDefault(); $('#replay').click(); }

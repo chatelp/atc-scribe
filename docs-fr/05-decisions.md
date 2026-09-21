@@ -1945,3 +1945,56 @@ pas au commit suivant.
 > `configs/users.json` et refaire la page de premier lancement. Ça marche, et ça ne
 > devrait pas être la réponse.
 
+### D39 — Montrer les modèles à l'annotateur, mais le dire *(21/09)*
+
+**Demandé par le propriétaire**, et l'argument tenait en deux moitiés qui ne valaient pas
+pareil : *« je risque d'avoir du mal à reconnaître la voix sans aide, et en plus ça
+permettrait d'indiquer quel modèle s'est le mieux débrouillé »*.
+
+**La seconde moitié ne justifie rien.** « Quel modèle s'est le mieux débrouillé » se
+calcule *après*, en confrontant chaque sortie à la vérité terrain. C'est ce à quoi une
+vérité terrain sert, et c'est plus solide qu'une impression formée clip par clip. Ce que
+cet argument justifie vraiment, c'est de **faire tourner les modèles sur les 120 clips** —
+fait, voir plus bas.
+
+**La première moitié est réelle.** Une référence pleine de `[unclear]` ne mesure rien.
+
+**Mais montrer coûte, et le coût n'est pas neutre.** Qui lit « Fox-trot Golf Alpha Bravo »
+l'entend. Le biais va **systématiquement dans le sens qui flatte le modèle** : la référence
+se rapproche de sa sortie, son score monte, et le chiffre a l'air d'une mesure. C'est la
+faute que ce dossier redoute le plus — celle qui ne ressemble pas à une faute.
+
+**Le dispositif retenu** — ni caché, ni affiché :
+
+1. **Caché par défaut.** Les lectures ne sont pas dans la page ; elles ne partent au
+   navigateur qu'au clic, via un point d'accès séparé. Un annotateur qui essaie de ne pas
+   regarder ne les trouve pas dans l'inspecteur.
+2. **La tentative à l'aveugle est photographiée** à l'instant précédant l'affichage, et
+   conservée à côté du texte final. C'est la seule version non ancrée qui existera jamais.
+3. **Le clip est marqué `assisté`**, pour que les clips aidés et non aidés se notent
+   séparément.
+4. **Les lectures sont sans étiquette et dans un ordre tiré au hasard par clip**, graine
+   20260921, conservée dans le fichier. On ne favorise pas un modèle qu'on ne sait pas
+   lire — et la comparaison entre modèles, qui est le livrable, reste propre.
+
+**Ce que ça donne en plus** : la taille du biais, **mesurée**. Combien de fois voir le
+modèle a changé la réponse. Personne n'a ce chiffre d'habitude, parce que personne ne
+garde la tentative d'avant.
+
+**Les lectures**, produites par `whisper-lab/candidats-jeu-de-test.py` : les deux modèles
+sur **tous** les clips, pas seulement là où la porte de D31 s'ouvrirait — ici on cherche
+l'aide maximale et une comparaison complète, pas à rejouer l'arbitrage de production.
+120/120 en 7 min, 0 échec, 2 sorties vides côté anglais. `bofenghuang` est **resté sur le
+disque externe** (5,7 Go) : l'interne est déjà juste, et il se charge en 4,7 s de là.
+
+> **Un défaut trouvé à l'écran, pas dans le code** : `save()` appelle `render()`, qui
+> repliait le panneau à l'instant où il s'ouvrait. Le bouton basculait, la pastille
+> apparaissait, et les lectures disparaissaient — tout avait l'air de marcher. Corrigé en
+> retenant à quel clip le panneau ouvert appartient. **Aucune relecture ne l'aurait
+> trouvé ; un clic l'a trouvé tout de suite.**
+
+> **Aperçu franc, sur le premier clip** (Chavenay, français attendu) : *« Il m'a autorisé
+> à vous toucher, je rappelle qu'en arrière »* contre *« Heli Maus Zero Zero Two Shreds
+> rappelment arrire »*. **Les deux sont faux, et faux différemment.** C'est exactement
+> pourquoi l'ancrage est dangereux ici : il n'y a pas de bonne réponse à copier.
+

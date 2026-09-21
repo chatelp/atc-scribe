@@ -10,6 +10,13 @@ The corpus directory is expected to contain a `manifeste.json` describing the
 sample (see docs-fr/09-jeu-de-test.md), or, failing that, any nested audio
 files, which are then discovered by scanning.
 
+If the corpus also holds a `candidats.json`, the UI can reveal what the models
+made of a clip -- on demand, never by default. Revealing is recorded, and the
+blind attempt is kept alongside the final text, because seeing a reading changes
+what you hear and the size of that effect is worth knowing rather than assuming.
+The readings are served unlabelled, in an order drawn once per clip and stored,
+so an annotator cannot systematically favour one model over another.
+
 Binds to localhost only. This tool has no authentication and is not meant to
 be reachable from anywhere else.
 """
@@ -20,7 +27,7 @@ import os
 import posixpath
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 AUDIO_EXTENSIONS = (".mp3", ".wav", ".flac", ".ogg", ".m4a")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -44,6 +51,15 @@ def load_items(corpus):
                 rel = os.path.relpath(os.path.join(root, name), corpus)
                 found.append({"id": rel.replace(os.sep, "/"), "fichier": name})
     return found
+
+
+def load_candidates(corpus):
+    """Model readings per clip, or {} when none were produced."""
+    path = os.path.join(corpus, "candidats.json")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
 
 
 def load_annotations(path):
@@ -90,8 +106,29 @@ def make_handler(corpus, out_path):
                     payload = {
                         "items": load_items(corpus),
                         "annotations": load_annotations(out_path),
+                        # Whether the reveal button has anything to reveal. The
+                        # readings themselves are not in this payload.
+                        "has_readings": bool(load_candidates(corpus)),
                     }
                 return self._send(200, json.dumps(payload, ensure_ascii=False))
+
+            if path == "/api/candidates":
+                # One clip at a time, and only when asked. Shipping every
+                # reading with the clip list would put them a devtools panel
+                # away from an annotator who is trying not to look.
+                clip_id = parse_qs(urlparse(self.path).query).get("id", [""])[0]
+                entry = load_candidates(corpus).get(unquote(clip_id))
+                if not entry:
+                    return self._send(404, '{"error":"no readings for this clip"}')
+                order = entry.get("ordre") or [
+                    k for k in entry if isinstance(entry.get(k), dict)
+                ]
+                readings = [
+                    {"texte": entry[name].get("texte", "")}
+                    for name in order if isinstance(entry.get(name), dict)
+                ]
+                return self._send(200, json.dumps({"readings": readings},
+                                                  ensure_ascii=False))
 
             if path.startswith("/audio/"):
                 rel = posixpath.normpath(path[len("/audio/"):])
@@ -137,6 +174,9 @@ def main():
     done = len([v for v in load_annotations(out_path).values()
                 if v.get("text") or v.get("no_speech")])
     print(f"{len(items)} clips in {corpus}")
+    cands = load_candidates(corpus)
+    print(f"{len(cands)} clips have model readings"
+          if cands else "no candidats.json -- the reveal button stays hidden")
     print(f"{done} already annotated in {out_path}")
     print(f"open http://127.0.0.1:{args.port}/  (Ctrl-C to stop)")
 
