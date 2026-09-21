@@ -2,6 +2,8 @@ package api
 
 import (
 	"encoding/json"
+
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 
@@ -92,4 +94,40 @@ func isLoopback(host string) bool {
 		return true
 	}
 	return false
+}
+
+// PutFrequencyLabel records what a frequency is currently carrying.
+//
+// Upstream models a frequency as one channel with one name and one number in
+// MHz, which is true of a channel and false of a mix -- and what a mix carries
+// can change while the server runs. co-atc cannot know when that happens, and
+// should not learn one station's way of switching groups. So the mechanism is
+// here and the policy stays outside: whoever changes what is broadcast says so,
+// with whatever they already use.
+//
+//	curl -X PUT -d '{"label":"CDG approaches"}' .../api/v1/frequencies/aero-melange/label
+//
+// Behind authentication, like the other writes: this changes what every viewer
+// is told they are listening to.
+func (h *Handler) PutFrequencyLabel(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	var body struct {
+		Label string `json:"label"` // empty restores the configured name
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1024)).Decode(&body); err != nil {
+		http.Error(w, "invalid request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := h.frequenciesService.SetLabel(id, body.Label); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	h.logger.Info("Frequency label set from outside",
+		logger.String("id", id), logger.String("label", body.Label))
+
+	freq, _ := h.frequenciesService.GetFrequencyByID(id)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(freq)
 }

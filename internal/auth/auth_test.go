@@ -327,3 +327,45 @@ func TestAMissingAccountFileIsNotAnError(t *testing.T) {
 		t.Errorf("expected no accounts, got %d", len(f.Users))
 	}
 }
+
+// The bug this guards against, found by restarting a server an hour after
+// writing the setup page: the account was in the file, the setup page was
+// satisfied, and authentication was off -- because auth.enabled lives in a
+// config.toml the page never writes. Configured-looking and unprotected is
+// worse than either.
+func TestAnAccountInTheFileTurnsAuthenticationOn(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.toml")
+
+	f1, _ := LoadUserFile(cfgPath)
+	s1, _ := NewService(Config{UserFile: f1}) // Enabled false, as a config without [auth]
+	if err := s1.AddUser("pierre", "correcthorsebattery"); err != nil {
+		t.Fatal(err)
+	}
+
+	// The restart: a fresh service from the same files, Enabled still false.
+	f2, _ := LoadUserFile(cfgPath)
+	s2, err := NewService(Config{Enabled: false, UserFile: f2})
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	if !s2.Enabled() {
+		t.Fatal("an account exists and authentication is off: the server is open")
+	}
+	if s2.NeedsSetup() {
+		t.Error("setup should stay done")
+	}
+}
+
+// A hand-written `enabled = false` beside hand-written users is a decision, not
+// an oversight, and must be left alone.
+func TestConfiguredUsersStillObeyEnabled(t *testing.T) {
+	hash, _ := HashPassword("un mot de passe correct")
+	s, err := NewService(Config{Enabled: false, Users: []User{{Name: "pierre", PasswordHash: hash}}})
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	if s.Enabled() {
+		t.Error("auth.enabled = false with users in the config must stay off")
+	}
+}

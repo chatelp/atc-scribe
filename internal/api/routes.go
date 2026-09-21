@@ -75,6 +75,10 @@ func (r *Router) Routes() http.Handler {
 			// Frequency routes
 			router.Get("/frequencies", r.handler.GetAllFrequencies)
 			router.Get("/frequencies/{id}", r.handler.GetFrequencyByID)
+			// What a frequency is currently carrying, when that is not what the
+			// configuration says -- a mixed stream's contents can change while the
+			// server runs. See internal/frequencies/label.go.
+			router.Put("/frequencies/{id}/label", r.handler.PutFrequencyLabel)
 
 			// Audio stream route
 			router.Get("/stream/{id}", r.handler.StreamAudio)

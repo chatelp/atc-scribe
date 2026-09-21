@@ -458,6 +458,9 @@ func (sp *StreamProcessor) updateClientActivity(clientID string) {
 
 // Service manages frequency audio streams with persistent connections.
 type Service struct {
+	// Live labels, set from outside. See label.go: a mixed stream's contents can
+	// change while the server runs, and only whoever changed them knows.
+	labels               *labels
 	client               *Client
 	frequenciesConfig    map[string]*cfg.FrequencyConfig
 	bufferSize           int
@@ -612,6 +615,7 @@ func NewService(
 	}
 
 	return &Service{
+		labels:               newLabels(),
 		client:               NewClient(0, logger),
 		frequenciesConfig:    freqsConfig,
 		bufferSize:           bufferSize,
@@ -1034,7 +1038,7 @@ func (s *Service) GetAllFrequencies() []*Frequency { // frequencies.Frequency fr
 		result = append(result, &Frequency{
 			ID:              fc.ID,
 			Airport:         fc.Airport,
-			Name:            fc.Name,
+			Name:            s.labels.nameFor(fc.ID, fc.Name),
 			FrequencyMHz:    fc.FrequencyMHz,
 			URL:             fc.URL,
 			StreamURL:       streamURL,
@@ -1074,7 +1078,7 @@ func (s *Service) GetFrequencyByID(id string) (*Frequency, bool) {
 	return &Frequency{
 		ID:              fc.ID,
 		Airport:         fc.Airport,
-		Name:            fc.Name,
+		Name:            s.labels.nameFor(fc.ID, fc.Name),
 		Order:           fc.Order,
 		FrequencyMHz:    fc.FrequencyMHz,
 		URL:             fc.URL,

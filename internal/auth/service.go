@@ -61,6 +61,16 @@ func NewService(cfg Config) (*Service, error) {
 	// The file comes second so an account created from the page can replace one
 	// of the same name in the configuration -- the page is the thing someone
 	// just used, and surprising them is worse than surprising the file.
+	//
+	// And an account in the file turns authentication on, whatever the
+	// configuration says. Creating one through the setup page *is* the act of
+	// turning it on; without this, a restart left the account in place, the
+	// setup page satisfied, and the server open -- configured-looking and
+	// unprotected, which is worse than either.
+	//
+	// Accounts written by hand into config.toml keep obeying auth.enabled: a
+	// deliberate `enabled = false` there is someone's decision, not an oversight.
+	enabled := cfg.Enabled
 	if cfg.UserFile != nil {
 		for _, u := range cfg.UserFile.Users {
 			name := strings.TrimSpace(u.Name)
@@ -68,6 +78,7 @@ func NewService(cfg Config) (*Service, error) {
 				continue
 			}
 			users[name] = u.PasswordHash
+			enabled = true
 		}
 	}
 	if cfg.Enabled && len(users) == 0 {
@@ -82,7 +93,7 @@ func NewService(cfg Config) (*Service, error) {
 		window = 15 * time.Minute
 	}
 	return &Service{
-		enabled: cfg.Enabled,
+		enabled: enabled,
 		users:   users,
 		file:    cfg.UserFile,
 		store:   NewStore(cfg.SessionTTL),
