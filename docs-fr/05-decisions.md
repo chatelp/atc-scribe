@@ -1279,7 +1279,7 @@ manque se voit, une erreur plausible non. **Non retenu, mais désormais mesuré.
    les justifie complètement.
 3. **Pas le seuil à deux chiffres**, sauf changement de doctrine assumé.
 
-### Q31 — `raw_data` : redondant, pas mort *(nouvelle, 20/09, et elle corrige Q26 et D24)*
+### Q31 — `raw_data` : redondant, pas mort *(20/09 — **corrigé le 21/09, voir D32**)*
 
 **Correction d'abord.** Q26 puis D24 affirmaient que `raw_data` était *« une copie JSON de
 colonnes déjà analysées, que rien ne relit »*. **C'est faux, vérifié dans le code le
@@ -1611,4 +1611,44 @@ reposent encore sur la seule après-midi du 15 septembre. Celle-ci ne repose plu
 
 > **Et la précision de 74 % elle-même est une réplication** : 72 % sur le corpus du
 > 15/09, 74 % ici. Le chiffre n'était pas une propriété de cette après-midi-là.
+
+### D32 — `raw_data` déménage dans la table `aircraft` *(21/09)*
+
+Q31 avait établi le fait et s'était trompée sur le remède. Le champ n'est **pas** mort —
+`getLatestADSBData` le désérialise pour reconstituer l'objet ADS-B complet — mais il est
+**redondant** : les deux requêtes qui le lisent portent `LIMIT 1` et `MAX(timestamp)`,
+donc elles ne veulent que **la ligne la plus récente de chaque avion**. Il était écrit sur
+les 82 lignes par seconde et lu sur 0,05 % d'entre elles.
+
+**Le correctif n'est pas un élagage, c'est un déménagement.** La table `aircraft` existe
+déjà, avec `hex` en clé primaire — **une ligne par avion**, exactement ce que les deux
+requêtes reconstruisaient à grands frais. `raw_data`, `source_type`, `registration` et
+`aircraft_type` y vont ; `adsb_targets` ne les porte plus.
+
+**Mesuré sur cinq minutes de trafic réel :**
+
+| | avant | après |
+|---|---|---|
+| octets par ligne | 1 441 | **445** |
+| croissance | 418 Mo/h | **112 Mo/h** |
+| par jour | 9,8 Go | **2,6 Go** |
+| **à 7 jours de rétention** | **69 Go** | **18 Go** |
+
+**−73 %**, mieux que les 57 % attendus de la seule part de `raw_data` : retirer la colonne
+allège aussi la ligne et les index.
+
+**Et la lecture devient une recherche par clé primaire** au lieu d'un balayage trié par
+date. La requête par lot perd sa jointure sur `MAX(timestamp)` *et* la liste d'identifiants
+passée deux fois.
+
+**Ce que ça débloque, et c'était le but.** À 50 Gio libres et 18 Go au régime établi,
+**co-atc peut enfin tourner sans surveillance** — il ne le pouvait pas au-delà de quatre
+jours. C'était le dernier défaut bloquant de la mission.
+
+**Vérifié** : 155 avions avec `raw_data` dans `aircraft`, **zéro octet** dans
+`adsb_targets`, l'API rend les 155 avec leurs données complètes, et une base à l'ancien
+schéma migre en place — 8 colonnes à 12, ligne préservée.
+
+**Contribuable en amont** : c'est leur schéma, leur défaut, et le correctif rend leurs
+deux requêtes plus simples et plus rapides.
 

@@ -71,11 +71,35 @@ func initDatabase(db *sql.DB, log *logger.Logger) error {
 			last_seen TIMESTAMP,
 			on_ground INTEGER DEFAULT 0,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			raw_data TEXT,
+			source_type TEXT,
+			registration TEXT,
+			aircraft_type TEXT
 		)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create aircraft table: %w", err)
+	}
+
+	// raw_data is the full ADS-B message as JSON, and it used to live on every
+	// row of adsb_targets -- 82 rows a second, 57% of the database, read on the
+	// 0.05% that are each aircraft's most recent. It belongs here, where there is
+	// one row per aircraft, which is also what the two queries that read it were
+	// already reconstructing with ORDER BY timestamp DESC LIMIT 1.
+	//
+	// Measured before the move: 9.8 GB a day, 66 GB at seven days' retention
+	// against 39 GB free. After: roughly half that, and the read becomes a
+	// primary-key lookup instead of a scan.
+	for column, ddl := range map[string]string{
+		"raw_data":      "ALTER TABLE aircraft ADD COLUMN raw_data TEXT",
+		"source_type":   "ALTER TABLE aircraft ADD COLUMN source_type TEXT",
+		"registration":  "ALTER TABLE aircraft ADD COLUMN registration TEXT",
+		"aircraft_type": "ALTER TABLE aircraft ADD COLUMN aircraft_type TEXT",
+	} {
+		if _, err := db.Exec(ddl); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+			return fmt.Errorf("failed to add aircraft.%s: %w", column, err)
+		}
 	}
 
 	// Create adsb_targets table with all possible fields from both local and external APIs
@@ -443,11 +467,11 @@ func (s *AircraftStorage) getAllAircraftInternal(lastSeenMinutes int, minimal bo
 
 // getLatestADSBData returns the latest ADSB data for an aircraft
 func (s *AircraftStorage) getLatestADSBData(hex string) (*adsb.ADSBTarget, error) {
+	// A primary-key lookup on one row per aircraft, where it used to be a scan of
+	// every target for that aircraft sorted by time to keep the newest.
 	row := s.db.QueryRow(`
-		SELECT raw_data, source_type, registration, aircraft_type FROM adsb_targets
-		WHERE aircraft_hex = ?
-		ORDER BY timestamp DESC
-		LIMIT 1
+		SELECT raw_data, source_type, registration, aircraft_type FROM aircraft
+		WHERE hex = ? AND raw_data IS NOT NULL
 	`, hex)
 
 	var rawDataJSON, sourceType, registration, aircraftType string
@@ -480,34 +504,23 @@ func (s *AircraftStorage) GetLatestADSBDataBatch(hexCodes []string) (map[string]
 		return make(map[string]*adsb.ADSBTarget), nil
 	}
 
-	// Create placeholders for the IN clause (need two copies for the query)
+	// One IN clause, so one set of arguments. The second copy existed for the
+	// subquery that reconstructed each aircraft's most recent row.
 	placeholders := make([]string, len(hexCodes))
-	args := make([]interface{}, len(hexCodes)*2) // Double args: once for subquery, once for main query
+	args := make([]interface{}, len(hexCodes))
 	for i, hex := range hexCodes {
 		placeholders[i] = "?"
-		args[i] = hex               // First set for subquery
-		args[i+len(hexCodes)] = hex // Second set for outer WHERE
+		args[i] = hex
 	}
 
-	// Use GROUP BY + JOIN pattern - more efficient than correlated subquery on large tables
-	// 1. Subquery groups to find MAX(timestamp) per aircraft (small result set)
-	// 2. JOIN fetches the actual data rows using the index
+	// One row per aircraft, so the group-by-and-join that used to reconstruct
+	// "the most recent target" is no longer needed -- nor is passing the hex list
+	// twice.
 	query := fmt.Sprintf(`
-		SELECT
-			a.aircraft_hex,
-			a.raw_data,
-			a.source_type,
-			a.registration,
-			a.aircraft_type
-		FROM adsb_targets a
-		INNER JOIN (
-			SELECT aircraft_hex, MAX(timestamp) as max_ts
-			FROM adsb_targets
-			WHERE aircraft_hex IN (%s)
-			GROUP BY aircraft_hex
-		) latest ON a.aircraft_hex = latest.aircraft_hex AND a.timestamp = latest.max_ts
-		WHERE a.aircraft_hex IN (%s)
-	`, strings.Join(placeholders, ","), strings.Join(placeholders, ","))
+		SELECT hex, raw_data, source_type, registration, aircraft_type
+		FROM aircraft
+		WHERE hex IN (%s) AND raw_data IS NOT NULL
+	`, strings.Join(placeholders, ","))
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -1209,10 +1222,10 @@ func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 				track, track_rate, roll, mag_heading, true_heading, baro_rate, geom_rate, squawk, emergency,
 				category, nav_qnh, nav_altitude_mcp, nav_altitude_fms, nav_heading, nav_modes, lat, lon,
 				nic, rc, seen_pos, r_dst, r_dir, version, nic_baro, nac_p, nac_v, sil, sil_type, gva, sda,
-				alert, spi, mlat, tisb, messages, seen, rssi, timestamp, raw_data, source_type
+				alert, spi, mlat, tisb, messages, seen, rssi, timestamp, source_type
 			) VALUES (
 				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 			)
 		`,
 			aircraft.Hex, aircraft.ADSB.Hex, aircraft.ADSB.Type, aircraft.ADSB.Flight,
@@ -1231,10 +1244,20 @@ func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 			nullableIntValue(aircraft.ADSB.SDA), nullableIntValue(aircraft.ADSB.Alert), nullableIntValue(aircraft.ADSB.SPI),
 			"", "",
 			nullableIntValue(aircraft.ADSB.Messages), nullableFloatValue(aircraft.ADSB.Seen), nullableFloatValue(aircraft.ADSB.RSSI),
-			aircraft.LastSeen.Format(time.RFC3339), string(rawData), sourceType,
+			aircraft.LastSeen.Format(time.RFC3339), sourceType,
 		)
 		if err != nil {
 			return fmt.Errorf("insert ADSB target: %w", err)
+		}
+
+		// The full message goes on the aircraft row, not on the target row. It is
+		// only ever read for an aircraft's most recent position, so writing it 82
+		// times a second and reading it once was 57% of the database for nothing.
+		if _, err := tx.Exec(`
+			UPDATE aircraft SET raw_data = ?, source_type = ?, registration = ?, aircraft_type = ?
+			WHERE hex = ?
+		`, string(rawData), sourceType, registration, aircraftType, aircraft.Hex); err != nil {
+			return fmt.Errorf("update aircraft state: %w", err)
 		}
 	}
 
