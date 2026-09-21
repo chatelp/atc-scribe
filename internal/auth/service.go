@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,8 +20,10 @@ type User struct {
 
 // Service answers "who is asking", and is the only place that says yes.
 type Service struct {
+	mu      sync.RWMutex
 	enabled bool
 	users   map[string]string // name -> password hash
+	file    *UserFile
 	store   *Store
 	proxies *TrustedProxies
 	limiter *Limiter
@@ -34,6 +37,12 @@ type Config struct {
 	TrustedProxies []string
 	MaxAttempts    int
 	AttemptWindow  time.Duration
+
+	// Accounts created by the first-run page. config.toml is never rewritten by
+	// the program -- it carries the measured tables this project reasons from,
+	// in comments -- so a page that creates an account writes here instead, and
+	// the two sources are merged.
+	UserFile *UserFile
 }
 
 func NewService(cfg Config) (*Service, error) {
@@ -49,8 +58,20 @@ func NewService(cfg Config) (*Service, error) {
 		}
 		users[name] = u.PasswordHash
 	}
+	// The file comes second so an account created from the page can replace one
+	// of the same name in the configuration -- the page is the thing someone
+	// just used, and surprising them is worse than surprising the file.
+	if cfg.UserFile != nil {
+		for _, u := range cfg.UserFile.Users {
+			name := strings.TrimSpace(u.Name)
+			if name == "" || u.PasswordHash == "" {
+				continue
+			}
+			users[name] = u.PasswordHash
+		}
+	}
 	if cfg.Enabled && len(users) == 0 {
-		return nil, fmt.Errorf("auth.enabled is true but no user has a password hash; run: co-atc -add-user <name>")
+		return nil, fmt.Errorf("auth.enabled is true but no account exists; create one from the setup page, or run: co-atc -add-user <name>")
 	}
 	max := cfg.MaxAttempts
 	if max <= 0 {
@@ -63,6 +84,7 @@ func NewService(cfg Config) (*Service, error) {
 	return &Service{
 		enabled: cfg.Enabled,
 		users:   users,
+		file:    cfg.UserFile,
 		store:   NewStore(cfg.SessionTTL),
 		proxies: proxies,
 		limiter: NewLimiter(max, window),
@@ -84,7 +106,9 @@ func (s *Service) SignIn(r *http.Request, name, password string) (*Session, erro
 		return nil, fmt.Errorf("too many attempts")
 	}
 
+	s.mu.RLock()
 	hash, known := s.users[strings.TrimSpace(name)]
+	s.mu.RUnlock()
 	if !known {
 		// Verify against a throwaway hash so an unknown name costs the same time as
 		// a known one.
@@ -160,4 +184,58 @@ func (s *Service) Require(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// NeedsSetup reports that no account exists anywhere -- neither in the
+// configuration nor in the accounts file. It is the question the first-run page
+// asks, and it stays true until someone answers it.
+func (s *Service) NeedsSetup() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.users) == 0
+}
+
+// AddUser hashes a password, writes the account to the accounts file, and turns
+// authentication on. The password is never stored, logged or returned.
+//
+// It refuses once an account exists: this is the first-run path, and a page that
+// creates accounts without being signed in must stop being able to the moment
+// there is someone to sign in as.
+func (s *Service) AddUser(name, password string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.users) > 0 {
+		return fmt.Errorf("an account already exists; sign in, or use co-atc -add-user")
+	}
+	if s.file == nil {
+		return fmt.Errorf("no accounts file configured")
+	}
+	if len(strings.TrimSpace(name)) == 0 {
+		return fmt.Errorf("choose a user name")
+	}
+	if len([]rune(password)) < 10 {
+		// Ten because this may end up reachable from outside a LAN, and the
+		// rate limiter buys time rather than safety.
+		return fmt.Errorf("the password must be at least 10 characters")
+	}
+
+	hash, err := HashPassword(password)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	if err := s.file.Add(strings.TrimSpace(name), hash); err != nil {
+		return err
+	}
+	s.users[strings.TrimSpace(name)] = hash
+	s.enabled = true
+	return nil
+}
+
+// AccountsFile is where accounts created from the page are kept.
+func (s *Service) AccountsFile() string {
+	if s.file == nil {
+		return ""
+	}
+	return s.file.Path()
 }

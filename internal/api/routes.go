@@ -56,6 +56,11 @@ func (r *Router) Routes() http.Handler {
 		router.Post("/auth/login", r.handler.PostLogin)
 		router.Post("/auth/logout", r.handler.PostLogout)
 
+		// First run: the page must be able to ask what is needed before anyone
+		// can sign in, and to answer it once.
+		router.Get("/setup/status", r.handler.GetSetupStatus)
+		router.Post("/setup", r.handler.PostSetup)
+
 		// Everything below carries data from the receiver. A Group is a mux of
 		// its own, which is what lets its middleware be declared after the public
 		// routes above -- chi refuses a Use() that follows a route on the same mux.

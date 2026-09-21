@@ -1,0 +1,99 @@
+package auth
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+// UserFile is the accounts the first-run page creates, kept beside the
+// configuration rather than inside it.
+//
+// config.toml is never rewritten by the program: it carries the measured tables
+// this project reasons from, in comments, and a round-trip through a TOML
+// encoder would lose every one of them. So a page that creates an account has to
+// write somewhere else, and the two sources coexist -- the file you edit by hand
+// and the file the page owns.
+type UserFile struct {
+	path  string
+	Users []UserRecord `json:"users"`
+}
+
+// UserRecord is one account. The password itself is never here, only its
+// Argon2id hash; see password.go.
+type UserRecord struct {
+	Name         string `json:"name"`
+	PasswordHash string `json:"password_hash"`
+	CreatedAt    string `json:"created_at"`
+}
+
+// DefaultUserFile is the file the first-run page writes, next to config.toml.
+const DefaultUserFile = "users.json"
+
+// LoadUserFile reads the accounts file. A missing file is not an error: it is
+// the normal state before anyone has set anything up.
+func LoadUserFile(configPath string) (*UserFile, error) {
+	path := filepath.Join(filepath.Dir(configPath), DefaultUserFile)
+	f := &UserFile{path: path}
+
+	raw, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return f, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	if err := json.Unmarshal(raw, f); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	f.path = path
+	return f, nil
+}
+
+// Path is where the accounts are kept.
+func (f *UserFile) Path() string { return f.path }
+
+// Add appends an account and writes the file. It refuses a duplicate name
+// rather than shadowing one silently: two accounts with one name is a question
+// about which password works, and nobody should have to find out by trying.
+func (f *UserFile) Add(name, hash string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("a user needs a name")
+	}
+	if hash == "" {
+		return fmt.Errorf("a user needs a password hash")
+	}
+	for _, u := range f.Users {
+		if strings.EqualFold(strings.TrimSpace(u.Name), name) {
+			return fmt.Errorf("an account named %q already exists in %s", name, f.path)
+		}
+	}
+	f.Users = append(f.Users, UserRecord{Name: name, PasswordHash: hash, CreatedAt: nowRFC3339()})
+	return f.save()
+}
+
+// save writes through a temporary file. A half-written accounts file would lock
+// the owner out of their own server, and the failure would only appear at the
+// next start.
+func (f *UserFile) save() error {
+	b, err := json.MarshalIndent(f, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := f.path + ".tmp"
+	// 0600: this holds password hashes. They are Argon2id and slow to attack,
+	// which is a reason not to hand them out, not a reason to.
+	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
+		return fmt.Errorf("write %s: %w", tmp, err)
+	}
+	if err := os.Rename(tmp, f.path); err != nil {
+		return fmt.Errorf("install %s: %w", f.path, err)
+	}
+	return nil
+}
+
+func nowRFC3339() string { return time.Now().UTC().Format(time.RFC3339) }

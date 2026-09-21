@@ -355,6 +355,22 @@ func main() {
 		allPorts = append(allPorts, cfg.Server.AdditionalPorts...)
 	}
 
+	// No account anywhere. On loopback that is a legitimate state and the setup
+	// page handles it; bound to anything else it is a server about to serve the
+	// receiver's data to whoever asks, which is precisely what upstream's README
+	// warns against. Refusing to start is the only honest answer -- a warning
+	// scrolls past and the server stays open.
+	if router.Handler().Auth().NeedsSetup() {
+		if !isLoopbackHost(cfg.Server.Host) {
+			fatalLog := log.WithOptions(zap.AddStacktrace(zapcore.PanicLevel))
+			fatalLog.Fatal("Refusing to start: no account exists and the server is not bound to loopback",
+				logger.String("host", cfg.Server.Host),
+				logger.String("fix", "set server.host to 127.0.0.1 and open the setup page, or create an account with: co-atc -add-user <name>"))
+		}
+		log.Warn("No account configured -- open the setup page to choose local-only or an account",
+			logger.String("url", fmt.Sprintf("http://%s:%d/", cfg.Server.Host, cfg.Server.Port)))
+	}
+
 	log.Info("Configured listener ports", logger.Any("ports", allPorts))
 
 	// Start a server for each configured port
@@ -635,4 +651,14 @@ func readPassword(prompt string) (string, error) {
 		return "", err
 	}
 	return strings.TrimRight(line, "\r\n"), nil
+}
+
+// isLoopbackHost reports whether a bind address can only be reached from this
+// machine. An empty host means every interface, which is the one to get right.
+func isLoopbackHost(host string) bool {
+	switch host {
+	case "127.0.0.1", "::1", "localhost":
+		return true
+	}
+	return false
 }

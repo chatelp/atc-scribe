@@ -12,6 +12,11 @@ import (
 // Config represents the main application configuration structure
 // containing all configuration sections
 type Config struct {
+	// ConfigPath is where this configuration was read from. Not a TOML field:
+	// it is filled in by the loader, so that anything written beside the
+	// configuration -- runtime settings, accounts -- lands in the same place.
+	ConfigPath string `toml:"-"`
+
 	Server         ServerConfig         `toml:"server"`          // HTTP server settings
 	ADSB           ADSBConfig           `toml:"adsb"`            // Aircraft tracking data source settings
 	Frequencies    FrequenciesConfig    `toml:"frequencies"`     // Radio frequency monitoring settings
@@ -355,6 +360,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	// Read the config file
+	config.ConfigPath = path
 	meta, err := toml.DecodeFile(path, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode config file: %w", err)

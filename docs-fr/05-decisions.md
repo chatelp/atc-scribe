@@ -1687,3 +1687,52 @@ un second est lancé, il sort en code 1 avec *« pid 72978 answered, ours is …
 reste **un co-atc et un sidecar**. Plus deux tests : le refus, et le fait que le cas
 délibéré passe toujours.
 
+### D34 — La première configuration se fait dans le navigateur *(21/09)*
+
+L'amont livre sans authentification et un README qui dit de ne jamais exposer le serveur.
+D30 avait donné les réglages ; il manquait la façon d'**répondre à la question** plutôt
+que d'éditer du TOML.
+
+**Une page web, pas une fenêtre native.** co-atc est un serveur : lui donner une fenêtre
+demanderait une bibliothèque graphique en dépendance, alors qu'il sert déjà une interface.
+C'est aussi le motif habituel — Home Assistant, Portainer, Nextcloud font tous ça.
+
+**Pas de jeton de configuration, et le propriétaire avait raison de le contester.** Ma
+première proposition imprimait une URL à usage unique au démarrage. Objection :
+*« tous les autres outils auto-hébergés que j'ai n'ont jamais eu besoin de ça »*. Exact,
+et le raisonnement tient — **si le serveur écoute sur `127.0.0.1`, atteindre la page c'est
+déjà être sur la machine**, la même frontière de confiance que le terminal où on aurait
+lancé `-add-user`. Un jeton n'y ajoute rien.
+
+Le jeton n'aurait servi que si le serveur était joignable de l'extérieur — et ce cas est
+couvert plus nettement par un **refus de démarrer**. Un mécanisme au lieu de deux.
+
+| situation | comportement |
+|---|---|
+| aucun compte, écoute sur `127.0.0.1` | la page s'affiche, deux choix |
+| aucun compte, écoute ailleurs | **refus de démarrer**, avec le remède dans le message |
+| un compte existe | la page disparaît définitivement |
+
+**Les deux choix sont écrits pour être compris, pas pour être cliqués vite.** « Cette
+machine uniquement » dit que c'est ce que fait l'amont, *choisi plutôt que subi*. « Joignable,
+avec un compte » dit qu'il faudra **encore** TLS ou un proxy de confiance déclaré, parce
+qu'un mot de passe en clair sur un réseau qu'on ne contrôle pas ne protège rien.
+
+**Les comptes vont dans `configs/users.json`, pas dans `config.toml`** — que le programme
+ne réécrit jamais, puisqu'il porte les tableaux de mesures en commentaires. Les deux
+sources sont fusionnées, le fichier l'emportant sur la configuration : c'est la page que
+quelqu'un vient d'utiliser.
+
+**Sept tests**, dont ceux qui portent le sens : la page cesse de pouvoir créer un compte
+dès qu'il en existe un (elle travaille sans être authentifiée), le fichier contient
+l'empreinte Argon2id et pas le mot de passe, il est en `0600`, et les comptes survivent au
+redémarrage — sinon la page se déferait en silence.
+
+**Vérifié dans le navigateur** : la page s'affiche, refuse un mot de passe trop court,
+crée le compte, bascule sur la connexion, et les données passent de 200 à 401 sans session.
+
+> **Deux défauts de ma part au passage, tous deux du même genre** : un `replace` de CSS
+> visant 14 espaces d'indentation là où il y en avait 12 — sans assertion, donc silencieux
+> —, et une structure HTML où `<b>` et `<span>` étaient deux enfants flex côte à côte au
+> lieu d'être empilés. Les deux vus à l'écran, aucun des deux par le code.
+

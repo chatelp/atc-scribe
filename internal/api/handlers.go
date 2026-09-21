@@ -71,9 +71,20 @@ func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Servi
 	// on this service while it is constructing the routes, so it has to exist by
 	// then. A failure is fatal by design -- a server that cannot build its
 	// authentication must not come up serving the data unprotected.
+	// Accounts created from the first-run page live beside config.toml, which
+	// the program never rewrites. A file that cannot be read is fatal rather
+	// than ignored: silently starting without the accounts someone created is
+	// how a server ends up open.
+	userFile, err := auth.LoadUserFile(config.ConfigPath)
+	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to read accounts: %v", err))
+		os.Exit(1)
+	}
+
 	authService, err := auth.NewService(auth.Config{
 		Enabled:        config.Auth.Enabled,
 		Users:          authUsers(config),
+		UserFile:       userFile,
 		SessionTTL:     time.Duration(orDefault(config.Auth.SessionTTLHours, 720)) * time.Hour,
 		TrustedProxies: config.Server.TrustedProxies,
 		MaxAttempts:    config.Auth.MaxAttempts,
