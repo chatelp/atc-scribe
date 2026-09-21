@@ -1998,3 +1998,54 @@ disque externe** (5,7 Go) : l'interne est déjà juste, et il se charge en 4,7 s
 > rappelment arrire »*. **Les deux sont faux, et faux différemment.** C'est exactement
 > pourquoi l'ancrage est dangereux ici : il n'y a pas de bonne réponse à copier.
 
+### Q34 — Le gain quotidien coûte-t-il quelque chose sur les avions ? *(nouvelle, 21/09)*
+
+Q32 a montré que le témoin à **40,2 dB — le réglage quotidien de la station — écrête** :
+6 392 échantillons à moins de 3 dB de la butée. Nous avons écrit dans la foulée que la
+mesure **ne se transporte pas** : elle porte sur un émetteur au sol à +49 dB à quelques
+kilomètres, et un avion à 40 NM arrive des dizaines de décibels plus bas.
+
+Donc la question reste entière, et elle n'est pas mineure : **si le gain quotidien abîme
+le signal des avions, tout notre travail de reconnaissance vocale part d'une source
+dégradée sans que nous le sachions.**
+
+**Demande envoyée le 21/09** (`whisper-lab/demande-gain-avions.md`) : gain alterné toutes
+les 30 min entre 40,2 et 32,8 dB, de 22 h à 7 h, groupe `en-route-et-descente-cdg`,
+18 blocs, 9 par réglage. Alterné et non pas une moitié de nuit chacun — **le trafic varie
+d'un facteur 30 entre 23 h et 03 h ; une nuit coupée en deux comparerait les heures, pas
+les gains.** Mesure par appariement ADS-B, sans annotation.
+
+#### Pourquoi la nuit ici, et pourquoi la nuit ne peut rien pour le français
+
+Le propriétaire proposait des captations nocturnes pour affiner le modèle. **Mesuré sur
+cinq jours d'ADS-B, en ne comptant que les immatriculations `F-XXXX`** :
+
+| Heure UTC | Points ADS-B | dont aviation générale |
+|---|---|---|
+| 00 h | 24 945 | **0** |
+| 03 h | 25 396 | **0** |
+| 14 h | 272 756 | **23 871** |
+| 21 h | 51 748 | **0** |
+| 23 h | 35 019 | **0** |
+
+**Le contrôle qui rend la mesure valable** : aux heures creuses le récepteur *regardait* —
+24 945 points à 00 h, 51 748 à 21 h. Ce n'est pas un trou de données, c'est une absence
+réelle. L'aviation générale française vole **de 07 h à 22 h locales**, pointe à 16 h, et
+disparaît la nuit. **Une nuit de captation ne contiendrait aucune transmission
+francophone d'aéroclub.**
+
+La question française demande donc du jour, ce qui coupe `gros-porteurs` aux heures
+d'écoute — même coût que Q33. **Et surtout : nous n'avons pas encore mesuré ce que nous
+avons.** 120 transmissions tirées, les deux modèles passés dessus (D39), taux d'erreur
+inconnu. Demander des données avant d'exploiter les existantes est précisément la faute
+que ce dossier se reproche depuis le début.
+
+#### Le confondant signalé dans la demande
+
+**Le squelch.** S'il est à seuil absolu, baisser le gain de 7,4 dB rend le squelch plus
+sélectif : des transmissions faibles n'ouvriront plus du tout. On mesurerait alors une
+sélectivité en croyant mesurer une transcription. **Un gain qui capte moins mais transcrit
+mieux ce qu'il capte n'est pas un gain qui gagne** — il faudra compter les deux, ouvertures
+et taux d'appariement. Question posée à la station, qui seule connaît la sémantique de son
+seuil.
+
