@@ -1907,7 +1907,10 @@
                                 <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)" class="flex flex-col justify-center overflow-hidden flex-grow mr-2">
                                     <div class="font-semibold text-sm truncate" x-text="freq.name" :title="freq.name"></div>
                                     <div class="text-[11px] opacity-80 mt-0.5">
-                                        <span x-text="freq.frequency_mhz + ' MHz'"></span>
+                                        <!-- A mixed stream has no single frequency; showing one
+                                             would be a fiction. The name carries the meaning then. -->
+                                        <span x-show="freq.frequency_mhz > 0" x-text="freq.frequency_mhz + ' MHz'"></span>
+                                        <span x-show="!(freq.frequency_mhz > 0)" class="opacity-60">mixed</span>
                                         <span x-show="$store.atc.isFrequencyFailed(freq.id)" class="ml-1 text-red-300/60">(Failed)</span>
                                         <span x-show="$store.atc.isFrequencyConnecting(freq.id)" class="ml-1 text-amber-200/50">(Retry)</span>
                                     </div>

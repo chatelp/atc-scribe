@@ -1771,3 +1771,54 @@ là. Une autre implémentation du contrat ignorera simplement la variable.
 > vient de mourir. C'est inhérent, et sans conséquence — la preuve est dans le délai, qui
 > vaut exactement l'intervalle de veille.
 
+### D36 — Un flux mélangé n'a pas de fréquence *(21/09)*
+
+Constaté par le propriétaire en vérifiant l'interface : la barre du bas annonçait
+**« VHF melangee (amas 132-133, espace superieur) — 132,7625 MHz »** alors que la station
+diffusait `gros-porteurs` depuis la veille. **L'interface affichait la mauvaise
+fréquence.**
+
+Et sa question était la bonne : *« c'est un outil qui a vocation à être public, ma config
+audio multiplexée est très spécifique à mon setup, comment on traite ça ? »*
+
+**Le défaut est générique, pas local.** L'amont modélise une entrée de fréquence comme
+*un* canal avec *un* nom et *un* nombre en MHz. C'est vrai d'un canal et faux d'un
+mélange — et le mélangeur de RTLSDR-Airband est une fonction standard. `frequency_mhz`
+devient donc **facultatif** : absent, l'interface affiche `mixed` au lieu d'inventer un
+nombre. Rien ne change pour qui a de vraies fréquences.
+
+**La partie spécifique reste dehors.** Ce que le mélange porte change quand la station
+bascule de groupe, et co-atc ne peut pas le savoir. Embarquer `/radio/etat` en amont
+serait exactement le mauvais échange : personne d'autre ne l'a. Le mécanisme est donc
+générique — `PUT /api/v1/frequencies/{id}/label` — et **la politique reste chez celui qui
+sait**. `radio-ctl`, un `cron`, une ligne de shell : qui change ce qui est diffusé
+l'annonce, avec ce qu'il utilise déjà. Une étiquette vide restaure le nom configuré.
+
+**Quatre tests**, dont celui qui refuse une étiquette trop longue plutôt que de la
+tronquer — une étiquette coupée en deux est pire qu'une absente, parce que personne ne
+cherche un message qu'on ne lui a pas montré.
+
+### D37 — Un compte dans le fichier active l'authentification *(21/09)*
+
+**Un défaut que j'ai créé une heure plus tôt et qui laissait le serveur ouvert.**
+
+Après un redémarrage : le compte existait dans `configs/users.json`, la page de
+configuration ne se proposait plus — **et `enabled` valait `false`**. Le serveur avait
+l'air configuré et ne protégeait rien, ce qui est pire que l'un ou l'autre.
+
+La cause : `AddUser` activait l'authentification **en mémoire**, mais au démarrage le
+service se reconstruit depuis `config.Auth.Enabled`, et la page n'écrit jamais dans
+`config.toml` — délibérément, puisqu'il porte les mesures en commentaires.
+
+**La règle** : un compte présent dans le fichier de comptes **active** l'authentification,
+quoi que dise la configuration. Créer un compte depuis la page *est* l'acte de l'activer.
+En revanche, des comptes écrits à la main dans `config.toml` continuent d'obéir à
+`auth.enabled` — un `enabled = false` écrit à la main est une décision, pas un oubli.
+
+Trouvé en testant autre chose : `GET /api/v1/frequencies` répondait **200 sans session**.
+Le genre de défaut qu'aucun test ne trouve quand on n'a pas pensé à redémarrer.
+
+> **Au passage** : les sessions vivent en mémoire et ne survivent pas à un redémarrage.
+> C'est cohérent — une session est un jeton de présence, pas une donnée — mais ça veut
+> dire qu'on se reconnecte après chaque mise à jour du binaire.
+

@@ -82,3 +82,6 @@ __pycache__/
 # Personal editor and agent settings.
 .claude/settings.local.json
 /.trash/
+
+# Accounts created by the first-run page. Password hashes, never published.
+configs/users.json

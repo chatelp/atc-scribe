@@ -679,7 +679,11 @@ func (c *Config) ValidateFrequencies() error {
 		}
 
 		// Validate frequency
-		if freq.FrequencyMHz <= 0 {
+		// Zero means there is no single frequency to state, which is the honest
+		// answer for a mixed stream: RTLSDR-Airband's mixer puts several channels
+		// on one mount, and any number chosen for it would be a fiction. The UI
+		// shows the name alone in that case. Negative is still a mistake.
+		if freq.FrequencyMHz < 0 {
 			return fmt.Errorf("frequency #%d: invalid frequency: %f", i+1, freq.FrequencyMHz)
 		}
 
