@@ -20,7 +20,7 @@ motif. Une question qui se pose s'ajoute à la seconde.*
 | D10 | **Le moteur d'exécution est mlx-whisper** | 15/09 | Q2 tranchée par la mesure (`08-premiere-mesure.md`) : le modèle affiné de jacktol se convertit en 10,5 s et se charge. Mesuré sur 16 transmissions réelles, **× 8,5 le temps réel en médiane contre × 1,4 pour `large-v3-turbo`**. Et le moteur que l'amont recommande, faster-whisper, n'a pas d'accélération Metal. Décision révisable si l'affinage maison (stratégie C) impose un autre format. |
 | D11 | **Passe de confidentialité sur les documents publiables** — les coordonnées de la station restent, le reste part | 15/09 | `CLAUDE.md` demande « pas d'adresse exacte » tout en notant que la position est déjà publique via FlightAware. Arbitrage du propriétaire : **on garde la position** (48.80586 / 2.04932 / 152 m), sans laquelle aucune mesure de portée ou de propagation n'a de sens, et **on retire de `01-station.md` l'étage, l'orientation de la prise d'antenne et les identifiants de compte FlightAware et Flightradar24** — aucune valeur technique, et ensemble ils désignaient un logement plutôt qu'une station. Fait avant le premier commit : **rien de tout cela n'est entré dans l'historique git**. |
 | D12 | **Le modèle anglais est `large-v3-atco2` multilingue, pas `jacktol medium.en`** | 16/09 | Départagé par l'ADS-B, pas par un accord entre modèles : sur 1 468 transmissions de la captation du 15/09, le multilingue affiné ATC produit **94 appariements vrais contre 62,6**, et gagne sur les cinq fréquences sans exception. Sur 124,625 le modèle anglais tombe **au niveau du hasard**. `03-transcription.md` désignait le mauvais candidat ; c'est corrigé. Détail dans `18-nuit-du-15.md`. |
-| D13 | **La base SQLite de Co-ATC ne s'efface jamais** | 15/09 | Un `rm -rf data/` a détruit l'historique ADS-B d'une fenêtre de captation. Récupéré depuis `globe_history` de readsb, mais la règle tient : cette base est la seule trace locale du croisement radio/ADS-B, et elle ne se reconstitue pas toute seule. |
+| D13 | **La base SQLite ne s'efface jamais** — *amendée le 21/09, voir D29* | 15/09 | Un `rm -rf data/` a détruit l'historique ADS-B d'une fenêtre de captation. Récupéré depuis `globe_history` de readsb, mais la règle tient : cette base est la seule trace locale du croisement radio/ADS-B, et elle ne se reconstitue pas toute seule. |
 
 ## Questions ouvertes
 
@@ -1488,4 +1488,47 @@ WAV n'était supprimé qu'après vérification que le MP3 existait et n'était p
 
 > **Ce qu'il faut changer dans le sidecar** : écrire directement en MP3 64 kbit/s à
 > 16 kHz. Le WAV n'a servi à rien qu'à occuper douze fois la place.
+
+### D29 — Les bases brutes sont remplacées par des extraits *(21/09)*
+
+**D13 disait « la base ne s'efface jamais », et son motif était juste** : *« cette base
+est la seule trace locale du croisement radio/ADS-B, et elle ne se reconstitue pas toute
+seule »*. Ce motif ne tient plus, parce que la trace a été extraite.
+
+**Ce que pesaient les bases** : 11,57 Go pour cinq journées. Décomposé :
+
+| | |
+|---|---|
+| les transcriptions — l'irremplaçable | **~2,3 Mo** (6 105 lignes) |
+| l'historique ADS-B brut | **11,5 Go** (7,6 M lignes) |
+
+**L'historique brut ne sert qu'à une chose** : savoir quels avions étaient visibles à
+quel instant, pour vérifier qu'un indicatif transcrit correspond à un avion réel. Ça se
+résume, et le format existait déjà — celui que `cmd/phraseology -adsb` consomme.
+
+**11,57 Go → 339 Mo, 34× plus petit.** Extraits dans `whisper-lab/extraits/` : un fichier
+ADS-B et un fichier de transcriptions par jour.
+
+**Vérifié avant de supprimer, et le premier test était mauvais.** J'ai d'abord voulu
+rejouer la mesure de référence du 15/09 avec l'extrait de la base du même jour :
+**0 appariement**. La cause n'était pas l'extrait — la base du 15 couvre 16 h 07 à
+22 h 21, alors que la capture de référence va de 12 h 05 à 14 h 43. **co-atc ne tournait
+pas encore**, et `adsb-captation.json` vient du `globe_history` de la station, pas de sa
+base. Deux sources différentes pour la même journée.
+
+**Le bon test, sur la nuit du 20 au 21**, où la base couvre bien la période :
+**11 467 transmissions, 1 000 appariements, 736 vrais, 74 % de précision** — cohérent
+avec les 72 % du corpus du 15/09. L'extrait rejoue l'appariement.
+
+> **Et il révèle l'ampleur de D26** : le processeur en direct n'a enregistré que
+> **238 appariements** cette nuit-là, contre **1 000 au rejeu**. Les écritures échouaient
+> sur `SQLITE_BUSY` à cause des 17 instances. Les quatre cinquièmes du travail de la nuit
+> n'ont jamais atteint la base.
+
+**Contrôle d'intégrité avant suppression** : 6 105 transcriptions extraites contre 6 105
+en base, à l'unité près, et les douze fichiers relus sans erreur.
+
+**La règle amendée** : ce qui ne s'efface jamais, ce sont **les transcriptions et le
+résumé ADS-B**. La base brute, elle, est un format de travail — et l'historique ADS-B est
+de toute façon reconstituable depuis `globe_history` sur la station (Q18).
 
