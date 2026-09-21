@@ -1822,3 +1822,35 @@ Le genre de défaut qu'aucun test ne trouve quand on n'a pas pensé à redémarr
 > C'est cohérent — une session est un jeton de présence, pas une donnée — mais ça veut
 > dire qu'on se reconnecte après chaque mise à jour du binaire.
 
+### D38 — `git add -A` sur un dépôt qui porte maintenant de l'état *(21/09)*
+
+**J'ai publié l'empreinte du mot de passe du propriétaire sur un dépôt public**, cinq
+minutes après avoir écrit D37 sur le fait qu'un compte doit protéger quelque chose.
+
+`git add -A`, et `configs/users.json` est parti avec le commit. Le fichier n'était pas
+dans `.gitignore` — je l'avais créé le matin même sans l'y ajouter, alors que ses trois
+voisins y étaient déjà (`config.toml`, `runtime-settings.json`, `data/`). L'oubli n'est
+pas d'avoir mal choisi : c'est de ne pas avoir choisi du tout.
+
+**Ce qui change dans le dépôt** : `configs/users.json` est ignoré, retiré de l'index et
+du commit, `main` réécrit et re-poussé de force.
+
+**Ce qui ne s'efface pas** : GitHub continue de servir le blob par le SHA du commit
+abandonné (`08f80431`) tant qu'il n'a pas ramassé ses miettes. Vérifié — il répond encore.
+Dépôt à 0 fork, 0 étoile, 0 observateur, exposition de quelques minutes ; mais les flux
+d'événements publics enregistrent les poussées, donc ce n'est pas zéro.
+
+Une empreinte Argon2id `m=64 Mio, t=3` n'est pas un mot de passe : l'attaquer coûte cher.
+C'est une raison de ne pas la distribuer, **pas** une raison de la laisser traîner. **Le
+mot de passe se change** — c'est le seul geste qui rend la fuite sans objet.
+
+**La règle** : dans ce dépôt, `git add -A` se relit avant de committer. La règle
+« pas de secret dans le dépôt » ne se tient pas par intention, elle se tient par
+`.gitignore` — et un fichier d'état nouveau s'y ajoute **dans le même geste qui le crée**,
+pas au commit suivant.
+
+> **Au passage, une lacune** : il n'existe aucun moyen de changer un mot de passe.
+> `AddUser` refuse dès qu'un compte existe. Changer le sien, c'est aujourd'hui supprimer
+> `configs/users.json` et refaire la page de premier lancement. Ça marche, et ça ne
+> devrait pas être la réponse.
+
