@@ -28,6 +28,7 @@ import json
 import logging
 import sys
 import os
+import threading
 import time
 import unicodedata
 import wave
@@ -404,6 +405,45 @@ async def transcribe(
     }
 
 
+def watch_parent(interval: float = 5.0) -> None:
+    """Stop when the process that started this one goes away.
+
+    co-atc stops its sidecar on the way out, but it cannot do so when it is
+    killed outright, and a sidecar that outlives it keeps port 8178 -- which is
+    how seventeen servers came to share one in a night. The parent cannot
+    prevent that; the child can notice.
+
+    A process that is already orphaned at startup is left alone, so running this
+    under `nohup ... &` and closing the terminal still works.
+    """
+    # co-atc sets this when it spawns the sidecar. Guessing instead -- watching
+    # whenever the parent looks alive -- would kill a sidecar started by hand
+    # with `nohup ... &` the moment its terminal closes, because its parent
+    # becomes init too. The caller knows; it should say so rather than be
+    # inferred.
+    if os.environ.get("COATC_SPAWNED") != "1":
+        log.info("not spawned by co-atc; not watching for a parent")
+        return
+
+    original = os.getppid()
+    if original == 1:
+        log.info("already orphaned at startup; not watching for a parent")
+        return
+
+    def loop() -> None:
+        while True:
+            time.sleep(interval)
+            if os.getppid() != original:
+                log.warning("parent %d is gone, stopping", original)
+                # The hard exit is deliberate: uvicorn's graceful shutdown waits
+                # on in-flight requests, and the client that would have finished
+                # them is the process that just died.
+                os._exit(0)
+
+    threading.Thread(target=loop, daemon=True, name="parent-watch").start()
+    log.info("watching parent %d", original)
+
+
 def main() -> None:
     global cfg
     cfg = from_args()
@@ -415,6 +455,9 @@ def main() -> None:
         load(cfg.model_en)
         if cfg.model_fr:
             load(cfg.model_fr)
+    if cfg.exit_with_parent:
+        watch_parent()
+
     import uvicorn
     uvicorn.run(app, host=cfg.host, port=cfg.port, log_level=cfg.log_level)
 

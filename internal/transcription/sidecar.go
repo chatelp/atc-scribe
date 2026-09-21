@@ -219,6 +219,12 @@ func (s *Sidecar) spawn() error {
 	cmd := exec.Command(s.command[0], s.command[1:]...)
 	// Its own process group, so Stop can reach the children too.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Tells our sidecar to stop if we are killed outright. Stop() handles every
+	// ordinary exit, but not SIGKILL -- and a sidecar that outlives us holds the
+	// port, which is how seventeen servers came to share one in a night. A
+	// sidecar that does not know this variable simply ignores it, which is what
+	// any other implementation of the contract will do.
+	cmd.Env = append(os.Environ(), "COATC_SPAWNED=1")
 	// The sidecar's own logs stay visible on the terminal, and a copy is kept so
 	// a startup failure can be reported with its cause attached.
 	cmd.Stdout = io.MultiWriter(os.Stdout, s.output)

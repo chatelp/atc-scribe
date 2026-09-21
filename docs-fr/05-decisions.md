@@ -967,8 +967,9 @@ Vérification finale, **six cas** — `SIGTERM`, `SIGINT`, `SIGHUP`, chacun tir�
 fenêtre de course puis une fois tout démarré : co-atc s'arrête, le sidecar part, aucun
 orphelin.
 
-**Ce qui n'est pas couvert, et c'est assumé** : un `kill -9` sur co-atc orpheline le
-sidecar — aucun parent ne peut s'en prémunir. En revanche il n'y a **aucun appel `Fatal`
+**Ce qui n'était pas couvert** : un `kill -9` sur co-atc orphelinait le sidecar. Écrit
+ici comme une fatalité — *« aucun parent ne peut s'en prémunir »* — ce qui était vrai du
+parent et faux de l'enfant. **Corrigé le 21/09, voir D35.** En revanche il n'y a **aucun appel `Fatal`
 après le démarrage du sidecar** dans `main.go` (vérifié), donc le chemin d'arrêt normal
 et tous les échecs de démarrage sont couverts.
 
@@ -1735,4 +1736,38 @@ crée le compte, bascule sur la connexion, et les données passent de 200 à 401
 > visant 14 espaces d'indentation là où il y en avait 12 — sans assertion, donc silencieux
 > —, et une structure HTML où `<b>` et `<span>` étaient deux enfants flex côte à côte au
 > lieu d'être empilés. Les deux vus à l'écran, aucun des deux par le code.
+
+### D35 — Le sidecar s'arrête quand co-atc meurt brutalement *(21/09)*
+
+D21 déclarait ce cas incorrigible : *« un `kill -9` sur co-atc orpheline le sidecar,
+aucun parent ne peut s'en prémunir »*. La phrase était vraie et la conclusion fausse —
+**le parent ne peut rien faire, l'enfant peut remarquer.**
+
+Trois orphelins constatés en une journée : le `resource_tracker` de Silero le 20/09, les
+seize sidecars morts de la nuit, et un troisième au cours des essais du 21. Le dernier
+tournait depuis une heure avec `PPID 1` quand le propriétaire a demandé ce qui restait en
+arrière-plan.
+
+**Le mécanisme** : un fil de veille regarde `os.getppid()` toutes les cinq secondes et
+appelle `os._exit(0)` s'il change. Sortie dure et non gracieuse, délibérément : l'arrêt
+propre d'uvicorn attend les requêtes en cours, et le client qui les aurait terminées vient
+de mourir.
+
+**Le critère est déclaré, pas deviné — et mon premier essai le devinait.** J'avais écrit
+« si le PPID devient 1, s'arrêter », en me protégeant du seul cas où il valait déjà 1 au
+démarrage. Ça tuait un sidecar lancé à la main avec `nohup ... &` dès la fermeture du
+terminal, puisque son parent devient init aussi. **co-atc pose donc `COATC_SPAWNED=1`
+dans l'environnement du processus qu'il lance**, et le sidecar ne veille que si elle est
+là. Une autre implémentation du contrat ignorera simplement la variable.
+
+**Les deux cas, vérifiés :**
+
+| | |
+|---|---|
+| lancé par co-atc, `kill -9` sur le parent | *« watching parent 62829 »* puis **arrêt en 3 s** |
+| lancé à la main | *« not spawned by co-atc; not watching »*, **vivant après 15 s** |
+
+> Son dernier message n'apparaît nulle part : sa sortie passe par le tuyau de co-atc, qui
+> vient de mourir. C'est inhérent, et sans conséquence — la preuve est dans le délai, qui
+> vaut exactement l'intervalle de veille.
 
