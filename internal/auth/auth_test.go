@@ -3,6 +3,9 @@ package auth
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -180,5 +183,147 @@ func TestSignInIssuesASession(t *testing.T) {
 	}
 	if c.Secure {
 		t.Error("cookie marked Secure on a plain HTTP request; the browser would never send it back")
+	}
+}
+
+// The first-run path. Upstream ships with no authentication and a README saying
+// never to expose it; this is what lets someone answer that instead of editing
+// TOML, so it has to be exactly as careful as the command-line path.
+
+func loginRequest() *http.Request {
+	r := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+	r.RemoteAddr = "127.0.0.1:5000"
+	return r
+}
+
+func setupService(t *testing.T) *Service {
+	t.Helper()
+	f, err := LoadUserFile(filepath.Join(t.TempDir(), "config.toml"))
+	if err != nil {
+		t.Fatalf("LoadUserFile: %v", err)
+	}
+	s, err := NewService(Config{UserFile: f})
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	return s
+}
+
+func TestSetupIsNeededUntilAnAccountExists(t *testing.T) {
+	s := setupService(t)
+	if !s.NeedsSetup() {
+		t.Fatal("a server with no account anywhere needs setting up")
+	}
+	if s.Enabled() {
+		t.Error("authentication cannot be on with no account")
+	}
+
+	if err := s.AddUser("pierre", "correcthorsebattery"); err != nil {
+		t.Fatalf("AddUser: %v", err)
+	}
+	if s.NeedsSetup() {
+		t.Error("setup should be done once an account exists")
+	}
+	if !s.Enabled() {
+		t.Error("creating an account must turn authentication on, or it protects nothing")
+	}
+	if _, err := s.SignIn(loginRequest(), "pierre", "correcthorsebattery"); err != nil {
+		t.Errorf("the account just created should be able to sign in: %v", err)
+	}
+}
+
+// The page creates accounts without being signed in, so it has to stop being
+// able to the moment there is someone to sign in as.
+func TestSetupRefusesOnceAnAccountExists(t *testing.T) {
+	s := setupService(t)
+	if err := s.AddUser("pierre", "correcthorsebattery"); err != nil {
+		t.Fatalf("first AddUser: %v", err)
+	}
+	if err := s.AddUser("intrus", "alsolongenough"); err == nil {
+		t.Fatal("a second account through the setup path must be refused")
+	}
+	if _, err := s.SignIn(loginRequest(), "intrus", "alsolongenough"); err == nil {
+		t.Error("the refused account must not exist")
+	}
+}
+
+func TestSetupRefusesAShortPassword(t *testing.T) {
+	s := setupService(t)
+	if err := s.AddUser("pierre", "court"); err == nil {
+		t.Fatal("a short password must be refused")
+	}
+	if !s.NeedsSetup() {
+		t.Error("a refused account must leave the server still needing setup")
+	}
+}
+
+// What is written must be the hash and nothing else. The password exists in
+// memory for the moment it takes to hash it, and nowhere afterwards.
+func TestTheAccountFileHoldsAHashAndNotThePassword(t *testing.T) {
+	dir := t.TempDir()
+	f, err := LoadUserFile(filepath.Join(dir, "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := NewService(Config{UserFile: f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const password = "correcthorsebattery"
+	if err := s.AddUser("pierre", password); err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := os.ReadFile(f.Path())
+	if err != nil {
+		t.Fatalf("the accounts file should exist at %s: %v", f.Path(), err)
+	}
+	if strings.Contains(string(raw), password) {
+		t.Fatal("the password is in the file in clear")
+	}
+	if !strings.Contains(string(raw), "$argon2id$") {
+		t.Error("the file should hold an Argon2id hash")
+	}
+	if info, err := os.Stat(f.Path()); err == nil && info.Mode().Perm() != 0o600 {
+		t.Errorf("the accounts file holds password hashes: mode is %v, want 0600", info.Mode().Perm())
+	}
+}
+
+// Accounts survive a restart, or the page would silently undo itself.
+func TestAccountsAreReadBackAtTheNextStart(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.toml")
+
+	f1, _ := LoadUserFile(cfgPath)
+	s1, _ := NewService(Config{UserFile: f1})
+	if err := s1.AddUser("pierre", "correcthorsebattery"); err != nil {
+		t.Fatal(err)
+	}
+
+	f2, err := LoadUserFile(cfgPath)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	s2, err := NewService(Config{Enabled: true, UserFile: f2})
+	if err != nil {
+		t.Fatalf("a restart should find the account: %v", err)
+	}
+	if s2.NeedsSetup() {
+		t.Error("the account did not survive the restart")
+	}
+	if _, err := s2.SignIn(loginRequest(), "pierre", "correcthorsebattery"); err != nil {
+		t.Errorf("the account should still sign in after a restart: %v", err)
+	}
+}
+
+// A missing accounts file is the normal state before anyone sets anything up,
+// not an error to fail on.
+func TestAMissingAccountFileIsNotAnError(t *testing.T) {
+	f, err := LoadUserFile(filepath.Join(t.TempDir(), "config.toml"))
+	if err != nil {
+		t.Fatalf("a missing accounts file must not be an error: %v", err)
+	}
+	if len(f.Users) != 0 {
+		t.Errorf("expected no accounts, got %d", len(f.Users))
 	}
 }

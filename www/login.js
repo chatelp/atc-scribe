@@ -13,6 +13,7 @@
     'use strict';
 
     const ENDPOINT = '/api/v1/auth';
+    const SETUP = '/api/v1/setup';
 
     function overlay() {
         const el = document.createElement('div');
@@ -34,6 +35,18 @@
             #coatc-login p  { font-size: .75rem; margin: 0 0 1.25rem; color: #6b7d74; }
             #coatc-login label { display: block; font-size: .7rem; text-transform: uppercase;
               letter-spacing: .08em; color: #6b7d74; margin-bottom: .35rem; }
+            #coatc-login .choice { margin-bottom: 1rem; }
+            #coatc-login .choice label {
+              display: flex; align-items: flex-start; gap: .5rem;
+              text-transform: none; letter-spacing: normal;
+              color: #d6e4dc; font-size: .8rem; line-height: 1.45;
+              border: 1px solid #1f2d26; border-radius: .25rem;
+              padding: .6rem .7rem; margin-bottom: .5rem; cursor: pointer;
+            }
+            #coatc-login .choice label:has(input:checked) { border-color: #4ade80; }
+            #coatc-login .choice b { color: #4ade80; font-weight: 600; }
+            #coatc-login .choice span { display: block; color: #6b7d74; font-size: .7rem; margin-top: .25rem; }
+            #coatc-login .choice input { width: auto; margin: .2rem 0 0; flex: none; }
             #coatc-login input {
               width: 100%; box-sizing: border-box; margin-bottom: 1rem; padding: .5rem .6rem;
               background: #0b0f0d; border: 1px solid #1f2d26; border-radius: .25rem;
@@ -100,8 +113,87 @@
         });
     }
 
+    /*
+     * First run. Upstream ships with no authentication and a README saying never
+     * to expose it; this asks the question instead of leaving it to whoever reads
+     * the TOML.
+     *
+     * No setup token: the server refuses to start unconfigured unless it is bound
+     * to loopback, so reaching this page already means being on the machine --
+     * the same trust boundary as the terminal where you would run -add-user.
+     */
+    function setupOverlay(state) {
+        const el = overlay();
+        el.querySelector('form').innerHTML = `
+          <h1>Set up co-atc</h1>
+          <p>No account exists yet. Choose how this server should be reached.</p>
+
+          <div class="choice">
+            <label><input type="radio" name="coatc-mode" value="local" checked><div>
+              <b>This machine only</b>
+              <span>No sign-in. The server stays on ${state.host}, reachable from
+              nowhere else. This is what upstream does, chosen rather than inherited.</span>
+            </div></label>
+            <label><input type="radio" name="coatc-mode" value="account"><div>
+              <b>Reachable, with an account</b>
+              <span>Creates a sign-in. You will still need TLS, or a trusted proxy
+              declared in the configuration, before a password is safe to send over
+              a network you do not control.</span>
+            </div></label>
+          </div>
+
+          <div id="coatc-account" hidden>
+            <label for="coatc-user">User name</label>
+            <input id="coatc-user" autocomplete="username" autocapitalize="none">
+            <label for="coatc-pass">Password (10 characters or more)</label>
+            <input id="coatc-pass" type="password" autocomplete="new-password">
+          </div>
+
+          <p class="err"></p>
+          <button type="submit">Continue</button>
+        `;
+        document.body.appendChild(el);
+
+        const form = el.querySelector('form');
+        const err = el.querySelector('.err');
+        const button = el.querySelector('button');
+        const account = el.querySelector('#coatc-account');
+        const modeOf = () => el.querySelector('input[name=coatc-mode]:checked').value;
+
+        el.querySelectorAll('input[name=coatc-mode]').forEach((r) =>
+            r.addEventListener('change', () => { account.hidden = modeOf() !== 'account'; }));
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            err.textContent = '';
+            button.disabled = true;
+            const mode = modeOf();
+            try {
+                const res = await fetch(SETUP, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mode,
+                        username: el.querySelector('#coatc-user').value,
+                        password: el.querySelector('#coatc-pass').value,
+                    }),
+                });
+                if (res.ok) { location.reload(); return; }
+                err.textContent = (await res.text()).trim() || 'Setup failed.';
+            } catch (e) {
+                err.textContent = 'Server unreachable.';
+            }
+            button.disabled = false;
+        });
+    }
+
     async function check() {
         try {
+            const setup = await fetch(`${SETUP}/status`);
+            if (setup.ok) {
+                const st = await setup.json();
+                if (st.needed) { setupOverlay(st); return; }
+            }
             const res = await fetch(`${ENDPOINT}/status`);
             if (!res.ok) return;
             const s = await res.json();
