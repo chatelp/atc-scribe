@@ -187,8 +187,13 @@ champ `accord` qui dit si ce qui sort d'Icecast correspond bien au gabarit charg
 **Balises permanentes à exclure de toute transcription** : 131,025 (ATIS Saint-Cyr,
 +49 dB, émet en continu), 127,475 (ATIS Toussus), 128,225 et 127,125 (ATIS De Gaulle),
 120,000 (ATIS Le Bourget), 125,275 (ATIS Chavenay), 132,742 (porteuse permanente non
-identifiée). Un ATIS est une boucle enregistrée : elle sature le squelch et n'apporte
-rien, sauf à vouloir en extraire le METAR — ce qui est une idée séparée et plutôt bonne.
+identifiée). Un ATIS est une boucle enregistrée : elle ne ferme jamais le squelch et
+n'apporte rien au trafic, sauf à vouloir en extraire le contenu — idée séparée, traitée
+en Q9 et Q32.
+
+> **Corrigé le 21/09** : ce paragraphe disait que l'ATIS de Saint-Cyr « sature ».
+> Mesuré — il ne sature pas, il se transcrit au gain quotidien. En revanche la boucle de
+> 21 h ne porte **pas** de météo : ni vent, ni QNH, ni piste en service. Détail en Q32.
 
 **Quinze fréquences actives ne sont dans aucune liste publique** et restent à
 identifier ; sept d'entre elles sont en cours d'enregistrement nocturne. Le catalogue
