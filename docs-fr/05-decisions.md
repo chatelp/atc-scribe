@@ -157,7 +157,7 @@ passent par le SIA. À arbitrer selon les conditions d'utilisation.
 Voir D6 (la licence amont est MIT, le fork est publiable) et D7 (le fork est publié
 sous MIT). Plus rien d'ouvert ici.
 
-### Q9 — Transcrire les ATIS : **oui, mais pour une seule fréquence** *(prémisse remise en cause le 20/09, voir Q32)*
+### Q9 — Transcrire les ATIS : **oui, mais pour une seule fréquence** *(doublement infirmée le 20/09 — voir Q32)*
 
 La question posée était : à quoi bon, si le METAR est gratuit en ligne ? Vérifié le
 15 septembre auprès d'Aviation Weather Center, requête sur les terrains de la zone :
@@ -188,10 +188,14 @@ plutôt qu'on ne reconstitue un METAR complet. C'est une porteuse permanente (m�
 collée à la crête), donc aucun problème de squelch : il suffit d'enregistrer N secondes
 à intervalle régulier.
 
-> ⚠️ **Un obstacle connu** : l'ATIS de Saint-Cyr **sature le récepteur** — le
-> propriétaire l'a constaté à l'oreille, un souffle continu par-dessus la voix. À +49 dB
-> c'est attendu. Il faudra un gain réduit ou une quantification plus basse **sur ce canal
-> seulement** — ce que le mode de diffusion par canal rend justement possible.
+> ⚠️ ~~**Un obstacle connu** : l'ATIS de Saint-Cyr **sature le récepteur** — le~~
+> ~~propriétaire l'a constaté à l'oreille, un souffle continu par-dessus la voix.~~
+>
+> **Mesuré le 20/09 : faux.** Au gain quotidien de 40,2 dB la transcription est déjà
+> exploitable ; réduire à 32,8 dB l'améliore mais ne la débloque pas. « Sature le
+> récepteur » décrivait une écoute, pas une mesure, et a tenu cinq jours. **Et le contenu
+> espéré — piste en service, niveau de transition — n'est pas diffusé à cette heure.**
+> Voir Q32 ; la boucle de jour reste à vérifier, c'est Q33.
 
 C'est probablement la seule donnée réellement originale que la station produise : tout
 le reste est, en principe, téléchargeable.
@@ -1318,7 +1322,7 @@ ne garder `raw_data` que sur la dernière ligne demande du code et un choix de s
 (table séparée, ou effacement périodique des lignes anciennes). **À décider avant toute
 marche continue de plus de quatre jours.**
 
-### Q32 — L'ATIS sature-t-il vraiment, ou est-ce le pic DC du tuner ? *(nouvelle, 20/09)*
+### Q32 — L'ATIS sature-t-il vraiment, ou est-ce le pic DC du tuner ? *(répondue le 20/09 — non, et la question d'après était la mauvaise)*
 
 **Trouvé par l'agent de la station, pas par nous, et ça aurait invalidé la mesure.**
 
@@ -1364,6 +1368,88 @@ dédié `atis-131025`** déclenché à la demande, pas un canal ajouté à un gr
 
 > **Le garde de `salves.py` était déjà en place** depuis la nuit du 15 au 16 ; notre
 > demande le réclamait comme une tâche à faire. Document périmé, corrigé.
+
+---
+
+#### La réponse, mesurée par l'agent de la station le 20/09 à 21 h 45
+
+**Le confondant n'était pas là.** A (décalé) et E (sur la porteuse) sont à **0,1 dB l'une
+de l'autre**, en RMS comme en crête, histogrammes superposés. Le gabarit dit pourquoi :
+`highpass = 300` retire le terme quasi continu avant la sortie. La précaution était déjà
+prise, ailleurs, et probablement pas pour cette raison. **Mon hypothèse était fausse ; la
+prise qui la teste valait quand même d'être faite**, c'est la seule façon de le savoir.
+
+**Et la prémisse de Q9 était fausse aussi.** La prise témoin, au gain de 40,2 dB auquel la
+station tourne tous les jours, rend **déjà** un texte exploitable. L'ATIS n'était pas
+irrécupérable : il n'avait jamais été transcrit. *« Sature le récepteur »*, écrit le 15/09,
+décrivait une écoute, pas une mesure — et tenait depuis cinq jours.
+
+| prise | gain | RMS | crête | éch. à 0-3 dB de la butée | transcription | calcul |
+|---|---|---|---|---|---|---|
+| A témoin | 40,2 | −15,1 | −0,1 | 11 / 200 / 1 416 / 6 392 | exploitable | 115 s |
+| **B** | **32,8** | −15,5 | −0,7 | 2 / 82 / 651 / 3 763 | **la plus propre** | 114 s |
+| C | 25,4 | −16,4 | −1,0 | 1 / 18 / 148 / 1 117 | boucle et se répète | 273 s |
+| D | 16,6 | **−35,5** | −2,0 | 0 / 1 / 3 / 12 | échec | 26 s |
+| E sur porteuse | 40,2 | −15,1 | −0,2 | 15 / 214 / 1 462 / 6 582 | exploitable, noms déformés | 234 s |
+
+**Ce que le gain fait, et que le niveau ne montre pas.** De A à C le RMS ne bouge
+quasiment pas (−15,1 → −16,4) pendant que la population d'échantillons à moins de 3 dB de
+la butée **s'effondre d'un facteur 6**. On retire l'écrêtage sans rien perdre : la
+normalisation rattrape le niveau, l'écrêtage non. **Chercher l'écrêtage dans le RMS, c'est
+le chercher là où il n'est pas.** Domaine utile 40 → 25 dB, point recommandé **32,8**.
+Sous 20 dB le lien casse et whisper hallucine sa sortie de silence classique.
+
+**Le temps de calcul est un indicateur de détresse.** Quand le décodeur peine, il boucle,
+et son temps explose : 115 s pour la prise propre, 273 s pour la même durée d'audio à gain
+trop bas. Signal gratuit, non prévu, et potentiellement utilisable en production.
+
+#### Mais le livrable espéré n'existe pas
+
+**L'ATIS de Saint-Cyr, à 21 h, n'est pas un ATIS météo.** C'est une boucle
+d'auto-information bilingue : service non assuré, piste 11G/29D fermée, FATO hélicoptère
+fermée, taxiways Bravo et Charlie fermés, transit vertical interdit sauf mission d'État,
+renvoi au supplément AIP 113/26.
+
+**Ni vent, ni QNH, ni piste en service, ni niveau de transition.** Q9 justifiait
+l'opération par *« la piste en service, le type d'approche, le niveau de transition »* :
+rien de cela n'est diffusé. Ce qu'on récupère est du contenu de type NOTAM. Ça a une
+valeur — mais pas celle qui fondait la demande. **Aucune lettre de version** non plus : la
+question de comparabilité est sans objet, pour une autre raison que celle imaginée.
+
+**Q9 est donc doublement corrigée** : l'obstacle technique n'existait pas, et le contenu
+attendu non plus. **Q7 (météo française) ne peut pas s'appuyer sur cet ATIS.**
+
+#### Ce qui sert vraiment à notre chaîne
+
+**Un : le forçage d'une langue mutile l'autre, confirmé de l'extérieur.** Les cinq prises
+sont décodées `language="fr"`, et les segments anglais de la boucle ressortent mâchés dans
+les cinq. C'est **l'image miroir exacte de D24/D31** — où c'est le forçage anglais qui
+mutilait le français, et où l'union portée par un second avis rendait +11,7 %. Deux
+mesures indépendantes, deux sens opposés, même conclusion : **sur une bande bilingue, une
+passe monolingue perd l'autre langue, quelle qu'elle soit.** La décision « un modèle ou
+deux, mais adossés » ne repose plus sur un seul corpus.
+
+**Deux : notre corpus de nuit a été enregistré au gain qui écrête.** La station tourne à
+40,2 dB tous les jours, et le témoin A montre 6 392 échantillons à moins de 3 dB de la
+butée. ⚠️ **Ne pas surinterpréter** : c'est mesuré sur un émetteur au sol très proche à
++49 dB. Un avion à 40 NM arrive des dizaines de décibels plus bas et n'écrête certainement
+pas. **La mesure ne se transporte pas d'un émetteur fort à un émetteur faible** — savoir
+si le gain quotidien écrête les *avions* demande de le mesurer sur des avions, ce qui n'a
+pas été fait.
+
+### Q33 — La boucle de jour contient-elle la météo ? *(nouvelle, 21/09)*
+
+La séance a eu lieu à 21 h, aérodrome fermé. **La boucle diurne d'un terrain ouvert est
+une autre boucle** et peut porter le vent, le QNH et la piste en service — c'est-à-dire
+exactement ce que Q9 cherchait. Une séance, vingt minutes de jour, mode `atis-131025` déjà
+en place au point recommandé (`gain = 32.8`, `centerfreq = 130.550`, déclenchable par
+`aero-mode atis-131025`).
+
+**Ce qu'on ne saura toujours pas** : la stabilité d'un jour à l'autre. Une prise par gain,
+une séance. Et whisper n'est pas parfaitement reproductible — la transcription de E est un
+peu moins bonne que celle de A, ce qui **ne suffit pas** à conclure quoi que ce soit sur
+le pic DC au-delà du niveau.
+
 
 ### D26 — Le veilleur de mode a lancé 17 co-atc en une nuit *(21/09)*
 
