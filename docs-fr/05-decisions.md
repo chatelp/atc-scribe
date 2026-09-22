@@ -2373,3 +2373,73 @@ sur la nuit contre ~3 800 par canal pour les six autres, −97 %.** Ils signalen
 confondant qu'ils ne peuvent pas lever — ce canal était peut-être simplement calme — et
 refusent de vendre la conclusion qui les arrange. **C'est la piste actionnable, et elle
 demande une nuit avec un second canal à 25 pour être tranchée.**
+
+### D43 — L'écrêtage coûte de la transcription, et la baisse de niveau n'est pas le remède *(22/09)*
+
+Suite de D42. La station a cherché où se règle le niveau des fichiers : **nulle part.**
+`ampfactor` est écrit dans le bloc de sortie `mixer` de tous leurs gabarits, donc il agit
+sur le flux Icecast et **pas un octet des fichiers que nous consommons**. Le niveau est
+fixé par la démodulation AM interne. Ce qui explique enfin leurs 0,2 dB, et pourquoi deux
+campagnes de gain ne pouvaient pas répondre à la question qu'elles posaient.
+
+#### Est-ce que ça coûte vraiment ? Essai apparié, dose calibrée
+
+Comparer les écrêtées aux propres ne répond pas : même dans la bande −20/−15 dB, les
+écrêtées restent plus fortes (−16,0 contre −18,9) **et plus courtes** (2,4 s contre 4,0 s).
+On mesurerait le niveau et la durée.
+
+Donc **chaque transmission est son propre témoin** : on part d'une transmission propre, on
+l'écrête à dose voulue, on **redescend au niveau d'origine**. Niveau et durée identiques,
+seule la distorsion change.
+
+| Dose visée | Éch. en butée | Transcriptions identiques | Similarité médiane |
+|---|---|---|---|
+| 0,03 % | 9 | 60 % | 1,000 |
+| 0,5 % | 168 | 43 % | 0,937 |
+| **1,56 %** *(la dose mesurée)* | **522** | **38 %** | **0,879** |
+| 5,0 % | 1 670 | 29 % | 0,830 |
+
+Test des signes apparié de 0,5 % à 5 % : **61 se dégradent, 20 s'améliorent, p < 0,0001.**
+Le taux de sorties vides ne bouge pas (35 à toutes les doses) et le nombre de mots non plus :
+**l'écrêtage ne tue pas la transcription, il la corrompt.**
+
+Et le mode de défaillance est exactement notre goulot de Q30 :
+
+> propre : *« **Lufthansa** Six Seven Four Three four zero one one »*
+> écrêtée : *« **hello** Six Seven Four Three Four Zero One One »*
+
+**Un indicatif détruit.** Q30 mesurait que 84 % des candidats ne trouvent aucun avion à
+cause de chiffres et de lettres massacrés dans la transcription ; en voici une cause
+identifiée, et elle frappe **les transmissions fortes, c'est-à-dire les avions les plus
+proches**.
+
+> **Mon premier essai était nul, et faux.** Je visais une cible de −15 dB de RMS, ce qui ne
+> produisait que **9 échantillons** en butée là où les vraies écrêtées en ont **263**.
+> Trente fois trop faible, résultat nul, et j'allais conclure « ça ne coûte rien ». **Une
+> dose non calibrée donne une mesure qui a l'air valide et ne répond à rien** — c'est la
+> même faute que la médiane de D42, sous un autre habit. La réponse graduée est ce qui
+> protège : un point isolé n'aurait rien prouvé dans un sens ni dans l'autre.
+
+#### La baisse de niveau proposée ne peut pas être le remède
+
+La station prédit qu'une cible abaissée d'environ 6 dB ferait tomber l'écrêtage à zéro.
+**Deux corrections, tirées de la distribution des niveaux mesurée sur 999 transmissions :**
+
+| Baisse | Écrêtées restantes | Transmissions sous −35 dB |
+|---|---|---|
+| 0 dB | 76/76 | 7/999 (1 %) |
+| 6 dB | **22/76** | 86/999 (9 %) |
+| 10 dB | 0/76 | **333/999 (33 %)** |
+
+1. **6 dB ne suffit pas** : 29 % des écrêtées le resteraient. Il en faut **10**.
+2. **Et 10 dB n'est pas payable.** La prise ATIS à −35,5 dB de RMS n'a **rien** rendu
+   (Q32) : à −10 dB, **un tiers du corpus passe sous ce niveau**. On échangerait un
+   problème qui touche 8 % des transmissions contre un qui en touche 33 %.
+
+**Le remède n'a pas la bonne forme.** Il ne faut pas baisser tout le monde, il faut
+**écrêter moins les forts sans toucher aux faibles** — un limiteur ou une compression, pas
+un facteur multiplicatif. Ça relève de notre aval à nous, pas de leur gabarit.
+
+**Leur test `ampfactor` au niveau du canal reste à faire** : il répond à une question de
+capacité — le niveau des fichiers est-il atteignable du tout ? — qu'aucune de nos données
+ne peut trancher. Une ligne, en journée, sans rien couper.
