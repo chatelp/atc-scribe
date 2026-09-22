@@ -68,6 +68,7 @@
   <div class="row nav">
     <button id="prev">← Previous</button>
     <button id="replay">Replay <kbd>space</kbd></button>
+    <label><input type="checkbox" id="loop" checked> Loop</label>
     <button id="next" class="primary">Save &amp; next <kbd>⌘↵</kbd></button>
     <button id="skip">Skip</button>
     <button id="reveal" class="warn" hidden>Show model readings</button>
@@ -88,6 +89,8 @@
           assisted and unassisted clips can be scored apart. The readings are unlabelled
           and shuffled — you cannot favour a model you cannot identify.</li>
     </ol>
+    The clip loops while you type, so you should not need the replay key at all —
+    untick <b>Loop</b> if you prefer silence.
     Saved automatically on every change. Close and reopen at will — progress is kept.
   </div>
 </main>
@@ -207,10 +210,40 @@ $('#reveal').onclick = async () => {
   save();
 };
 
+// Space must never reach the replay shortcut from a control that has its own
+// meaning for it. The audio player is the one that bit: clicking play moves
+// focus there, and then space fires the browser's native play/pause AND this
+// shortcut, while the keystrokes never reach the textarea.
+const SAISIE = /^(TEXTAREA|INPUT|SELECT|BUTTON|AUDIO|VIDEO)$/;
 addEventListener('keydown', e => {
-  if (e.key === ' ' && e.target.tagName !== 'TEXTAREA'){ e.preventDefault(); $('#replay').click(); }
+  const t = e.target;
+  const saisit = SAISIE.test(t.tagName) || t.isContentEditable;
+  if (e.key === ' ' && !saisit){ e.preventDefault(); $('#replay').click(); }
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter'){ e.preventDefault(); $('#next').click(); }
   if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowLeft'){ e.preventDefault(); $('#prev').click(); }
+});
+
+// Looping is what makes the shortcut unnecessary while typing, which is the
+// real fix for the space key. The pause lets the ear reset, and the clip id is
+// captured so a pending timer cannot restart audio on a clip you have left.
+const PAUSE_BOUCLE = 800;
+function boucleActive(){
+  try { return localStorage.getItem('loop') !== '0'; } catch(e) { return true; }
+}
+$('#loop').checked = boucleActive();
+$('#loop').addEventListener('change', () => {
+  try { localStorage.setItem('loop', $('#loop').checked ? '1' : '0'); } catch(e) {}
+  if ($('#loop').checked && $('#player').paused) $('#replay').click();
+});
+$('#player').addEventListener('ended', () => {
+  if (!$('#loop').checked) return;
+  const pour = items[i] && items[i].id;
+  setTimeout(() => {
+    if (!$('#loop').checked) return;
+    if (!items[i] || items[i].id !== pour) return;   // on a change de clip
+    $('#player').currentTime = 0;
+    $('#player').play().catch(()=>{});
+  }, PAUSE_BOUCLE);
 });
 
 boot();
