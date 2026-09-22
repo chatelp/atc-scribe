@@ -1998,7 +1998,7 @@ disque externe** (5,7 Go) : l'interne est déjà juste, et il se charge en 4,7 s
 > rappelment arrire »*. **Les deux sont faux, et faux différemment.** C'est exactement
 > pourquoi l'ancrage est dangereux ici : il n'y a pas de bonne réponse à copier.
 
-### Q34 — Le gain quotidien coûte-t-il quelque chose sur les avions ? *(nouvelle, 21/09)*
+### Q34 — Le gain quotidien coûte-t-il quelque chose sur les avions ? *(répondue le 22/09 : **non**)*
 
 Q32 a montré que le témoin à **40,2 dB — le réglage quotidien de la station — écrête** :
 6 392 échantillons à moins de 3 dB de la butée. Nous avons écrit dans la foulée que la
@@ -2165,3 +2165,89 @@ n'a rien subi. Ce qui compte en fin de bloc n'est pas un délai fixe mais **le c
 — exact dès qu'on connaît la durée de la transmission, et une garde de 10 s aurait de
 toute façon raté les transmissions longues (43,8 s existe dans le jeu de test). Corrigé,
 et le test qui l'a trouvé était écrit pour ça.
+
+### D40 — Le gain quotidien n'écrête pas les avions *(22/09)*
+
+**Réponse à Q34, et elle est nette.** Nuit du 21 au 22, 18 blocs, 29 823 déclenchements,
+**999 transmissions porteuses de parole** — l'estimation de la station (~1 040) était juste
+à 4 % près.
+
+#### 1. Le confondant du squelch est mort, sur leur propre test
+
+Ils avaient proposé de compter les déclenchements par bloc **avant** de regarder la moindre
+transcription : si le seuil était absolu malgré son nom, baisser le gain de 7,4 dB les
+aurait effondrés.
+
+| Bras | Déclenchements |
+|---|---|
+| 40,2 dB | 13 529 |
+| 32,8 dB | 14 266 |
+| **rapport** | **1,054** |
+
+Pas d'effondrement. **Le seuil est bien relatif, ils avaient raison** — et nous le savons
+sur nos données, pas sur leur parole.
+
+#### 2. La réponse : non, et ce n'est pas un simple résultat nul
+
+Écrêtage lu **transmission par transmission, sur les seuls fichiers porteurs de parole**,
+comme leur garde-fou l'imposait :
+
+| Source | Gain | Butée (p. 1000) | RMS |
+|---|---|---|---|
+| ATIS Saint-Cyr (émetteur au sol) | 40,2 | **4,564** | −15,1 |
+| ATIS Saint-Cyr | 32,8 | **2,567** | −15,5 |
+| **Avions, médiane** | **40,2** | **0,000** | **−22,8** |
+| **Avions, médiane** | **32,8** | **0,000** | **−23,2** |
+| Avions, moyenne | 40,2 | 2,352 | −23,0 |
+| Avions, moyenne | 32,8 | 2,738 | −23,3 |
+
+- **La médiane est nulle aux deux gains.** 51 % des transmissions à 40,2 dB et 55 % à
+  32,8 dB n'ont **aucun** échantillon à moins de 3 dB de la butée.
+- L'écart des moyennes va dans le **mauvais sens** (−0,39 p. 1000, Welch t = −0,67) : rien.
+- Les avions arrivent à **−23 dB**, soit 23 dB de marge sous la butée.
+
+**Ce qui rend la conclusion solide, c'est qu'elle ne repose pas sur un test négatif.** Un
+résultat nul issu d'une mesure sous-dimensionnée ne vaut rien ; ici une mesure *positive*
+dit qu'il n'y a rien à écrêter. La moyenne de 2,35 p. 1000 est portée par une queue (15 %
+des transmissions au-dessus de 1 p. 1000), et cette queue a **la même taille dans les deux
+bras** — 37 contre 38 transmissions au-dessus de 10 p. 1000.
+
+#### 3. Le non-transport, confirmé quantitativement
+
+C'est le point qui comptait. **Sur l'ATIS, baisser le gain marche** : 4,56 → 2,57 p. 1000,
+la moitié. **Sur les avions, ça ne change rien**, parce qu'il n'y avait rien à corriger.
+Un émetteur au sol à quelques kilomètres arrive **8 dB plus haut** qu'un avion.
+
+La prudence écrite en Q32 — *« la mesure ne se transporte pas d'un émetteur fort à un
+émetteur faible »* — était justifiée, et il aura fallu une nuit pour le savoir plutôt que
+de le supposer dans un sens ou dans l'autre.
+
+#### 4. Le bénéfice gratuit est un résultat négatif
+
+Fichiers vides heure par heure : **96 à 98 % toute la nuit**, contre les 92-98 % de
+référence du 15-16. **Le retrait des adaptateurs CPL n'a rien changé au parasite.** Seule
+exception, 22 h à 44,6 % de vides — mais 233 déclenchements seulement, sur le point bas de
+la courbe, et on n'en conclut rien.
+
+#### 5. Deux incidents
+
+**Deux scripts de campagne ont tourné en parallèle.** Armés à 21 h 39 et 21 h 45, le
+premier jamais arrêté, tous deux écrivant `gain = ...` dans le même gabarit et appelant
+`aero-mode` au même horaire. **Sans effet sur les données** : les deux calculaient le même
+gain pour le même bloc, et Docker a sérialisé — **un seul démarrage de conteneur par bloc,
+vérifié identique sur les 18**. Mais c'est exactement la classe de faute qui nous a valu
+17 co-atc en une nuit (D26) : un processus lancé, remplacé par un meilleur, et jamais tué.
+
+**Le témoin continu a perdu la moitié de ses données.** `append = false` sur une sortie
+rouverte toutes les 30 minutes : chaque redémarrage tronque, donc chaque fichier horaire ne
+contient **qu'un bloc** (27 à 30 min d'échantillons réels) au lieu de deux. Lequel des deux
+a survécu ne se établit pas depuis les données — tenté par corrélation entre l'énergie du
+témoin et la densité de déclenchements, non concluant, le parasite est trop uniforme.
+**L'idée était juste, le drapeau était faux** ; `append = true` suffit. Sans conséquence
+ici, la prédiction qu'il devait tester étant sans objet dès lors que 32,8 ne gagne pas.
+
+> **Au passage** : `ffprobe` annonce des durées fausses de −17 à +12 minutes sur ces
+> fichiers VBR. La station nous avait renvoyé l'avertissement ; il valait bien au-delà de
+> ce qu'on en disait. **On compte les échantillons décodés, jamais l'en-tête.**
+
+> **Et 501 fichiers illisibles** sur 29 823 (1,7 %), écartés et comptés comme tels.
