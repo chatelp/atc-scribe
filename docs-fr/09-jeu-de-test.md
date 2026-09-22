@@ -118,3 +118,42 @@ réfléchir** : ce sont des enregistrements de communications radio réelles, av
 indicatifs identifiables. Ce qui est publiable, c'est probablement la **liste des noms de
 fichiers, la graine du tirage et les annotations** — de quoi rejouer la mesure pour qui
 possède la station, sans rediffuser l'audio. À arbitrer (Q16).
+
+## Écrêtage dans le jeu : négligeable, et c'est une bonne nouvelle
+
+Vérifié le 22/09, avant d'engager les heures d'annotation. D43 a montré qu'environ 8 % des
+transmissions de la nuit du 21 sont **franchement écrêtées** et que ça change la
+transcription dans près de deux cas sur trois. Il fallait donc savoir si le jeu
+d'évaluation en portait.
+
+| | clips |
+|---|---|
+| Franchement écrêtés (≥ 100 éch. en butée) | **1** |
+| Légèrement (1 à 99) | 4 |
+| Intacts | **115** |
+
+**1 % contre 8 % dans le corpus de nuit.** Les 120 annotations mesureront donc bien les
+modèles et non la chaîne d'enregistrement — c'est ce qu'on voulait.
+
+> ⚠️ **La contrepartie, à ne pas oublier au moment de conclure** : le jeu
+> **sous-représente l'écrêtage**. Le taux d'erreur qu'on en tirera sera donc *optimiste*
+> par rapport au trafic réel de nuit, où une transmission sur douze est abîmée avant même
+> d'arriver au modèle. Le jeu mesure les modèles ; il ne mesure pas la chaîne.
+
+## Le calcul est prêt et attend les annotations
+
+`whisper-lab/note-modeles.py`, 18 tests. **Utilisable dès le premier clip** : il n'y a pas
+de seuil en dessous duquel on ne rapporte rien, seulement une incertitude à afficher.
+
+Trois précautions qui changent le résultat :
+
+- **normalisation** — la consigne demande « flight level three five zero » quand les
+  modèles rendent « FL350 » ; comparer sans normaliser mesurerait la typographie ;
+- **les `[unclear]`** — une référence dont l'annotateur n'a pas compris un passage ne peut
+  pas servir de référence sur ce passage ; score rapporté avec et sans, l'écart est une
+  donnée ;
+- **le partage aveugle / assisté** (D39) — un clip où l'annotateur a regardé les lectures
+  est contaminé ; les deux lots sont notés séparément et **l'écart mesure l'ancrage**.
+
+Le contrôle qui valide la chaîne entière : si l'on donne comme référence la sortie d'un
+modèle, ce modèle marque exactement 0 %.
