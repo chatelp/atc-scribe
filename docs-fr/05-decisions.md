@@ -2166,7 +2166,7 @@ n'a rien subi. Ce qui compte en fin de bloc n'est pas un délai fixe mais **le c
 toute façon raté les transmissions longues (43,8 s existe dans le jeu de test). Corrigé,
 et le test qui l'a trouvé était écrit pour ça.
 
-### D40 — Le gain quotidien n'écrête pas les avions *(22/09)*
+### D40 — Le gain quotidien n'écrête pas les avions *(22/09 — ⚠️ **titre faux, corrigé par D42**)*
 
 **Réponse à Q34, et elle est nette.** Nuit du 21 au 22, 18 blocs, 29 823 déclenchements,
 **999 transmissions porteuses de parole** — l'estimation de la station (~1 040) était juste
@@ -2290,3 +2290,86 @@ disque. **La règle était juste, je ne me la suis pas appliquée.**
 **La règle, maintenant explicite** : *avant de demander une donnée à qui que ce soit,
 mesurer sur ce qui est déjà sur disque.* Ça vaut pour la station, et ça vaut pour les
 120 annotations qui attendent depuis une semaine.
+
+### D42 — Si, ça écrête — et j'avais le chiffre sous les yeux *(22/09)*
+
+**La station a mesuré la même nuit et conclu l'inverse.** Vérifié plutôt que défendu : ils
+ont raison.
+
+#### Où était la faute
+
+Nous ne mesurions pas la même chose. Ils sélectionnaient par taille de fichier et lisaient
+*« la crête atteint-elle la butée ? »* ; je sélectionnais par détection de voix et lisais
+*« quelle fraction des échantillons est près de la butée ? »*. Les deux séries se
+recoupent une fois recalculées sur le même ensemble — **~10 % des transmissions de parole
+touchent la butée, aux deux gains** (9,8 % à 40,2 et 10,3 % à 32,8 ; eux trouvaient 16,3 et
+14,6 sur leur sélection, plus large).
+
+**La faute est d'avoir lu la médiane d'une distribution à queue.** J'ai écrit « médiane
+nulle, donc rien n'écrête ». Pour un phénomène de queue, la médiane est exactement la
+statistique qui l'efface. **Et j'avais le chiffre** : D40 dit « 15 % des transmissions
+au-dessus de 1 p. 1000, 37 au-dessus de 10 p. 1000, la queue a la même taille dans les deux
+bras ». J'ai lu cette queue comme du bruit autour du zéro. C'**était** le phénomène.
+
+#### Ce n'est pas un effleurement
+
+Parmi les transmissions de parole qui atteignent la butée :
+
+| | 40,2 dB | 32,8 dB |
+|---|---|---|
+| Échantillons collés à la butée, médiane | **263** | **261** |
+| … en proportion de la transmission | 1,56 % | 1,87 % |
+| Transmissions avec ≥ 100 échantillons en butée | **71 %** | **80 %** |
+| Transmissions avec 1 ou 2 seulement | 8 % | 8 % |
+
+263 échantillons à 8 kHz, c'est **33 ms de forme d'onde écrasée**. Pas une crête qui
+effleure : de la distorsion franche.
+
+#### Et la cause n'est pas le gain, elle est en aval
+
+La mesure qui referme le dossier — l'écrêtage en fonction du **niveau délivré** :
+
+| RMS délivré | n | % vraiment écrêtées |
+|---|---|---|
+| sous −20 dB | 771 | **0,0 %** |
+| −20 à −15 dB | 189 | 19,6 % |
+| au-dessus de −15 dB | 39 | **100 %** |
+
+RMS médian des écrêtées **−14,9 dB**, des propres **−23,6 dB**. C'est un seuil, pas une
+tendance.
+
+**Lecture probable, à vérifier** : la parole a un facteur de crête d'environ 15 dB. Une
+transmission normalisée à −15 dB de RMS a donc ses crêtes **à la butée par construction**.
+Ce ne serait pas une saturation radio mais **un niveau de sortie trop chaud pour la
+dynamique de la parole**.
+
+Ce qui explique enfin pourquoi le gain ne sert à rien, et la station l'a mesuré : **7,4 dB
+de gain de tuner en moins donnent 0,2 dB de niveau délivré en moins** — la normalisation
+aval absorbe le gain. Le levier n'est pas là où nous l'avons cherché toute la nuit.
+
+#### Ce qui tient de D40 et ce qui tombe
+
+- **Tient** : baisser le gain ne change rien. Mesuré deux fois, indépendamment, et le
+  mécanisme est maintenant expliqué.
+- **Tient** : la mesure de l'ATIS ne se transportait pas — mais pas pour la raison écrite.
+  Ce n'est pas que les avions sont trop faibles pour écrêter ; c'est que **le gain n'est
+  pas la variable**, ni pour l'un ni pour l'autre.
+- **Tombe** : « le gain quotidien n'écrête pas les avions ». Une transmission sur dix est
+  écrêtée, et franchement.
+- **Tient** : la nuit n'était pas nécessaire pour le savoir (D41). Les 473 transmissions
+  des 14-17/09 déjà sur disque portaient la même queue ; je ne l'aurais pas plus vue.
+
+#### Deux choses de leur côté, dites en clair par eux
+
+**La restauration automatique du gabarit a échoué** — fichier laissé vide à 07 h 00 min 00,
+sauvegarde intacte, disque à 165 Go. Restauré à la main à 07 h 21. Ils écrivent *« je n'ai
+pas d'explication et je n'en fabrique pas »*, et en tirent la seule leçon disponible : une
+restauration qui ne se vérifie pas n'est pas une restauration, les prochaines finiront par
+un `cmp`.
+
+**Et le levier contre le parasite n'est pas le gain, c'est le seuil de squelch.**
+132,783 tournait déjà à `squelch_snr_threshold = 25` au lieu de 10 : **~115 déclenchements
+sur la nuit contre ~3 800 par canal pour les six autres, −97 %.** Ils signalent eux-mêmes le
+confondant qu'ils ne peuvent pas lever — ce canal était peut-être simplement calme — et
+refusent de vendre la conclusion qui les arrange. **C'est la piste actionnable, et elle
+demande une nuit avec un second canal à 25 pour être tranchée.**
