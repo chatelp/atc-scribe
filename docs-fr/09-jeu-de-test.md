@@ -157,3 +157,28 @@ Trois précautions qui changent le résultat :
 
 Le contrôle qui valide la chaîne entière : si l'on donne comme référence la sortie d'un
 modèle, ce modèle marque exactement 0 %.
+
+## L'ordre d'annotation : entrelacé, pour que tout arrêt soit exploitable
+
+Le tirage rangeait les clips **par fréquence** — 43 Chavenay, 17 Villacoublay, 30 en route,
+30 Orly. Constaté le 22/09 après les six premières annotations : le propriétaire faisait
+les 43 plus difficiles d'affilée et n'aurait atteint l'anglais qu'au clip 61. **Un arrêt à
+40 clips n'aurait donné aucun anglais et aucun chiffre exploitable.**
+
+Réordonné le 22/09, graine 20260922 : mélange à l'intérieur de chaque fréquence, puis
+**entrelacement proportionnel**. Pas un mélange simple — celui-ci ne garantit la
+représentativité qu'en espérance, l'entrelacement la garantit à **chaque** position :
+
+| | 127750 | 128950 | 129525 | 132500 |
+|---|---|---|---|---|
+| cible | 25 % | 14 % | 36 % | 25 % |
+| après 20 clips | 25 % | 15 % | 35 % | 25 % |
+| après 30 | 23 % | 13 % | 37 % | 27 % |
+| après 60 | 25 % | 13 % | 37 % | 25 % |
+
+**La composition du jeu n'a pas bougé**, seulement l'ordre de présentation ; l'ordre
+d'origine est conservé dans `manifeste-ordre-origine.json`. Les annotations sont repérées
+par identifiant de clip et non par position : rien n'a été perdu.
+
+> **Conséquence utile** : 30 clips suffisent désormais à un premier résultat honnête, au
+> lieu d'exiger d'aller jusqu'à 61 pour voir la première transmission anglaise.
