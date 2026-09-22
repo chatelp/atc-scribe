@@ -2251,3 +2251,42 @@ ici, la prédiction qu'il devait tester étant sans objet dès lors que 32,8 ne 
 > ce qu'on en disait. **On compte les échantillons décodés, jamais l'en-tête.**
 
 > **Et 501 fichiers illisibles** sur 29 823 (1,7 %), écartés et comptés comme tels.
+
+### D41 — La nuit n'était pas nécessaire, et c'est la vraie leçon *(22/09)*
+
+Le propriétaire a posé la seule question qui comptait : *« donc la nuit ne nous a rien
+appris ? »* Vérifié plutôt que défendu.
+
+**473 transcriptions porteuses de parole des 14-17/09 sur 132,275, enregistrées au gain
+quotidien, déjà présentes sur la station depuis une semaine :**
+
+| | 14-17/09, déjà sur disque | Campagne de nuit, bras 40,2 |
+|---|---|---|
+| Butée, médiane | **0,000** | **0,000** |
+| Sans aucun échantillon près de la butée | **53 %** | **51 %** |
+| RMS médian | −20,0 dB | −22,8 dB |
+
+**La question principale se répondait en dix minutes, sur des fichiers déjà là, sans
+mobiliser personne.** Il suffisait de regarder avant de demander.
+
+**Ce que j'ai fait à l'envers.** J'ai écrit à la station, à propos du corpus français :
+*« nous n'avons pas encore mesuré ce que nous avons ; demander des données avant
+d'exploiter les existantes serait la faute que ce dossier se reproche depuis le début. »*
+Puis j'ai demandé une nuit entière pour une question dont la réponse dormait sur leur
+disque. **La règle était juste, je ne me la suis pas appliquée.**
+
+**Ce que la nuit a quand même apporté**, et qu'il faut compter honnêtement :
+
+- **à la station**, leur propre question : le parasite est inchangé après le retrait des
+  adaptateurs CPL, ce qui désigne le bloc d'alimentation de la Freebox par élimination ;
+- **deux défauts trouvés dans leur montage** — les deux scripts concurrents, et
+  `append = false` qui détruit la moitié du témoin ;
+- le bras à 32,8 dB, c'est-à-dire la preuve que baisser le gain ne gagne rien. Mais **dès
+  lors que rien n'écrête à 40,2, ce bras ne pouvait rien apprendre** : il répondait à une
+  question déjà close ;
+- la résolution de mon confondant de squelch — qui **n'existait que parce que j'avais
+  conçu la campagne**. Un problème qu'on se crée et qu'on résout n'est pas un acquis.
+
+**La règle, maintenant explicite** : *avant de demander une donnée à qui que ce soit,
+mesurer sur ce qui est déjà sur disque.* Ça vaut pour la station, et ça vaut pour les
+120 annotations qui attendent depuis une semaine.
