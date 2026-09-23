@@ -573,6 +573,31 @@
                                             </div>
                                         </div>
                             
+                                        <!-- The airport phases are judged against. Upstream measured them
+                                             from the receiver; this lets a receiver that does not sit on the
+                                             airport worth watching say which one it is. -->
+                                        <template x-if="state.reference">
+                                            <!-- Label above, select full width: airport names are long and the
+                                                 panel is narrow; side by side they overflowed it and clipped
+                                                 every other control in the section. -->
+                                            <div class="grid gap-1 min-w-0">
+                                                <span class="text-sm">Reference airport</span>
+                                                <div class="min-w-0">
+                                                    <select x-model="draft.reference_airport" @change="save()" :disabled="busy"
+                                                            class="w-full min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                        <template x-for="c in airportChoices()" :key="c.code">
+                                                            <option :value="c.code" :selected="c.code === draft.reference_airport"
+                                                                    x-text="c.code + ' · ' + c.name + ' · ' + c.distance_nm + ' NM'"></option>
+                                                        </template>
+                                                    </select>
+                                                </div>
+                                                <div class="text-xs opacity-60 leading-snug">
+                                                    Approach, departure, takeoff, landing, runway in use and weather are
+                                                    judged against this airport. Distances and range rings stay on the receiver.
+                                                </div>
+                                            </div>
+                                        </template>
+
                                         <template x-if="note">
                                             <div class="text-xs" :class="noteBad ? 'text-red-400' : 'text-green-400'" x-text="note"></div>
                                         </template>
@@ -879,7 +904,10 @@
                                         </h4>
                                         <div class="space-y-2">
                                             <div class="flex justify-between">
-                                                <span class="text-text/70">Airport Code:</span>
+                                                <!-- Next to the receiver's coordinates, "Airport Code" read as if the
+                                                     receiver sat on that airport. It is the reference airport, which
+                                                     the settings panel can set to one miles away. -->
+                                                <span class="text-text/70">Reference airport:</span>
                                                 <span class="font-mono font-bold" x-text="$store.atc.stationAirportCode || '-'"></span>
                                             </div>
                                             <div class="flex justify-between">

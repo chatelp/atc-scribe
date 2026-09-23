@@ -244,11 +244,18 @@ func main() {
 		DisplayRangeNM:     cfg.Station.DisplayRangeNM,
 		ExtensionLengthNM:  cfg.Station.RunwayExtensionLengthNM,
 	}, log)
+	// The reference airport: the one saved from the settings panel, else
+	// [station] airport_code. Without reference data, phases keep being judged
+	// from the receiver, as upstream did.
+	var refAirport *referenceAirport
+	effectiveAirport := cfg.Station.AirportCode
 	if err != nil {
 		log.Warn("Failed to load reference data", logger.Error(err))
 	} else {
 		adsbService.SetReferenceService(&refAdapter{service: refService})
-		adsbService.SetRunwayData(refService.GetHomeRunwayData())
+		refAirport = &referenceAirport{ref: refService, adsb: adsbService, log: log}
+		effectiveAirport = refAirport.start(runtimeSettings.Settings().ReferenceAirport, cfg.Station.AirportCode)
+		runtimeSettings.UseReferenceAirport(effectiveAirport)
 		log.Info("Reference data loaded",
 			logger.Int("aircraft_count", refService.AircraftCount()),
 			logger.Int("airline_count", refService.AirlineCount()))
@@ -280,7 +287,17 @@ func main() {
 		FetchNOTAMs:            cfg.Weather.FetchNOTAMs,
 		CacheExpiryMinutes:     cfg.Weather.CacheExpiryMinutes,
 	}
-	weatherService := weather.NewService(weatherConfigConverted, cfg.Station.AirportCode, log)
+	weatherService := weather.NewService(weatherConfigConverted, effectiveAirport, log)
+
+	// From here the panel can change the reference airport: the three services
+	// that hold a piece of it exist.
+	if refAirport != nil {
+		refAirport.weather = weatherService
+		runtimeSettings.SetReferenceAirportHook(config.ReferenceAirportHook{
+			Validate: refAirport.validate,
+			Apply:    refAirport.apply,
+		})
+	}
 
 	// Start weather service
 	if err := weatherService.Start(); err != nil {

@@ -174,12 +174,13 @@ func (tt *TrajectoryTracker) ruleApproach(aircraft *Aircraft, d *DerivedState) s
 	}
 
 	// Must be approaching the station
-	if !d.IsApproachingStation {
+	if !d.IsApproachingAirport {
 		return ""
 	}
 
 	// Check runway alignment using the latest position
-	runwayInfo := DetectRunwayApproach(lat, lon, NumberOrZero(adsb.Track), d.AltMean, tt.runwayData, *cfg)
+	ref := tt.ref.load()
+	runwayInfo := DetectRunwayApproach(lat, lon, NumberOrZero(adsb.Track), d.AltMean, ref.Runways, *cfg)
 	if runwayInfo == nil || !runwayInfo.OnApproach {
 		return ""
 	}
@@ -196,8 +197,8 @@ func (tt *TrajectoryTracker) ruleApproach(aircraft *Aircraft, d *DerivedState) s
 	}
 
 	// Verify heading toward airport (bearing difference <= 90°)
-	bearingToStation := CalculateBearing(lat, lon, tt.stationLat, tt.stationLon)
-	headingDiff := math.Abs(NumberOrZero(adsb.Track) - bearingToStation)
+	bearingToAirport := CalculateBearing(lat, lon, ref.Lat, ref.Lon)
+	headingDiff := math.Abs(NumberOrZero(adsb.Track) - bearingToAirport)
 	if headingDiff > 180 {
 		headingDiff = 360 - headingDiff
 	}
@@ -266,9 +267,10 @@ func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, take
 	if adsb != nil {
 		lat, lon, hasPosition := adsb.Position()
 		if hasPosition {
+			ref := tt.ref.load()
 			departureInfo = DetectRunwayDeparture(
 				lat, lon, NumberOrZero(adsb.Track),
-				tt.runwayData, tt.stationLat, tt.stationLon, *cfg,
+				ref.Runways, ref.Lat, ref.Lon, *cfg,
 			)
 		}
 	}
@@ -284,7 +286,7 @@ func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, take
 		}
 
 		// (b) Still within airport vicinity at low altitude — not yet on SID
-		if d.DistToStationNM <= cfg.AirportRangeNM {
+		if d.DistToAirportNM <= cfg.AirportRangeNM {
 			return "CLB"
 		}
 	}
@@ -294,7 +296,7 @@ func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, take
 	// airport. With spotty ADS-B coverage this is the most common CLB scenario.
 	if departureInfo != nil && departureInfo.OnDeparture &&
 		d.AltMean <= float64(cfg.DepartureAltitudeFt) &&
-		d.DistToStationNM <= cfg.AirportRangeNM {
+		d.DistToAirportNM <= cfg.AirportRangeNM {
 		if tt.runwayTracker != nil {
 			tt.runwayTracker.RecordEvent(departureInfo.RunwayID, RunwayEventClimb, aircraft.Hex)
 		}
@@ -348,8 +350,8 @@ func (tt *TrajectoryTracker) ruleDeparture(d *DerivedState) string {
 func (tt *TrajectoryTracker) ruleArrival(d *DerivedState) string {
 	cruiseAlt := float64(tt.phasesConfig.CruiseAltitudeFt)
 
-	// Must be approaching the station
-	if !d.IsApproachingStation {
+	// Must be approaching the reference airport
+	if !d.IsApproachingAirport {
 		return ""
 	}
 
@@ -412,11 +414,12 @@ func (tt *TrajectoryTracker) singlePointPhase(aircraft *Aircraft) string {
 		if track == 0 && NumberOrZero(adsb.MagHeading) != 0 {
 			track = NumberOrZero(adsb.MagHeading)
 		}
-		distToStation := MetersToNM(Haversine(lat, lon, tt.stationLat, tt.stationLon))
-		if distToStation <= cfg.AirportRangeNM {
+		ref := tt.ref.load()
+		distToAirport := MetersToNM(Haversine(lat, lon, ref.Lat, ref.Lon))
+		if distToAirport <= cfg.AirportRangeNM {
 			departureInfo := DetectRunwayDeparture(
 				lat, lon, track,
-				tt.runwayData, tt.stationLat, tt.stationLon, *cfg,
+				ref.Runways, ref.Lat, ref.Lon, *cfg,
 			)
 			if departureInfo != nil && departureInfo.OnDeparture {
 				// Extra confidence: matches the known active runway
@@ -458,7 +461,7 @@ func (tt *TrajectoryTracker) fewPointsAirbornePhase(
 	// With spotty ADS-B coverage, aircraft often first appear already airborne.
 	// Use MagHeading as fallback when Track is 0 (common with early Mode S contacts).
 	if d.VRMean > 0 && d.AltMean <= float64(tt.phasesConfig.DepartureAltitudeFt) &&
-		d.DistToStationNM <= tt.phasesConfig.AirportRangeNM && aircraft.ADSB != nil {
+		d.DistToAirportNM <= tt.phasesConfig.AirportRangeNM && aircraft.ADSB != nil {
 		lat, lon, hasPosition := aircraft.ADSB.Position()
 		if !hasPosition {
 			return "UNK"
@@ -468,9 +471,10 @@ func (tt *TrajectoryTracker) fewPointsAirbornePhase(
 			track = NumberOrZero(aircraft.ADSB.MagHeading)
 		}
 		if track != 0 {
+			ref := tt.ref.load()
 			departureInfo := DetectRunwayDeparture(
 				lat, lon, track,
-				tt.runwayData, tt.stationLat, tt.stationLon, *tt.phasesConfig,
+				ref.Runways, ref.Lat, ref.Lon, *tt.phasesConfig,
 			)
 			if departureInfo != nil && departureInfo.OnDeparture {
 				return "CLB"
@@ -484,7 +488,7 @@ func (tt *TrajectoryTracker) fewPointsAirbornePhase(
 	}
 
 	// Approaching station and descending
-	if d.IsApproachingStation && d.VRMean < 0 && d.AltMean < cruiseAlt {
+	if d.IsApproachingAirport && d.VRMean < 0 && d.AltMean < cruiseAlt {
 		return "ARR"
 	}
 
@@ -509,14 +513,15 @@ func (tt *TrajectoryTracker) hasRecentTakeoff(aircraft *Aircraft, takeoffTime *t
 
 // ─── Signal-Lost Landing Enhancement ──────────────────────────────────────────
 
-// WasDescendingTowardStation checks the trajectory history to determine if an
-// aircraft was on a descending trajectory toward the station before signal was lost.
+// WasDescendingTowardAirport checks the trajectory history to determine if an
+// aircraft was on a descending trajectory toward the reference airport before
+// signal was lost.
 // Returns true with high confidence when the medium-window altitude trend shows
 // steady descent and the aircraft was closing on the station.
 //
 // This is used by detectSignalLostLandings() to boost confidence in auto-landing
 // inference when an aircraft disappears near the airport.
-func (tt *TrajectoryTracker) WasDescendingTowardStation(hex string) bool {
+func (tt *TrajectoryTracker) WasDescendingTowardAirport(hex string) bool {
 	tt.mu.RLock()
 	at, ok := tt.aircraft[hex]
 	tt.mu.RUnlock()
@@ -533,7 +538,7 @@ func (tt *TrajectoryTracker) WasDescendingTowardStation(hex string) bool {
 	d := &at.Derived
 
 	// Check: was descending AND approaching station
-	return d.IsDescending && d.IsApproachingStation && d.AltTrendFPM < -100
+	return d.IsDescending && d.IsApproachingAirport && d.AltTrendFPM < -100
 
 	// Note: We use a gentler threshold (-100 fpm) than the normal descent threshold
 	// (-200 fpm) because near landing the descent rate may be quite shallow.
@@ -555,12 +560,12 @@ func (tt *TrajectoryTracker) LogDerivedState(hex string) {
 		logger.Float64("gs_mean", d.GSMean),
 		logger.Float64("gs_trend", d.GSTrendKtsPerSec),
 		logger.Float64("vr_mean", d.VRMean),
-		logger.Float64("dist_nm", d.DistToStationNM),
+		logger.Float64("dist_airport_nm", d.DistToAirportNM),
 		logger.Float64("dist_trend", d.DistTrendNMPerSec),
 		logger.Bool("descending", d.IsDescending),
 		logger.Bool("climbing", d.IsClimbing),
 		logger.Bool("level", d.IsLevel),
-		logger.Bool("approaching", d.IsApproachingStation),
+		logger.Bool("approaching", d.IsApproachingAirport),
 		logger.Bool("turning", d.IsTurning),
 	)
 }

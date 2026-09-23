@@ -3,7 +3,9 @@ package reference
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/pkg/logger"
@@ -24,10 +26,16 @@ type Service struct {
 	runways    []*RunwayInfo
 	navaids    []*NavaidInfo
 
-	// Home airport specific
+	// Home airport specific. It can be changed from the settings panel while
+	// the server runs, so everything below is read and replaced under homeMu.
+	homeMu               sync.RWMutex
+	homeCode             string
 	homeRunways          []*RunwayInfo
 	homeRunwayData       adsb.RunwayData
 	homeRunwayExtensions map[string]map[string][]RunwayExtensionPoint
+
+	stationLat, stationLon float64 // the receiver, for candidate distances
+	extensionLengthNM      float64
 }
 
 // NewService creates a new reference service, loading all CSV data at startup.
@@ -122,8 +130,11 @@ func NewService(cfg ServiceConfig, log *logger.Logger) (*Service, error) {
 	}
 
 	// 7. Build home runway data (backward-compatible format for phase detection)
-	s.buildHomeRunwayData(cfg.HomeAirportCode)
-	s.buildHomeRunwayExtensions(cfg.ExtensionLengthNM)
+	s.stationLat, s.stationLon = cfg.StationLat, cfg.StationLon
+	s.extensionLengthNM = cfg.ExtensionLengthNM
+	s.homeCode = strings.ToUpper(strings.TrimSpace(cfg.HomeAirportCode))
+	s.homeRunwayData = runwayDataFor(s.homeCode, s.homeRunways)
+	s.homeRunwayExtensions = runwayExtensionsFor(s.homeRunwayData, s.extensionLengthNM)
 
 	return s, nil
 }
@@ -204,17 +215,127 @@ func (s *Service) GetRunways() []*RunwayInfo {
 
 // GetHomeRunways returns runways for the home airport only.
 func (s *Service) GetHomeRunways() []*RunwayInfo {
+	s.homeMu.RLock()
+	defer s.homeMu.RUnlock()
 	return s.homeRunways
 }
 
 // GetHomeRunwayData returns the backward-compatible RunwayData struct for phase detection.
 func (s *Service) GetHomeRunwayData() adsb.RunwayData {
+	s.homeMu.RLock()
+	defer s.homeMu.RUnlock()
 	return s.homeRunwayData
 }
 
 // GetHomeRunwayExtensions returns the precomputed runway extension points for the home airport.
 func (s *Service) GetHomeRunwayExtensions() map[string]map[string][]RunwayExtensionPoint {
+	s.homeMu.RLock()
+	defer s.homeMu.RUnlock()
 	return s.homeRunwayExtensions
+}
+
+// HomeAirportCode is the airport phases are judged against, as currently set.
+func (s *Service) HomeAirportCode() string {
+	s.homeMu.RLock()
+	defer s.homeMu.RUnlock()
+	return s.homeCode
+}
+
+// usableRunways are an airport's runways with both thresholds located -- the
+// only ones phase detection can use, since a runway's heading comes from its
+// two ends.
+func (s *Service) usableRunways(code string) []*RunwayInfo {
+	var out []*RunwayInfo
+	for _, r := range s.runways {
+		if !strings.EqualFold(r.AirportIdent, code) || r.LEIdent == "" || r.HEIdent == "" {
+			continue
+		}
+		if (r.LELatitude == 0 && r.LELongitude == 0) || (r.HELatitude == 0 && r.HELongitude == 0) {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// SetHomeAirport makes another airport the one phases are judged against. It
+// refuses rather than guesses: an unknown code, or an airport none of whose
+// runways can be used, would silently turn every approach into "unknown", which
+// is the failure this setting exists to cure.
+//
+// Only airports within the display range are known -- the reference data is
+// loaded for that circle around the receiver -- which is also the only place a
+// receiver could watch an airport from.
+func (s *Service) SetHomeAirport(code string) (*AirportInfo, int, error) {
+	code = strings.ToUpper(strings.TrimSpace(code))
+	airport, runways, err := s.checkHomeAirport(code)
+	if err != nil {
+		return nil, 0, err
+	}
+	data := runwayDataFor(code, runways)
+	ext := runwayExtensionsFor(data, s.extensionLengthNM)
+
+	s.homeMu.Lock()
+	s.homeCode, s.homeRunways, s.homeRunwayData, s.homeRunwayExtensions = code, runways, data, ext
+	s.homeMu.Unlock()
+
+	s.logger.Info("Home airport changed",
+		logger.String("code", code), logger.String("name", airport.Name),
+		logger.Int("runways", len(runways)))
+	return airport, len(runways), nil
+}
+
+// CheckHomeAirport says whether SetHomeAirport would accept code, without
+// changing anything -- so a settings change can be refused before any part of
+// it is applied.
+func (s *Service) CheckHomeAirport(code string) (*AirportInfo, error) {
+	a, _, err := s.checkHomeAirport(strings.ToUpper(strings.TrimSpace(code)))
+	return a, err
+}
+
+func (s *Service) checkHomeAirport(code string) (*AirportInfo, []*RunwayInfo, error) {
+	airport := s.airportMap[code]
+	if airport == nil {
+		return nil, nil, fmt.Errorf("unknown airport %q, or beyond the display range", code)
+	}
+	runways := s.usableRunways(code)
+	if len(runways) == 0 {
+		return nil, nil, fmt.Errorf("airport %s has no runway with both ends located", code)
+	}
+	return airport, runways, nil
+}
+
+// AirportCandidate is an airport the settings panel can offer as reference.
+type AirportCandidate struct {
+	Code       string  `json:"code"`
+	Name       string  `json:"name"`
+	Type       string  `json:"type"`
+	DistanceNM float64 `json:"distance_nm"`
+	Runways    int     `json:"runways"`
+}
+
+// HomeAirportCandidates lists the airports within maxNM of the receiver that
+// have at least one usable runway, nearest first. Heliports are left out: they
+// have no runway to align an approach with.
+func (s *Service) HomeAirportCandidates(maxNM float64) []AirportCandidate {
+	var out []AirportCandidate
+	for _, a := range s.airports {
+		if a.Type == "heliport" || a.Type == "closed" {
+			continue
+		}
+		d := haversineNM(s.stationLat, s.stationLon, a.Latitude, a.Longitude)
+		if d > maxNM {
+			continue
+		}
+		n := len(s.usableRunways(a.Ident))
+		if n == 0 {
+			continue
+		}
+		out = append(out, AirportCandidate{Code: a.Ident, Name: a.Name, Type: a.Type,
+			DistanceNM: math.Round(d*10) / 10, Runways: n})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].DistanceNM < out[j].DistanceNM })
+	return out
 }
 
 // --- Navaids ---
@@ -247,15 +368,15 @@ type thresholdEntry = struct {
 	Longitude float64 `json:"longitude"`
 }
 
-// buildHomeRunwayData converts home runways into the adsb.RunwayData format
+// runwayDataFor converts an airport's runways into the adsb.RunwayData format
 // expected by DetectRunwayApproach/DetectRunwayDeparture.
-func (s *Service) buildHomeRunwayData(homeCode string) {
-	s.homeRunwayData = adsb.RunwayData{
+func runwayDataFor(homeCode string, runways []*RunwayInfo) adsb.RunwayData {
+	data := adsb.RunwayData{
 		Airport:          homeCode,
 		RunwayThresholds: make(map[string]map[string]thresholdEntry),
 	}
 
-	for _, rwy := range s.homeRunways {
+	for _, rwy := range runways {
 		if rwy.LEIdent == "" || rwy.HEIdent == "" {
 			continue
 		}
@@ -272,20 +393,21 @@ func (s *Service) buildHomeRunwayData(homeCode string) {
 		thresholds[rwy.HEIdent] = thresholdEntry{
 			Latitude: rwy.HELatitude, Longitude: rwy.HELongitude,
 		}
-		s.homeRunwayData.RunwayThresholds[pairKey] = thresholds
+		data.RunwayThresholds[pairKey] = thresholds
 	}
+	return data
 }
 
-// buildHomeRunwayExtensions precomputes runway extension points for the home airport.
-func (s *Service) buildHomeRunwayExtensions(extensionLengthNM float64) {
+// runwayExtensionsFor precomputes the extended centrelines of an airport's runways.
+func runwayExtensionsFor(data adsb.RunwayData, extensionLengthNM float64) map[string]map[string][]RunwayExtensionPoint {
 	if extensionLengthNM <= 0 {
 		extensionLengthNM = 10.0
 	}
 
-	s.homeRunwayExtensions = make(map[string]map[string][]RunwayExtensionPoint)
+	ext := make(map[string]map[string][]RunwayExtensionPoint)
 
-	for pairKey, thresholds := range s.homeRunwayData.RunwayThresholds {
-		s.homeRunwayExtensions[pairKey] = make(map[string][]RunwayExtensionPoint)
+	for pairKey, thresholds := range data.RunwayThresholds {
+		ext[pairKey] = make(map[string][]RunwayExtensionPoint)
 
 		for endID, threshold := range thresholds {
 			// Find opposite end
@@ -319,7 +441,8 @@ func (s *Service) buildHomeRunwayExtensions(extensionLengthNM float64) {
 				})
 			}
 
-			s.homeRunwayExtensions[pairKey][endID] = points
+			ext[pairKey][endID] = points
 		}
 	}
+	return ext
 }

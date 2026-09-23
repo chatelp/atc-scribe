@@ -301,6 +301,19 @@ func (rt *RunwayInUseTracker) recompute(now time.Time) {
 // SetRunwayData provides the tracker with all known runway end IDs for parallel
 // runway detection. When one runway of a parallel pair (e.g. 06L) is active,
 // the tracker automatically includes the parallel (06R) in the active set.
+// Reset forgets every piece of evidence, as when the reference airport changes:
+// the approaches and climbs seen so far were onto another airport's runways, and
+// "last known active runway" would name one that is no longer in the data.
+func (rt *RunwayInUseTracker) Reset() {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	rt.events = nil
+	rt.scores = nil
+	rt.activeSet = nil
+	rt.lastActiveEnd = ""
+	rt.everHadData = false
+}
+
 func (rt *RunwayInUseTracker) SetRunwayData(runways RunwayData) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()

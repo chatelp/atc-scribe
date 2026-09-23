@@ -895,7 +895,9 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 		Longitude:        effectiveLon,
 		ElevationFeet:    h.config.Station.ElevationFeet,
 		CruiseAltitudeFt: h.config.FlightPhases.CruiseAltitudeFt,
-		AirportCode:      h.config.Station.AirportCode,
+		// The reference airport in force, which the settings panel can change;
+		// [station] airport_code is only where it starts.
+		AirportCode:      h.adsbService.PhaseReference().Airport,
 		FetchMETAR:       h.config.Weather.FetchMETAR,
 		FetchTAF:         h.config.Weather.FetchTAF,
 		FetchNOTAMs:      h.config.Weather.FetchNOTAMs,

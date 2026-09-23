@@ -11,9 +11,16 @@ import (
 
 // Service manages weather data fetching and caching
 type Service struct {
-	config      WeatherConfig
+	config WeatherConfig
+	client *Client
+
+	// The airport can be changed from the settings panel while a fetch is in
+	// flight. airportGen counts the changes: a result fetched for a previous
+	// airport is thrown away instead of being filed under the new one.
+	airportMu   sync.Mutex
 	airportCode string
-	client      *Client
+	airportGen  uint64
+
 	cache       *Cache
 	logger      *logger.Logger
 
@@ -58,7 +65,7 @@ func (s *Service) Start() error {
 	}
 
 	s.logger.Info("Starting weather service",
-		logger.String("airport", s.airportCode),
+		logger.String("airport", s.AirportCode()),
 		logger.Int("refresh_interval_minutes", s.config.RefreshIntervalMinutes))
 
 	// Perform initial fetch
@@ -131,6 +138,34 @@ func (s *Service) GetWeatherData() *WeatherData {
 }
 
 // RefreshNow triggers an immediate refresh of weather data
+// AirportCode returns the airport weather is fetched for.
+func (s *Service) AirportCode() string {
+	s.airportMu.Lock()
+	defer s.airportMu.Unlock()
+	return s.airportCode
+}
+
+// SetAirport switches the airport weather is fetched for. The cache is emptied
+// first: it keeps the last good value of each kind when a fetch fails, so
+// without this the previous airport's NOTAMs would be shown as the new one's
+// until the new airport happened to answer.
+func (s *Service) SetAirport(code string) {
+	s.airportMu.Lock()
+	if code == s.airportCode {
+		s.airportMu.Unlock()
+		return
+	}
+	s.airportCode = code
+	s.airportGen++
+	s.cache.Invalidate()
+	s.airportMu.Unlock()
+
+	s.logger.Info("Weather airport changed", logger.String("airport", code))
+	if s.IsStarted() {
+		go s.fetchAndUpdateCache()
+	}
+}
+
 func (s *Service) RefreshNow() {
 	s.logger.Info("Manual weather refresh triggered")
 	go s.fetchAndUpdateCache()
@@ -151,7 +186,7 @@ func (s *Service) IsStarted() bool {
 // performInitialFetch performs the first weather data fetch on service start
 func (s *Service) performInitialFetch() {
 	s.logger.Info("Performing initial weather data fetch",
-		logger.String("airport", s.airportCode))
+		logger.String("airport", s.AirportCode()))
 
 	s.fetchAndUpdateCache()
 
@@ -187,18 +222,30 @@ func (s *Service) backgroundRefresh() {
 func (s *Service) fetchAndUpdateCache() {
 	startTime := time.Now()
 
+	s.airportMu.Lock()
+	code, gen := s.airportCode, s.airportGen
+	s.airportMu.Unlock()
+
 	s.logger.Debug("Fetching weather data",
-		logger.String("airport", s.airportCode))
+		logger.String("airport", code))
 
 	// Fetch all enabled weather data types
-	results := s.client.FetchAll(s.airportCode)
+	results := s.client.FetchAll(code)
 
-	// Update cache with results
-	s.cache.Update(results, s.airportCode)
+	// Update cache with results -- unless the airport changed during the fetch.
+	s.airportMu.Lock()
+	if gen != s.airportGen {
+		s.airportMu.Unlock()
+		s.logger.Info("Discarding weather fetched for a previous airport",
+			logger.String("fetched_for", code))
+		return
+	}
+	s.cache.Update(results, code)
+	s.airportMu.Unlock()
 
 	duration := time.Since(startTime)
 	s.logger.Info("Weather data fetch completed",
-		logger.String("airport", s.airportCode),
+		logger.String("airport", code),
 		logger.String("duration", duration.String()),
 		logger.Int("total_requests", len(results)))
 }
