@@ -3173,7 +3173,7 @@ d'essai sur une copie de la base du jour, 73 transmissions retraitées : la colo
 ajoutée à une base existante, MEA230 (« sydar jet », pour *Cedar Jet*) a ses deux
 « two three zero » en gras dans la liste, et la fiche les affiche aussi.
 
-### Q37 — Le hachage entendu sur certaines réceptions *(ouverte, 23/09)*
+### Q37 — Le hachage entendu sur certaines réceptions *(ouverte, 23/09 — cause mesurée le soir : le squelch, pas le réseau)*
 
 Signalé par le propriétaire : *« un problème de hachage rapide sur certaines réceptions ;
 quelque chose qu'on a changé ? »*. **Rien n'a changé, mesuré** :
@@ -3195,6 +3195,36 @@ quelques secondes** depuis le Mac (« no route to host » à 18:24), et le ping 
 signaux faibles qui battent autour du seuil de squelch. **Pour trancher : l'heure à la
 minute d'un cas entendu**, et où il a été entendu. Les boîtiers CPL prévus traiteraient la
 première.
+
+**Mesuré le 23/09 à 21:24, pendant un hachage signalé en direct par le propriétaire** —
+deux captations du flux de la station (1 min 30 et 2 min 30), en direct, sans passer par
+co-atc :
+- **Ce n'est pas le réseau.** 0 % de perte sur 150 pings vers la station (4 à 55 ms), et tout
+  le son est arrivé : 172 s de son reçues en 150 s d'écoute (l'avance est le tampon qu'Icecast
+  envoie à la connexion). Aucun trou de transport.
+- **C'est le squelch, à la station.** Les coupures sont du **silence numérique pur** (–180 dBFS)
+  de 30 à 310 ms **au milieu d'une transmission** : la voix passe, s'arrête net, reprend. Un
+  arrêt du réseau ne peut pas écrire de zéros dans le fichier ; seul le squelch de
+  RTLSDR-Airband le fait, quand un signal faible repasse sous son seuil (`squelch_snr_threshold
+  = 10`).
+- **Une seule fréquence.** Chaque canal est placé à gauche ou à droite dans le mélange
+  (`balance`), ce qui permet de dire d'où vient chaque coupure par l'écart de niveau
+  gauche/droite. Première captation : **9 coupures, toutes sur 125,825 (De Gaulle
+  Approche)**, en trois grappes — la signature d'un squelch qui bat. Seconde : 2 coupures, dont
+  une sur 124,350. D'où *« pas sur toutes les transmissions »* : seulement les plus faibles.
+  125,825 est aussi la fréquence dont le niveau est le plus relevé dans le mélange
+  (`ampfactor = 1.4`) et la moins bien transcrite (Q19).
+- **`salves.py` ne pouvait pas le voir.** Sa règle compte les silences de **0,35 s et plus** ;
+  ces coupures durent de 30 à 310 ms. La mesure du 23/09 après-midi (« flux sain ») était
+  juste pour ce qu'elle mesure et aveugle à ce défaut. Il faut lui adjoindre le compte des
+  coupures courtes en silence numérique.
+
+**Remède possible, côté station, non appliqué** (configuration de production : accord
+explicite du propriétaire requis) : baisser le seuil du squelch **sur 125,825 seulement**,
+et mesurer avant/après à la même heure — coupures courtes, et ouvertures sur le bruit
+(`salves.py`). Outils rangés dans le laboratoire : `scripts/hachage-coupures-courtes.py` (la règle de
+`salves.py` plus les coupures courtes) et `scripts/hachage-par-frequence.py` (quelle
+fréquence est coupée).
 
 ### Q38 — Les mots accentués sont coupés en deux par l'analyse *(répondue le 23/09 : corrigé, voir la suite)*
 
