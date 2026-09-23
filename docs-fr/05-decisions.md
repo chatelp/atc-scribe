@@ -2484,9 +2484,11 @@ référence qui serait trop courte ; les modèles inventent aussi quand tout a �
 
 - **Anglais** : atco2-en entend bien — **21 % de substitutions** seulement. Son WER de 69 %
   vient presque entièrement de ce qu'il ajoute.
-- **Français** : atco2-en substitue 71 % des mots, il entend mal le français. Mais
+- **Français** : atco2-en substitue 71 % des mots, il entend mal le français. ~~Mais
   **bofenghuang-fr fait pire sur le français lui-même** : 149 % contre 133 %, porté par 90 %
-  d'insertions.
+  d'insertions.~~ **Faux — corrigé par D45** : c'est un artefact du WER. Sur ce qui compte,
+  la part de ce qui a été dit qu'on retrouve, bofenghuang fait **deux fois mieux** (41 %
+  contre 20 %) ; il invente aussi davantage, et le WER laisse les inventions l'emporter.
 
 > ⚠️ **Ce n'est pas une contradiction de D24/D31, et il ne faut pas le lire comme tel.**
 > D31 mesurait le *gain de l'union* par appariement ADS-B : un modèle au WER plus mauvais
@@ -2518,3 +2520,77 @@ faux. Ces clips étaient ignorés du calcul, alors que ce sont **les plus préci
 transmission qu'aucun humain ne déchiffre, tout ce qu'un modèle produit est inventé. Ajouté :
 un état « parole, mais rien de compréhensible », noté à part — mots inventés par clip, et
 nombre de clips que chaque modèle a eu la sagesse de laisser vides.
+
+### D45 — Aucun garde-fou du modèle ne sépare l'invention de la transcription *(23/09)*
+
+Suite de D44. Si les modèles inventent, les réglages de whisper prévus pour ça devraient
+aider : probabilité moyenne des tokens, probabilité de silence, relance à température
+non nulle — et l'accord entre les deux modèles. **Mesuré sur les 42 clips figés, aucun
+n'aide.**
+
+#### D'abord, le modèle inventait bien
+
+Deux des cinq clips que le propriétaire a jugés incompréhensibles datent du 12/09, jour dont
+la station a gardé l'ADS-B (`globe_history`, décodé par `heatmap.py`) :
+
+- le modèle entend *« Lufthansa 6935 »* — le seul Lufthansa en l'air à ±10 min est **DLH29Y** ;
+- il entend *« Lufthansa… 6011 »* — **aucun Lufthansa en l'air**.
+
+L'oreille humaine avait raison, et la question « le modèle entend-il mieux que l'humain ? »
+avait mérité d'être posée avant de bâtir un indicateur qui suppose la réponse. **Et le
+premier des deux sortait avec une probabilité moyenne de −0,58 : rien ne le signalait.**
+
+#### Un contrôle qui a sonné : 20 textes sur 110 non reproductibles
+
+La relance du modèle devait redonner les textes de `candidats.json`. **20 sur 110
+différaient.** Les 20, sans exception, viennent de passes où le modèle a **relancé avec du
+hasard** (température > 0) après avoir échoué à ses propres critères ; les 89 passes
+directes sont identiques au mot près.
+
+Deux conséquences : **19 % des passes relancent au hasard**, et sur ces clips-là la sortie
+de production n'est pas reproductible d'un passage à l'autre. Le contrôle était dans le
+script précisément pour ça — sans lui, on comparait des textes qui n'étaient pas les mêmes.
+
+#### La mesure : précision et rappel plutôt que WER
+
+Le WER récompense l'effacement : sur des sorties à 300 %, tout effacer donne 100 % et
+« améliore ». On mesure donc séparément **la part des mots affichés qui sont justes**
+(précision) et **la part des mots dits qu'on affiche encore** (rappel).
+
+| Clips | Modèle | Filtre | Précision | Rappel | Effacés |
+|---|---|---|---|---|---|
+| anglais (11) | atco2-en | aucun | 47 % | **79 %** | 0 |
+| anglais | atco2-en | confiance ≥ −0,6 | 52 % | 66 % | 3 |
+| français (28) | atco2-en | aucun | 15 % | 20 % | 0 |
+| français | bofenghuang-fr | aucun | 26 % | **41 %** | 0 |
+| français | bofenghuang-fr | confiance ≥ −0,8 | 30 % | 31 % | 13 |
+| tous (39) | atco2-en | confiance ≥ −0,4 | 56 % | **7 %** | 36/42 |
+
+Accord entre les deux modèles, probabilité de silence, absence de relance : aucun ne fait
+mieux que quelques points de précision contre davantage de rappel perdu.
+
+**Conclusion : le modèle invente avec aplomb.** Ses propres indices de confiance ne
+distinguent pas ce qu'il entend de ce qu'il fabrique. On n'achète de la justesse qu'en
+effaçant presque tout — 36 clips sur 42 pour passer de 21 à 56 %.
+
+#### Et une correction de D44
+
+J'avais écrit, et dit au propriétaire, que **le modèle français fait pire sur le français**
+(WER 149 % contre 133 %). **C'est un artefact du WER.** Sur les clips français, bofenghuang
+retrouve **41 %** de ce qui a été dit contre **20 %** pour le modèle anglais — deux fois plus
+— et affiche des mots justes plus souvent (26 % contre 15 %). Il invente aussi davantage,
+et le WER laisse les inventions l'emporter sur les mots retrouvés.
+
+C'est **cohérent avec D31**, pas en contradiction : le modèle français apporte ce que
+l'anglais rate. Le WER seul m'avait fait dire le contraire.
+
+#### Ce qui reste valable, et le jeu de contrôle intact
+
+Aucun filtre n'ayant été retenu, **les 13 clips annotés depuis le figement n'ont servi à
+rien** — ils restent vierges pour la prochaine expérience. C'est la bonne situation : rien
+n'a été ajusté dessus.
+
+**Piste suivante, non testée** : plutôt que filtrer après coup, **orienter le décodeur
+avant** en lui donnant en amorce les indicatifs réellement en l'air (l'ADS-B les connaît).
+C'est viser la cause — le modèle invente des indicatifs faute d'en connaître de vrais — et
+c'est mesurable sur les clips du 12/09 dont on a l'historique.
