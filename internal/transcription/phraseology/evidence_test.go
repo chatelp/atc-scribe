@@ -99,13 +99,13 @@ func TestLettersAreEvidence(t *testing.T) {
 }
 
 // Positions are in UTF-16 units and must stay so past characters that are
-// several bytes in UTF-8.
+// several bytes in UTF-8: "é" is two bytes and one unit, so "Air" starts at 5.
 func TestTokenSpansCountUTF16Units(t *testing.T) {
 	toks, spans := tokenSpans("été, Air France")
-	if !reflect.DeepEqual(toks, []string{"t", "air", "france"}) {
+	if !reflect.DeepEqual(toks, []string{"ete", "air", "france"}) {
 		t.Fatalf("tokens %q", toks)
 	}
-	want := []Span{{1, 2}, {5, 8}, {9, 15}}
+	want := []Span{{0, 3}, {5, 8}, {9, 15}}
 	if !reflect.DeepEqual(spans, want) {
 		t.Errorf("spans %v, want %v", spans, want)
 	}

@@ -141,6 +141,23 @@ func tokenize(s string) []string {
 	return toks
 }
 
+// accentFold reads accented Latin letters as their base letter. The French model
+// writes "zéro", "fréquence", "autorisé", "nœuds"; split on the accent they became
+// "z" + "ro" and never met the tables, which hold both spellings. Folded, a
+// transcript with accents and one without read alike -- the only thing the
+// tables were written for. Display keeps the accents: see normalize.
+var accentFold = map[rune]string{
+	'à': "a", 'á': "a", 'â': "a", 'ä': "a", 'ã': "a", 'å': "a",
+	'ç': "c",
+	'è': "e", 'é': "e", 'ê': "e", 'ë': "e",
+	'ì': "i", 'í': "i", 'î': "i", 'ï': "i",
+	'ñ': "n",
+	'ò': "o", 'ó': "o", 'ô': "o", 'ö': "o", 'õ': "o",
+	'ù': "u", 'ú': "u", 'û': "u", 'ü': "u",
+	'ý': "y", 'ÿ': "y",
+	'œ': "oe", 'æ': "ae",
+}
+
 // Span is where a word sits in a text: [Start, End) in UTF-16 code units, the
 // unit a browser indexes strings in, so the page can highlight it as is.
 type Span struct{ Start, End int }
@@ -161,12 +178,18 @@ func tokenSpans(s string) ([]string, []Span) {
 		}
 	}
 	for _, r := range s {
-		switch lr := unicode.ToLower(r); {
-		case lr >= 'a' && lr <= 'z', lr >= '0' && lr <= '9', lr == '-':
+		lr := unicode.ToLower(r)
+		folded, isFolded := accentFold[lr]
+		switch {
+		case lr >= 'a' && lr <= 'z', lr >= '0' && lr <= '9', lr == '-', isFolded:
 			if cur.Len() == 0 {
 				start = pos
 			}
-			cur.WriteRune(lr)
+			if isFolded {
+				cur.WriteString(folded)
+			} else {
+				cur.WriteRune(lr)
+			}
 		default:
 			flush()
 		}
