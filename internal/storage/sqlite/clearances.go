@@ -16,23 +16,16 @@ type ClearanceStorage struct {
 
 // NewClearanceStorage creates a new SQLite clearance storage
 func NewClearanceStorage(db *DB, logger *logger.Logger) *ClearanceStorage {
-	storage := &ClearanceStorage{
+	return &ClearanceStorage{
 		db:     db,
 		logger: logger.Named("sqlite-clearances"),
 	}
-
-	// Initialize database
-	if err := storage.initDB(); err != nil {
-		logger.Error("Failed to initialize clearance storage", Error(err))
-	}
-
-	return storage
 }
 
-// initDB initializes the database tables
-func (s *ClearanceStorage) initDB() error {
+// createClearancesSchema runs at every open of a daily file, from initDatabase.
+func createClearancesSchema(db execer) error {
 	// Create clearances table
-	_, err := s.db.Exec(`
+	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS clearances (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			transcription_id INTEGER NOT NULL,
@@ -60,7 +53,7 @@ func (s *ClearanceStorage) initDB() error {
 	}
 
 	for _, indexSQL := range indexes {
-		_, err = s.db.Exec(indexSQL)
+		_, err = db.Exec(indexSQL)
 		if err != nil {
 			return fmt.Errorf("failed to create clearance index: %w", err)
 		}

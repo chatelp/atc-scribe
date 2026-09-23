@@ -33,16 +33,13 @@ type PhraseologyStorage struct {
 	db *DB
 }
 
-func NewPhraseologyStorage(db *DB) (*PhraseologyStorage, error) {
-	s := &PhraseologyStorage{db: db}
-	if err := s.initDB(); err != nil {
-		return nil, err
-	}
-	return s, nil
+func NewPhraseologyStorage(db *DB) *PhraseologyStorage {
+	return &PhraseologyStorage{db: db}
 }
 
-func (s *PhraseologyStorage) initDB() error {
-	if _, err := s.db.Exec(`
+// createPhraseologySchema runs at every open of a daily file, from initDatabase.
+func createPhraseologySchema(db execer) error {
+	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS phraseology_values (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			transcription_id INTEGER NOT NULL,
@@ -60,7 +57,7 @@ func (s *PhraseologyStorage) initDB() error {
 		`CREATE INDEX IF NOT EXISTS idx_phv_callsign ON phraseology_values(callsign)`,
 		`CREATE INDEX IF NOT EXISTS idx_phv_role ON phraseology_values(role)`,
 	} {
-		if _, err := s.db.Exec(idx); err != nil {
+		if _, err := db.Exec(idx); err != nil {
 			return fmt.Errorf("failed to create phraseology index: %w", err)
 		}
 	}

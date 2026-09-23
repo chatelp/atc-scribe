@@ -237,6 +237,18 @@ func initDatabase(db *sql.DB, log *logger.Logger) error {
 		return fmt.Errorf("failed to create index on adsb_targets unique check: %w", err)
 	}
 
+	// The tables the radio writes to, in the same open: see Open for why a
+	// table created anywhere else is missing from every file opened at midnight.
+	for _, create := range []func(execer) error{
+		createTranscriptionsSchema,
+		createClearancesSchema,
+		createPhraseologySchema,
+	} {
+		if err := create(db); err != nil {
+			return err
+		}
+	}
+
 	log.Info("Database schema initialized successfully")
 	return nil
 }
