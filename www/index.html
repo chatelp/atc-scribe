@@ -94,8 +94,11 @@
                     <aside id="settings-panel" 
                           :class="{ '-translate-x-full': $store.atc.settingsCollapsed }"
                           class="w-80 min-w-80 bg-panel border-r border-border absolute left-0 top-0 bottom-0 transition-transform duration-300 z-50">
+                        <!-- Straddles the panel's edge. Folded, that edge is the window's,
+                             and upstream left half the button outside it: it moves in by
+                             1.5rem so it shows whole, 0.5rem from the edge. -->
                         <button class="absolute -right-4 top-2.5 w-8 h-8 bg-panel border border-border rounded-full text-text cursor-pointer flex items-center justify-center z-50 transition-transform duration-300"
-                                :class="{ 'rotate-180': $store.atc.settingsCollapsed }"
+                                :class="{ 'rotate-180 translate-x-6': $store.atc.settingsCollapsed }"
                                 @click="$store.atc.settingsCollapsed = !$store.atc.settingsCollapsed">
                             <i class="fas fa-cog"></i>
                         </button>

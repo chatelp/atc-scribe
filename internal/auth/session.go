@@ -100,6 +100,15 @@ func (s *Store) RevokeUser(user string) int {
 	return n
 }
 
+// RevokeAll ends every session, for when sign-in stops meaning anything.
+func (s *Store) RevokeAll() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := len(s.sessions)
+	s.sessions = make(map[string]*Session)
+	return n
+}
+
 // Count reports how many sessions are in force.
 func (s *Store) Count() int {
 	s.mu.Lock()

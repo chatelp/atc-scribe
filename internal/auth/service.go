@@ -302,6 +302,10 @@ func (s *Service) ChooseLocal() error {
 	if err := s.file.SetAccess(AccessLocal); err != nil {
 		return err
 	}
+	// Sessions from before would otherwise outlive the switch: requiring
+	// sign-in again later would find them still valid and ask nobody to sign
+	// in -- which is what the owner met on the first try.
+	s.store.RevokeAll()
 	s.resolve()
 	return nil
 }

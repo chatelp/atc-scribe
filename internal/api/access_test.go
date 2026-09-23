@@ -160,6 +160,34 @@ func TestThePanelSwitchesAccessBothWays(t *testing.T) {
 	s.signIn("pierre", "correcthorsebattery") // the kept account, its password unchanged
 }
 
+// Found by the owner on the first try: signed in, switched to local, switched
+// back -- and no sign-in form. The session from before the switch was still
+// valid, so requiring sign-in again asked nobody to sign in.
+func TestRequiringSignInAgainAsksEveryoneToSignIn(t *testing.T) {
+	dir := t.TempDir()
+	s := startServer(t, dir, "127.0.0.1")
+	s.do("POST", "/api/v1/setup", `{"mode":"account","username":"pierre","password":"correcthorsebattery"}`)
+	s.signIn("pierre", "correcthorsebattery")
+	if rec := s.do("PUT", "/api/v1/access", `{"mode":"local"}`); rec.Code != http.StatusOK {
+		t.Fatalf("switching to local: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := s.do("PUT", "/api/v1/access", `{"mode":"account"}`); rec.Code != http.StatusOK {
+		t.Fatalf("switching back: %d %s", rec.Code, rec.Body.String())
+	}
+
+	// The browser still sends the cookie it had before the switch.
+	if rec := s.do("PUT", "/api/v1/access", `{}`); rec.Code != http.StatusUnauthorized {
+		t.Errorf("the session from before local-only still lets requests through (%d): "+
+			"sign-in is required again and nobody is asked to sign in", rec.Code)
+	}
+	var st struct{ Authenticated bool }
+	json.NewDecoder(s.do("GET", "/api/v1/auth/status", "").Body).Decode(&st)
+	if st.Authenticated {
+		t.Error("auth/status says authenticated, so the page shows no sign-in form")
+	}
+	s.signIn("pierre", "correcthorsebattery") // and signing in again works
+}
+
 // From local-only with no account, the panel creates the first one.
 func TestThePanelCreatesTheFirstAccountFromLocal(t *testing.T) {
 	dir := t.TempDir()
