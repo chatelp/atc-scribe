@@ -252,7 +252,7 @@ def health():
 # Words that do not exist in air-traffic English, so an English model only writes
 # them when it actually heard French. Deliberately short and common: this opens a
 # gate, it does not measure a proportion. The same list produced the Q29 figures;
-# keep it in step with whisper-lab/q1-francais.py or the measurement stops
+# keep it in step with whisper-lab/scripts/q1-francais.py or the measurement stops
 # describing what runs.
 FRENCH_MARKERS = (
     "bonjour", "bonsoir", "au revoir", "aurevoir", "merci", "monsieur",

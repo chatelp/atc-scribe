@@ -8,7 +8,7 @@ méthode à tenir.
 
 ## Le tirage
 
-Script : `whisper-lab/jeu-de-test.py`. **Tirage aléatoire** — `random.Random(20260915)` —
+Script : `whisper-lab/scripts/jeu-de-test.py`. **Tirage aléatoire** — `random.Random(20260915)` —
 et non par ordre alphabétique ni par taille de fichier. `04-corpus.md` rappelle qu'une
 évaluation faite sur les quatre plus gros fichiers d'une fréquence a déjà produit une
 fausse conclusion publiée : les gros fichiers sont les atypiques.
@@ -144,7 +144,7 @@ modèles et non la chaîne d'enregistrement — c'est ce qu'on voulait.
 
 ## Le calcul est prêt et attend les annotations
 
-`whisper-lab/note-modeles.py`, 21 tests. **Utilisable dès le premier clip** : il n'y a pas
+`whisper-lab/scripts/note-modeles.py`, 21 tests. **Utilisable dès le premier clip** : il n'y a pas
 de seuil en dessous duquel on ne rapporte rien, seulement une incertitude à afficher.
 
 Trois précautions qui changent le résultat :

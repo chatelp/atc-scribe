@@ -47,7 +47,8 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 
 > Les dossiers audio du laboratoire `~/Dev/Aero/whisper-lab/`, hors dépôt, ont été rangés et
 > renommés le 23/09 (D50) : `jeu-de-test/` est devenu `audio/2026-09-15-jeu-de-test-120/`,
-> etc. Les documents datés gardent les anciens noms, pour la même raison. **La table de
+> etc. ; le même jour, scripts, résultats et journaux sont passés dans `scripts/`,
+> `resultats/` et `journaux/`. Les documents datés gardent les anciens chemins, pour la même raison. **La table de
 > correspondance et l'index du laboratoire sont dans `whisper-lab/CORPUS.md`.**
 
 `05-decisions.md` se tient à jour au fil de l'eau. C'est la seule consigne non

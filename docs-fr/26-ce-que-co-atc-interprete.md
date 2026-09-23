@@ -44,7 +44,7 @@ par seconde environ. Champs lus par co-atc (`internal/adsb/models.go`, type `ADS
 > **Aucune fonction ne les confronte à la voix aujourd'hui** (voir §4).
 
 **Ce qui est gardé en historique.** L'historique permanent de la station
-(`/opt/adsb/globe_history`, décodé par `whisper-lab/heatmap.py`) ne conserve que position,
+(`/opt/adsb/globe_history`, décodé par `whisper-lab/scripts/heatmap.py`) ne conserve que position,
 altitude, vitesse sol et indicatif. La base SQLite de co-atc ne garde l'enregistrement brut
 complet que pour le **dernier état** de chaque avion (D32). **Les intentions d'équipage ne
 sont donc pas rejouables après coup** : toute vérification qui s'en sert doit se faire en
