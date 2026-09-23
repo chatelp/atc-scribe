@@ -1858,10 +1858,13 @@
                                 <div class="mb-2 text-sm font-semibold text-amber-400 border-b border-border pb-1 flex items-center justify-between">
                                     <span>Radio</span>
                                     <span class="text-[10px] text-text/50 font-normal"
-                                          x-text="$store.atc.aircraftRadio.loading ? 'loading…' : ($store.atc.aircraftRadio.transcriptions.length + ' transmission(s)')"></span>
+                                          x-text="($store.atc.aircraftRadio.loading && !$store.atc.aircraftRadio.transcriptions.length) ? 'loading…' : ($store.atc.aircraftRadio.transcriptions.length + ' transmission(s)')"></span>
                                 </div>
 
-                                <template x-if="!$store.atc.aircraftRadio.loading && $store.atc.aircraftRadio.transcriptions.length === 0">
+                                <template x-if="$store.atc.aircraftRadio.error">
+                                    <div class="p-4 text-center text-xs text-red-400" x-text="$store.atc.aircraftRadio.error"></div>
+                                </template>
+                                <template x-if="!$store.atc.aircraftRadio.loading && !$store.atc.aircraftRadio.error && $store.atc.aircraftRadio.transcriptions.length === 0">
                                     <div class="p-4 text-center text-xs text-text/50">Nothing on this aircraft has been matched to a transmission</div>
                                 </template>
 

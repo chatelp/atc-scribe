@@ -480,6 +480,11 @@ func (s *TranscriptionStorage) GetTranscriptionsByCallsign(callsign string, limi
 			&contentProcessed,
 			&speakerType,
 			&callsignDB,
+			// Added to the SELECT on 20/09 and not here, which failed every call:
+			// the aircraft card showed nothing for the aircraft heard on the radio.
+			&language,
+			&contentSecond,
+			&callsignSource,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan transcription: %w", err)
 		}
