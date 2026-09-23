@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 )
 
 // Role is what a spoken number turned out to mean.
@@ -273,6 +274,12 @@ func readNumber(toks []string, i int) (string, int) {
 			j++
 			continue
 		}
+		// An ordinal -- "3ème", "2nd" -- is not part of a number. Taken whole, as a
+		// token that opens on a digit is ("27l" for a runway), "300, 3ème" read as
+		// the flight number "3003eme".
+		if isOrdinal(w) {
+			break
+		}
 		if len(w) > 0 && w[0] >= '0' && w[0] <= '9' {
 			b.WriteString(w)
 			j++
@@ -281,6 +288,23 @@ func readNumber(toks []string, i int) (string, int) {
 		break
 	}
 	return b.String(), j
+}
+
+// isOrdinal reports a numeral with an ordinal ending, in either language, once
+// accents are folded: "3eme", "1ere", "1er", "2e", "2nd", "3rd", "4th".
+func isOrdinal(w string) bool {
+	i := 0
+	for i < len(w) && w[i] >= '0' && w[i] <= '9' {
+		i++
+	}
+	if i == 0 || i == len(w) {
+		return false
+	}
+	switch w[i:] {
+	case "eme", "emes", "ieme", "e", "er", "ere", "st", "nd", "rd", "th":
+		return true
+	}
+	return false
 }
 
 // digitFollows reports whether the token at i reads as a digit in its own right.
@@ -589,7 +613,13 @@ func clearances(toks []string, values []Value) []Clearance {
 // post-processing prompt asks a language model to do. It also returns where each
 // word of text landed in the output, {-1, -1} for the words it rewrote.
 func normalize(text string, values []Value) (string, []Span) {
-	toks := tokenize(text)
+	toks, spans := tokenSpans(text)
+	units := utf16.Encode([]rune(text))
+	// The word as written, lowercased: the tokens fold accents so that the tables
+	// match, but a person reads "départ", not "depart".
+	shown := func(i int) string {
+		return strings.ToLower(string(utf16.Decode(units[spans[i].Start:spans[i].End])))
+	}
 	out := make([]string, 0, len(toks))
 	where := make([]Span, len(toks))
 	for i := range where {
@@ -614,8 +644,8 @@ func normalize(text string, values []Value) (string, []Span) {
 		}
 		if v, ok := byWord[i]; ok && v.Role != RoleCallsign {
 			_, end := readNumber(toks, i+keywordLen(toks, i))
-			for _, w := range toks[i : i+keywordLen(toks, i)] {
-				emit(w)
+			for k := i; k < i+keywordLen(toks, i); k++ {
+				emit(shown(k)) // "fréquence", as written
 			}
 			emit(v.Text)
 			for j := i; j < end; j++ {
@@ -624,8 +654,9 @@ func normalize(text string, values []Value) (string, []Span) {
 			i = end - 1
 			continue
 		}
-		emit(toks[i])
-		where[i] = Span{pos - utf16Len(toks[i]), pos}
+		w := shown(i)
+		emit(w)
+		where[i] = Span{pos - utf16Len(w), pos}
 	}
 	return strings.Join(out, " "), where
 }
