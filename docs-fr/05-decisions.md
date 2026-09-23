@@ -2924,3 +2924,18 @@ tous ; les 18 chemins qu'ils citent existent ; l'outil présente les mêmes 60 c
 > **Une erreur corrigée en route** : la première passe datait cinq dossiers du 12/09, date
 > du plus ancien clip. Le laboratoire a été créé le 15/09 à 10:58, et tout ce qu'il contient
 > a été prélevé à partir de ce jour-là. Renommés au 15/09 avant publication de l'index.
+
+**Complété le même jour, à la demande du propriétaire : la racine aussi.** Les 89 fichiers
+en vrac sont rangés par nature, sous leur nom : `scripts/` (39), `resultats/` (19 et
+`q1-francais/`), `journaux/` (24), `echanges-station/` (6). **Restent à la racine**
+`.venv` et le lien `mlx-fr-bofenghuang`, parce que **co-atc lui-même les appelle** depuis
+`configs/config.toml` — les déplacer aurait arrêté la transcription —, avec les autres liens
+de modèles, `audio/`, `extraits/` et l'index.
+
+**Vérifié par comparaison** : quatre scripts qui ne font que lire, lancés avant et après,
+donnent **la même sortie** ; 36 lignes réécrites dans 22 scripts, tous compilent ; sur les
+60 chemins que citent les scripts, **aucun n'a disparu du fait du rangement**. Huit
+manquaient déjà : les données supprimées le matin même, qu'il faudrait redécoder ou
+reprendre sur la station pour relancer `amorce-adsb.py` ou `depouille-nuit-gain.py`, et
+deux modèles français absents du laboratoire. Dans le dépôt, seuls les pointeurs à usage
+courant suivent : un commentaire du sidecar, les docs 09 et 26.
