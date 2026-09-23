@@ -1979,7 +1979,15 @@
                                 :data-freq-id="freq.id"
                                 :title="$store.atc.isFrequencyFailed(freq.id) ? 'Connection failed: ' + ($store.atc.getFrequencyError(freq.id) || 'Unknown error') : ($store.atc.isFrequencyConnecting(freq.id) ? 'Connecting...' : '')">
                                 <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)" class="flex flex-col justify-center overflow-hidden flex-grow mr-2">
-                                    <div class="font-semibold text-sm truncate" x-text="freq.name" :title="freq.name"></div>
+                                    <!-- Muted or listening, said in so many words: upstream said it
+                                         only by the colour of the bars, and a silent page with text
+                                         arriving read as a fault. -->
+                                    <div class="font-semibold text-sm flex items-center gap-1.5 min-w-0">
+                                        <i class="fas text-xs flex-shrink-0"
+                                           :class="$store.atc.isUnmuted(freq.id) ? 'fa-volume-high' : 'fa-volume-xmark opacity-50'"
+                                           :title="$store.atc.isUnmuted(freq.id) ? 'Listening. Click to mute' : 'Muted. Click to listen'"></i>
+                                        <span class="truncate" x-text="freq.name" :title="freq.name"></span>
+                                    </div>
                                     <div class="text-[11px] opacity-80 mt-0.5">
                                         <!-- A mixed stream has no single frequency; showing one
                                              would be a fiction. The name carries the meaning then. -->
