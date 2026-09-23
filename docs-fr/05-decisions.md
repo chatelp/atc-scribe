@@ -2662,3 +2662,67 @@ est *« Alpine »*). Quand le modèle entend correctement *« France Soleil »*,
 production ne sait pas que c'est TVF. **Non corrigé ici** : `spoken-operators.csv` est par
 construction une table de formes *observées*, y écrire des indicatifs de référence en
 trahirait le rôle. Il faut une couche de correction distincte — décision à prendre.
+
+### D47 — Une couche de correction des indicatifs radio, et ce qu'elle change vraiment *(23/09)*
+
+Demandé par le propriétaire après D46. `assets/telephony-overrides.csv`, lu **avant**
+`airlines.dat` par `NewMatcher`, et qui l'emporte sur lui.
+
+#### Pourquoi ce n'est pas un bonus de score
+
+Quand un opérateur est nommé **et** présent dans le ciel, l'appariement ne considère que
+ses avions. Sans correction, un *« France Soleil 1234 »* bien entendu mais non reconnu
+laisse en lice tout avion qui porte 1234. **Mesuré par les tests, sans le fichier :**
+*« France Soleil 1234 »* part sur **AFR1234**, *« Bee Line 367 »* sur **AFR367**,
+*« Fedex 512 »* sur **BAW512**. La mauvaise compagnie, à chaque fois.
+
+#### Ce qui est corrigé
+
+`airlines.dat` date de 2014. Sur 3 jours d'ADS-B (12, 14, 15/09), parmi les 40 opérateurs
+les plus présents : **9 compagnies, 785 avions** — un sur dix — que l'appariement ne
+savait pas nommer. Absentes (ITA, Wizz Air UK, Norwegian Suède), marquées inactives et
+donc ignorées (FedEx, DHL, VistaJet, ASL), renommées (Transavia France y est *« French
+Sun »*), ou classées sous un code retiré.
+
+**Une seule collision, et elle justifie la priorité donnée au fichier** : *« Bee-Line »*
+était attribué à **DAT**, l'ancien code de Brussels Airlines. La compagnie vole sous
+**BEL**. La table d'origine avait tort, la correction doit gagner.
+
+#### Deux surestimations, corrigées avant de conclure
+
+**J'annonçais ~1 250 avions ; c'est 785.** easyJet Europe et NetJets étaient absents
+d'`airlines.dat` **mais déjà appris par la station** dans `spoken-operators.csv`. Trouvé
+parce qu'un test censé prouver la correction **passait sans elle**. Remplacé par un cas
+qui échoue sans le fichier ; les quatre cas échouent désormais sans lui et passent avec.
+**Un test qui passe sans le correctif ne teste pas le correctif.**
+
+**Et ma correction phare ne sert presque à rien.** Dans 30 817 transcriptions existantes :
+
+| Indicatif corrigé | Occurrences | … suivies d'un chiffre ou d'une lettre |
+|---|---|---|
+| Eurotrans (DHL) | 553 | **387** |
+| Vista (VistaJet) | 185 | **142** |
+| Quality (ASL) | 20 | 17 |
+| Fedex | 5 | — |
+| Red Nose (Norwegian) | 4 | — |
+| **France Soleil** (Transavia) | **1** | — |
+
+Transavia France fait 231 avions en 3 jours, et les modèles n'écrivent **jamais** son nom.
+**Le gain réel est DHL** — près de 400 indicatifs qui nomment désormais leur opérateur —
+que j'avais rangé parmi les détails « marqués inactifs ». Sans ce comptage, j'aurais
+présenté la correction par son cas le moins utile.
+
+*« Vista »* et *« Quality »* sont aussi des mots courants : un risque de restriction à tort.
+Mesuré : suivis d'un chiffre ou d'une lettre phonétique dans 77 % et 85 % des cas, donc
+employés comme indicatifs. Et la restriction ne joue que si l'opérateur est dans le ciel,
+les chiffres devant encore concorder. Gardés.
+
+#### Ce qui n'est pas fait
+
+- **Aucune mesure sur l'appariement de bout en bout.** Les tests prouvent le mécanisme ;
+  combien d'appariements du tunnel de Q30 changent, et dans quel sens, reste à mesurer —
+  rejouer `cmd/phraseology -adsb` sur la nuit du 20 avec et sans le fichier.
+- `internal/reference` (amont) lit aussi `airlines.dat`, pour **afficher** des noms dans
+  l'interface ; un avion EJU y reste sans compagnie. Cosmétique, non touché.
+- **Contribuable à l'amont** tel quel : le mécanisme est générique et les entrées sont des
+  indicatifs OACI actuels, pas des réglages de cette station.
