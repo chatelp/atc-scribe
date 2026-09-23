@@ -3317,3 +3317,46 @@ transcriptions du fichier du 24 doit croître dès 00:10, et `no_such_table` res
 trou de la première : les constructeurs créaient les tables au démarrage, donc rien ne
 manquait *au démarrage*, et c'est le seul moment qu'on regarde. Un test doit écrire ce que
 le programme écrit, pas un substitut.
+
+### Q40 — Plusieurs aéroports de référence, pas un seul *(ouverte, 23/09)*
+
+Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
+CDG »*, puis *« à vrai dire la question serait pour n aéroports »*. D49 avait noté la
+limite : **un seul aéroport à la fois**.
+
+**Ce qui dépend aujourd'hui de l'aéroport unique** (lu dans le code) : les phases (APP,
+CLB, DEP, ARR, T/O, T/D, mesurées depuis un point et une liste de pistes), la piste en
+service (un seul compteur, indexé par identifiant de piste nu), le filtre des avions au sol,
+l'atterrissage déduit à la perte du signal, la météo (un METAR, un TAF, des NOTAM), les axes
+de piste tracés sur la carte, et le réglage du panneau (une liste à choix unique).
+
+**La vraie question n'est pas le réglage, c'est l'attribution** : pour chaque avion, de quel
+aéroport s'agit-il ? *Le plus proche* ne marche pas. Mesuré le 23/09 de 17:12 à 21:19 (heure
+de Paris), avions distincts reçus :
+
+| aéroport | < 500 ft, 5 NM | 500–1 000 ft, 5 NM | 1 000–3 000 ft, 5 NM | < 3 000 ft, 10 NM |
+|---|---|---|---|---|
+| Orly (LFPO) | 1 | 78 | 115 | 130 |
+| De Gaulle (LFPG) | 0 | 4 | 169 | 245 |
+| Le Bourget (LFPB) | 0 | 5 | 165 | 198 |
+| Beauvais (LFOB) | 0 | 0 | 0 | 1 |
+| Toussus (LFPN) | 8 | 22 | 22 | 31 |
+| Villacoublay (LFPV) | 9 | 23 | 18 | 112 |
+
+- **De Gaulle est exploitable pour APP et CLB** (169 avions entre 1 000 et 3 000 ft), pas pour
+  T/O et T/D — même limite qu'Orly, pour la même raison (rien sous 500 ft).
+- **Le Bourget « voit » surtout les avions de De Gaulle**, à 4 NM : attribuer au plus proche
+  donnerait au Bourget une partie des approches de Roissy.
+- **Beauvais est hors de portée** à basse altitude : l'ajouter n'apporterait rien.
+
+**Piste envisagée, non codée** : attribuer l'avion à l'aéroport **dont il suit l'axe de
+piste** — le code sait déjà choisir la piste la mieux alignée dans une liste, il suffit de lui
+donner les pistes de tous les aéroports choisis —, et seulement à défaut au plus proche dans
+le rayon. Identifiants de piste qualifiés par l'aéroport (`LFPG 27R`), piste en service par
+aéroport, météo par aéroport, phase affichée avec son aéroport (`APP LFPG`), colonne
+`airport` dans `phase_changes`. Avec un seul aéroport choisi, comportement identique à
+aujourd'hui : la contribution amont de D49 reste possible.
+
+**À trancher par le propriétaire** : quels aéroports (la mesure plaide pour Orly et De Gaulle,
+les autres apportant peu) ; la météo de chacun ou du seul principal (Windy, API privée : 3
+requêtes par aéroport toutes les 10 minutes) ; la présentation de plusieurs METAR.
