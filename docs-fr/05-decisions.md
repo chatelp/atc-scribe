@@ -3130,3 +3130,74 @@ sinon. Le seul signe à l'écran était la couleur des barres, gris ou vert.
 coupé ; clic sur la tuile → son, choix retenu ; **rechargement puis « Start Monitoring »
 seul → le son revient**, position de lecture qui avance de 2,6 s en 3 s ; coupé puis
 rechargé → reste coupé.
+
+### D55 — Les mots qui ont nommé l'avion sont gardés au moment de l'association *(23/09)*
+
+Demandé par le propriétaire : *« mettre en gras et colorer la partie du texte qui a servi à
+faire l'association avec l'avion »*, dans la liste des transcriptions et dans la section
+*Radio* de la fiche. Ma première proposition les retrouvait à l'affichage ; le propriétaire
+l'a refusée — *« ça ne peut pas être gardé au moment de l'association plutôt que retrouvé
+rétroactivement ? »* — **et il avait raison** : recalculer peut désigner d'autres mots que
+ceux qui ont réellement décidé.
+
+**Ce qui est gardé** : les mots qui ont **nommé** l'avion — les chiffres qui ont concordé
+(toutes leurs occurrences quand l'indicatif est répété, puisque la répétition compte), les
+lettres d'une queue (*victor juliett*), l'opérateur quand il est dit. **Pas** ce qui a
+seulement corroboré — l'altitude, une autorisation : elles soutiennent une association
+sans nommer personne.
+
+**Où** : une colonne `callsign_evidence`, des positions en unités UTF-16 — celles dont le
+navigateur se sert —, **dans le texte affiché** pour la lecture qui a décidé : le texte
+normalisé pour le modèle principal (celui où « niveau un zéro zéro » devient « FL100 », les
+positions tenant compte de ce décalage), le texte brut pour le second avis français. Quand
+c'est le second avis qui a nommé l'avion, il est désormais **affiché sur une ligne « FR »**,
+faute de quoi le surlignage n'aurait eu nulle part où aller.
+
+**Au passage** :
+- **Les sept fonctions qui lisent les transcriptions n'en font plus qu'une** — même liste
+  de colonnes, même lecture. C'est leur duplication qui avait produit le défaut de D53.
+- L'affichage échappe désormais le texte ; la mise en évidence de recherche de l'amont
+  l'injectait tel quel dans la page.
+
+**Limite** : les transcriptions associées avant ce changement n'ont pas de mots gardés et
+restent sans surlignage — rien n'est reconstruit après coup, c'est le principe même.
+
+**Vérifié** : 10 tests, dont les positions après une valeur réécrite, dans un texte brut
+avec accents et ponctuation, une occurrence répétée, des lettres ; de bout en bout par le
+processeur et la base, pour les deux lectures. **Six retraits, six attrapés.** Instance
+d'essai sur une copie de la base du jour, 73 transmissions retraitées : la colonne est
+ajoutée à une base existante, MEA230 (« sydar jet », pour *Cedar Jet*) a ses deux
+« two three zero » en gras dans la liste, et la fiche les affiche aussi.
+
+### Q37 — Le hachage entendu sur certaines réceptions *(ouverte, 23/09)*
+
+Signalé par le propriétaire : *« un problème de hachage rapide sur certaines réceptions ;
+quelque chose qu'on a changé ? »*. **Rien n'a changé, mesuré** :
+- **Station** : mode actif `gros-porteurs`, gabarit inchangé depuis le 14/09 (le fichier daté
+  du 22/09 est le retour à ce mode après le test d'ampfactor, contenu identique). Gain 40,
+  squelch à 10 dB, **aucune sortie fichier par transmission** — la cause de hachage déjà
+  connue (01-station). Réception et filtre redémarrés proprement à 09:54, même
+  configuration, aucune erreur depuis, processeur libre à 76 %.
+- **Notre côté** : le code de la chaîne audio est **identique à l'amont** depuis le fork.
+- **Trois minutes enregistrées en même temps**, en direct et à travers co-atc : flux de la
+  station **sain au repère de `salves.py`** (médiane 4,6 s, 0 % sous la seconde) ; à travers
+  co-atc, transmissions de **durée identique** et **14 contre 13** micro-coupures (des
+  pauses entre mots). co-atc raccourcit seulement des silences entre transmissions.
+
+**Piste, non prouvée** : la station est branchée sur une borne mesh **dont le lien de retour
+est radio** (01-station). Pendant ces mesures, la station est devenue **injoignable
+quelques secondes** depuis le Mac (« no route to host » à 18:24), et le ping varie de 5 à
+57 ms sur 30 s. Une coupure du lien hache tout ce que le Mac reçoit. Autre possibilité, des
+signaux faibles qui battent autour du seuil de squelch. **Pour trancher : l'heure à la
+minute d'un cas entendu**, et où il a été entendu. Les boîtiers CPL prévus traiteraient la
+première.
+
+### Q38 — Les mots accentués sont coupés en deux par l'analyse *(ouverte, 23/09)*
+
+Trouvé en écrivant les tests de D55 : le découpage en mots ne garde que `a-z`, `0-9` et le
+trait d'union. **« zéro » devient « z » + « ro »** — alors que la table des chiffres français
+contient « zéro », comme celle des rôles contient « degrés » et « nœuds ». Ces entrées ne
+peuvent jamais servir. Le modèle français écrit avec accents : un « zéro » en tête d'un
+numéro de vol est perdu. **À mesurer avant de corriger** — changer le découpage change
+l'association sur tout le français, et c'est l'effet sur les appariements qui dira si c'est
+un gain.
