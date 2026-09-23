@@ -3072,3 +3072,34 @@ Sur le trafic réel : avant, **2 sondes sur 113** au-delà de 2 s en une minute 
 de 5 s) ; après, **0 sur 178** en 90 s, pire attente **40 ms**, avec 5 transmissions
 transcrites dont un second avis réussi, aucune erreur au journal. Le texte transcrit du
 clip d'essai est identique avant et après.
+
+### D53 — La fiche d'un avion entendu montre enfin ce qui a été entendu *(23/09)*
+
+Signalé par le propriétaire, en deux temps : pour les avions du filtre *« Heard on the
+radio »*, la section *Radio* de la fiche **clignote** — et, *« une fois de plus »*, elle
+est **vide**, *« ce n'est pas logique »*.
+
+**Une seule cause pour les deux.** La requête qui lit les transmissions d'un indicatif
+demandait 12 colonnes et n'en lisait que 9 : `sql: expected 12 destination arguments in
+Scan, not 9`, **à chaque appel**, 80 fois dans le journal du jour. Introduit le **20/09**
+par le second avis (`e90433e`), qui avait ajouté trois colonnes à la requête, déclaré les
+variables, et oublié de les lire — ce qui compile. La marque « entendu » passe par une
+autre requête, correcte : d'où l'avion marqué entendu et la fiche vide.
+
+**Le clignotement venait d'un second défaut, côté page.** La fiche est rafraîchie à chaque
+mise à jour de position, environ une fois par seconde, et relançait la requête **chaque
+fois que la réponse précédente était vide** — ou en erreur. Donc « loading… », puis rien,
+puis « loading… ». Cela touchait aussi **tout avion non entendu**, une requête par seconde.
+
+**Corrigé** : la requête lit ses 12 colonnes ; la fiche ne redemande que si l'avion change
+ou si **quelque chose de nouveau** est entendu sur lui (le compteur de transmissions le
+dit) ; et une erreur du serveur s'affiche comme une erreur, plus comme « rien d'attribué »
+— c'est ce déguisement qui a caché le défaut trois jours.
+
+**Vérifié** : test sur la requête, qui échoue avec l'erreur exacte du journal sans la
+correction ; balayage de toutes les requêtes du stockage, colonnes contre lectures — aucun
+autre écart. **Instance d'essai sur une copie de la base du jour** : AFR32UN, entendu,
+affiche sa transmission et la valeur FL100, stable sur 12 relevés en 6 s, **une seule
+requête** au lieu d'une par seconde ; VLG35WR, non entendu, « Nothing matched » stable, une
+requête ; une transmission nouvelle simulée dans la page déclenche **exactement une**
+relecture.
