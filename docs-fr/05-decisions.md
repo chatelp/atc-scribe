@@ -2798,7 +2798,7 @@ voix et de l'ADS-B et ce qu'il en affiche. Il fait apparaître cinq écarts, auc
 3. **Langue et second avis français stockés, jamais affichés.**
 4. ~~**Météo sur LFPZ, qui ne publie ni METAR ni TAF**~~ — **traité par D49**, la météo suit
    l'aéroport de référence. Reste le chat IA activé avec une clé vide, et l'API météo par
-   défaut, qui est celle, privée, de Windy.
+   défaut, qui est celle, privée, de Windy — **mesuré en Q36, gardée pour l'instant**.
 5. **Aucune alerte sur code d'urgence** (7500, 7600, 7700), alors que le code transpondeur est
    reçu.
 
@@ -2940,7 +2940,7 @@ reprendre sur la station pour relancer `amorce-adsb.py` ou `depouille-nuit-gain.
 deux modèles français absents du laboratoire. Dans le dépôt, seuls les pointeurs à usage
 courant suivent : un commentaire du sidecar, les docs 09 et 26.
 
-### Q36 — Remplacer Windy par aviationweather.gov : ce qu'on perdrait *(ouverte, 23/09)*
+### Q36 — Remplacer Windy par aviationweather.gov : ce qu'on perdrait *(en attente, décidé le 23/09 : Windy reste)*
 
 Question du propriétaire : *« est-on sûr qu'on ne perd rien au niveau données ? »*. Mesuré
 le 23/09 à 14:36Z sur Orly, les deux sources interrogées au même moment, puis l'historique
@@ -2966,5 +2966,6 @@ d'AWC sur quatre jours.
 AWC est gratuit, sans clé, limité à 100 requêtes par minute ; co-atc en fait 3 toutes les
 10 minutes.
 
-**Reste à décider** pour les NOTAM : garder Windy pour eux seuls, chercher une autre source
-(pas cherchée à ce stade), ou s'en passer.
+**Décidé par le propriétaire le 23/09 : on enregistre le résultat et on ne touche pas à
+Windy pour l'instant.** Le jour où la question reviendra, elle porte sur les NOTAM seuls :
+garder Windy pour eux, chercher une autre source (pas cherchée à ce stade), ou s'en passer.
