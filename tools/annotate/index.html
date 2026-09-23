@@ -63,6 +63,7 @@
   <div class="row">
     <label><input type="checkbox" id="nospeech"> No speech at all</label>
     <label><input type="checkbox" id="partial"> Partly unintelligible</label>
+    <label><input type="checkbox" id="unintel"> Speech, but I got none of it</label>
   </div>
 
   <div class="row nav">
@@ -85,6 +86,9 @@
       <li>Mark what you cannot make out as <code>[unclear]</code> — or just <code>...</code>
           between the parts you did get — rather than guessing. Both are read the same way.</li>
       <li>If French and English alternate in one transmission, tick « Both ».</li>
+      <li>If you hear someone speaking but cannot make out a single word, tick
+          <b>« Speech, but I got none of it »</b> and leave the text empty. Do not skip it:
+          a clip no human can decode is the sharpest test there is of what a model invents.</li>
       <li><b>Stuck?</b> Type what you can, then « Show model readings ». Order matters:
           your blind attempt is kept, and the clip is marked <em>assisted</em> so that
           assisted and unassisted clips can be scored apart. The readings are unlabelled
@@ -115,7 +119,7 @@ async function boot(){
   if (i === -1) i = 0;
   render();
 }
-const isDone = a => !!a && (!!(a.text||'').trim() || a.no_speech);
+const isDone = a => !!a && (!!(a.text||'').trim() || a.no_speech || a.unintelligible);
 
 // The counter and the bar move on every keystroke. Everything else must not:
 // rebuilding the view mid-typing put the saved -- and therefore trimmed -- text
@@ -142,6 +146,7 @@ function render(){
   $('#text').value = a.text || '';
   $('#nospeech').checked = !!a.no_speech;
   $('#partial').checked = !!a.partial;
+  $('#unintel').checked = !!a.unintelligible;
   document.querySelectorAll('[name=lang]').forEach(r => r.checked = (a.lang === r.value));
 
   assisted = !!a.assisted;
@@ -165,6 +170,7 @@ function collect(){
     lang: (document.querySelector('[name=lang]:checked')||{}).value || null,
     no_speech: $('#nospeech').checked,
     partial: $('#partial').checked,
+    unintelligible: $('#unintel').checked,
     assisted: assisted,
     blind_text: blindText,
     at: new Date().toISOString()
@@ -181,7 +187,7 @@ async function save(){
 }
 
 const debounced = () => { clearTimeout(timer); timer = setTimeout(save, 700); };
-['#text','#nospeech','#partial'].forEach(s => $(s).addEventListener('input', debounced));
+['#text','#nospeech','#partial','#unintel'].forEach(s => $(s).addEventListener('input', debounced));
 document.querySelectorAll('[name=lang]').forEach(r => r.addEventListener('change', debounced));
 
 $('#next').onclick = async () => { await save(); if(i < items.length-1){ i++; render(); } };
