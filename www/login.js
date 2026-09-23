@@ -123,18 +123,25 @@
      * the same trust boundary as the terminal where you would run -add-user.
      */
     function setupOverlay(state) {
+        // Behind a declared proxy the server is reachable from elsewhere even on
+        // loopback, and refuses to run open: say so rather than offer it.
+        const local = state.local_allowed !== false;
         const el = overlay();
         el.querySelector('form').innerHTML = `
           <h1>Set up co-atc</h1>
           <p>No account exists yet. Choose how this server should be reached.</p>
 
           <div class="choice">
-            <label><input type="radio" name="coatc-mode" value="local" checked><div>
+            <label><input type="radio" name="coatc-mode" value="local" ${local ? 'checked' : 'disabled'}><div>
               <b>This machine only</b>
-              <span>No sign-in. The server stays on ${state.host}, reachable from
-              nowhere else. This is what upstream does, chosen rather than inherited.</span>
+              <span>${local
+                ? `No sign-in. The server stays on ${state.host}, reachable from
+              nowhere else. This is what upstream does, chosen rather than inherited.
+              It can be changed later in the settings.`
+                : `Not available: a proxy is declared in front of this server, so other
+              machines can reach it.`}</span>
             </div></label>
-            <label><input type="radio" name="coatc-mode" value="account"><div>
+            <label><input type="radio" name="coatc-mode" value="account" ${local ? '' : 'checked'}><div>
               <b>Reachable, with an account</b>
               <span>Creates a sign-in. You will still need TLS, or a trusted proxy
               declared in the configuration, before a password is safe to send over
@@ -142,7 +149,7 @@
             </div></label>
           </div>
 
-          <div id="coatc-account" hidden>
+          <div id="coatc-account" ${local ? 'hidden' : ''}>
             <label for="coatc-user">User name</label>
             <input id="coatc-user" autocomplete="username" autocapitalize="none">
             <label for="coatc-pass">Password (10 characters or more)</label>

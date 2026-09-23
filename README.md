@@ -183,6 +183,15 @@ One rule that looks obviously good and is not: accepting callsigns whose digits 
 Upstream says, correctly, that it must never be exposed to the internet. This fork
 adds enough to make that a choice rather than a fact.
 
+- **The first visit asks the question**: this machine only, without sign-in, or
+  reachable with an account. The answer is kept beside the configuration
+  (`configs/users.json`, never `config.toml`) and can be changed later under
+  *Settings → Server → Access*, either way. Going local-only keeps the accounts,
+  unused, for when sign-in is required again.
+- **Without sign-in only where nobody else can reach it**: bound to `127.0.0.1`,
+  with no proxy declared. Otherwise the first visit offers only an account, the
+  settings refuse to turn sign-in off, and a server listening beyond `127.0.0.1`
+  with no account refuses to start.
 - **Argon2id** (m = 64 MiB, t = 3, p = 2), PHC-encoded. Passwords are never written
   to a file by a human: `co-atc -add-user <name>` reads one without echoing it and
   prints the block to paste into the config.
@@ -245,16 +254,16 @@ Either way co-atc probes `/health` before it serves anything and **refuses to
 start if nothing answers**. Without that it would start perfectly and transcribe
 nothing, one error line per transmission.
 
-Create an account. The command does not write anything: it reads a password
-without echoing it and prints a `[[auth.users]]` block for you to paste into
-`configs/config.toml`.
-
 ```bash
-./bin/co-atc -add-user alice
 ./bin/co-atc -config configs/config.toml
 ```
 
-Then open `http://localhost:8000`.
+Then open `http://localhost:8000`. The first visit asks whether the server is for
+this machine only or needs an account.
+
+To write an account into the configuration instead, `./bin/co-atc -add-user alice`
+reads a password without echoing it and prints a `[[auth.users]]` block to paste into
+`configs/config.toml`; it writes nothing itself.
 
 > **The shipped example still defaults to `backend = "openai"`** for both
 > transcription and post-processing, so that a checkout behaves like upstream. To get

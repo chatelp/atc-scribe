@@ -103,6 +103,9 @@ func (r *Router) Routes() http.Handler {
 			// Writing is behind the same group, so it needs a session whenever
 			// authentication is on -- retention decides when data is deleted.
 			router.Put("/server/settings", r.handler.PutServerSettings)
+			// Local-only or sign-in, switched from the same panel. In this group so
+			// that turning sign-in off takes a session whenever it is on.
+			router.Put("/access", r.handler.PutAccess)
 			router.Get("/adsb/source", r.handler.GetADSBSourceStatus)
 
 			// Station Configuration

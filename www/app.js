@@ -5618,6 +5618,7 @@ function serverSettings() {
     return {
         state: null,
         draft: { log_level: 'info', db_retention_days: 7, reference_airport: '' },
+        newAccount: null, // { username, password } while the first account is being typed
         busy: false,
         error: '',
         note: '',
@@ -5697,6 +5698,71 @@ function serverSettings() {
                 await this.load();
             } catch (e) {
                 this.flash('Could not save: ' + e.message, true);
+            } finally {
+                this.busy = false;
+            }
+        },
+
+        accessLabel() {
+            const a = this.state.access;
+            if (a.mode === 'account') return 'Sign-in required · ' + a.accounts.join(', ');
+            if (a.mode === 'local') return 'This machine only · no sign-in';
+            return 'Not chosen yet';
+        },
+
+        accessNote() {
+            const a = this.state.access;
+            if (a.mode === 'account' && !a.local_allowed) {
+                return 'This server can be reached from other machines (it is not bound to 127.0.0.1, ' +
+                    'or a proxy is declared), so sign-in cannot be turned off.';
+            }
+            if (a.mode === 'account') return 'Switching keeps the account, unused, for when sign-in is required again.';
+            if (a.accounts.length) return 'Kept, unused: ' + a.accounts.join(', ') + '. Requiring sign-in brings it back with its password.';
+            return 'Requiring sign-in creates the first account.';
+        },
+
+        // Either way, and as often as wanted. Turning sign-in off asks first:
+        // it opens the server to anyone who can reach it.
+        async switchAccess(mode) {
+            const a = this.state.access;
+            if (mode === 'local') {
+                if (!confirm('Anyone who can reach this server will use it without signing in. ' +
+                    'The account ' + a.accounts.join(', ') + ' is kept, unused, and comes back if you ' +
+                    'require sign-in again. Continue?')) return;
+                return this.putAccess({ mode: 'local' });
+            }
+            if (!a.accounts.length) {
+                this.newAccount = { username: '', password: '' };
+                return;
+            }
+            if (!confirm('Sign-in will be required, with the account ' + a.accounts.join(', ') +
+                ' and its existing password. Continue?')) return;
+            return this.putAccess({ mode: 'account' });
+        },
+
+        async createAccount() {
+            const { username, password } = this.newAccount;
+            if (!username.trim()) { this.flash('Choose a user name.', true); return; }
+            if (password.length < 10) { this.flash('The password must be at least 10 characters.', true); return; }
+            return this.putAccess({ mode: 'account', username: username.trim(), password });
+        },
+
+        async putAccess(body) {
+            this.busy = true;
+            try {
+                const r = await fetch('/api/v1/access', {
+                    method: 'PUT',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (r.status === 401) { this.flash('Sign in to change access.', true); return; }
+                if (!r.ok) { this.flash((await r.text()).trim() || ('Refused (' + r.status + ')'), true); return; }
+                // What this browser may see has just changed. Reloading lets the
+                // page start over: with the sign-in form if sign-in is now required.
+                location.reload();
+            } catch (e) {
+                this.flash('Could not change access: ' + e.message, true);
             } finally {
                 this.busy = false;
             }
