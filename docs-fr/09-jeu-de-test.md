@@ -182,3 +182,18 @@ par identifiant de clip et non par position : rien n'a été perdu.
 
 > **Conséquence utile** : 30 clips suffisent désormais à un premier résultat honnête, au
 > lieu d'exiger d'aller jusqu'à 61 pour voir la première transmission anglaise.
+
+## Aérodromes masqués, depuis le 23/09 (D48)
+
+Le français visé est celui des avions de ligne en approche et au départ, pas des
+aérodromes. L'outil est donc lancé en masquant Chavenay et Villacoublay :
+
+```bash
+python3 tools/annotate/server.py --corpus whisper-lab/jeu-de-test \
+  --out whisper-lab/verite-terrain.json --exclude-freq 129525,128950
+```
+
+Masqué pour l'annotateur seulement : le manifeste et le fichier d'annotations sont
+intacts, et le calcul des scores voit toujours les clips déjà faits. Restent présentés
+Orly Départs (bilingue, au cœur de la cible) et l'en-route (anglais) — 60 clips, 24 faits
+au moment du masquage.
