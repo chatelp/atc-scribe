@@ -193,6 +193,7 @@ document.addEventListener('alpine:init', () => {
         audioFrequencies: [],
         clientID: generateUUID(), // Unique client ID for audio streams
         unmutedFrequencies: new Set(), // Set of unmuted frequency IDs
+        restoreListeningPending: false, // "Start Monitoring" clicked before the frequency list arrived
         audioElements: {}, // Map of frequency ID to audio element
         audioAnalysers: {}, // Map of frequency ID to analyser node
         audioDataArrays: {}, // Map of frequency ID to data array
@@ -5156,6 +5157,7 @@ async initAircraftDataSource() {
                     // this.connectToAllFrequencies();
                     // Instead, just prepare them (create elements, setup viz graph)
                     this.prepareAllFrequencies();
+                    if (this.restoreListeningPending) this.restoreListening();
                 } else {
                     this.audioFrequencies = [];
                 }
@@ -5192,6 +5194,45 @@ async initAircraftDataSource() {
         toggleMute(frequency) {
             if (!audioClient) { console.warn("audioClient not ready in toggleMute"); return; }
             audioClient.toggleMute(frequency);
+            this.saveListening();
+        },
+
+        // Which frequencies are listened to, remembered by this browser like the
+        // display preferences. Upstream kept it for the page's lifetime only, so
+        // every reload -- signing in, a server restart, a change of access --
+        // opened the page silent while transcriptions kept arriving: "sometimes
+        // both, sometimes only the text" was whether the tile had been clicked
+        // since the last load.
+        saveListening() {
+            try {
+                localStorage.setItem('listeningFrequencies', JSON.stringify([...this.unmutedFrequencies]));
+            } catch (e) { /* private mode: the choice lasts the page, as before */ }
+        },
+
+        rememberedListening() {
+            try {
+                const ids = JSON.parse(localStorage.getItem('listeningFrequencies') || '[]');
+                return Array.isArray(ids) ? ids.map(String) : [];
+            } catch (e) {
+                return [];
+            }
+        },
+
+        // Browsers let a page play sound only after a click on it. "Start
+        // Monitoring" is that click: the frequencies listened to last time start
+        // again there, instead of waiting for their tile to be clicked.
+        restoreListening() {
+            if (!audioClient) return;
+            if (!this.audioFrequencies.length) {
+                this.restoreListeningPending = true; // the list is still loading
+                return;
+            }
+            this.restoreListeningPending = false;
+            const known = new Set(this.audioFrequencies.map(f => String(f.id)));
+            const ids = this.rememberedListening().filter(id => known.has(id));
+            if (!ids.length) return;
+            ids.forEach(id => this.unmutedFrequencies.add(id));
+            audioClient.startAllRadios();
         },
 
         cleanupFrequency(frequencyId) {
@@ -5269,7 +5310,10 @@ async initAircraftDataSource() {
         closeSplashScreen() {
             // Play the welcome sound when user clicks the button
             this.playWelcomeSound();
-            
+
+            // The same click lets the radios play: resume what was listened to.
+            this.restoreListening();
+
             // Hide the splash screen
             this.showSplashScreen = false;
             
