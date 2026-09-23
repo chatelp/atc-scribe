@@ -1,6 +1,8 @@
 # 26 — Ce que co-atc interprète et affiche, par la voix et par l'ADS-B
 
-*État de l'implémentation au 23 septembre 2026, branche `local`.*
+*État de l'implémentation au 23 septembre 2026, branche `local`. Mis à jour le même jour
+après D49 : les phases sont désormais jugées par rapport à un aéroport de référence
+réglable.*
 
 Document de référence. Il répond à une question simple : **de ce que co-atc reçoit — le son
 de la radio et les messages ADS-B — qu'est-ce qu'il comprend, et qu'est-ce qu'il montre ?**
@@ -82,26 +84,38 @@ direct.
 ### Phases de vol — `trajectory_phase.go`
 
 Dix phases : **NEW** (vu à l'arrêt), **TAX** (roulage), **T/O** (décollage), **CLB** (montée
-initiale depuis *notre* aéroport), **DEP** (départ, s'éloigne de la station), **CRZ**
-(croisière, FL180 et plus), **ARR** (arrivée, se rapproche de la station), **APP** (finale,
-aligné sur *notre* piste), **T/D** (toucher), **UNK** (indéterminé). Changements historisés,
-dates de décollage et d'atterrissage déduites.
+initiale depuis l'aéroport), **DEP** (départ, s'éloigne de l'aéroport), **CRZ**
+(croisière, FL180 et plus), **ARR** (arrivée, se rapproche de l'aéroport), **APP** (finale,
+aligné sur une piste de l'aéroport), **T/D** (toucher), **UNK** (indéterminé). Changements
+historisés, dates de décollage et d'atterrissage déduites.
 
-⚠️ **« Notre aéroport » est LFPZ, Saint-Cyr-l'École** (`station.airport_code`), et ses pistes
-sont les seules chargées (`GetHomeRunwayData`). Conséquences :
+✅ **Toutes ces phases sont jugées par rapport à l'aéroport de référence** (D49,
+`adsb.PhaseReference`), **réglable dans les paramètres** de l'application — *Server →
+Reference airport* —, qui propose les aéroports à moins de 50 NM dont les pistes sont
+utilisables, triés par distance. Démarre sur `station.airport_code` ; le choix fait dans le
+panneau est gardé dans `configs/runtime-settings.json` et survit au redémarrage.
 
-- **T/O, CLB, APP, T/D ne valent que pour Saint-Cyr.** Un avion qui atterrit à De Gaulle ou à
-  Orly ne sera jamais classé APP ni T/D ;
-- **ARR et DEP sont relatifs à la station**, pas à l'aéroport de l'avion : un départ d'Orly
-  qui passe vers la station est « en rapprochement » ;
-- pour le trafic qui intéresse le propriétaire, seules **CRZ, ARR, DEP et UNK** ont un sens,
-  et ARR/DEP un sens approximatif.
+L'amont jugeait tout depuis **la position du récepteur**, ce qui n'est juste que si le
+récepteur est posé sur son aéroport. Avant D49, avec Saint-Cyr : aucune approche ni aucun
+départ d'Orly ou de De Gaulle n'était jamais reconnu.
+
+⚠️ **Limites mesurées, avec Orly comme référence** (récepteur à 14 NM, 3 jours d'historique) :
+
+- **APP et CLB sont détectables** : 375 avions reçus entre 500 et 1 000 ft à moins de 5 NM
+  d'Orly, plusieurs centaines plus haut. Observé en direct le 23/09 : 4 approches en
+  9 minutes (TAP432, RAM642J suivi de 3 300 à 2 600 ft) ;
+- **T/O et T/D ne le sont pas** : ils se jugent sur le passage sol/air, et **aucun avion
+  n'est reçu sous 500 ft** à moins de 5 NM d'Orly ;
+- **Le Bourget comme référence confond** probablement ses approches avec celles de De
+  Gaulle, dont les pistes sont presque parallèles et à 4 NM (un Lufthansa en approche vu
+  pendant l'essai).
 
 ### Piste en service — `runway_tracker.go`
 
 Probabilité de chaque extrémité de piste d'après les approches, toucher et montées
-observés, fenêtre glissante, pistes parallèles gérées. ⚠️ **Saint-Cyr seulement**, pour la
-même raison. Sert à écarter les fausses approches sur les pistes sécantes.
+observés, fenêtre glissante, pistes parallèles gérées. ✅ Pour l'aéroport de référence ;
+les indices sont **oubliés quand on change d'aéroport** (ils portaient sur d'autres pistes).
+Sert à écarter les fausses approches sur les pistes sécantes.
 
 ---
 
@@ -209,7 +223,7 @@ nombre. ✅
 | **DETAILS** | altitude, cap (avec sa source), vitesses vraie et sol, taux vertical, phase courante, enrichissement | ✅ |
 | **TRACKS** | positions passées et prévues : heure, altitude, cap, vitesses, distance | ✅ |
 | **PROXIMITY** | avions voisins, distances et écarts relatifs | ✅ |
-| Phases | historique des changements de phase | ⚠️ Saint-Cyr (§2) |
+| Phases | historique des changements de phase | ✅ par rapport à l'aéroport de référence (§2) |
 | Autorisations | type, piste, texte entendu, statut, âge | ✅ — statut toujours « émise » (§4) |
 | **Radio** | transmissions rattachées à l'avion : heure, qui parle, **valeurs extraites en pastilles** (niveau, cap…), texte | ✅ |
 
@@ -233,15 +247,21 @@ type (décollage, atterrissage, approche). ✅ C'est le **seul** déclencheur d'
 
 ### Météo — `GET /wx`
 
-⚠️ Interroge une API publique pour **LFPZ**, qui ne publie **ni METAR ni TAF** : réponse vide
-à chaque essai (158 réponses 204 dans le journal du 21/09). Seuls les **NOTAM** de Saint-Cyr
-arrivent. Pas de vent ni de pression affichés.
+✅ **Suit l'aéroport de référence.** Avec Saint-Cyr (qui ne publie ni METAR ni TAF), seuls
+les NOTAM arrivaient — 158 réponses vides dans le journal du 21/09. Avec Orly : METAR, TAF
+et NOTAM, vérifié le 23/09. Le cache est vidé au changement d'aéroport, et un résultat
+arrivé pour l'ancien est jeté plutôt que rangé sous le nouveau.
+
+⚠️ **L'API par défaut de l'amont est celle, privée, de Windy** (`node.windy.com/airports`),
+qui répond elle-même : *« Do not steal this API. Download your own METARs for free from
+aviationweather.gov »*. À remplacer dans un outil public.
 
 ### Le reste
 
 | | |
 |---|---|
-| Premier lancement : choix « local » ou « accès externe avec compte » (fork) | ✅ |
+| Premier lancement : choix « local » ou « accès externe avec compte » (fork) | ⚠️ **le choix « local » n'est pas enregistré** : l'écran revient à chaque visite (trouvé le 23/09) |
+| **Aéroport de référence**, dans *Server* (fork, D49) | ✅ |
 | Réglages serveur : niveau et rotation des journaux, rétention des bases (fork) | ✅ |
 | Avions simulés pilotables (amont) | ✅ |
 | **Conversation vocale avec un « contrôleur IA »** (amont, OpenAI Realtime) | ❌ activée dans la configuration, **clé vide** — inopérante, et hors de l'esprit « tout local » du fork |
@@ -258,11 +278,11 @@ Pas un plan : ce que ce relevé fait apparaître, pour la suite.
    première fois, **une mesure de la reconnaissance vocale sans annotation humaine** — et
    sur le trafic visé, les avions de ligne étant tous équipés. Limite : en direct
    seulement, l'historique ne garde pas ces champs (§1).
-2. **Les phases et la piste en service sont calées sur Saint-Cyr**, et la configuration
-   n'accepte qu'un aéroport de référence. Pour De Gaulle et Orly, il faudrait plusieurs
-   aéroports de référence — un changement de l'amont, pas un réglage.
+2. ~~**Les phases et la piste en service sont calées sur Saint-Cyr**~~ — **corrigé par
+   D49** : l'aéroport de référence est réglable. Reste qu'il n'y en a **qu'un** à la fois :
+   Orly *ou* De Gaulle, pas les deux.
 3. **Le travail bilingue est invisible.** Langue et second avis français sont en base ;
    les afficher est le plus simple des trois.
-4. **Des réglages simples**, sans code : faire pointer la météo sur LFPO ou LFPG, qui
-   publient METAR et TAF ; désactiver le chat IA dont la clé est vide.
+4. **Des réglages simples**, sans code : ~~faire pointer la météo sur LFPO ou LFPG~~ (fait
+   avec l'aéroport de référence, D49) ; désactiver le chat IA dont la clé est vide.
 5. **Aucune alerte d'urgence.** Le code transpondeur est reçu (§1) ; rien ne le surveille.
