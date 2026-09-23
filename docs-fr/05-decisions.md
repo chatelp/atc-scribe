@@ -1018,6 +1018,8 @@ Il annonce `rotates: true`.
 
 **Non observé** : un vrai passage de minuit en production. Le mécanisme est testé, le
 câblage est vérifié au démarrage ; la première rotation réelle reste à constater.
+*(⚠️ Constatée après coup, le 23/09 : la rotation du 21/09 à 00:00:02 a bien eu lieu, et
+le fichier qu'elle a ouvert n'avait pas de table `transcriptions` — voir D56.)*
 
 **Candidat à une pull request amont** (D19) : le défaut est le leur, le correctif ne
 touche que leur couche de stockage, et il n'ajoute aucune dépendance.
@@ -1485,7 +1487,9 @@ relancerait pas un processus déjà vivant**, qui est la seule propriété qui d
 superviseur. Un test aurait pris trente secondes : lancer, attendre un tour, compter.
 
 **La cascade.** 17 instances se disputant la même base SQLite ont produit des tempêtes de
-`SQLITE_BUSY` ; les écritures de transcription ont commencé à échouer vers 7 h. Et la
+`SQLITE_BUSY` ; les écritures de transcription ont commencé à échouer vers 7 h *(⚠️ faux :
+dès 00:00:02, et pour une autre raison — le fichier de minuit n'avait pas de table
+`transcriptions`, voir D56)*. Et la
 charge a fait expirer les appels `curl` du veilleur lui-même, qui a conclu *« station
 injoignable »* pendant neuf heures — **mon bug a cassé mon propre instrument de mesure**,
 et `accord` valait `True` tout du long.
@@ -3268,3 +3272,48 @@ sans étiqueter mieux. **Pas mise en service** ; gardée hors dépôt.
 partie des segments contient **les deux voix** — le découpage coupe sur 600 ms de silence, et
 un collationnement suit souvent de moins (« air france three two bravo yankee hello … hello »).
 Le locuteur se lirait mieux dans l'audio que dans le texte.
+
+### D56 — À minuit, le fichier du jour naissait sans ses tables radio *(23/09)*
+
+Le propriétaire, avant de laisser tourner la nuit : *« tu es sûr à 100 % que tu as tout
+bien programmé pour la nuit ? on a eu plusieurs fois des bugs qui ont invalidé plusieurs
+heures de captation »*. Non. La vérification a trouvé ceci.
+
+**Le défaut.** La rotation de minuit (D22) ouvre le nouveau fichier par `openOne`, qui
+appelait `initDatabase` : tables `aircraft`, `adsb_targets`, `phase_changes`, et rien
+d'autre. Les tables `transcriptions`, `clearances` et `phraseology_values` étaient créées
+par les constructeurs de leur stockage, **une fois par processus, au démarrage**. Le fichier
+ouvert à minuit n'avait donc pas de table `transcriptions`, et chaque écriture y échouait
+jusqu'au redémarrage suivant.
+
+**Ça s'est déjà produit, et on ne l'a pas vu.** Nuit du 20 au 21/09 (`runs/local.log`) :
+à 00:00:02 « Rotated to a new daily database », et dans les trois minutes qui suivent
+**829 erreurs « no such table: transcriptions »** — 92 échecs d'enregistrement, 487 de
+l'index vocal, 248 du traitement par lots, 2 de mise à jour. Entre 0 h et 10 h, **1 877
+transmissions transcrites, aucune conservée** : la base du 21 commence à 10:51, au
+redémarrage. D26 mettait les échecs d'écriture sur le compte des 17 serveurs et de
+`SQLITE_BUSY` « vers 7 h » ; ils ont commencé à 00:00:02, pour cette raison-ci. D22 disait
+« non observé : un vrai passage de minuit en production » — il avait été observé, et il
+avait échoué.
+
+**Pourquoi les tests ne l'ont pas vu.** `TestStoragesBuiltBeforeRotationFollowIt`
+écrivait, à travers chaque stockage, **dans la table `aircraft`** — la seule que la rotation
+créait. Il prouvait que la poignée suit, pas que les tables existent.
+
+**Le correctif** (`d25c182`). Le schéma de toutes les tables est créé par `initDatabase`,
+donc à chaque ouverture — démarrage et rotation ; les constructeurs ne créent plus rien.
+Deux tests écrivent ce que chaque stockage écrit réellement : sur le fichier créé par la
+rotation, et sur un fichier plus ancien auquel manquent des colonnes ajoutées depuis. Sans
+le correctif, les deux échouent (vérifié par mutation). Le binaire reconstruit a été
+relancé à 21:08, `vcs.modified=false`.
+
+**Ce qui reste non observé** : un passage de minuit réel avec ce correctif. Surveillance
+passive cette nuit — `whisper-lab/scripts/surveillance-nuit.sh` écrit une ligne toutes
+les dix minutes dans `journaux/2026-09-23-nuit-surveillance.log` (processus, mémoire,
+fichier du jour, transcriptions, erreurs, disque). À lire demain : le compte de
+transcriptions du fichier du 24 doit croître dès 00:10, et `no_such_table` rester à 0.
+
+**Leçon de méthode.** Une seconde voie qui fait la même chose que la première masque le
+trou de la première : les constructeurs créaient les tables au démarrage, donc rien ne
+manquait *au démarrage*, et c'est le seul moment qu'on regarde. Un test doit écrire ce que
+le programme écrit, pas un substitut.
