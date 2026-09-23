@@ -25,6 +25,13 @@ type Match struct {
 	Reason    string
 	Ambiguous bool     // another aircraft scored just as well
 	Runners   []string // the other candidates, when ambiguous
+
+	// Words are the token ranges of the transmission that named the aircraft:
+	// the digits that matched, its letters, its operator. Kept when the match is
+	// made rather than searched for afterwards, so what is highlighted is what
+	// decided. Corroboration -- an altitude, a clearance -- is not among them: it
+	// supports a match without naming anyone. See Result.NormalizedSpans.
+	Words [][2]int
 }
 
 // Matcher attaches spoken callsigns to aircraft the receiver can actually see.
@@ -217,7 +224,7 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 	// was attached to AFR174 because the digits matched and the name was ignored.
 	restrict := map[string]bool{}
 	for _, ac := range fleet {
-		if prefix, _, _ := splitCallsign(ac.Callsign); spokenOperators[prefix] {
+		if prefix, _, _ := splitCallsign(ac.Callsign); len(spokenOperators[prefix]) > 0 {
 			restrict[prefix] = true
 		}
 	}
@@ -242,6 +249,7 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 		ac     Aircraft
 		score  float64
 		reason string
+		words  [][2]int
 	}
 	var best []scored
 
@@ -255,23 +263,25 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 		}
 		var score float64
 		var why []string
+		var words [][2]int
 
 		for _, v := range r.Values {
 			if v.Role != RoleCallsign || len(v.Digits) < m.MinDigits {
 				continue
 			}
+			here := [][2]int{{v.Word, v.End}}
 			switch {
 			case digits != "" && v.Digits == digits:
 				if s := 0.9; s > score {
-					score, why = s, []string{"digits exact"}
+					score, why, words = s, []string{"digits exact"}, here
 				}
 			case len(digits) >= 3 && len(v.Digits) >= 3 && strings.HasSuffix(v.Digits, digits):
 				if s := 0.6; s > score {
-					score, why = s, []string{"digits suffix"}
+					score, why, words = s, []string{"digits suffix"}, here
 				}
 			case m.FuzzyDigits && len(digits) >= 3 && len(v.Digits) == len(digits) && editDistance(v.Digits, digits) == 1:
 				if s := 0.5; s > score {
-					score, why = s, []string{"digits off by one"}
+					score, why, words = s, []string{"digits off by one"}, here
 				}
 			}
 		}
@@ -281,14 +291,23 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 		if score > 0 && repeats[digits] > 1 {
 			score += 0.15
 			why = append(why, "digits repeated")
+			words = nil // every occurrence counted, so every occurrence is evidence
+			for _, v := range r.Values {
+				if v.Role == RoleCallsign && v.Digits == digits {
+					words = append(words, [2]int{v.Word, v.End})
+				}
+			}
 		}
 
 		// Letter tails such as EZY36VJ, read out as "three six victor juliett".
 		if letters != "" {
-			for _, g := range r.Letters {
+			for k, g := range r.Letters {
 				if strings.HasSuffix(g, letters) || strings.HasSuffix(letters, g) {
 					score += 0.3
 					why = append(why, "letters")
+					if k < len(r.letterRuns) {
+						words = append(words, r.letterRuns[k])
+					}
 					break
 				}
 			}
@@ -297,9 +316,10 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 		if score == 0 {
 			continue
 		}
-		if spokenOperators[prefix] {
+		if named := spokenOperators[prefix]; len(named) > 0 {
 			score += 0.4
 			why = append(why, "operator named")
+			words = append(words, named...)
 		}
 
 		// Altitude is the one corroboration where both sides are measured rather
@@ -327,7 +347,7 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 			score -= 0.25
 			why = append(why, "airborne, not departing")
 		}
-		best = append(best, scored{ac, score, strings.Join(why, " + ")})
+		best = append(best, scored{ac, score, strings.Join(why, " + "), words})
 	}
 
 	if len(best) == 0 {
@@ -351,7 +371,7 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 	if top.score < 0.6 {
 		return Match{}, false
 	}
-	out := Match{Callsign: top.ac.Callsign, Hex: top.ac.Hex, Score: top.score, Reason: top.reason}
+	out := Match{Callsign: top.ac.Callsign, Hex: top.ac.Hex, Score: top.score, Reason: top.reason, Words: sortedRanges(top.words)}
 	for _, b := range best[1:] {
 		if top.score-b.score < 0.15 {
 			// A tie the recent exchange resolves is no longer a tie: the aircraft
@@ -409,20 +429,66 @@ func absF(x float64) float64 {
 	return x
 }
 
-// operatorsIn finds the ICAO codes of every operator named in the text. Single
-// and two-word forms are both tried: "air france" is two words, "ryanair" one.
-func (m *Matcher) operatorsIn(text string) map[string]bool {
+// operatorsIn finds the ICAO codes of every operator named in the text, with the
+// token range of each mention. Single and two-word forms are both tried: "air
+// france" is two words, "ryanair" one.
+func (m *Matcher) operatorsIn(text string) map[string][][2]int {
 	toks := tokenize(text)
-	out := map[string]bool{}
+	out := map[string][][2]int{}
 	for i := range toks {
 		for n := 2; n >= 1; n-- {
 			if i+n > len(toks) {
 				continue
 			}
 			if code, ok := m.telephony[normalizeName(strings.Join(toks[i:i+n], " "))]; ok {
-				out[code] = true
+				out[code] = append(out[code], [2]int{i, i + n})
 				break
 			}
+		}
+	}
+	return out
+}
+
+// sortedRanges orders token ranges and drops repeats, so the evidence reads in
+// the order it was spoken.
+func sortedRanges(in [][2]int) [][2]int {
+	if len(in) == 0 {
+		return nil
+	}
+	out := append([][2]int(nil), in...)
+	sort.Slice(out, func(i, j int) bool { return out[i][0] < out[j][0] })
+	uniq := out[:1]
+	for _, w := range out[1:] {
+		if w != uniq[len(uniq)-1] {
+			uniq = append(uniq, w)
+		}
+	}
+	return uniq
+}
+
+// RawSpans places token ranges in Raw: [start, end) in UTF-16 code units.
+func (r Result) RawSpans(words [][2]int) [][2]int { return spansOf(words, r.spans) }
+
+// NormalizedSpans places token ranges in Normalized, the text displayed once a
+// transcription is processed. A range covering a word the normalisation
+// rewrote has no place there and is left out rather than misplaced.
+func (r Result) NormalizedSpans(words [][2]int) [][2]int { return spansOf(words, r.normSpans) }
+
+func spansOf(words [][2]int, at []Span) [][2]int {
+	var out [][2]int
+	for _, w := range words {
+		if w[0] < 0 || w[0] >= w[1] || w[1] > len(at) {
+			continue
+		}
+		placed := true
+		for i := w[0]; i < w[1]; i++ {
+			if at[i].Start < 0 {
+				placed = false
+				break
+			}
+		}
+		if placed {
+			out = append(out, [2]int{at[w[0]].Start, at[w[1]-1].End})
 		}
 	}
 	return out

@@ -8,7 +8,11 @@
 // gives it, and callsigns are matched on their digits first.
 package phraseology
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+	"unicode/utf16"
+)
 
 // numberWords maps spoken digits to their value. ATC speaks digits individually,
 // so "three five zero" is 3-5-0 and never "three hundred and fifty" — but models
@@ -133,24 +137,58 @@ func isLetterWord(w string) (byte, bool) {
 // tokenize lowercases and splits on anything that is not a letter, digit or the
 // hyphen inside "x-ray". Transcripts arrive with stray punctuation and casing.
 func tokenize(s string) []string {
-	var out []string
+	toks, _ := tokenSpans(s)
+	return toks
+}
+
+// Span is where a word sits in a text: [Start, End) in UTF-16 code units, the
+// unit a browser indexes strings in, so the page can highlight it as is.
+type Span struct{ Start, End int }
+
+// tokenSpans is tokenize with the position of every token in s. One function
+// for both, so the words the matcher reasons about and the words the page
+// highlights cannot drift apart.
+func tokenSpans(s string) ([]string, []Span) {
+	var toks []string
+	var spans []Span
 	var cur strings.Builder
+	pos, start := 0, 0
 	flush := func() {
 		if cur.Len() > 0 {
-			out = append(out, cur.String())
+			toks = append(toks, cur.String())
+			spans = append(spans, Span{start, pos})
 			cur.Reset()
 		}
 	}
-	for _, r := range strings.ToLower(s) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
-			cur.WriteRune(r)
-		case r == '-':
-			cur.WriteRune(r)
+	for _, r := range s {
+		switch lr := unicode.ToLower(r); {
+		case lr >= 'a' && lr <= 'z', lr >= '0' && lr <= '9', lr == '-':
+			if cur.Len() == 0 {
+				start = pos
+			}
+			cur.WriteRune(lr)
 		default:
 			flush()
 		}
+		if n := utf16.RuneLen(r); n > 0 {
+			pos += n
+		} else {
+			pos++
+		}
 	}
 	flush()
-	return out
+	return toks, spans
+}
+
+// utf16Len is the length of s in UTF-16 code units.
+func utf16Len(s string) int {
+	n := 0
+	for _, r := range s {
+		if k := utf16.RuneLen(r); k > 0 {
+			n += k
+		} else {
+			n++
+		}
+	}
+	return n
 }

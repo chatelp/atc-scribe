@@ -164,7 +164,7 @@ func TestWithoutOverridesTheMatcherIsUnchanged(t *testing.T) {
 	if ops := m.operatorsIn("france soleil one two three four"); len(ops) != 0 {
 		t.Errorf("without the file, france soleil should name nothing, got %v", ops)
 	}
-	if ops := m.operatorsIn("speedbird five two two"); !ops["BAW"] {
+	if ops := m.operatorsIn("speedbird five two two"); len(ops["BAW"]) == 0 {
 		t.Errorf("airlines.dat must still work on its own, got %v", ops)
 	}
 }
@@ -174,7 +174,7 @@ func TestOverridesWinOverAirlinesDat(t *testing.T) {
 	// is BEL, and the correction must take the key.
 	m := newTestMatcher(t)
 	ops := m.operatorsIn("bee line three six seven")
-	if !ops["BEL"] || ops["DAT"] {
+	if len(ops["BEL"]) == 0 || len(ops["DAT"]) > 0 {
 		t.Errorf("bee line should name BEL and not DAT, got %v", ops)
 	}
 }

@@ -1890,7 +1890,14 @@
                                                       x-text="v.text"></span>
                                             </template>
                                         </div>
-                                        <div class="text-xs text-text/85 leading-snug" x-text="t.content_processed || t.content"></div>
+                                        <div class="text-xs text-text/85 leading-snug"
+                                             x-html="$store.atc.transcriptHtml(t.content_processed || t.content, (t.callsign_source !== 'fr' && t.content_processed) ? t.callsign_evidence : null)"></div>
+                                        <div x-show="t.callsign_source === 'fr' && t.content_second" class="text-xs leading-snug mt-0.5">
+                                            <span class="text-[9px] text-text/40 mr-1"
+                                                  title="Second reading, by the French model. It is the one that named the aircraft.">FR</span>
+                                            <span class="text-text/70 italic"
+                                                  x-html="$store.atc.transcriptHtml(t.content_second, t.callsign_evidence)"></span>
+                                        </div>
                                     </div>
                                 </template>
                             </div>
@@ -2093,16 +2100,28 @@
                                                     <span x-show="transcription.speaker_type && transcription.speaker_type !== 'ATC' && transcription.speaker_type !== 'PILOT'"
                                                           class="text-gray-400 font-semibold">@<span x-text="transcription.speaker_type"></span></span>
                                                 </div>
-                                                <!-- Show processed content if available, otherwise show original -->
+                                                <!-- Show processed content if available, otherwise show original.
+                                                     The words that named the aircraft are in bold: kept when the
+                                                     match was made, in this text unless the French reading made it. -->
                                                 <p class="text-text/90 leading-tight cursor-help"
                                                    x-show="transcription.is_processed && transcription.content_processed"
-                                                   x-html="$store.atc.highlightSearchTerm(transcription.content_processed)"
+                                                   x-html="$store.atc.transcriptHtml(transcription.content_processed, transcription.callsign_source !== 'fr' ? transcription.callsign_evidence : null)"
                                                    :title="'Original: ' + transcription.text"></p>
                                                 
                                                 <!-- Show original content if not processed -->
                                                 <p class="text-text/90 leading-tight"
                                                    x-show="!transcription.is_processed || !transcription.content_processed"
-                                                   x-html="$store.atc.highlightSearchTerm(transcription.text)"></p>
+                                                   x-html="$store.atc.transcriptHtml(transcription.text, null)"></p>
+
+                                                <!-- When the French reading named the aircraft, the words are in it:
+                                                     shown, or the highlight would have nowhere to go. -->
+                                                <div x-show="transcription.callsign_source === 'fr' && transcription.content_second"
+                                                     class="mt-0.5 leading-tight">
+                                                    <span class="text-[9px] text-text/40 mr-1"
+                                                          title="Second reading, by the French model. It is the one that named the aircraft.">FR</span>
+                                                    <span class="text-text/70 italic"
+                                                          x-html="$store.atc.transcriptHtml(transcription.content_second, transcription.callsign_evidence)"></span>
+                                                </div>
                                             </div>
                                             </div>
                                         </template>

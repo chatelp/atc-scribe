@@ -245,6 +245,9 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 
 	callsign, source := "", ""
 	var match phraseology.Match
+	// Where the words that named the aircraft sit in the text displayed for the
+	// reading that named it -- the processed primary text, or the second reading.
+	var evidence [][2]int
 	if len(sky) > 0 {
 		ctx := p.recentlyHeard(record.FrequencyID, record.CreatedAt)
 
@@ -273,9 +276,11 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 		// on a bigger corpus tomorrow. Measured on the 15/09 capture (Q29): the
 		// two never disagreed inside the gate, 8 agreements out of 8.
 		var second phraseology.Match
+		var secondResult phraseology.Result
 		okSecond := false
 		if record.ContentSecond != "" {
-			second, okSecond = try(phraseology.Parse(record.ContentSecond), record.ContentSecond)
+			secondResult = phraseology.Parse(record.ContentSecond)
+			second, okSecond = try(secondResult, record.ContentSecond)
 		}
 
 		switch {
@@ -283,19 +288,24 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 			// The primary model wins. It runs on every transmission, so its
 			// precision is the one that was measured -- 72% against 65%.
 			match, callsign, source = primary, primary.Callsign, "en>fr"
+			evidence = result.NormalizedSpans(primary.Words)
 			p.logger.Info("The two readings named different aircraft, keeping the primary",
 				logger.Int64("id", record.ID),
 				logger.String("primary", primary.Callsign),
 				logger.String("second", second.Callsign))
 		case okPrimary:
 			match, callsign, source = primary, primary.Callsign, "en"
+			evidence = result.NormalizedSpans(primary.Words)
 		case okSecond:
+			// The second reading is stored as decoded, so its words are placed in it
+			// as it stands.
 			match, callsign, source = second, second.Callsign, "fr"
+			evidence = secondResult.RawSpans(second.Words)
 		}
 	}
 
-	if err := p.transcriptionStorage.UpdateProcessedTranscription(
-		record.ID, processed, speaker, callsign, source,
+	if err := p.transcriptionStorage.UpdateMatchedTranscription(
+		record.ID, processed, speaker, callsign, source, evidence,
 	); err != nil {
 		p.logger.Error("Failed to update annotated transcription",
 			logger.Int64("id", record.ID), logger.Error(err))
@@ -315,7 +325,7 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 
 	p.storeValues(record, result, callsign)
 	p.storeClearances(record, result, callsign)
-	p.broadcast(record, processed, speaker, callsign)
+	p.broadcast(record, processed, speaker, callsign, source, evidence)
 }
 
 // recentlyHeard returns the aircraft named on this frequency in the last two
@@ -453,7 +463,7 @@ func (p *GrammarProcessor) storeClearances(record *sqlite.TranscriptionRecord, r
 // stopped sending it — it writes the processed record to a log file instead — so
 // the handler is currently dead code. Reviving it is what makes a match visible
 // without a page reload.
-func (p *GrammarProcessor) broadcast(record *sqlite.TranscriptionRecord, processed, speaker, callsign string) {
+func (p *GrammarProcessor) broadcast(record *sqlite.TranscriptionRecord, processed, speaker, callsign, source string, evidence [][2]int) {
 	p.wsServer.Broadcast(&websocket.Message{
 		Type: "transcription_update",
 		Data: map[string]interface{}{
@@ -466,6 +476,9 @@ func (p *GrammarProcessor) broadcast(record *sqlite.TranscriptionRecord, process
 			"content_processed": processed,
 			"speaker_type":      speaker,
 			"callsign":          callsign,
+			"callsign_source":   source,
+			"callsign_evidence": evidence,
+			"content_second":    record.ContentSecond,
 		},
 	})
 }

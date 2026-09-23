@@ -59,3 +59,52 @@ func TestTranscriptionsByCallsignAreReadBack(t *testing.T) {
 		}
 	}
 }
+
+// The two readers the page uses -- the frequency history and the aircraft card
+// -- carry the words that named the aircraft, and a damaged value costs the
+// highlight, never the transcription.
+func TestCallsignEvidenceIsReadBackByThePageReaders(t *testing.T) {
+	log := testLog(t)
+	aircraft, err := NewAircraftStorage(DailyPath(t.TempDir(), time.Now()), log)
+	if err != nil {
+		t.Fatalf("NewAircraftStorage: %v", err)
+	}
+	s := NewTranscriptionStorage(aircraft.GetDB(), log)
+
+	id, err := s.StoreTranscription(&TranscriptionRecord{
+		FrequencyID: "aero-melange", CreatedAt: time.Now().UTC().Truncate(time.Second),
+		Content: "air france one zero eight one", IsComplete: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][2]int{{0, 10}, {11, 29}}
+	if err := s.UpdateMatchedTranscription(id, "air france one zero eight one", "ATC", "AFR1081", "en", want); err != nil {
+		t.Fatalf("UpdateMatchedTranscription: %v", err)
+	}
+	byCS, err := s.GetTranscriptionsByCallsign("AFR1081", 10, 0)
+	if err != nil || len(byCS) != 1 {
+		t.Fatalf("by callsign: %v, %d records", err, len(byCS))
+	}
+	byFreq, err := s.GetTranscriptionsByFrequency("aero-melange", 10, 0)
+	if err != nil || len(byFreq) != 1 {
+		t.Fatalf("by frequency: %v, %d records", err, len(byFreq))
+	}
+	for name, r := range map[string]*TranscriptionRecord{"by callsign": byCS[0], "by frequency": byFreq[0]} {
+		if len(r.CallsignEvidence) != 2 || r.CallsignEvidence[0] != want[0] || r.CallsignEvidence[1] != want[1] {
+			t.Errorf("%s: evidence %v, want %v", name, r.CallsignEvidence, want)
+		}
+	}
+
+	// Damaged by hand: the transcription must still be read.
+	if _, err := s.db.Exec(`UPDATE transcriptions SET callsign_evidence = 'not json' WHERE id = ?`, id); err != nil {
+		t.Fatal(err)
+	}
+	again, err := s.GetTranscriptionsByCallsign("AFR1081", 10, 0)
+	if err != nil || len(again) != 1 {
+		t.Fatalf("a damaged highlight made the transcription unreadable: %v, %d records", err, len(again))
+	}
+	if again[0].CallsignEvidence != nil {
+		t.Errorf("damaged evidence should read as none, got %v", again[0].CallsignEvidence)
+	}
+}

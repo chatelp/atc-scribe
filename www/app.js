@@ -3450,6 +3450,9 @@ async initAircraftDataSource() {
                     content_processed: data.content_processed,
                     speaker_type: data.speaker_type,
                     callsign: data.callsign,
+                    callsign_source: data.callsign_source,
+                    callsign_evidence: data.callsign_evidence,
+                    content_second: data.content_second,
                     is_processed: true
                 };
                 
@@ -3472,6 +3475,9 @@ async initAircraftDataSource() {
                         content_processed: data.content_processed,
                         speaker_type: data.speaker_type,
                         callsign: data.callsign,
+                        callsign_source: data.callsign_source,
+                        callsign_evidence: data.callsign_evidence,
+                        content_second: data.content_second,
                         is_processed: true
                     };
                     
@@ -3491,6 +3497,9 @@ async initAircraftDataSource() {
                             content_processed: data.content_processed,
                             speaker_type: data.speaker_type,
                             callsign: data.callsign,
+                            callsign_source: data.callsign_source,
+                            callsign_evidence: data.callsign_evidence,
+                            content_second: data.content_second,
                             is_processed: true
                         };
                         
@@ -3589,6 +3598,37 @@ async initAircraftDataSource() {
             const diffH = Math.floor(diffM / 60);
             if (diffH < 24) return diffH + 'h ' + (diffM % 60) + 'm';
             return ts.toLocaleDateString();
+        },
+
+        // A transcript as HTML: the words that named its aircraft in bold, kept
+        // when the match was made (callsign_evidence, UTF-16 offsets into this
+        // very text), and the search term underlined. Everything is escaped here:
+        // the text comes from a speech model and must never reach x-html raw --
+        // highlightSearchTerm below does not escape, which is why this replaces it.
+        transcriptHtml(text, spans) {
+            if (!text) return '';
+            const esc = str => str.replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const term = (this.transcriptionSearchTerm || '').trim();
+            const re = term ? new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi') : null;
+            const plain = str => re
+                ? str.split(re).map((piece, i) => i % 2
+                    ? '<span class="border-b border-red-400">' + esc(piece) + '</span>'
+                    : esc(piece)).join('')
+                : esc(str);
+            // Offsets that do not fit this text name words in another one: shown
+            // without highlight rather than with a wrong one.
+            const fits = Array.isArray(spans) && spans.length > 0 && spans.every(sp =>
+                Array.isArray(sp) && sp[0] >= 0 && sp[0] < sp[1] && sp[1] <= text.length);
+            if (!fits) return plain(text);
+            let out = '', at = 0;
+            for (const [a, b] of [...spans].sort((x, y) => x[0] - y[0])) {
+                if (a < at) continue;
+                out += plain(text.slice(at, a)) +
+                    '<b class="font-bold text-amber-300">' + plain(text.slice(a, b)) + '</b>';
+                at = b;
+            }
+            return out + plain(text.slice(at));
         },
 
         highlightSearchTerm(text) {

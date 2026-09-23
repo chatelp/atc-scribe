@@ -3,8 +3,10 @@ package transcription
 import (
 	"context"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
+	"unicode/utf16"
 
 	_ "modernc.org/sqlite"
 
@@ -290,5 +292,84 @@ func TestASingleReadingBehavesExactlyAsBefore(t *testing.T) {
 	}
 	if r.ContentSecond != "" {
 		t.Errorf("no gate means no second reading, got %q", r.ContentSecond)
+	}
+}
+
+// highlighted cuts out of s the pieces the stored evidence points at, indexing
+// in UTF-16 code units as the browser does.
+func highlighted(s string, spans [][2]int) []string {
+	u := utf16.Encode([]rune(s))
+	var out []string
+	for _, sp := range spans {
+		if sp[0] < 0 || sp[1] > len(u) || sp[0] >= sp[1] {
+			out = append(out, "<out of range>")
+			continue
+		}
+		out = append(out, string(utf16.Decode(u[sp[0]:sp[1]])))
+	}
+	return out
+}
+
+// What the page highlights is read back from the database, not recomputed: the
+// words that named the aircraft, placed in the processed text it displays.
+func TestTheStoredEvidencePointsAtTheDisplayedWords(t *testing.T) {
+	proc, txStore, _ := newTestProcessor(t, fixedFleet{
+		{Callsign: "AFR1081", Hex: "39c1a2", AltitudeFt: 10000, Phase: "ARR"},
+	})
+	id := store(t, txStore, "air france one zero eight one descend flight level one zero zero")
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+	r := reread(t, txStore, id)
+	if r.CallsignSource != "en" {
+		t.Fatalf("source: got %q, want en", r.CallsignSource)
+	}
+	got := highlighted(r.ContentProcessed, r.CallsignEvidence)
+	if want := []string{"air france", "one zero eight one"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("stored evidence highlights %q in %q, want %q", got, r.ContentProcessed, want)
+	}
+}
+
+// When the second reading named the aircraft, its words are in that reading --
+// which is the text that has to be shown for the highlight to mean anything.
+func TestEvidenceFromTheSecondReadingPointsIntoIt(t *testing.T) {
+	proc, txStore, _ := newTestProcessor(t, fixedFleet{
+		{Callsign: "AFR062", Hex: "39a1b2", AltitudeFt: 24000, Phase: "CRZ"},
+	})
+	id := storeTwo(t, txStore,
+		"rehear les niveaux unite nine zero air france zero seven two",
+		"Enchère : les niveaux, unité ninety, Air France zero six two")
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+	r := reread(t, txStore, id)
+	if r.CallsignSource != "fr" {
+		t.Fatalf("source: got %q, want fr", r.CallsignSource)
+	}
+	got := highlighted(r.ContentSecond, r.CallsignEvidence)
+	if len(got) == 0 {
+		t.Fatalf("no evidence stored for a match the second reading made")
+	}
+	for _, w := range got {
+		if w == "<out of range>" {
+			t.Fatalf("evidence %v does not fit the second reading %q", r.CallsignEvidence, r.ContentSecond)
+		}
+	}
+	if want := []string{"Air France", "zero six two"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("stored evidence highlights %q in %q, want %q", got, r.ContentSecond, want)
+	}
+}
+
+// No match, no evidence: nothing to highlight is stored as nothing.
+func TestNoMatchStoresNoEvidence(t *testing.T) {
+	proc, txStore, _ := newTestProcessor(t, fixedFleet{
+		{Callsign: "BAW572", Hex: "400a1b", AltitudeFt: 37000, Phase: "CRZ"},
+	})
+	id := store(t, txStore, "air france one zero eight one descend flight level one zero zero")
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+	if r := reread(t, txStore, id); r.Callsign != "" || r.CallsignEvidence != nil {
+		t.Errorf("callsign %q with evidence %v, want neither", r.Callsign, r.CallsignEvidence)
 	}
 }
