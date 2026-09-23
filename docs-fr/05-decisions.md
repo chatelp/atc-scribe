@@ -3192,7 +3192,7 @@ signaux faibles qui battent autour du seuil de squelch. **Pour trancher : l'heur
 minute d'un cas entendu**, et où il a été entendu. Les boîtiers CPL prévus traiteraient la
 première.
 
-### Q38 — Les mots accentués sont coupés en deux par l'analyse *(ouverte, 23/09)*
+### Q38 — Les mots accentués sont coupés en deux par l'analyse *(répondue le 23/09 : corrigé, voir la suite)*
 
 Trouvé en écrivant les tests de D55 : le découpage en mots ne garde que `a-z`, `0-9` et le
 trait d'union. **« zéro » devient « z » + « ro »** — alors que la table des chiffres français
@@ -3201,3 +3201,32 @@ peuvent jamais servir. Le modèle français écrit avec accents : un « zéro »
 numéro de vol est perdu. **À mesurer avant de corriger** — changer le découpage change
 l'association sur tout le français, et c'est l'effet sur les appariements qui dira si c'est
 un gain.
+
+> **Mesuré puis corrigé le même soir**, à la demande du propriétaire. Les accents sont
+> **repliés pour la reconnaissance** (« zéro » se lit « zero », et rencontre les tables qui
+> avaient déjà les deux graphies), **et gardés à l'affichage** : le texte normalisé montre
+> « départ », là où il montrait « d part ».
+>
+> **Sur les appariements, rien ne bouge** — ni en français (le modèle français sur les
+> 1 378 transmissions du 15/09 : 93 appariements dont 62,2 vrais avant comme après, fréquence
+> par fréquence), ni en anglais (les trois modèles du même corpus, identiques ; 143 dont
+> 102,4 vrais pour le modèle de production). Pas de fausse association introduite non plus.
+>
+> **Sur ce que la grammaire extrait, 94 transmissions sur 1 378 changent**, lues une à une :
+> - « à », jusqu'ici un blanc, **sépare les nombres** : « passez le niveau 115 à 190 » donnait
+>   `115190` et donne **FL115** ; même chose pour « niveau 100 à 36 », « 160 à 190 »…
+> - « degrés » **introduit un cap** : « 300 degrés » était un numéro de vol, c'est un cap 300 ;
+> - « zéro » est lu : « 2 6 zéro » → 260 ;
+> - **les lettres OTAN à la française** sont reconnues — « Québec », « Hôtel », « écho » —,
+>   13 → 21 groupes, ce qui compte pour les immatriculations d'aviation légère ;
+> - **une régression, corrigée** : un ordinal collé au nombre précédent (« 300, 3ème » →
+>   `3003eme`). Un ordinal termine désormais un nombre, ce qui règle aussi « 300, 3ème »
+>   qui donnait `3003` avant ce changement, sans toucher « 27L ».
+> - **Le locuteur change sur 62 transmissions**, dans les deux sens (+40 identifiés, −21,
+>   1 inversé). Certains cas sont plausibles (« cap 300 autorisé » → ATC), d'autres
+>   invérifiables : ce corpus est le modèle français passé sur *toutes* les transmissions,
+>   anglaises comprises, et beaucoup de textes sont inventés. **Non mesuré contre une
+>   vérité** — et le locuteur n'entre pas dans l'association, seulement dans l'étiquette.
+>
+> **Vérifié** : 8 tests, dont la piste « 27L » qui doit survivre à la règle des ordinaux ;
+> trois retraits, trois attrapés.
