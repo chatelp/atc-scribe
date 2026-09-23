@@ -31,7 +31,9 @@ fausse conclusion publiée : les gros fichiers sont les atypiques.
 > n'est plus un échantillon, c'est la population. À ne pas traiter comme une mesure
 > généralisable — c'est de la tour militaire de Villacoublay, en VFR français.
 
-Le jeu vit dans `whisper-lab/jeu-de-test/` avec son `manifeste.json`. **Il reste hors du
+Le jeu vit dans `whisper-lab/audio/2026-09-15-jeu-de-test-120/` avec son `manifeste.json`,
+ses annotations et la liste des clips de réglage — `whisper-lab/jeu-de-test/` jusqu'au
+rangement du 23/09 (D50, correspondances dans `whisper-lab/CORPUS.md`). **Il reste hors du
 dépôt** : ce sont des enregistrements de communications réelles, et leur rediffusion est
 une question distincte (voir plus bas).
 
@@ -42,8 +44,8 @@ une page unique.
 
 ```bash
 python3 tools/annotate/server.py \
-  --corpus ~/Dev/Aero/whisper-lab/jeu-de-test \
-  --out    ~/Dev/Aero/whisper-lab/verite-terrain.json
+  --corpus ~/Dev/Aero/whisper-lab/audio/2026-09-15-jeu-de-test-120 \
+  --out    ~/Dev/Aero/whisper-lab/audio/2026-09-15-jeu-de-test-120/verite-terrain.json
 ```
 
 Puis <http://127.0.0.1:8777/>. Lecture automatique, <kbd>espace</kbd> rejoue,
@@ -142,7 +144,7 @@ modèles et non la chaîne d'enregistrement — c'est ce qu'on voulait.
 
 ## Le calcul est prêt et attend les annotations
 
-`whisper-lab/note-modeles.py`, 18 tests. **Utilisable dès le premier clip** : il n'y a pas
+`whisper-lab/note-modeles.py`, 21 tests. **Utilisable dès le premier clip** : il n'y a pas
 de seuil en dessous duquel on ne rapporte rien, seulement une incertitude à afficher.
 
 Trois précautions qui changent le résultat :
@@ -189,8 +191,10 @@ Le français visé est celui des avions de ligne en approche et au départ, pas 
 aérodromes. L'outil est donc lancé en masquant Chavenay et Villacoublay :
 
 ```bash
-python3 tools/annotate/server.py --corpus whisper-lab/jeu-de-test \
-  --out whisper-lab/verite-terrain.json --exclude-freq 129525,128950
+python3 tools/annotate/server.py \
+  --corpus ~/Dev/Aero/whisper-lab/audio/2026-09-15-jeu-de-test-120 \
+  --out    ~/Dev/Aero/whisper-lab/audio/2026-09-15-jeu-de-test-120/verite-terrain.json \
+  --exclude-freq 129525,128950
 ```
 
 Masqué pour l'annotateur seulement : le manifeste et le fichier d'annotations sont

@@ -159,6 +159,7 @@ C'est un argument de plus pour Q4 / D2, le mode de diffusion par canal — et il
 différent de celui du doc 23 (R1), qui portait sur la qualité de transcription. Ici, ce
 n'est pas la transcription qui souffre du mélange, c'est **l'interprétation**.
 
-> **Le corpus reste disponible** : `whisper-lab/nuit-132-133/par-canal.json`,
+> **Le corpus reste disponible** : `whisper-lab/nuit-132-133/par-canal.json` — depuis le
+> 23/09 `whisper-lab/audio/2026-09-15-132-133-nuit-continu/par-canal.json` (D50) —,
 > 462 transcriptions avec canal, heure, offset et durée. C'est le premier corpus du
 > dossier qui porte l'attribution par fréquence sur du texte transcrit.
