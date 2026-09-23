@@ -126,10 +126,12 @@ const isDone = a => !!a && (!!(a.text||'').trim() || a.no_speech || a.unintellig
 // back into the textarea, eating the space just typed, and reassigned the audio
 // source, restarting the clip.
 function majProgression(){
-  $('#pos').textContent = `${i+1} / ${items.length}`;
+  // Position and progress used to read alike ("11 / 120" next to "42 annotated").
+  // Since the order is interleaved they diverge, so each says what it is.
+  $('#pos').textContent = `Clip ${i+1} of ${items.length}`;
   const done = items.filter(x => isDone(ann[x.id])).length;
   $('#prog').style.width = (100*done/items.length) + '%';
-  $('#count').innerHTML = `<span class="done">${done}</span> annotated`;
+  $('#count').innerHTML = `<span class="done">${done}</span> / ${items.length} done`;
 }
 
 function render(){
