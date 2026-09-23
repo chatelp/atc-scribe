@@ -1581,6 +1581,17 @@ WAV n'était supprimé qu'après vérification que le MP3 existait et n'était p
 > **Ce qu'il faut changer dans le sidecar** : écrire directement en MP3 64 kbit/s à
 > 16 kHz. Le WAV n'a servi à rien qu'à occuper douze fois la place.
 
+
+> **Déplacé le 23/09** sur le disque externe, `/Volumes/Crucial X8/whisper-corpus/nuit-20260920`,
+> et remplacé dans `whisper-lab/` par un lien : les scripts n'ont rien à changer, mais
+> **ce corpus n'est lisible que disque branché**. Copie vérifiée fichier par fichier avant
+> suppression de l'original (14 252 fichiers, SHA-256 identiques). Gardé parce que c'est
+> **le seul enregistrement existant** des approches de Roissy — le trafic visé par D48 — :
+> la station n'archive pas le groupe `gros-porteurs`. Trace aussi dans
+> `whisper-lab/CORPUS.md` et dans un `LISEZMOI.md` à côté du corpus.
+>
+> Le même jour, **315 Mo supprimés du Mac** après vérification d'une copie sur la station :
+> la nuit de la campagne de gain, l'ADS-B décodé des 12, 14 et 15/09, des fichiers d'essai.
 ### D29 — Les bases brutes sont remplacées par des extraits *(21/09)*
 
 **D13 disait « la base ne s'efface jamais », et son motif était juste** : *« cette base
