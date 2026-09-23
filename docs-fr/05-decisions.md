@@ -2780,13 +2780,107 @@ voix et de l'ADS-B et ce qu'il en affiche. Il fait apparaître cinq écarts, auc
    transmet en direct l'altitude, le cap et le calage affichés par l'équipage : les
    confronter aux instructions entendues mesurerait la reconnaissance **sans annotation**,
    sur le trafic visé (D48). Seulement en direct : l'historique ne garde pas ces champs.
-2. **Phases d'approche et de départ, piste en service : calées sur Saint-Cyr (LFPZ)**, seul
-   aéroport de référence possible. Rien pour De Gaulle ni Orly.
+2. ~~**Phases d'approche et de départ, piste en service : calées sur Saint-Cyr (LFPZ)**~~ —
+   **traité par D49** : l'aéroport de référence est réglable, et les phases sont jugées
+   depuis lui. Reste : un seul aéroport à la fois.
 3. **Langue et second avis français stockés, jamais affichés.**
-4. **Météo sur LFPZ, qui ne publie ni METAR ni TAF** ; chat IA activé avec une clé vide.
-   Réglages, pas de code.
+4. ~~**Météo sur LFPZ, qui ne publie ni METAR ni TAF**~~ — **traité par D49**, la météo suit
+   l'aéroport de référence. Reste le chat IA activé avec une clé vide, et l'API météo par
+   défaut, qui est celle, privée, de Windy.
 5. **Aucune alerte sur code d'urgence** (7500, 7600, 7700), alors que le code transpondeur est
    reçu.
 
 Le premier est le seul qui touche à la reconnaissance vocale — et le seul qui pourrait
 sortir le projet de sa dépendance aux annotations manuelles.
+
+### D49 — Les phases se jugent depuis un aéroport de référence réglable *(23/09)*
+
+Décidé par le propriétaire : *« il faudrait mieux mettre Orly en aéroport de référence, c'est
+le vrai aéroport le plus proche »* — le plus proche **qui reçoit des avions de ligne** —, puis,
+entre trois options présentées : **corriger le code**, et *« prévoir ça comme une vraie
+fonction configurable dans mes paramètres de l'app »*.
+
+#### Le défaut de l'amont
+
+**Dans le code de l'amont, « la station » désigne deux choses** : l'emplacement du
+récepteur, et l'aéroport. Elles se confondent quand le récepteur est posé sur sa piste —
+l'exemple de configuration est Toronto Pearson —, et divergent sinon. Toutes les règles de
+phase mesuraient depuis le récepteur : une approche devait se diriger **vers la station**, une
+montée initiale être **à moins de 5 NM de la station** et **s'en éloigner**, un avion au sol
+n'était gardé que **près de la station**.
+
+**L'amont voulait bien l'aéroport** : la règle d'approche est commentée *« verify heading
+toward airport »* au-dessus d'un code qui lit la station, et un champ de journal s'appelle
+`distance_from_airport` en calculant depuis la station. L'intention était juste, le code non.
+
+Simplement mettre `airport_code = "LFPO"` aurait donné **les pistes d'Orly avec une géométrie
+centrée sur le récepteur** : aucun départ d'Orly reconnu (Orly est à 14 NM, le rayon est de 5),
+une approche seulement si elle se fait vers Fontenay.
+
+#### La correction
+
+- **`adsb.PhaseReference`** : un aéroport, sa position, ses pistes. Tenu derrière un pointeur
+  **atomique** — il peut changer depuis le panneau pendant que la réception classe les avions,
+  et une phase calculée à moitié avec un aéroport et à moitié avec un autre serait pire que
+  l'une ou l'autre. Chaque calcul le lit une fois.
+- **Ce qui passe à l'aéroport** : phases (APP, CLB, DEP, ARR, T/O, T/D), piste en service,
+  filtre des avions au sol, correction des mesures près de la piste, atterrissage déduit
+  quand le signal se perd. Grandeurs dérivées renommées pour dire ce qu'elles mesurent
+  (`DistToAirportNM`, `IsApproachingAirport`).
+- **Ce qui reste au récepteur** : distance affichée, anneaux, positions prévues, réglage
+  manuel de la station.
+- **Sans aéroport connu, repli sur le récepteur** : exactement le comportement de l'amont.
+  **Pour une station posée sur son aéroport, rien ne change** — condition pour que la
+  correction reparte vers l'amont telle quelle.
+
+#### Le réglage
+
+*Server → Reference airport*, dans les paramètres. Une liste des aéroports à moins de 50 NM
+**dont les pistes sont utilisables** — 41 sur 319 dans le rayon de Paris, les autres n'ayant
+pas les deux extrémités localisées —, triés par distance, avec la distance au récepteur.
+Même mécanisme que la rétention et le niveau de journal : validé **en entier avant qu'une
+seule chose s'applique**, gardé dans `configs/runtime-settings.json`, jamais écrit dans
+`config.toml`. Un aéroport enregistré devenu inutilisable cède au démarrage la place à
+`station.airport_code`, **dit dans le journal**, sans écraser le choix enregistré.
+
+Le changement bascule ensemble **trois services** : pistes (référentiel), phases (ADS-B) et
+météo. Les indices de piste en service sont oubliés — ils portaient sur d'autres pistes. Le
+cache météo est vidé, et un résultat arrivé pour l'ancien aéroport est jeté plutôt que rangé
+sous le nouveau : le cache garde la dernière bonne valeur quand une récupération échoue, sans
+quoi les NOTAM de Saint-Cyr auraient été affichés comme ceux d'Orly.
+
+#### Vérifié
+
+- **Témoin** : même trajectoire, mêmes pistes, seule la référence change. Mesurées depuis le
+  récepteur, une approche et une montée initiale tombent en **UNK** ; depuis l'aéroport,
+  **APP** et **CLB**. 6 tests, dont un sous détecteur de concurrence.
+- Le paquet ADS-B **n'avait aucun test**. Toute la détection de phases de l'amont tournait
+  sans filet.
+- **Chaque garde-fou échoue quand on le retire** : sans vidage, le cache garde l'ancien
+  aéroport ; sans l'abandon des résultats périmés, un NOTAM de LFPZ est rangé sous LFPO.
+  Leçon de D47 appliquée : un test qui passe sans le correctif ne prouve rien.
+- **Instance d'essai isolée**, trafic réel : Orly accepté, code bidon refusé, pistes
+  redessinées sur la carte, **METAR et TAF d'Orly** reçus, choix survivant au redémarrage,
+  repli au démarrage vérifié. **4 approches d'Orly détectées en 9 minutes** (TAP432, RAM642J
+  suivi de 3 300 à 2 600 ft) — il n'y en avait jamais.
+
+#### Limites mesurées
+
+- **T/O et T/D restent invisibles à Orly** : ils se jugent sur le passage sol/air, et aucun
+  avion n'est reçu sous 500 ft à moins de 5 NM d'Orly (3 jours d'historique). APP et CLB
+  fonctionnent : 375 avions reçus entre 500 et 1 000 ft à moins de 5 NM.
+- **Un seul aéroport à la fois.**
+- **Le Bourget comme référence confondrait** ses approches avec celles de De Gaulle, pistes
+  presque parallèles à 4 NM.
+
+#### Trouvé en route, hors du sujet
+
+- **Le choix « local » du premier lancement n'est pas enregistré** : le code n'écrit qu'une
+  ligne de journal, alors que son commentaire parle d'enregistrer le choix. L'écran revient à
+  chaque visite. Invisible pour le propriétaire, qui a un compte ; bloquant pour quiconque
+  installe l'outil en local.
+- **L'API météo par défaut de l'amont est celle, privée, de Windy**, qui répond elle-même
+  *« Do not steal this API »*.
+- **La mise en page du panneau** : la première version de la ligne débordait (345 px dans un
+  panneau de 276) et coupait **toutes** les listes de la section. Trouvé à l'écran, mesuré,
+  corrigé.
