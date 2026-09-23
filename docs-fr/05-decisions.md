@@ -3029,3 +3029,43 @@ de connexion si elle est désormais demandée.
 - **Non fait dans le navigateur** : saisir un mot de passe. Le compte d'essai a été créé
   et utilisé par l'API ; l'affichage du mode compte a été vérifié en posant l'état du
   panneau dans la page, sans rien envoyer au serveur.
+
+> **Trouvé par le propriétaire au premier essai, le soir même** : repasser en « Require
+> sign-in » n'a **pas** fait réapparaître le formulaire de connexion. Sa session d'avant la
+> bascule était toujours valide : exiger à nouveau la connexion ne la demandait à
+> personne. C'était le seul chemin que je n'avais pas parcouru dans le navigateur, faute
+> d'y saisir un mot de passe — et les tests créaient chaque fois une session neuve.
+> **Corrigé** : passer en local ferme toutes les sessions. Test ajouté, qui suit ce chemin
+> exact et échoue sans la correction — **13 tests** au lieu de 12.
+>
+> **Au même essai** : l'icône qui ouvre les réglages sortait à moitié du bord gauche de la
+> fenêtre, panneau replié. Défaut de l'amont (le bouton chevauche le bord du panneau, et
+> replié ce bord est celui de la fenêtre). Il se décale de 1,5 rem une fois replié ;
+> mesuré à l'écran : de −17…15 px à 7…39 px, inchangé panneau ouvert.
+
+### D52 — Le sidecar répond pendant qu'il transcrit *(23/09)*
+
+Signalé par le propriétaire en bas des réglages : *« Transcription ok · second opinion (not
+reached just now: … context deadline exceeded) »*.
+
+**La cause** : la route `/transcribe` du sidecar est `async`, et elle appelait le modèle
+directement. Pendant tout le décodage, la boucle d'événements était tenue et `/health` ne
+pouvait pas répondre. Le panneau attend 2 s, puis affiche le dernier état connu avec ce
+message — prévu ainsi par D30, qui avait vu le symptôme sans en chercher la cause.
+
+**La correction** : le décodage passe dans un fil à part, derrière un verrou qui garde **une
+transcription à la fois**, comme avant — rien ne dit que les modèles supportent des appels
+simultanés, et ils partageraient de toute façon le même GPU.
+
+**Mesuré avant et après**, même clip de 7,3 s envoyé directement au sidecar, `/health`
+interrogé toutes les 100 ms :
+
+| | pendant la transcription | pire attente | au-delà de 2 s |
+|---|---|---|---|
+| avant | 2 requêtes | coupées à 10 s | 2 sur 2 |
+| après | 17 requêtes | 874 ms | 0 |
+
+Sur le trafic réel : avant, **2 sondes sur 113** au-delà de 2 s en une minute (une au-delà
+de 5 s) ; après, **0 sur 178** en 90 s, pire attente **40 ms**, avec 5 transmissions
+transcrites dont un second avis réussi, aucune erreur au journal. Le texte transcrit du
+clip d'essai est identique avant et après.
