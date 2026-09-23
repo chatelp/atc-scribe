@@ -168,7 +168,7 @@ document.addEventListener('alpine:init', () => {
         // /api/v1/transcriptions/callsign/{callsign}, an endpoint upstream already
         // serves and no page ever called -- it only becomes useful once something
         // fills the callsign column, which the local grammar now does.
-        aircraftRadio: { callsign: '', loading: false, transcriptions: [], values: {} },
+        aircraftRadio: { callsign: '', key: '', loading: false, error: '', transcriptions: [], values: {} },
         searchTerm: '',
         // Computed aircraft counts — derived from the live aircraft store so they stay
         // in sync as WebSocket adds/updates/removes aircraft at runtime.
@@ -1717,30 +1717,48 @@ document.addEventListener('alpine:init', () => {
         // Methods for Aircraft Details Panel (moved from x-data in HTML)
         // Fetch the transmissions matched to one aircraft, and the values the
         // grammar recovered from them.
-        async loadAircraftRadio(callsign) {
+        //
+        // Called on every position update of the selected aircraft, about once a
+        // second. It asks the server again only when the aircraft changed or
+        // something new was heard on it -- the voice count is what says so. It
+        // used to ask again whenever the last answer was empty, so every aircraft
+        // with nothing matched blinked between "loading" and "nothing" each second.
+        async loadAircraftRadio(callsign, heard) {
             const cs = (callsign || '').trim();
             if (!cs) {
-                this.aircraftRadio = { callsign: '', loading: false, transcriptions: [], values: {} };
+                this.aircraftRadio = { callsign: '', key: '', loading: false, error: '', transcriptions: [], values: {} };
                 return;
             }
-            if (this.aircraftRadio.callsign === cs && this.aircraftRadio.transcriptions.length) return;
+            const key = cs + '|' + (heard || 0);
+            if (this.aircraftRadio.key === key) return; // loaded, loading, or failed: nothing new
 
-            this.aircraftRadio = { callsign: cs, loading: true, transcriptions: [], values: {} };
+            // Something new on the same aircraft: keep what is shown while asking.
+            const same = this.aircraftRadio.callsign === cs;
+            this.aircraftRadio = {
+                callsign: cs, key, loading: true, error: '',
+                transcriptions: same ? this.aircraftRadio.transcriptions : [],
+                values: same ? this.aircraftRadio.values : {}
+            };
             try {
                 const res = await fetch(`/api/v1/transcriptions/callsign/${encodeURIComponent(cs)}?limit=50`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 // The aircraft may have changed while the request was in flight.
-                if (this.aircraftRadio.callsign !== cs) return;
+                if (this.aircraftRadio.key !== key) return;
                 this.aircraftRadio = {
-                    callsign: cs,
-                    loading: false,
+                    callsign: cs, key,
+                    loading: false, error: '',
                     transcriptions: (data.transcriptions || []).slice().reverse(),
                     values: data.values || {}
                 };
             } catch (e) {
                 console.warn('Failed to load radio for', cs, e);
-                if (this.aircraftRadio.callsign === cs) this.aircraftRadio.loading = false;
+                // Said, not shown as "nothing matched": the server failing is not
+                // the aircraft being silent, which is how a broken query hid for days.
+                if (this.aircraftRadio.key === key) {
+                    this.aircraftRadio.loading = false;
+                    this.aircraftRadio.error = 'Could not load the transmissions (' + e.message + ')';
+                }
             }
         },
 
@@ -1750,7 +1768,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         setupAircraftDetailsPanel() {
-            this.loadAircraftRadio(this.selectedAircraft ? this.selectedAircraft.flight : '');
+            const a = this.selectedAircraft;
+            this.loadAircraftRadio(a ? a.flight : '', a && a.voice ? a.voice.transmissions : 0);
 
             if (!this.selectedAircraft) { // No aircraft selected, fully close and reset
                 this.aircraftDetailsShowHistoryView = false;
