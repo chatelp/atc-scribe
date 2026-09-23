@@ -77,7 +77,7 @@ def save_annotations(path, data):
     os.replace(tmp, path)
 
 
-def make_handler(corpus, out_path):
+def make_handler(corpus, out_path, exclude=frozenset()):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -104,7 +104,11 @@ def make_handler(corpus, out_path):
             if path == "/api/items":
                 with lock:
                     payload = {
-                        "items": load_items(corpus),
+                        # Hidden frequencies are only hidden from the annotator.
+                        # The manifest and the annotations file are untouched,
+                        # so scoring still sees every clip already done.
+                        "items": [it for it in load_items(corpus)
+                                  if str(it.get("freq", "")) not in exclude],
                         "annotations": load_annotations(out_path),
                         # Whether the reveal button has anything to reveal. The
                         # readings themselves are not in this payload.
@@ -166,7 +170,10 @@ def main():
     parser.add_argument("--corpus", required=True, help="directory holding the clips")
     parser.add_argument("--out", default="ground-truth.json", help="annotations file")
     parser.add_argument("--port", type=int, default=8777)
+    parser.add_argument("--exclude-freq", default="",
+                        help="comma-separated frequencies to stop presenting, e.g. 129525,128950")
     args = parser.parse_args()
+    exclude = frozenset(f.strip() for f in args.exclude_freq.split(",") if f.strip())
 
     corpus = os.path.abspath(args.corpus)
     out_path = os.path.abspath(args.out)
@@ -174,13 +181,17 @@ def main():
     done = len([v for v in load_annotations(out_path).values()
                 if v.get("text") or v.get("no_speech")])
     print(f"{len(items)} clips in {corpus}")
+    if exclude:
+        hidden = sum(1 for it in items if str(it.get("freq", "")) in exclude)
+        print(f"{hidden} hidden (frequencies {', '.join(sorted(exclude))}), "
+              f"{len(items) - hidden} presented")
     cands = load_candidates(corpus)
     print(f"{len(cands)} clips have model readings"
           if cands else "no candidats.json -- the reveal button stays hidden")
     print(f"{done} already annotated in {out_path}")
     print(f"open http://127.0.0.1:{args.port}/  (Ctrl-C to stop)")
 
-    ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(corpus, out_path)).serve_forever()
+    ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(corpus, out_path, exclude)).serve_forever()
 
 
 if __name__ == "__main__":
