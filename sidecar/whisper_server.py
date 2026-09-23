@@ -23,6 +23,7 @@ Run:
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -212,6 +213,21 @@ def load(path: str):
     return _models[path]
 
 
+# One decode at a time, off the event loop. /transcribe is async, and a model
+# call made directly in it held the whole server for the length of the decode:
+# /health could not answer while a transmission was being transcribed. Measured
+# on 23/09: not one answer during a 17 s decode, and the settings panel showing
+# "not reached just now" whenever it asked at that moment. The lock keeps decodes
+# one at a time, as they were -- nothing says the models are safe to call
+# concurrently, and two decodes at once would only share the same GPU anyway.
+_decode_lock = threading.Lock()
+
+
+def decode(mlx_whisper, audio, **kwargs):
+    with _decode_lock:
+        return mlx_whisper.transcribe(audio, **kwargs)
+
+
 # --------------------------------------------------------------------------- routes
 
 @app.get("/health")
@@ -337,7 +353,7 @@ async def transcribe(
     if prompt:
         kwargs["initial_prompt"] = prompt
 
-    result = mlx_whisper.transcribe(audio, **kwargs)
+    result = await asyncio.to_thread(decode, mlx_whisper, audio, **kwargs)
     text = " ".join(result["text"].split())
     segments = [
         {"text": " ".join(s["text"].split()),
@@ -355,7 +371,8 @@ async def transcribe(
             and text and looks_french(text)):
         try:
             t1 = time.time()
-            r2 = mlx_whisper.transcribe(audio, path_or_hf_repo=cfg.model_fr, language="fr")
+            r2 = await asyncio.to_thread(decode, mlx_whisper, audio,
+                                         path_or_hf_repo=cfg.model_fr, language="fr")
             second = {
                 "text": " ".join(r2["text"].split()),
                 "language": "fr",
