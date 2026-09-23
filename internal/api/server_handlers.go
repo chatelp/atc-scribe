@@ -13,6 +13,7 @@ import (
 
 	"context"
 	"github.com/yegors/co-atc/internal/config"
+	"github.com/yegors/co-atc/internal/reference"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/transcription"
 	"github.com/yegors/co-atc/pkg/logger"
@@ -34,7 +35,26 @@ type ServerState struct {
 
 	// Absent when the transcription backend is not the local sidecar.
 	Transcription *TranscriptionState `json:"transcription,omitempty"`
+
+	// The airport phases are judged against, and those that could replace it.
+	Reference *ReferenceState `json:"reference,omitempty"`
 }
+
+// ReferenceState is what the panel needs to choose a reference airport without
+// knowing ICAO codes by heart: the one in force, and the nearby airports whose
+// runways phase detection can actually use.
+type ReferenceState struct {
+	Airport    string                       `json:"airport"`
+	Name       string                       `json:"name,omitempty"`
+	DistanceNM float64                      `json:"distance_nm"` // from the receiver
+	Runways    int                          `json:"runways"`
+	Candidates []reference.AirportCandidate `json:"candidates"`
+}
+
+// referenceCandidateRangeNM bounds the airports offered. Phases are about the
+// last and first few thousand feet around an airport; a receiver farther than
+// this rarely sees that low, whatever it hears at altitude.
+const referenceCandidateRangeNM = 50
 
 // TranscriptionState is the half of the product that used to have no operational
 // state at all. Degraded is the field worth reading: a model that has become
@@ -128,6 +148,10 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 			ts.Detail = strings.TrimSpace(ts.Detail + " (not reached just now: " + err.Error() + ")")
 		}
 		st.Transcription = ts
+	}
+
+	if h.refService != nil && h.adsbService != nil {
+		st.Reference = h.referenceState()
 	}
 
 	dir := h.config.Storage.SQLiteBasePath
@@ -268,6 +292,9 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 	if next.LogLevel == "" {
 		next.LogLevel = current.LogLevel
 	}
+	if next.ReferenceAirport == "" {
+		next.ReferenceAirport = current.ReferenceAirport
+	}
 
 	if err := h.runtime.Apply(next); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -283,10 +310,35 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("Server settings changed from the panel",
 		logger.String("by", by),
 		logger.Int("db_retention_days", next.DBRetentionDays),
-		logger.String("log_level", next.LogLevel))
+		logger.String("log_level", next.LogLevel),
+		logger.String("reference_airport", next.ReferenceAirport))
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(h.runtime.Settings()); err != nil {
 		h.logger.Error("Failed to encode settings response", logger.Error(err))
 	}
 }
+
+// referenceState describes the reference airport in force and the candidates.
+func (h *Handler) referenceState() *ReferenceState {
+	code := h.adsbService.PhaseReference().Airport
+	st := &ReferenceState{
+		Airport:    code,
+		Candidates: h.refService.HomeAirportCandidates(referenceCandidateRangeNM),
+	}
+	for _, c := range st.Candidates {
+		if c.Code == code {
+			st.Name, st.DistanceNM, st.Runways = c.Name, c.DistanceNM, c.Runways
+		}
+	}
+	// In force but not among the candidates -- farther than the range, set by
+	// hand in the configuration. Still say what it is.
+	if st.Name == "" {
+		if a := h.refService.GetAirport(code); a != nil {
+			st.Name = a.Name
+			st.Runways = len(h.refService.GetHomeRunwayData().RunwayThresholds)
+		}
+	}
+	return st
+}
+

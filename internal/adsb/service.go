@@ -227,7 +227,7 @@ type Service struct {
 	overrideMutex      sync.RWMutex              // Protect override coordinates
 	wsServer           WebSocketServer           // WebSocket server for broadcasting events
 	signalLostTimeout  time.Duration             // Time after which aircraft is marked as signal_lost
-	runwayData         RunwayData                // Runway data for approach detection
+	ref                *phaseRef                 // Airport phases are judged against; see PhaseReference
 	flightPhasesConfig config.FlightPhasesConfig // Flight phases configuration
 	changeDetector     *ChangeDetector           // Tracks aircraft changes
 	broadcastChan      chan []AircraftChange     // Channel for broadcasting changes
@@ -269,6 +269,13 @@ func NewService(
 		stationLat:         stationCfg.Latitude,
 		stationLon:         stationCfg.Longitude,
 		stationElevFeet:    float64(stationCfg.ElevationFeet),
+		// Until the reference airport is known the receiver stands in for it,
+		// which is upstream's behaviour exactly.
+		ref: newPhaseRef(PhaseReference{
+			Airport: stationCfg.AirportCode,
+			Lat:     stationCfg.Latitude,
+			Lon:     stationCfg.Longitude,
+		}),
 		wsServer:           wsServer,
 		signalLostTimeout:  signalLostTimeout,
 		flightPhasesConfig: flightPhasesConfig,
@@ -313,9 +320,7 @@ func NewService(
 				DecelerationThreshold:   -0.5,
 				AccelerationThreshold:   0.5,
 			},
-			stationCfg.Latitude,
-			stationCfg.Longitude,
-			service.runwayData,
+			service.ref,
 			&service.flightPhasesConfig,
 			logger,
 		)
@@ -603,7 +608,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 		correctedTAS, correctedGS, correctedAlt := ValidateSensorData(
 			currentTAS, currentGS, a.ADSB.AltBaro.Float64(),
 			prevTAS, prevGS, prevAlt,
-			lat, lon, s.stationLat, s.stationLon,
+			lat, lon, s.ref.load().Lat, s.ref.load().Lon,
 			s.flightPhasesConfig.AirportRangeNM,
 			&s.flightPhasesConfig,
 		)
@@ -808,18 +813,30 @@ func (s *Service) SetReferenceService(refService ReferenceService) {
 	s.refService = refService
 }
 
-// SetRunwayData sets the runway data for approach/departure detection
-// Called after reference service provides home runway data
-func (s *Service) SetRunwayData(data RunwayData) {
-	s.runwayData = data
+// SetPhaseReference sets the airport that approach, departure, takeoff and
+// landing are judged against, with its runways. It may be called at any time,
+// from the settings panel as well as at startup: the reference is swapped
+// atomically and the runway-in-use evidence of the previous airport is dropped.
+//
+// A reference without a position falls back to the receiver, as upstream did.
+func (s *Service) SetPhaseReference(r PhaseReference) {
+	if r.Lat == 0 && r.Lon == 0 {
+		r.Lat, r.Lon = s.stationLat, s.stationLon
+	}
+	s.ref.store(r)
 	if s.trajectoryTracker != nil {
-		s.trajectoryTracker.runwayData = data
+		s.trajectoryTracker.referenceChanged()
 	}
 }
 
-// GetRunwayData returns the current runway data
+// PhaseReference returns the airport phases are currently judged against.
+func (s *Service) PhaseReference() PhaseReference {
+	return *s.ref.load()
+}
+
+// GetRunwayData returns the runways of the reference airport.
 func (s *Service) GetRunwayData() RunwayData {
-	return s.runwayData
+	return s.ref.load().Runways
 }
 
 // GetRunwayInUseScores returns the top N runway-in-use probability scores.
@@ -1106,8 +1123,10 @@ func (s *Service) filterByAirportGrounded(aircraft []*Aircraft) []*Aircraft {
 			filtered = append(filtered, a)
 		} else if a.ADSB != nil && a.ADSB.HasPosition() {
 			lat, lon, _ := a.ADSB.Position()
-			// Calculate distance from station and apply filter
-			distMeters := Haversine(lat, lon, s.stationLat, s.stationLon)
+			// Distance from the reference airport: an aircraft on the ground is
+			// interesting when it is on that airport, wherever the receiver is.
+			ref := s.ref.load()
+			distMeters := Haversine(lat, lon, ref.Lat, ref.Lon)
 			distNM := MetersToNM(distMeters)
 			if distNM <= airportRangeNM {
 				filtered = append(filtered, a)
@@ -1341,7 +1360,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 					if ok {
 						runwayInfo := DetectRunwayApproach(
 							lat, lon, NumberOrZero(a.ADSB.Track),
-							a.ADSB.AltBaro.Float64(), s.runwayData, s.flightPhasesConfig,
+							a.ADSB.AltBaro.Float64(), s.ref.load().Runways, s.flightPhasesConfig,
 						)
 						if runwayInfo != nil && runwayInfo.OnApproach {
 							s.trajectoryTracker.RecordRunwayLanding(runwayInfo.RunwayID, a.Hex)
@@ -1454,7 +1473,7 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 		// a steady descent toward the airport, we can be confident this is a landing.
 		trajectoryConfirms := false
 		if s.trajectoryTracker != nil {
-			trajectoryConfirms = s.trajectoryTracker.WasDescendingTowardStation(aircraft.Hex)
+			trajectoryConfirms = s.trajectoryTracker.WasDescendingTowardAirport(aircraft.Hex)
 		}
 
 		// Accept aircraft in APP phase, low altitude ARR, or trajectory-confirmed descent
@@ -1469,20 +1488,21 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 		if !hasPosition {
 			continue
 		}
-		distanceFromStation := MetersToNM(Haversine(
+		ref := s.ref.load()
+		distanceFromAirport := MetersToNM(Haversine(
 			lat, lon,
-			s.stationLat, s.stationLon,
+			ref.Lat, ref.Lon,
 		))
 
 		// If aircraft was close to airport and low altitude when signal lost
-		if distanceFromStation <= s.flightPhasesConfig.AirportRangeNM &&
+		if distanceFromAirport <= s.flightPhasesConfig.AirportRangeNM &&
 			aircraft.ADSB.AltBaro.Float64() < s.flightPhasesConfig.SignalLostLandingMaxAltFt {
 
 			// Record for runway-in-use detection
 			if s.trajectoryTracker != nil {
 				runwayInfo := DetectRunwayApproach(
 					lat, lon, NumberOrZero(aircraft.ADSB.Track),
-					aircraft.ADSB.AltBaro.Float64(), s.runwayData, s.flightPhasesConfig,
+					aircraft.ADSB.AltBaro.Float64(), ref.Runways, s.flightPhasesConfig,
 				)
 				if runwayInfo != nil && runwayInfo.OnApproach {
 					s.trajectoryTracker.RecordRunwayLanding(runwayInfo.RunwayID, aircraft.Hex)
@@ -1508,7 +1528,7 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
 				logger.Float64("last_altitude", aircraft.ADSB.AltBaro.Float64()),
-				logger.Float64("distance_from_airport", distanceFromStation),
+				logger.Float64("distance_from_airport", distanceFromAirport),
 			)
 		}
 	}
@@ -1681,10 +1701,12 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 			previousPhase = prevPhase.Phase
 		}
 
-		// Log the phase change with detailed aircraft data for debugging
-		distanceFromStation := 0.0
+		// Log the phase change with detailed aircraft data for debugging. The
+		// distance that explains a phase is the one to the reference airport.
+		distanceFromAirport := 0.0
 		if lat, lon, hasPosition := aircraft.ADSB.Position(); hasPosition {
-			distanceFromStation = MetersToNM(Haversine(lat, lon, s.stationLat, s.stationLon))
+			ref := s.ref.load()
+			distanceFromAirport = MetersToNM(Haversine(lat, lon, ref.Lat, ref.Lon))
 		}
 
 		if previousPhase == "" {
@@ -1695,7 +1717,7 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
 				logger.Float64("ground_speed", NumberOrZero(aircraft.ADSB.GS)),
 				logger.Float64("vertical_rate", NumberOrZero(aircraft.ADSB.BaroRate)),
-				logger.Float64("distance_from_station", distanceFromStation),
+				logger.Float64("distance_from_airport", distanceFromAirport),
 				logger.Bool("on_ground", aircraft.OnGround),
 			)
 		} else {
@@ -1706,7 +1728,7 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
 				logger.Float64("ground_speed", NumberOrZero(aircraft.ADSB.GS)),
 				logger.Float64("vertical_rate", NumberOrZero(aircraft.ADSB.BaroRate)),
-				logger.Float64("distance_from_station", distanceFromStation),
+				logger.Float64("distance_from_airport", distanceFromAirport),
 				logger.Bool("on_ground", aircraft.OnGround),
 			)
 		}

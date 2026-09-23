@@ -5617,7 +5617,7 @@ async initAircraftDataSource() {
 function serverSettings() {
     return {
         state: null,
-        draft: { log_level: 'info', db_retention_days: 7 },
+        draft: { log_level: 'info', db_retention_days: 7, reference_airport: '' },
         busy: false,
         error: '',
         note: '',
@@ -5634,6 +5634,7 @@ function serverSettings() {
                 this.draft = {
                     log_level: this.state.settings.log_level,
                     db_retention_days: this.state.settings.db_retention_days,
+                    reference_airport: this.state.settings.reference_airport,
                 };
             } catch (e) {
                 this.error = 'Server state unreachable: ' + e.message;
@@ -5670,12 +5671,27 @@ function serverSettings() {
                     body: JSON.stringify({
                         log_level: this.draft.log_level,
                         db_retention_days: days,
+                        reference_airport: this.draft.reference_airport,
                     }),
                 });
                 if (r.status === 401) { this.flash('Sign in to change server settings.', true); return; }
-                if (!r.ok) { this.flash((await r.text()).trim() || ('Refused (' + r.status + ')'), true); return; }
+                if (!r.ok) {
+                    this.flash((await r.text()).trim() || ('Refused (' + r.status + ')'), true);
+                    // A refused airport must not stay selected as if it were in force.
+                    this.draft.reference_airport = this.state.settings.reference_airport;
+                    return;
+                }
+                const airportChanged = this.state.settings.reference_airport !== this.draft.reference_airport;
                 this.state.settings = await r.json();
                 this.flash('Saved.', false);
+                if (airportChanged) {
+                    // The map draws the reference airport's runway extensions from
+                    // /station; redraw them now. Weather is fetched by the server in
+                    // the background after the change, so read it a little later.
+                    const atc = Alpine.store('atc');
+                    if (atc && atc.fetchStationData) atc.fetchStationData();
+                    if (atc && atc.fetchWeatherData) setTimeout(() => atc.fetchWeatherData(), 4000);
+                }
                 // Reread rather than trust: the figures downstream -- retention,
                 // days until full -- move with what was just changed.
                 await this.load();
@@ -5684,6 +5700,18 @@ function serverSettings() {
             } finally {
                 this.busy = false;
             }
+        },
+
+        // The airports offered as reference, nearest first -- plus the one in
+        // force if it is not among them (set by hand farther than the range).
+        airportChoices() {
+            const ref = this.state && this.state.reference;
+            if (!ref) return [];
+            const list = (ref.candidates || []).slice();
+            if (ref.airport && !list.some(c => c.code === ref.airport)) {
+                list.unshift({ code: ref.airport, name: ref.name || '', distance_nm: ref.distance_nm || 0 });
+            }
+            return list;
         },
 
         flash(msg, bad) {

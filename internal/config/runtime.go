@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/yegors/co-atc/pkg/logger"
@@ -21,14 +22,29 @@ import (
 type RuntimeSettings struct {
 	DBRetentionDays int    `json:"db_retention_days"`
 	LogLevel        string `json:"log_level"`
+
+	// ReferenceAirport is the airport that approach, departure, takeoff and
+	// landing are judged against, and whose weather is fetched. It starts as
+	// [station] airport_code and can be changed from the panel -- the airport a
+	// receiver sits on is not always the one worth watching.
+	ReferenceAirport string `json:"reference_airport"`
+}
+
+// ReferenceAirportHook validates and applies a change of reference airport. The
+// config package cannot do either itself -- it takes the reference data, the
+// ADS-B service and the weather service -- so the server wires them in.
+type ReferenceAirportHook struct {
+	Validate func(code string) error // no side effect: refuse before anything moves
+	Apply    func(code string)        // cannot fail once Validate has passed
 }
 
 // Runtime holds the live values and persists changes.
 type Runtime struct {
-	mu       sync.RWMutex
-	settings RuntimeSettings
-	path     string
-	log      *logger.Logger
+	mu          sync.RWMutex
+	settings    RuntimeSettings
+	path        string
+	log         *logger.Logger
+	airportHook *ReferenceAirportHook
 }
 
 // RuntimeSettingsFile is where changes made from the panel are kept, beside the
@@ -41,8 +57,9 @@ const RuntimeSettingsFile = "runtime-settings.json"
 func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 	r := &Runtime{
 		settings: RuntimeSettings{
-			DBRetentionDays: cfg.Storage.DBRetentionDays,
-			LogLevel:        cfg.Logging.Level,
+			DBRetentionDays:  cfg.Storage.DBRetentionDays,
+			LogLevel:         cfg.Logging.Level,
+			ReferenceAirport: normalizeAirport(cfg.Station.AirportCode),
 		},
 		path: filepath.Join(filepath.Dir(configPath), RuntimeSettingsFile),
 		log:  log.Named("runtime-settings"),
@@ -63,11 +80,38 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 	if saved.LogLevel != "" {
 		r.settings.LogLevel = saved.LogLevel
 	}
+	if a := normalizeAirport(saved.ReferenceAirport); a != "" {
+		r.settings.ReferenceAirport = a
+	}
 	r.log.Info("Applied saved runtime settings",
 		logger.String("path", r.path),
 		logger.Int("db_retention_days", r.settings.DBRetentionDays),
-		logger.String("log_level", r.settings.LogLevel))
+		logger.String("log_level", r.settings.LogLevel),
+		logger.String("reference_airport", r.settings.ReferenceAirport))
 	return r
+}
+
+func normalizeAirport(code string) string {
+	return strings.ToUpper(strings.TrimSpace(code))
+}
+
+// SetReferenceAirportHook wires in how a reference airport is checked and
+// applied. Without it the reference airport cannot be changed from the panel:
+// a setting that is saved but never applied is the failure this file refuses.
+func (r *Runtime) SetReferenceAirportHook(h ReferenceAirportHook) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.airportHook = &h
+}
+
+// UseReferenceAirport records the airport actually in force at startup, when the
+// one saved from the panel turned out unusable and the server fell back. It is
+// not written to disk: the saved choice stays, and each start says in the log
+// why it was not used.
+func (r *Runtime) UseReferenceAirport(code string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.settings.ReferenceAirport = normalizeAirport(code)
 }
 
 // Settings returns a copy of the values in force.
@@ -98,8 +142,29 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		return fmt.Errorf("log_level must be debug, info, warn or error, got %q", next.LogLevel)
 	}
 
+	// The reference airport is checked with the rest, before anything is applied.
+	next.ReferenceAirport = normalizeAirport(next.ReferenceAirport)
+	r.mu.RLock()
+	current, hook := r.settings.ReferenceAirport, r.airportHook
+	r.mu.RUnlock()
+	airportChanged := next.ReferenceAirport != current
+	if airportChanged {
+		if next.ReferenceAirport == "" {
+			return fmt.Errorf("reference_airport cannot be empty")
+		}
+		if hook == nil {
+			return fmt.Errorf("reference_airport cannot be changed while the server runs in this configuration")
+		}
+		if err := hook.Validate(next.ReferenceAirport); err != nil {
+			return fmt.Errorf("reference_airport: %w", err)
+		}
+	}
+
 	if err := logger.SetLevel(next.LogLevel); err != nil {
 		return fmt.Errorf("failed to set log level: %w", err)
+	}
+	if airportChanged {
+		hook.Apply(next.ReferenceAirport)
 	}
 
 	r.mu.Lock()
@@ -122,6 +187,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 
 	r.log.Info("Runtime settings changed",
 		logger.Int("db_retention_days", next.DBRetentionDays),
-		logger.String("log_level", next.LogLevel))
+		logger.String("log_level", next.LogLevel),
+		logger.String("reference_airport", next.ReferenceAirport))
 	return nil
 }

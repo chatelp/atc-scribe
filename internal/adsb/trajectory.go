@@ -131,10 +131,12 @@ type DerivedState struct {
 	VRMean   float64 // Mean vertical rate (fpm)
 	VRStdDev float64 // Standard deviation of vertical rate
 
-	// Distance and bearing to monitoring station
-	DistToStationNM   float64 // Current distance to station (nautical miles)
+	// Distance and bearing to the reference airport -- see PhaseReference. Upstream
+	// measured these from the receiver, which is only the airport when the two
+	// coincide.
+	DistToAirportNM   float64 // Current distance to the reference airport (nautical miles)
 	DistTrendNMPerSec float64 // OLS regression slope of distance vs time (negative = approaching)
-	BearingToStation  float64 // Current bearing to station (degrees)
+	BearingToAirport  float64 // Current bearing to the reference airport (degrees)
 
 	// Data quality indicators
 	ValidPointCount   int     // Number of valid snapshots in the analysis window
@@ -148,7 +150,7 @@ type DerivedState struct {
 	IsDecelerating       bool // GSTrendKtsPerSec below deceleration threshold
 	IsAccelerating       bool // GSTrendKtsPerSec above acceleration threshold
 	IsTurning            bool // |TrackRateDegPerSec| above turning threshold
-	IsApproachingStation bool // DistTrendNMPerSec < 0 (closing on station)
+	IsApproachingAirport bool // DistTrendNMPerSec < 0 (closing on the reference airport)
 
 	ComputedAt time.Time // When this derived state was last computed
 }
@@ -259,9 +261,7 @@ type TrajectoryTracker struct {
 	mu            sync.RWMutex
 	aircraft      map[string]*AircraftTrajectory
 	config        TrajectoryConfig
-	stationLat    float64
-	stationLon    float64
-	runwayData    RunwayData
+	ref           *phaseRef // the airport phases are judged against, shared with the service
 	phasesConfig  *config.FlightPhasesConfig
 	runwayTracker *RunwayInUseTracker
 	logger        *logger.Logger
@@ -273,17 +273,14 @@ type TrajectoryTracker struct {
 // The cleanup goroutine runs in the background until Stop is called.
 func NewTrajectoryTracker(
 	cfg TrajectoryConfig,
-	stationLat, stationLon float64,
-	runwayData RunwayData,
+	ref *phaseRef,
 	phasesConfig *config.FlightPhasesConfig,
 	log *logger.Logger,
 ) *TrajectoryTracker {
 	tt := &TrajectoryTracker{
 		aircraft:     make(map[string]*AircraftTrajectory),
 		config:       cfg,
-		stationLat:   stationLat,
-		stationLon:   stationLon,
-		runwayData:   runwayData,
+		ref:          ref,
 		phasesConfig: phasesConfig,
 		runwayTracker: NewRunwayInUseTracker(
 			phasesConfig.RunwayInUseWindowMinutes,
@@ -296,7 +293,7 @@ func NewTrajectoryTracker(
 		logger: log.Named("trajectory"),
 		stopCh: make(chan struct{}),
 	}
-	tt.runwayTracker.SetRunwayData(runwayData)
+	tt.runwayTracker.SetRunwayData(ref.load().Runways)
 	tt.wg.Add(1)
 	go tt.cleanupLoop()
 	tt.logger.Info("Trajectory tracker started",
@@ -305,6 +302,19 @@ func NewTrajectoryTracker(
 		logger.Int("min_points", cfg.MinPointsForAnalysis),
 	)
 	return tt
+}
+
+// referenceChanged is called by the service after it has stored a new reference.
+// The evidence of which runway is in use belonged to the previous airport: kept,
+// it would decay over the next hour while pointing at runways that no longer
+// exist in the data.
+func (tt *TrajectoryTracker) referenceChanged() {
+	ref := tt.ref.load()
+	tt.runwayTracker.Reset()
+	tt.runwayTracker.SetRunwayData(ref.Runways)
+	tt.logger.Info("Phase reference changed",
+		logger.String("airport", ref.Airport),
+		logger.Int("runway_pairs", len(ref.Runways.RunwayThresholds)))
 }
 
 // Stop shuts down the background cleanup goroutine and waits for it to finish.
@@ -656,9 +666,12 @@ func (tt *TrajectoryTracker) computeDerivedState(at *AircraftTrajectory) {
 		return
 	}
 
-	// ── Current distance and bearing to station ──
-	d.DistToStationNM = MetersToNM(Haversine(latest.Lat, latest.Lon, tt.stationLat, tt.stationLon))
-	d.BearingToStation = CalculateBearing(latest.Lat, latest.Lon, tt.stationLat, tt.stationLon)
+	// ── Current distance and bearing to the reference airport ──
+	// One load for the whole computation: a reference changed mid-way would
+	// otherwise mix two airports in a single state.
+	ref := tt.ref.load()
+	d.DistToAirportNM = MetersToNM(Haversine(latest.Lat, latest.Lon, ref.Lat, ref.Lon))
+	d.BearingToAirport = CalculateBearing(latest.Lat, latest.Lon, ref.Lat, ref.Lon)
 
 	// ── Short window: smoothed current values ──
 	if len(shortValid) > 0 {
@@ -702,10 +715,10 @@ func (tt *TrajectoryTracker) computeDerivedState(at *AircraftTrajectory) {
 	d.VRMean = mean(window, func(s TrajectorySnapshot) float64 { return s.BaroRate })
 	d.VRStdDev = stdDev(window, func(s TrajectorySnapshot) float64 { return s.BaroRate })
 
-	// ── Medium window: distance to station trend ──
+	// ── Medium window: distance to the reference airport, trend ──
 	d.DistTrendNMPerSec = olsSlopeWithXY(window, func(s TrajectorySnapshot) (float64, float64) {
 		return s.Timestamp.Sub(window[0].Timestamp).Seconds(),
-			MetersToNM(Haversine(s.Lat, s.Lon, tt.stationLat, tt.stationLon))
+			MetersToNM(Haversine(s.Lat, s.Lon, ref.Lat, ref.Lon))
 	})
 
 	// ── Boolean flags ──
@@ -716,7 +729,7 @@ func (tt *TrajectoryTracker) computeDerivedState(at *AircraftTrajectory) {
 	d.IsDecelerating = d.GSTrendKtsPerSec < cfg.DecelerationThreshold
 	d.IsAccelerating = d.GSTrendKtsPerSec > cfg.AccelerationThreshold
 	d.IsTurning = math.Abs(d.TrackRateDegPerSec) > cfg.TurningRateThresholdDeg
-	d.IsApproachingStation = d.DistTrendNMPerSec < -0.001 // Slightly negative threshold to avoid noise
+	d.IsApproachingAirport = d.DistTrendNMPerSec < -0.001 // Slightly negative threshold to avoid noise
 }
 
 // ─── Statistical Helpers ──────────────────────────────────────────────────────
