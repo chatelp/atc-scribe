@@ -32,8 +32,21 @@ type DB struct {
 	log  *logger.Logger
 }
 
+// execer is what a schema needs to be created with: *sql.DB at open, *DB
+// anywhere else.
+type execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
 // Open creates the database file if needed, initializes the schema and returns
 // a handle to it.
+//
+// The schema of every table is created here, on the *sql.DB, and not by the
+// storage constructors. Rotation is an open too, and a table created only by a
+// constructor exists in the file opened at startup and in no file opened after
+// midnight. Measured on 2026-09-21: the new day's file received 829 "no such
+// table: transcriptions" errors in its first three minutes, and nothing was
+// stored from the 1,877 transmissions transcribed before the 10:51 restart.
 func Open(path string, log *logger.Logger) (*DB, error) {
 	db, err := openOne(path, log)
 	if err != nil {

@@ -46,23 +46,17 @@ type TranscriptionStorage struct {
 
 // NewTranscriptionStorage creates a new SQLite transcription storage
 func NewTranscriptionStorage(db *DB, logger *logger.Logger) *TranscriptionStorage {
-	storage := &TranscriptionStorage{
+	return &TranscriptionStorage{
 		db:     db,
 		logger: logger.Named("sqlite-tx"),
 	}
-
-	// Initialize database
-	if err := storage.initDB(); err != nil {
-		logger.Error("Failed to initialize transcription storage", Error(err))
-	}
-
-	return storage
 }
 
-// initDB initializes the database tables
-func (s *TranscriptionStorage) initDB() error {
+// createTranscriptionsSchema runs at every open of a daily file, from
+// initDatabase -- never from the constructor, which runs once per process.
+func createTranscriptionsSchema(db execer) error {
 	// Create transcriptions table
-	_, err := s.db.Exec(`
+	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS transcriptions (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			frequency_id TEXT NOT NULL,
@@ -99,29 +93,29 @@ func (s *TranscriptionStorage) initDB() error {
 		"callsign_source":   "ALTER TABLE transcriptions ADD COLUMN callsign_source TEXT",
 		"callsign_evidence": "ALTER TABLE transcriptions ADD COLUMN callsign_evidence TEXT",
 	} {
-		if _, err := s.db.Exec(ddl); err != nil &&
+		if _, err := db.Exec(ddl); err != nil &&
 			!strings.Contains(err.Error(), "duplicate column name") {
 			return fmt.Errorf("failed to add transcriptions.%s: %w", column, err)
 		}
 	}
 
 	// Create indexes
-	_, err = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_frequency_id ON transcriptions(frequency_id)`)
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_frequency_id ON transcriptions(frequency_id)`)
 	if err != nil {
 		return fmt.Errorf("failed to create frequency_id index: %w", err)
 	}
 
-	_, err = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_created_at ON transcriptions(created_at)`)
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_created_at ON transcriptions(created_at)`)
 	if err != nil {
 		return fmt.Errorf("failed to create created_at index: %w", err)
 	}
 
-	_, err = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_speaker_type ON transcriptions(speaker_type)`)
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_speaker_type ON transcriptions(speaker_type)`)
 	if err != nil {
 		return fmt.Errorf("failed to create speaker_type index: %w", err)
 	}
 
-	_, err = s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_callsign ON transcriptions(callsign)`)
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_callsign ON transcriptions(callsign)`)
 	if err != nil {
 		return fmt.Errorf("failed to create callsign index: %w", err)
 	}

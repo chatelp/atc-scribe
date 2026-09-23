@@ -86,14 +86,9 @@ func NewGrammarProcessor(
 		interval = 10 * time.Second
 	}
 
-	// Where the extracted levels, headings and squawks are kept. A failure here is
-	// not fatal: the speaker, the callsign and the clearances are the load-bearing
-	// output, and they do not depend on it.
-	values, err := sqlite.NewPhraseologyStorage(sqlite.DBOf(transcriptionStorage))
-	if err != nil {
-		log.Error("Failed to open phraseology value storage; values will not be kept", Error(err))
-		values = nil
-	}
+	// Where the extracted levels, headings and squawks are kept, in the same
+	// daily database as the transcriptions they came from.
+	values := sqlite.NewPhraseologyStorage(sqlite.DBOf(transcriptionStorage))
 
 	procCtx, procCancel := context.WithCancel(ctx)
 	return &GrammarProcessor{

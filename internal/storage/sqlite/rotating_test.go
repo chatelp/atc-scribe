@@ -21,6 +21,11 @@ func testLog(t *testing.T) *logger.Logger {
 
 func countAircraft(t *testing.T, path string) int {
 	t.Helper()
+	return countRows(t, path, "aircraft")
+}
+
+func countRows(t *testing.T, path, table string) int {
+	t.Helper()
 	// The previous connection is closed on its own goroutine, so a reader that
 	// arrives immediately after a rotation can still meet its WAL lock. Waiting
 	// is the reader's job, not a reason to make rotation synchronous.
@@ -30,8 +35,8 @@ func countAircraft(t *testing.T, path string) int {
 	}
 	defer db.Close()
 	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM aircraft`).Scan(&n); err != nil {
-		t.Fatalf("count in %s: %v", path, err)
+	if err := db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
+		t.Fatalf("count %s in %s: %v", table, path, err)
 	}
 	return n
 }
@@ -145,6 +150,109 @@ func TestStoragesBuiltBeforeRotationFollowIt(t *testing.T) {
 	}
 	if n := countAircraft(t, DailyPath(dir, day1)); n != 0 {
 		t.Errorf("yesterday's file should have received nothing, got %d rows", n)
+	}
+}
+
+// The tables the radio writes to were created by the storage constructors, at
+// startup, and not by the open that rotation performs. On 2026-09-21 at
+// 00:00:02 rotation opened the new day's file and every transcription until
+// the 10:51 restart failed with "no such table: transcriptions": 1,877
+// transmissions transcribed that night, none kept. The test above wrote to the
+// aircraft table through every storage, which is the one table rotation did
+// create. This one writes what each storage actually writes.
+func TestEveryStorageCanWriteToTheFileRotationCreated(t *testing.T) {
+	dir := t.TempDir()
+	day1 := time.Date(2026, 9, 20, 23, 59, 0, 0, time.UTC)
+	day2 := day1.Add(2 * time.Minute)
+	log := testLog(t)
+
+	aircraft, err := NewAircraftStorage(DailyPath(dir, day1), log)
+	if err != nil {
+		t.Fatalf("NewAircraftStorage: %v", err)
+	}
+	transcriptions := NewTranscriptionStorage(aircraft.GetDB(), log)
+	clearances := NewClearanceStorage(aircraft.GetDB(), log)
+	values := NewPhraseologyStorage(DBOf(transcriptions))
+
+	if _, err := aircraft.GetDB().RotateIfNewDay(dir, day2); err != nil {
+		t.Fatalf("RotateIfNewDay: %v", err)
+	}
+
+	id, err := transcriptions.StoreTranscription(&TranscriptionRecord{
+		FrequencyID: "aero-melange", CreatedAt: day2,
+		Content: "air france one zero eight one", IsComplete: true,
+	})
+	if err != nil {
+		t.Fatalf("the first transcription after midnight: %v", err)
+	}
+	if err := transcriptions.UpdateMatchedTranscription(id, "air france one zero eight one",
+		"ATC", "AFR1081", "en", [][2]int{{0, 10}}); err != nil {
+		t.Fatalf("the first match after midnight: %v", err)
+	}
+	if _, err := clearances.StoreClearance(&ClearanceRecord{
+		TranscriptionID: id, Callsign: "AFR1081", ClearanceType: "landing",
+		ClearanceText: "cleared to land", Timestamp: day2, Status: "issued", CreatedAt: day2,
+	}); err != nil {
+		t.Fatalf("the first clearance after midnight: %v", err)
+	}
+	if err := values.StoreValues([]PhraseologyValue{{
+		TranscriptionID: id, Callsign: "AFR1081", Role: "flight_level",
+		Digits: "120", Text: "FL120", CreatedAt: day2,
+	}}); err != nil {
+		t.Fatalf("the first value after midnight: %v", err)
+	}
+
+	for _, table := range []string{"transcriptions", "clearances", "phraseology_values"} {
+		if n := countRows(t, DailyPath(dir, day2), table); n != 1 {
+			t.Errorf("today's file should hold one row of %s, has %d", table, n)
+		}
+		if n := countRows(t, DailyPath(dir, day1), table); n != 0 {
+			t.Errorf("yesterday's file should hold no %s, has %d", table, n)
+		}
+	}
+}
+
+// The file rotation lands on can already exist, written by an older build with
+// a transcriptions table short of the columns added since. Startup adds the
+// missing columns; the open that rotation performs must too.
+func TestRotationBringsAnOlderFileUpToDate(t *testing.T) {
+	dir := t.TempDir()
+	day1 := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
+	day2 := day1.AddDate(0, 0, 1)
+
+	// Upstream's transcriptions table, as a build before 16/09 created it.
+	older, err := sql.Open("sqlite", DailyPath(dir, day2))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if _, err := older.Exec(`CREATE TABLE transcriptions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, frequency_id TEXT NOT NULL,
+		created_at TIMESTAMP NOT NULL, content TEXT NOT NULL, is_complete BOOLEAN NOT NULL,
+		is_processed BOOLEAN NOT NULL, content_processed TEXT, speaker_type TEXT, callsign TEXT)`); err != nil {
+		t.Fatalf("create the older table: %v", err)
+	}
+	older.Close()
+
+	db, err := Open(DailyPath(dir, day1), testLog(t))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	transcriptions := NewTranscriptionStorage(db, testLog(t))
+
+	if _, err := db.RotateIfNewDay(dir, day2); err != nil {
+		t.Fatalf("RotateIfNewDay: %v", err)
+	}
+	id, err := transcriptions.StoreTranscription(&TranscriptionRecord{
+		FrequencyID: "aero-melange", CreatedAt: day2, Content: "bonjour", IsComplete: true,
+		Language: "fr", ContentSecond: "bonjour",
+	})
+	if err != nil {
+		t.Fatalf("storing into the older file after rotation: %v", err)
+	}
+	if err := transcriptions.UpdateMatchedTranscription(id, "bonjour", "ATC", "AFR1081", "fr",
+		[][2]int{{0, 7}}); err != nil {
+		t.Fatalf("the columns added since should exist after rotation: %v", err)
 	}
 }
 
