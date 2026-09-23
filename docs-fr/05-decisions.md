@@ -2443,3 +2443,78 @@ un facteur multiplicatif. Ça relève de notre aval à nous, pas de leur gabarit
 **Leur test `ampfactor` au niveau du canal reste à faire** : il répond à une question de
 capacité — le niveau des fichiers est-il atteignable du tout ? — qu'aucune de nos données
 ne peut trancher. Une ligne, en journée, sans rien couper.
+
+### D44 — Premiers résultats de la vérité terrain : les modèles inventent *(23/09)*
+
+**42 clips annotés par le propriétaire**, dont 32 à l'aveugle. Ordre entrelacé : l'échantillon
+est représentatif des quatre fréquences à chaque arrêt. Premier vrai chiffre du projet sur
+une référence humaine plutôt que sur un appariement ADS-B.
+
+#### Le chiffre brut, et pourquoi il ne suffit pas
+
+| | WER, tous | WER, aveugle |
+|---|---|---|
+| atco2-en | 127,5 % | 124,0 % |
+| bofenghuang-fr | 148,6 % | 146,0 % |
+
+Au-dessus de 100 % : les modèles produisent plus de mots faux que la référence n'a de mots.
+**Le taux seul ne dit pas pourquoi.** Décomposé :
+
+| Lot | Modèle | Insertions | Substitutions | Suppressions |
+|---|---|---|---|---|
+| tous (42) | atco2-en | **59 %** | 65 % | 6 % |
+| tous (42) | bofenghuang-fr | **93 %** | 55 % | 5 % |
+| sans lacune (18) | atco2-en | 46 % | 66 % | 8 % |
+| anglais, aveugle (9) | atco2-en | 48 % | **21 %** | 0 % |
+| français, aveugle (20) | atco2-en | 52 % | **71 %** | 10 % |
+| français, aveugle (20) | bofenghuang-fr | **90 %** | 52 % | 7 % |
+
+**Le défaut dominant n'est pas de mal entendre, c'est d'inventer.** Les suppressions plafonnent
+à 10 % : les modèles ne ratent presque rien, ils ajoutent. Et ça frappe d'abord les clips
+courts — **WER médian de 300 % sur les clips de quatre mots ou moins**, 100 % au-delà :
+
+> référence (2 mots) : *« la station... ? »*
+> atco2-en : *« Lufthansa X-ray Kilo Technic One College Lufthansa O »*
+
+**Le contrôle qui écarte l'artefact** : sur les 18 clips où l'annotateur a tout compris
+(aucune lacune), les insertions restent à 46 % et 68 %. Ce n'est donc pas seulement la
+référence qui serait trop courte ; les modèles inventent aussi quand tout a été entendu.
+
+#### Ce que ça dit, langue par langue
+
+- **Anglais** : atco2-en entend bien — **21 % de substitutions** seulement. Son WER de 69 %
+  vient presque entièrement de ce qu'il ajoute.
+- **Français** : atco2-en substitue 71 % des mots, il entend mal le français. Mais
+  **bofenghuang-fr fait pire sur le français lui-même** : 149 % contre 133 %, porté par 90 %
+  d'insertions.
+
+> ⚠️ **Ce n'est pas une contradiction de D24/D31, et il ne faut pas le lire comme tel.**
+> D31 mesurait le *gain de l'union* par appariement ADS-B : un modèle au WER plus mauvais
+> peut très bien apporter des indicatifs justes que l'autre rate. Mais c'est une réserve
+> sérieuse sur l'idée que bofenghuang serait « le bon modèle pour le français ». Il est
+> surtout **le modèle qui invente le plus**.
+
+#### Et une conséquence pour Q30
+
+Q30 attribuait les 84 % de candidats sans avion à des chiffres **massacrés**. D43 en a
+identifié une cause, l'écrêtage. D44 en suggère une autre, plus massive : une partie de ces
+« indicatifs » sont peut-être **inventés de toutes pièces** sur des transmissions courtes.
+*« Lufthansa X-ray Kilo »* sur une transmission qui disait *« la station »* produira un
+candidat qui ne trouvera jamais d'avion — et aucune règle d'appariement n'y peut rien.
+
+#### Un signal que j'avais annoncé et qui ne tient pas
+
+À **13 clips**, les clips assistés donnaient un WER nettement plus bas que les clips à
+l'aveugle (141 % contre 200 %), et j'avais écrit que l'ancrage de D39 était « déjà
+visible ». **À 32 clips à l'aveugle, l'écart s'est inversé** (143 % contre 124 %). C'était du
+bruit sur 5 clips et 26 mots. Je l'avais assorti de réserves, mais je l'avais présenté comme
+un signal : il ne l'était pas.
+
+#### Une lacune de l'outil, trouvée par l'usage
+
+**8 clips sur les 50 ouverts étaient restés vides** : le propriétaire entendait parler sans
+saisir un mot, et rien dans l'outil ne permettait de le dire — « no speech » aurait été
+faux. Ces clips étaient ignorés du calcul, alors que ce sont **les plus précieux** : sur une
+transmission qu'aucun humain ne déchiffre, tout ce qu'un modèle produit est inventé. Ajouté :
+un état « parole, mais rien de compréhensible », noté à part — mots inventés par clip, et
+nombre de clips que chaque modèle a eu la sagesse de laisser vides.
