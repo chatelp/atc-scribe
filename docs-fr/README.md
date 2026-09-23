@@ -34,6 +34,8 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `22-correction-lexicale.md` | corriger le texte sans IA : mesuré, gain nul, **abandonné** |
 | `23-voies-restantes.md` | **où on en est, et ce qu'il reste** : état mesuré, tout ce qui a été éliminé, le panel de relecture, la version courte à la fin |
 | `24-identification-amas.md` | **les sept fréquences de l'amas identifiées canal par canal** : Paris arrivée, Brest, cinq croisières |
+| `25-atis-131025-au-gain.md` | l'ATIS de Saint-Cyr au gain : il ne sature pas, et ne porte pas de météo à 21 h (Q32) |
+| `26-ce-que-co-atc-interprete.md` | **référence** : ce que co-atc comprend et affiche, par la voix et par l'ADS-B, vérifié dans le code — état au 23/09 |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
 
 > Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas

@@ -2769,3 +2769,24 @@ terrain.
 - **Un vrai jeu d'évaluation français** devra être tiré sur les fréquences d'approche de De
   Gaulle, celles du groupe `gros-porteurs` que le propriétaire écoute tous les jours. Pas
   lancé.
+
+### Q35 — Cinq écarts révélés par l'inventaire de ce que co-atc interprète *(ouverte, 23/09)*
+
+`26-ce-que-co-atc-interprete.md` recense, vérifié dans le code, tout ce que co-atc tire de la
+voix et de l'ADS-B et ce qu'il en affiche. Il fait apparaître cinq écarts, aucun traité :
+
+1. **La vérification des autorisations n'est pas branchée.** Le statut *respectée / écart*
+   existe dans les données, `UpdateClearanceStatus` n'est appelée nulle part. Et l'ADS-B
+   transmet en direct l'altitude, le cap et le calage affichés par l'équipage : les
+   confronter aux instructions entendues mesurerait la reconnaissance **sans annotation**,
+   sur le trafic visé (D48). Seulement en direct : l'historique ne garde pas ces champs.
+2. **Phases d'approche et de départ, piste en service : calées sur Saint-Cyr (LFPZ)**, seul
+   aéroport de référence possible. Rien pour De Gaulle ni Orly.
+3. **Langue et second avis français stockés, jamais affichés.**
+4. **Météo sur LFPZ, qui ne publie ni METAR ni TAF** ; chat IA activé avec une clé vide.
+   Réglages, pas de code.
+5. **Aucune alerte sur code d'urgence** (7500, 7600, 7700), alors que le code transpondeur est
+   reçu.
+
+Le premier est le seul qui touche à la reconnaissance vocale — et le seul qui pourrait
+sortir le projet de sa dépendance aux annotations manuelles.
