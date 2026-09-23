@@ -3042,6 +3042,9 @@ de connexion si elle est désormais demandée.
 > fenêtre, panneau replié. Défaut de l'amont (le bouton chevauche le bord du panneau, et
 > replié ce bord est celui de la fenêtre). Il se décale de 1,5 rem une fois replié ;
 > mesuré à l'écran : de −17…15 px à 7…39 px, inchangé panneau ouvert.
+>
+> **Confirmé par le propriétaire au second essai** : formulaire de connexion revenu,
+> icône en place, message du sidecar disparu.
 
 ### D52 — Le sidecar répond pendant qu'il transcrit *(23/09)*
 
