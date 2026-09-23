@@ -28,6 +28,7 @@ type Value struct {
 	Digits string // as spoken, e.g. "350"
 	Text   string // normalised for display, e.g. "FL350", "121.9", "27L"
 	Word   int    // token index where the value started
+	End    int    // token index just past its last digit
 }
 
 // Speaker is who transmitted.
@@ -55,6 +56,13 @@ type Result struct {
 	Letters    []string // NATO letter groups, e.g. "FKP" — light-aircraft callsigns
 	Speaker    Speaker
 	Clearances []Clearance
+
+	// Where each word of Raw sits, in Raw and in Normalized -- what lets the words
+	// that named an aircraft be highlighted in the text a person reads. A word the
+	// normalisation rewrote (a level, a heading) has no span in Normalized.
+	spans      []Span
+	normSpans  []Span
+	letterRuns [][2]int // token range of each entry of Letters
 }
 
 // roleKeywords maps the phrase that introduces a number to the role it confers.
@@ -145,8 +153,8 @@ var pilotPhrases = [][]string{
 // is noisy, and anchoring on "flight level" or "runway" survives garbage on either
 // side of the anchor, where a full parse would fail on the whole sentence.
 func Parse(text string) Result {
-	toks := tokenize(text)
-	res := Result{Raw: text}
+	toks, spans := tokenSpans(text)
+	res := Result{Raw: text, spans: spans}
 
 	used := make([]bool, len(toks))
 	for i := 0; i < len(toks); i++ {
@@ -161,7 +169,7 @@ func Parse(text string) Result {
 		if role == RoleFlightLevel && !plausibleFlightLevel(digits) {
 			role = RoleUnknown
 		}
-		v := Value{Role: role, Digits: digits, Word: i}
+		v := Value{Role: role, Digits: digits, Word: i, End: end}
 		v.Text = render(role, digits, toks, end)
 		res.Values = append(res.Values, v)
 		for j := i; j < end; j++ {
@@ -171,11 +179,11 @@ func Parse(text string) Result {
 		_ = kw
 	}
 
-	res.Letters = letterGroups(toks, used)
+	res.Letters, res.letterRuns = letterGroups(toks, used)
 	res.Values = append(res.Values, looseNumbers(toks, used)...)
 	res.Speaker = speakerOf(toks, res.Values)
 	res.Clearances = clearances(toks, res.Values)
-	res.Normalized = normalize(text, res.Values)
+	res.Normalized, res.normSpans = normalize(text, res.Values)
 	return res
 }
 
@@ -338,33 +346,39 @@ var trailingRoles = map[string]Role{
 
 // letterGroups collects runs of NATO letters not already consumed as a value.
 // Three or more in a row is a light-aircraft callsign such as F-GKPV read out.
-func letterGroups(toks []string, used []bool) []string {
+func letterGroups(toks []string, used []bool) ([]string, [][2]int) {
 	var out []string
+	var runs [][2]int
 	var cur []byte
+	first := 0
 	// Two letters are enough. A light aircraft is routinely called by the last
 	// two letters of its registration -- "Seven Six Zero Papa X-ray" for N760PX --
 	// and requiring three discarded exactly that case, which is most of the
 	// traffic this station hears from its neighbouring aerodromes. False letters
 	// cost nothing: the matcher may only ever raise a score with them.
-	flush := func() {
+	flush := func(end int) {
 		if len(cur) >= 2 {
 			out = append(out, string(cur))
+			runs = append(runs, [2]int{first, end})
 		}
 		cur = cur[:0]
 	}
 	for i, w := range toks {
 		if used[i] {
-			flush()
+			flush(i)
 			continue
 		}
 		if c, ok := isLetterWord(w); ok {
+			if len(cur) == 0 {
+				first = i
+			}
 			cur = append(cur, c)
 			continue
 		}
-		flush()
+		flush(i)
 	}
-	flush()
-	return out
+	flush(len(toks))
+	return out, runs
 }
 
 // opensNumber reports whether a token can start a number.
@@ -417,15 +431,15 @@ func looseNumbers(toks []string, used []bool) []Value {
 		}
 		if end < len(toks) {
 			if role, ok := trailingRoles[toks[end]]; ok {
-				out = append(out, Value{Role: role, Digits: digits, Text: digits, Word: i})
+				out = append(out, Value{Role: role, Digits: digits, Text: digits, Word: i, End: end})
 				i = end
 				continue
 			}
 		}
 		if role, text := classifyBare(digits); role != RoleUnknown {
-			out = append(out, Value{Role: role, Digits: digits, Text: text, Word: i})
+			out = append(out, Value{Role: role, Digits: digits, Text: text, Word: i, End: end})
 		} else if len(digits) >= 2 && !strings.Contains(digits, ".") {
-			out = append(out, Value{Role: RoleCallsign, Digits: digits, Text: digits, Word: i})
+			out = append(out, Value{Role: RoleCallsign, Digits: digits, Text: digits, Word: i, End: end})
 		}
 		i = end - 1
 	}
@@ -572,10 +586,23 @@ func clearances(toks []string, values []Value) []Clearance {
 }
 
 // normalize rewrites spoken numbers as digits, which is what upstream's
-// post-processing prompt asks a language model to do.
-func normalize(text string, values []Value) string {
+// post-processing prompt asks a language model to do. It also returns where each
+// word of text landed in the output, {-1, -1} for the words it rewrote.
+func normalize(text string, values []Value) (string, []Span) {
 	toks := tokenize(text)
 	out := make([]string, 0, len(toks))
+	where := make([]Span, len(toks))
+	for i := range where {
+		where[i] = Span{-1, -1}
+	}
+	pos := 0 // in UTF-16 units, like every Span
+	emit := func(w string) {
+		if len(out) > 0 {
+			pos++ // the joining space
+		}
+		out = append(out, w)
+		pos += utf16Len(w)
+	}
 	skip := map[int]bool{}
 	byWord := map[int]Value{}
 	for _, v := range values {
@@ -587,17 +614,20 @@ func normalize(text string, values []Value) string {
 		}
 		if v, ok := byWord[i]; ok && v.Role != RoleCallsign {
 			_, end := readNumber(toks, i+keywordLen(toks, i))
-			out = append(out, toks[i:i+keywordLen(toks, i)]...)
-			out = append(out, v.Text)
+			for _, w := range toks[i : i+keywordLen(toks, i)] {
+				emit(w)
+			}
+			emit(v.Text)
 			for j := i; j < end; j++ {
 				skip[j] = true
 			}
 			i = end - 1
 			continue
 		}
-		out = append(out, toks[i])
+		emit(toks[i])
+		where[i] = Span{pos - utf16Len(toks[i]), pos}
 	}
-	return strings.Join(out, " ")
+	return strings.Join(out, " "), where
 }
 
 func keywordLen(toks []string, i int) int {
