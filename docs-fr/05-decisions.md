@@ -2726,3 +2726,46 @@ les chiffres devant encore concorder. Gardés.
   l'interface ; un avion EJU y reste sans compagnie. Cosmétique, non touché.
 - **Contribuable à l'amont** tel quel : le mécanisme est générique et les entrées sont des
   indicatifs OACI actuels, pas des réglages de cette station.
+
+### D48 — Le français qui compte est celui des avions de ligne, pas des aérodromes *(23/09)*
+
+**Précisé par le propriétaire** : la question du français est née de ce que **les
+équipages français des avions de ligne font leurs phases d'approche et de départ en
+français**. Les aérodromes (aéroclub, tour militaire) ne l'intéressent pas vraiment.
+
+#### Conséquence : le jeu d'évaluation mesurait le mauvais français
+
+Les 60 clips « français » du tirage du 15/09 viennent de **Chavenay (129,525) et de
+Villacoublay (128,950)** — du trafic d'aérodrome. Aucun ne porte ce qui est visé. **Les
+chiffres français de D44 et D45 décrivent l'aéroclub**, pas Air France en approche.
+
+Le tirage avait cherché *« les fréquences qui parlent français »* sans demander *quel*
+français comptait. Question à poser avant de tirer, pas après quarante annotations.
+
+#### Le français visé est un problème bien plus facile
+
+Tout ce qui rendait l'aéroclub désespéré ne s'y applique pas :
+
+- **phraséologie normalisée** — caps, niveaux, fréquences, autorisations —, proche de ce
+  que le modèle anglais traite déjà ;
+- **indicatifs complets de compagnie**, pas les abréviations *« fox alpha charlie »* ;
+- **tous les avions en ADS-B** : la réserve de D46 sur l'aviation générale non équipée ne
+  concerne pas le trafic visé.
+
+**Une mesure sur le bon trafic existe déjà** : l'union des deux modèles (D31), mesurée par
+appariement ADS-B sur la nuit du 20 au 21 — groupe `gros-porteurs`, approches de De Gaulle.
+Le second avis s'y ouvre sur environ une transmission sur huit, et apporte +11,7 %
+d'indicatifs appariés. C'est le bon français, mesuré par une autre voie que la vérité
+terrain.
+
+#### Ce qui change dans le travail
+
+- **On cesse d'annoter Chavenay et Villacoublay.** Les clips déjà faits restent valables
+  comme description du comportement des modèles, mais ne guident plus les choix.
+- **Orly Départs (127,750) est au cœur de la cible** : fréquence bilingue, et des clips
+  déjà annotés en français y portent exactement ce trafic (*« … france soleil … bonne
+  journée au revoir »*). À continuer.
+- **L'en-route (132,500)** reste utile pour l'anglais.
+- **Un vrai jeu d'évaluation français** devra être tiré sur les fréquences d'approche de De
+  Gaulle, celles du groupe `gros-porteurs` que le propriétaire écoute tous les jours. Pas
+  lancé.
