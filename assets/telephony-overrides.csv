@@ -1,0 +1,36 @@
+# Radiotelephony designators that airlines.dat gets wrong, lacks, or ignores.
+#
+# airlines.dat is OpenFlights' table, frozen around 2014. Over this receiver, on
+# three days of ADS-B (12, 14 and 15 September 2026), 785 aircraft of the 40
+# busiest operators -- about one in ten -- were flown by an operator the matcher
+# could not name: absent from the file, marked inactive (which the matcher
+# skips), or listed under a callsign nobody says any more. Two more operators
+# below were already covered by spoken-operators.csv; they stay here because
+# this file is the reference, and what was observed can be lost.
+#
+# This matters more than a scoring bonus. When an operator is named and present
+# in the sky, the matcher considers only that operator's aircraft. A correctly
+# heard "France Soleil one two three four" that is not recognised as Transavia
+# France leaves every aircraft with 1234 in its number in the running.
+#
+# This file is a REFERENCE, unlike spoken-operators.csv beside it, which records
+# what the transcription models actually write -- garbled forms included. Keep
+# the two apart: a designator goes here only when it is the current ICAO one.
+#
+# Entries here are read before airlines.dat and win over it. That precedence is
+# the point: see BEL below, where airlines.dat maps BEE-LINE to DAT, the code
+# Brussels Airlines no longer flies under.
+#
+# Format: ICAO code, telephony designator, why it is here.
+
+TVF,FRANCE SOLEIL,airlines.dat has FRENCH SUN; 231 aircraft over 3 days
+EJU,ALPINE,easyJet Europe; absent from airlines.dat, already observed in spoken-operators.csv
+BEL,BEE-LINE,Brussels Airlines; airlines.dat files it under the retired code DAT; 121 aircraft
+NJE,FRACTION,NetJets Europe; absent from airlines.dat, already observed in spoken-operators.csv
+NSZ,REDNOSE,Norwegian Air Sweden; absent; 95 aircraft
+ITY,ITARROW,ITA Airways (founded 2020); absent; 77 aircraft
+WUK,WIZZ GO,Wizz Air UK; absent; 46 aircraft
+FDX,FEDEX,marked inactive in airlines.dat; 56 aircraft
+BCS,EUROTRANS,DHL European Air Transport; marked inactive; 65 aircraft
+VJT,VISTA,VistaJet; marked inactive; 48 aircraft
+TAY,QUALITY,ASL Airlines Belgium; marked inactive; 46 aircraft

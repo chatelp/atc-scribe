@@ -68,6 +68,11 @@ type Matcher struct {
 // and the file holds AIRFRANS and SPEEDBIRD alongside the names.
 func NewMatcher(airlinesDatPath string) (*Matcher, error) {
 	m := &Matcher{telephony: map[string]string{}, MinDigits: 3}
+
+	// Corrections first. They are current where airlines.dat is not, and every
+	// loader below lets the first writer win, so they take precedence.
+	m.loadOverrides(filepath.Join(filepath.Dir(airlinesDatPath), overridesFile))
+
 	f, err := os.Open(airlinesDatPath)
 	if err != nil {
 		return nil, err
@@ -107,6 +112,42 @@ func NewMatcher(airlinesDatPath string) (*Matcher, error) {
 	// The supplement is optional: without it the matcher works exactly as before.
 	m.loadSpokenForms(filepath.Join(filepath.Dir(airlinesDatPath), spokenFormsFile))
 	return m, nil
+}
+
+// overridesFile sits beside airlines.dat and holds the current radiotelephony
+// designators of operators airlines.dat gets wrong, lacks, or marks inactive.
+// Unlike spokenFormsFile it is a reference, not a record of what was heard.
+const overridesFile = "telephony-overrides.csv"
+
+// loadOverrides reads ICAO,TELEPHONY[,why] lines. A missing file is not an
+// error: without it the matcher behaves exactly as it did before the file
+// existed. A malformed line is skipped rather than guessed at.
+func (m *Matcher) loadOverrides(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.SplitN(line, ",", 3)
+		if len(fields) < 2 {
+			continue
+		}
+		icao := strings.ToUpper(strings.TrimSpace(fields[0]))
+		key := normalizeName(fields[1])
+		if len(icao) != 3 || len(key) < 3 {
+			continue
+		}
+		if _, seen := m.telephony[key]; !seen {
+			m.telephony[key] = icao
+		}
+	}
 }
 
 // spokenFormsFile sits beside airlines.dat and records what the transcription
