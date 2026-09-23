@@ -82,7 +82,8 @@
     <ol>
       <li>Write what is <em>said</em>, not what would be correct. Keep errors, hesitations and readbacks.</li>
       <li>Numbers as spoken: « flight level three five zero », not « FL350 ».</li>
-      <li>Mark what you cannot make out as <code>[unclear]</code> rather than guessing.</li>
+      <li>Mark what you cannot make out as <code>[unclear]</code> — or just <code>...</code>
+          between the parts you did get — rather than guessing. Both are read the same way.</li>
       <li>If French and English alternate in one transmission, tick « Both ».</li>
       <li><b>Stuck?</b> Type what you can, then « Show model readings ». Order matters:
           your blind attempt is kept, and the clip is marked <em>assisted</em> so that
@@ -116,17 +117,28 @@ async function boot(){
 }
 const isDone = a => !!a && (!!(a.text||'').trim() || a.no_speech);
 
-function render(){
-  const it = items[i]; if(!it) return;
-  const a = ann[it.id] || {};
+// The counter and the bar move on every keystroke. Everything else must not:
+// rebuilding the view mid-typing put the saved -- and therefore trimmed -- text
+// back into the textarea, eating the space just typed, and reassigned the audio
+// source, restarting the clip.
+function majProgression(){
   $('#pos').textContent = `${i+1} / ${items.length}`;
   const done = items.filter(x => isDone(ann[x.id])).length;
   $('#prog').style.width = (100*done/items.length) + '%';
   $('#count').innerHTML = `<span class="done">${done}</span> annotated`;
+}
+
+function render(){
+  const it = items[i]; if(!it) return;
+  const a = ann[it.id] || {};
+  majProgression();
   const pill = it.langue_attendue ? `<span class="pill ${it.langue_attendue}">expected ${it.langue_attendue}</span>` : '';
   $('#info').innerHTML = `<b>${it.fichier||it.id}</b> &nbsp; ${it.freq ? it.freq.replace(/(\d{3})(\d+)/,'$1.$2')+' MHz' : ''} &nbsp; ${it.service||''} &nbsp; ${pill}`;
-  $('#player').src = '/audio/' + it.id;
-  $('#player').play().catch(()=>{});
+  const src = '/audio/' + it.id;
+  if (!$('#player').src.endsWith(encodeURI(src))){
+    $('#player').src = src;
+    $('#player').play().catch(()=>{});
+  }
   $('#text').value = a.text || '';
   $('#nospeech').checked = !!a.no_speech;
   $('#partial').checked = !!a.partial;
@@ -165,7 +177,7 @@ async function save(){
   await fetch('/api/annotation', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(e)});
   $('#saved').textContent = 'saved';
   setTimeout(()=>{ $('#saved').textContent=''; }, 1200);
-  render();
+  majProgression();
 }
 
 const debounced = () => { clearTimeout(timer); timer = setTimeout(save, 700); };
