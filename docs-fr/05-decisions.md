@@ -1817,6 +1817,10 @@ couvert plus nettement par un **refus de démarrer**. Un mécanisme au lieu de d
 | aucun compte, écoute ailleurs | **refus de démarrer**, avec le remède dans le message |
 | un compte existe | la page disparaît définitivement |
 
+> **Complété le 23/09 par D51** : le choix « cette machine uniquement » n'était pas
+> enregistré, et la page revenait sans fin. Il l'est, et les deux choix se changent
+> depuis les réglages.
+
 **Les deux choix sont écrits pour être compris, pas pour être cliqués vite.** « Cette
 machine uniquement » dit que c'est ce que fait l'amont, *choisi plutôt que subi*. « Joignable,
 avec un compte » dit qu'il faudra **encore** TLS ou un proxy de confiance déclaré, parce
@@ -2887,7 +2891,7 @@ quoi les NOTAM de Saint-Cyr auraient été affichés comme ceux d'Orly.
 
 #### Trouvé en route, hors du sujet
 
-- **Le choix « local » du premier lancement n'est pas enregistré** : le code n'écrit qu'une
+- ~~**Le choix « local » du premier lancement n'est pas enregistré**~~ — **corrigé par D51** : le code n'écrivait qu'une
   ligne de journal, alors que son commentaire parle d'enregistrer le choix. L'écran revient à
   chaque visite. Invisible pour le propriétaire, qui a un compte ; bloquant pour quiconque
   installe l'outil en local.
@@ -2969,3 +2973,59 @@ AWC est gratuit, sans clé, limité à 100 requêtes par minute ; co-atc en fait
 **Décidé par le propriétaire le 23/09 : on enregistre le résultat et on ne touche pas à
 Windy pour l'instant.** Le jour où la question reviendra, elle porte sur les NOTAM seuls :
 garder Windy pour eux, chercher une autre source (pas cherchée à ce stade), ou s'en passer.
+
+### D51 — Local ou compte : le choix est enregistré, et se change dans les réglages *(23/09)*
+
+Demandé par le propriétaire : *« corrige-le avec le test — et il faut aussi avoir la
+possibilité de basculer de l'un à l'autre dans les settings »*.
+
+#### Le défaut, pire que noté en D49
+
+Choisir « cette machine uniquement » à la page de premier lancement **n'écrivait rien**.
+La page se rechargeait, redemandait au serveur s'il fallait poser la question — oui,
+puisqu'aucun compte n'existait — et **la même fenêtre réapparaissait aussitôt**. La seule
+sortie était de créer un compte. Invisible pour le propriétaire, qui en a un ; bloquant
+pour quiconque installe le projet. C'était notre code (D34), pas l'amont.
+
+#### Ce qui est décidé
+
+- **Le choix va dans `configs/users.json`**, à côté des comptes, champ `access` —
+  jamais dans `config.toml`. Un fichier d'avant, sans ce champ, se comporte comme avant :
+  des comptes, donc la connexion. **Vérifié sur le fichier du propriétaire**, relu par
+  le nouveau code : mode compte, un compte, fichier inchangé.
+- **Passer en local garde les comptes**, inutilisés. Repasser en compte les réactive
+  avec leur mot de passe ; sans compte, le panneau en fait créer un.
+- **Sans connexion seulement si personne d'autre ne peut atteindre le serveur** : écoute
+  sur `127.0.0.1` **et aucun proxy déclaré**. Le proxy est ajouté par rapport à D34 : c'est
+  précisément ce qui rend un serveur sur `127.0.0.1` joignable d'ailleurs, et le réglage
+  permet maintenant d'**ôter** un mot de passe à un serveur qui tourne — la page de
+  premier lancement ne faisait qu'en poser un. Ailleurs, la page n'offre plus le choix
+  local, le panneau le refuse en disant pourquoi, et un « local » enregistré puis devenu
+  impossible est **ignoré et dit dans le journal**, les comptes restant en vigueur.
+- **Ôter la connexion demande d'être connecté** ; la remettre, non — qui atteint un
+  serveur local est déjà sur la machine.
+- **Une seule règle, écrite à un seul endroit** (`resolve`), recalculée au démarrage et
+  à chaque changement. `Enabled`, lu à chaque requête, l'est désormais sous verrou : la
+  réponse peut changer pendant que des requêtes arrivent.
+
+*Settings → Server → Access* : l'état en clair, un bouton pour basculer, une
+confirmation qui dit ce qui va se passer, puis la page se recharge — avec le formulaire
+de connexion si elle est désormais demandée.
+
+#### Vérifié
+
+- **12 tests nouveaux** : 8 dans `auth`, 4 par les vraies routes de l'API — le défaut tel que le
+  navigateur le rencontrait, les deux sens depuis le panneau, la création du premier
+  compte, les refus. Les redémarrages sont simulés en relisant le fichier.
+- **Chaque garde-fou échoue quand on le retire** — six mutations, six attrapées, dont
+  **le code d'avant exactement** : la page qui n'enregistre pas le choix fait échouer le
+  test du premier lancement. `Enabled` sans verrou est attrapé par le détecteur de
+  concurrence.
+- **Instance d'essai isolée** (port 8090, dossier et fichier de comptes à part) : choix
+  local, rechargement — **l'application s'ouvre au lieu de la même question** ; bloc
+  *Access* dans les deux modes et en mode impossible ; page de premier lancement avec un
+  proxy déclaré, choix local grisé et expliqué ; avertissement du journal, dont le
+  premier libellé désignait mal la cause et a été corrigé.
+- **Non fait dans le navigateur** : saisir un mot de passe. Le compte d'essai a été créé
+  et utilisé par l'API ; l'affichage du mode compte a été vérifié en posant l'état du
+  panneau dans la page, sans rien envoyer au serveur.
