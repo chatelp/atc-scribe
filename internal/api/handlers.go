@@ -87,12 +87,24 @@ func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Servi
 		UserFile:       userFile,
 		SessionTTL:     time.Duration(orDefault(config.Auth.SessionTTLHours, 720)) * time.Hour,
 		TrustedProxies: config.Server.TrustedProxies,
+		Loopback:       isLoopback(config.Server.Host),
 		MaxAttempts:    config.Auth.MaxAttempts,
 		AttemptWindow:  time.Duration(orDefault(config.Auth.AttemptWindowMins, 15)) * time.Minute,
 	})
 	if err != nil {
 		logger.Error(fmt.Sprintf("Failed to build authentication: %v", err))
 		os.Exit(1)
+	}
+	if authService.LocalRefused() {
+		// Chosen when the server was reachable from this machine only; it no
+		// longer is. The accounts, if any, are in force -- and with none the
+		// server refuses to start, see cmd/server/main.go.
+		why := fmt.Sprintf("the server listens on %q", config.Server.Host)
+		if isLoopback(config.Server.Host) {
+			why = "a proxy is declared in server.trusted_proxies"
+		}
+		logger.Warn(fmt.Sprintf("Local-only access was chosen but is not honoured: %s, so other machines "+
+			"can reach it and sign-in stays on (%s)", why, authService.AccountsFile()))
 	}
 
 	return &Handler{
@@ -897,11 +909,11 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 		CruiseAltitudeFt: h.config.FlightPhases.CruiseAltitudeFt,
 		// The reference airport in force, which the settings panel can change;
 		// [station] airport_code is only where it starts.
-		AirportCode:      h.adsbService.PhaseReference().Airport,
-		FetchMETAR:       h.config.Weather.FetchMETAR,
-		FetchTAF:         h.config.Weather.FetchTAF,
-		FetchNOTAMs:      h.config.Weather.FetchNOTAMs,
-		OverrideActive:   effectiveLat != h.config.Station.Latitude || effectiveLon != h.config.Station.Longitude,
+		AirportCode:    h.adsbService.PhaseReference().Airport,
+		FetchMETAR:     h.config.Weather.FetchMETAR,
+		FetchTAF:       h.config.Weather.FetchTAF,
+		FetchNOTAMs:    h.config.Weather.FetchNOTAMs,
+		OverrideActive: effectiveLat != h.config.Station.Latitude || effectiveLon != h.config.Station.Longitude,
 	}
 
 	// Track if we have any data fetch failures

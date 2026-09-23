@@ -18,9 +18,22 @@ import (
 // write somewhere else, and the two sources coexist -- the file you edit by hand
 // and the file the page owns.
 type UserFile struct {
-	path  string
-	Users []UserRecord `json:"users"`
+	path string
+
+	// Access is how the server is to be reached, as last chosen on the first-run
+	// page or in the settings panel: AccessLocal or AccessAccount. Empty in a
+	// file written before the choice was recorded, where the accounts alone
+	// decide, as they always did.
+	Access string       `json:"access,omitempty"`
+	Users  []UserRecord `json:"users"`
 }
+
+// The two answers to "how is this server reached". Local-only keeps any
+// accounts in the file, unused, so choosing an account again brings them back.
+const (
+	AccessLocal   = "local"
+	AccessAccount = "account"
+)
 
 // UserRecord is one account. The password itself is never here, only its
 // Argon2id hash; see password.go.
@@ -73,13 +86,33 @@ func (f *UserFile) Add(name, hash string) error {
 		}
 	}
 	f.Users = append(f.Users, UserRecord{Name: name, PasswordHash: hash, CreatedAt: nowRFC3339()})
-	return f.save()
+	if err := f.save(); err != nil {
+		// Not written, so not added: a later save must not persist it by accident.
+		f.Users = f.Users[:len(f.Users)-1]
+		return err
+	}
+	return nil
+}
+
+// SetAccess records how the server is to be reached, or changes nothing if it
+// cannot be written.
+func (f *UserFile) SetAccess(mode string) error {
+	prev := f.Access
+	f.Access = mode
+	if err := f.save(); err != nil {
+		f.Access = prev
+		return err
+	}
+	return nil
 }
 
 // save writes through a temporary file. A half-written accounts file would lock
 // the owner out of their own server, and the failure would only appear at the
 // next start.
 func (f *UserFile) save() error {
+	if f.Users == nil {
+		f.Users = []UserRecord{} // "users": [] rather than null in a local-only file
+	}
 	b, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {
 		return err

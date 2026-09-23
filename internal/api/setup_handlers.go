@@ -2,11 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 
+	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
@@ -22,20 +24,22 @@ import (
 // network.
 
 type SetupState struct {
-	Needed    bool   `json:"needed"`     // no account exists anywhere
-	LocalOnly bool   `json:"local_only"` // the server is bound to loopback
-	Host      string `json:"host"`
-	File      string `json:"file"` // where an account would be written
+	Needed       bool   `json:"needed"`        // the first-run question has no answer yet
+	LocalOnly    bool   `json:"local_only"`    // the server is bound to loopback
+	LocalAllowed bool   `json:"local_allowed"` // ...and no proxy is declared in front of it
+	Host         string `json:"host"`
+	File         string `json:"file"` // where an account would be written
 }
 
 // GetSetupStatus says whether anything needs setting up. Public: the page has to
 // be able to ask before anyone can sign in.
 func (h *Handler) GetSetupStatus(w http.ResponseWriter, r *http.Request) {
 	st := SetupState{
-		Needed:    h.auth.NeedsSetup(),
-		LocalOnly: isLoopback(h.config.Server.Host),
-		Host:      h.config.Server.Host,
-		File:      h.auth.AccountsFile(),
+		Needed:       h.auth.NeedsSetup(),
+		LocalOnly:    isLoopback(h.config.Server.Host),
+		LocalAllowed: h.auth.LocalAllowed(),
+		Host:         h.config.Server.Host,
+		File:         h.auth.AccountsFile(),
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(st)
@@ -61,11 +65,17 @@ func (h *Handler) PostSetup(w http.ResponseWriter, r *http.Request) {
 
 	switch body.Mode {
 	case "local":
-		// Nothing to write. Staying without authentication is a legitimate
-		// answer on a loopback-bound server, and recording the choice is what
-		// makes it a choice rather than an oversight.
+		// Staying without authentication is a legitimate answer on a server only
+		// this machine can reach, and recording the choice is what makes it a
+		// choice rather than an oversight. Until it was recorded, the page asked
+		// again after every reload -- and there was no way past it but an account.
+		if err := h.auth.ChooseLocal(); err != nil {
+			http.Error(w, err.Error(), accessErrorStatus(err))
+			return
+		}
 		h.logger.Info("Setup: staying local-only, no authentication",
-			logger.String("host", h.config.Server.Host))
+			logger.String("host", h.config.Server.Host),
+			logger.String("file", h.auth.AccountsFile()))
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"mode": "local"})
 
@@ -83,6 +93,61 @@ func (h *Handler) PostSetup(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, `mode must be "local" or "account"`, http.StatusBadRequest)
 	}
+}
+
+// PutAccess switches between local-only and sign-in from the settings panel,
+// either way, as often as wanted:
+//
+//	{"mode": "local"}                                sign-in off; accounts kept, unused
+//	{"mode": "account"}                              sign-in back on, with those accounts
+//	{"mode": "account", "username": …, "password": …} sign-in on, creating the first account
+//
+// It sits in the authenticated group, so turning sign-in off takes a session
+// whenever sign-in is on. Turning it on from local-only takes none: whoever
+// reaches a local-only server is on the machine already.
+func (h *Handler) PutAccess(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Mode     string `json:"mode"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body); err != nil {
+		http.Error(w, "invalid request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var err error
+	switch body.Mode {
+	case auth.AccessLocal:
+		err = h.auth.ChooseLocal()
+	case auth.AccessAccount:
+		if body.Username != "" || body.Password != "" {
+			err = h.auth.AddUser(body.Username, body.Password)
+		} else {
+			err = h.auth.ChooseAccount()
+		}
+	default:
+		http.Error(w, `mode must be "local" or "account"`, http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), accessErrorStatus(err))
+		return
+	}
+
+	st := h.auth.Access()
+	h.logger.Info("Access changed from the settings panel",
+		logger.String("mode", st.Mode), logger.Int("accounts", len(st.Accounts)))
+	WriteJSON(w, http.StatusOK, st)
+}
+
+// accessErrorStatus tells a refusal -- this server cannot run open, or there is
+// nobody to sign in as -- from a malformed request.
+func accessErrorStatus(err error) int {
+	if errors.Is(err, auth.ErrLocalNotAllowed) || errors.Is(err, auth.ErrNoAccount) {
+		return http.StatusConflict
+	}
+	return http.StatusBadRequest
 }
 
 // isLoopback reports whether a bind address can only be reached from this

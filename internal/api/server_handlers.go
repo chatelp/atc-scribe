@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"context"
+	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/reference"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
@@ -38,6 +39,9 @@ type ServerState struct {
 
 	// The airport phases are judged against, and those that could replace it.
 	Reference *ReferenceState `json:"reference,omitempty"`
+
+	// Local-only or sign-in, and whether local-only is possible here.
+	Access auth.AccessState `json:"access"`
 }
 
 // ReferenceState is what the panel needs to choose a reference airport without
@@ -115,6 +119,7 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 		Logging:       h.loggingState(),
 		Settings:      h.runtime.Settings(),
 		Writable:      false, // flips once authentication is in place
+		Access:        h.auth.Access(),
 	}
 
 	if h.sttSidecar != nil {
@@ -341,4 +346,3 @@ func (h *Handler) referenceState() *ReferenceState {
 	}
 	return st
 }
-

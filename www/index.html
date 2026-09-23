@@ -598,6 +598,46 @@
                                             </div>
                                         </template>
 
+                                        <!-- Access: the first-run question, answerable again. Stacked rather
+                                             than side by side, for the same narrow panel. Switching reloads the
+                                             page, since what this browser may see changes with it. -->
+                                        <template x-if="state.access">
+                                            <div class="grid gap-1 min-w-0">
+                                                <span class="text-sm">Access</span>
+                                                <span class="text-xs" x-text="accessLabel()"></span>
+                                                <button x-show="state.access.mode === 'account'" @click="switchAccess('local')"
+                                                        :disabled="busy || !state.access.local_allowed"
+                                                        class="justify-self-start text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40 disabled:cursor-not-allowed">
+                                                    Switch to this machine only
+                                                </button>
+                                                <button x-show="state.access.mode !== 'account' && !newAccount" @click="switchAccess('account')"
+                                                        :disabled="busy"
+                                                        class="justify-self-start text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
+                                                    Require sign-in
+                                                </button>
+                                                <template x-if="newAccount">
+                                                    <div class="grid gap-1.5 min-w-0">
+                                                        <input x-model="newAccount.username" placeholder="User name"
+                                                               autocomplete="username" autocapitalize="none"
+                                                               class="min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                        <input x-model="newAccount.password" type="password"
+                                                               placeholder="Password, 10 characters or more" autocomplete="new-password"
+                                                               class="min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                        <div class="flex gap-2">
+                                                            <button @click="createAccount()" :disabled="busy"
+                                                                    class="text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
+                                                                Create and require sign-in
+                                                            </button>
+                                                            <button @click="newAccount = null" class="text-xs px-2 py-0.5 opacity-60 hover:opacity-100">
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                <div class="text-xs opacity-60 leading-snug" x-text="accessNote()"></div>
+                                            </div>
+                                        </template>
+
                                         <template x-if="note">
                                             <div class="text-xs" :class="noteBad ? 'text-red-400' : 'text-green-400'" x-text="note"></div>
                                         </template>
