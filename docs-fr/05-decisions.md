@@ -3230,3 +3230,41 @@ un gain.
 >
 > **Vérifié** : 8 tests, dont la piste « 27L » qui doit survivre à la règle des ordinaux ;
 > trois retraits, trois attrapés.
+
+### Q39 — L'étiquette ATC / PILOTE n'est pas fiable, et une règle plus prudente n'a pas fait mieux *(ouverte, 23/09)*
+
+Question du propriétaire : *« je ne comprends pas sur quoi il se base pour l'attribution
+ATC ou pilote, ça me semble très approximatif »*.
+
+**La règle en service** (`speakerOf`, la nôtre, écrite le 15/09 en remplaçant l'IA de
+l'amont) compte des mots de deux listes — impératifs pour le contrôleur, formes en *-ing* et
+politesses pour le pilote — et, à égalité seulement, regarde si l'indicatif ouvre ou ferme
+la transmission. Défaut visible à la lecture : un pilote **collationne l'instruction mot pour
+mot** (« descend five thousand, QNH 1030 » est venu des deux côtés d'un même échange), donc
+l'impératif anglais ne dit rien de qui parle — et c'est lui qui l'emporte.
+
+**Ce qui en dépend** : l'étiquette @ATC/@PILOT affichée, et **l'enregistrement des
+autorisations** (une autorisation n'est enregistrée que sur une transmission étiquetée ATC).
+
+**Mesures, et une erreur de ma part corrigée** :
+- 3 932 transcriptions uniques depuis le 15/09 : **48 % sans étiquette**, 34 % ATC, 18 % pilote.
+- J'avais d'abord annoncé « une paire d'échange sur dix dans le bon ordre, 43 % ATC puis
+  ATC ». **C'était faux** : les extraits des 20 et 21/09 contiennent **849 doublons**, et 138
+  des « paires » étaient la même transmission lue deux fois à la même seconde. Nettoyé :
+  sur les échanges réels (même avion, 1 à 20 s d'écart), environ **4 sur 10** sont dans le
+  bon ordre — toujours médiocre, moins que ce que j'avais dit.
+- **Aucune référence fiable n'a pu être construite** sans oreille humaine : les paires où la
+  réponse répète une valeur de l'ordre ne sont que 7, et plusieurs sont fausses (un pilote
+  qui appelle deux fois). Le propriétaire ne peut pas trancher à l'écoute qui parle.
+
+**Essayé et écarté** : une règle prudente — plus d'impératifs anglais, la place de
+l'indicatif d'abord, l'appel d'un organisme reconnu, seulement des mots propres à un camp,
+et pas d'étiquette si les indices se contredisent. Sur 68 échanges réels, elle alterne
+**moins** bien (10 paires justes contre 17, 24 fausses contre 23) ; sur les 7 paires de
+référence, égalité (5/9 contre 6/11). Elle étiquette moins (55 % sans étiquette contre 42 %)
+sans étiqueter mieux. **Pas mise en service** ; gardée hors dépôt.
+
+**Hypothèse pour la suite, non mesurée** : le texte seul ne porte pas l'information. Une
+partie des segments contient **les deux voix** — le découpage coupe sur 600 ms de silence, et
+un collationnement suit souvent de moins (« air france three two bravo yankee hello … hello »).
+Le locuteur se lirait mieux dans l'audio que dans le texte.
