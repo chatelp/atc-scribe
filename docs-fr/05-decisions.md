@@ -2939,3 +2939,32 @@ manquaient déjà : les données supprimées le matin même, qu'il faudrait red�
 reprendre sur la station pour relancer `amorce-adsb.py` ou `depouille-nuit-gain.py`, et
 deux modèles français absents du laboratoire. Dans le dépôt, seuls les pointeurs à usage
 courant suivent : un commentaire du sidecar, les docs 09 et 26.
+
+### Q36 — Remplacer Windy par aviationweather.gov : ce qu'on perdrait *(ouverte, 23/09)*
+
+Question du propriétaire : *« est-on sûr qu'on ne perd rien au niveau données ? »*. Mesuré
+le 23/09 à 14:36Z sur Orly, les deux sources interrogées au même moment, puis l'historique
+d'AWC sur quatre jours.
+
+- **TAF : rien de perdu.** Texte identique. Windy déclare lui-même sa source,
+  `ADDS-stored` : ADDS est le service d'aviationweather.gov. **Windy relaie déjà AWC.**
+- **METAR : presque rien.** Mêmes textes, mais AWC a des trous que Windy, qui a sa propre
+  source (`Internal`), n'avait pas ce jour-là : 12:00, 13:00 et 14:00Z manquaient chez AWC
+  pour Orly, De Gaulle, Le Bourget et Toussus. Sur les quatre jours qu'AWC renvoie : **8
+  METAR absents sur 204 à Orly (3,9 %), 3 sur 203 à De Gaulle**, jamais plus d'une heure
+  d'affilée. Effet : le dernier METAR affiché a parfois une heure au lieu d'une demi-heure.
+- **NOTAM : tout perdu.** Windy en donne **22 pour Orly**, texte intégral — dont la
+  fermeture de la piste 06/24 du 10 août au 17 décembre. **AWC n'en publie pas** : aucun des
+  20 services de son API n'en porte (`openapi.yaml`, lu le 23/09).
+- **La phrase décodée** que Windy fabrique (*« Wind 220° 4kt… »*, `trend[0].txt[0]`) ne sert
+  qu'au prompt du chat IA, inactif ici (Q35, n° 4). L'interface n'affiche que le texte brut.
+  AWC fournit de toute façon les champs décodés (vent, visibilité, nuages, catégorie de vol).
+- **Changer l'URL ne suffit pas** : l'interface et le prompt lisent la structure de Windy
+  (`trend[].metar`, `taf.taf`, `notams[].raw`). Il faut traduire la réponse d'AWC dans le
+  serveur.
+
+AWC est gratuit, sans clé, limité à 100 requêtes par minute ; co-atc en fait 3 toutes les
+10 minutes.
+
+**Reste à décider** pour les NOTAM : garder Windy pour eux seuls, chercher une autre source
+(pas cherchée à ce stade), ou s'en passer.
