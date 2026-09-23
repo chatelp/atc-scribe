@@ -3103,3 +3103,30 @@ affiche sa transmission et la valeur FL100, stable sur 12 relevés en 6 s, **une
 requête** au lieu d'une par seconde ; VLG35WR, non entendu, « Nothing matched » stable, une
 requête ; une transmission nouvelle simulée dans la page déclenche **exactement une**
 relecture.
+
+### D54 — Le choix d'écouter une fréquence est retenu *(23/09)*
+
+Demandé par le propriétaire : *« régler une fois pour toutes ce problème de l'activation ou
+non de l'audio : quelquefois j'ai juste des transcriptions sans audio, d'autres fois les
+deux »*.
+
+**Ce n'était pas une panne, c'était la conception de l'amont.** La page ne joue rien
+d'elle-même : toute fréquence démarre **coupée**, et le son ne part qu'au clic sur sa
+tuile. Ce choix n'était pas retenu — **chaque rechargement** (connexion, redémarrage du
+serveur, bascule d'accès, F5) repartait coupé. Les transcriptions, elles, sont faites par
+le serveur, qui écoute le flux lui-même : elles arrivent quoi que fasse la page. D'où
+« les deux » si la tuile avait été cliquée depuis le dernier chargement, « le texte seul »
+sinon. Le seul signe à l'écran était la couleur des barres, gris ou vert.
+
+**Corrigé** :
+- **Le choix est retenu par le navigateur**, comme les préférences d'affichage (D30).
+- **Il est réappliqué au clic sur « Start Monitoring »** — les navigateurs n'autorisent le
+  son qu'après un clic sur la page, et celui-là est déjà demandé à chaque chargement.
+- **Un haut-parleur sur la tuile** dit l'état en clair : barré et grisé si coupé.
+- Un navigateur qui n'a jamais choisi reste coupé, comme avant : rien ne se met à parler
+  sans qu'on l'ait demandé une fois.
+
+**Vérifié dans le navigateur**, instance d'essai sur le même flux : jamais choisi →
+coupé ; clic sur la tuile → son, choix retenu ; **rechargement puis « Start Monitoring »
+seul → le son revient**, position de lecture qui avance de 2,6 s en 3 s ; coupé puis
+rechargé → reste coupé.
