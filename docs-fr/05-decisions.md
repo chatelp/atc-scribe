@@ -2594,3 +2594,71 @@ n'a été ajusté dessus.
 avant** en lui donnant en amorce les indicatifs réellement en l'air (l'ADS-B les connaît).
 C'est viser la cause — le modèle invente des indicatifs faute d'en connaître de vrais — et
 c'est mesurable sur les clips du 12/09 dont on a l'historique.
+
+### D46 — Amorcer le décodeur avec l'ADS-B : non concluant, et pourquoi ça ne peut pas l'être ici *(23/09)*
+
+Suite de D45. Si le modèle invente des indicatifs faute d'en connaître de vrais, lui donner
+en amorce (`initial_prompt`) les avions que l'ADS-B voit à ce moment devrait l'orienter.
+Deux bras identiques à l'amorce près, **température 0 dans les deux** pour que les relances
+au hasard de D45 ne noient pas l'effet. `whisper-lab/amorce-adsb.py` et `amorce-analyse.py`.
+
+#### Le risque qu'il fallait mesurer d'abord
+
+Aujourd'hui un indicatif inventé ne trouve aucun avion : il ne trompe personne. Avec une
+amorce, le modèle pourrait produire **un avion réel — mais pas celui qui parlait**, et
+l'appariement le trouverait. **Mesuré sur les 5 clips que le propriétaire n'a pas
+compris : aucun avion de la liste cité, par aucun des deux modèles.** Le faux *« Lufthansa
+Six Niner three five »* persiste à l'identique, amorce ou pas : le modèle ne va même pas
+piocher dans la liste. Le risque ne s'est pas matérialisé — sur 5 clips.
+
+#### Le résultat
+
+| | Réglage (42 clips) | Contrôle (13 clips) |
+|---|---|---|
+| Indicatifs de l'amorce effectivement entendus | **2** | 0 |
+| atco2-en, anglais — mots justes sans / avec | 47 % → 45 % | 35 % → 48 % |
+| bofenghuang-fr, français — mots justes | **26 % → 16 %** | 51 % → 55 % |
+| atco2-en, français — mots justes | 16 % → 17 % | 42 % → 49 % |
+| Indicatifs justes gagnés grâce à l'amorce | 0 | 0 |
+
+**Le réglage et le contrôle se contredisent**, et le contrôle ne compte que **4 clips par
+case**. C'est la configuration exacte où D44 m'a fait annoncer un effet d'ancrage qui s'est
+inversé à 32 clips. On ne conclut pas du contrôle. Ce que le réglage, plus fourni, dit
+nettement : **l'amorce en phraséologie anglaise fait chuter le modèle français** de 26 à
+16 % de mots justes, et **n'apporte aucun indicatif**.
+
+#### Pourquoi le test ne peut pas trancher sur ces données
+
+**Seuls 2 des avions entendus par l'annotateur figurent dans les amorces**, alors que 20
+clips sur 42 contiennent un indicatif probable. Trois raisons, lisibles dans les exemples :
+
+1. **La phraséologie abrège.** Après le premier contact, F-HVAC devient *« fox alpha
+   charlie »*, et une compagnie est citée sans son numéro (*« … france soleil … »*). Une
+   liste d'indicatifs complets ne rejoint pas ce qui se dit.
+2. **Une bonne partie de l'aviation générale locale est probablement absente de l'ADS-B** :
+   sur Chavenay, des indicatifs entendus (*« charly oscar »*, *« kilo papa »*) ne
+   correspondent à aucun avion de la liste. L'emport ADS-B n'est pas obligatoire pour les
+   avions légers en France. **Non vérifié** — il faudrait l'immatriculation complète.
+3. Sur les rares cas où l'avion est dans la liste, le modèle le trouve **déjà sans amorce**.
+
+**L'idée vise donc la mauvaise population** : elle ne peut aider que les avions qui émettent
+en ADS-B, et c'est précisément le trafic français d'aéroclub — le plus mal reconnu — qui en
+est le moins équipé.
+
+#### Deux défauts de mesure trouvés en route, et corrigés
+
+- Le détecteur d'indicatifs cherchait les **trois** dernières lettres d'une immatriculation ;
+  la phraséologie française dit *« Fox »* + les **deux** dernières. Et *« charly »* n'était
+  pas reconnu comme *« charlie »*. Trouvé en lisant les textes, pas les chiffres.
+- L'option `--controle` était lue **après** que le chargement des autres scripts avait
+  remplacé `sys.argv` : le rapport de contrôle ne s'affichait jamais, sans erreur.
+
+#### Un vrai défaut de la production, trouvé au passage
+
+La table de prononciation vient d'OpenFlights, figée en 2014. **Transavia France**, qui
+domine les départs d'Orly (99 apparitions dans les amorces), y est **« French Sun »** au lieu
+de **« France Soleil »** ; **easyJet Europe** (34) n'y est pas du tout (son indicatif radio
+est *« Alpine »*). Quand le modèle entend correctement *« France Soleil »*, l'appariement de
+production ne sait pas que c'est TVF. **Non corrigé ici** : `spoken-operators.csv` est par
+construction une table de formes *observées*, y écrire des indicatifs de référence en
+trahirait le rôle. Il faut une couche de correction distincte — décision à prendre.
