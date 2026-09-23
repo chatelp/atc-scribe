@@ -1583,8 +1583,9 @@ WAV n'était supprimé qu'après vérification que le MP3 existait et n'était p
 
 
 > **Déplacé le 23/09** sur le disque externe, `/Volumes/Crucial X8/whisper-corpus/nuit-20260920`,
-> et remplacé dans `whisper-lab/` par un lien : les scripts n'ont rien à changer, mais
-> **ce corpus n'est lisible que disque branché**. Copie vérifiée fichier par fichier avant
+> et remplacé dans `whisper-lab/` par un lien — renommé le même jour
+> `audio/2026-09-20-gros-porteurs-nuit` (D50) —, mais **ce corpus n'est lisible que disque
+> branché**. Copie vérifiée fichier par fichier avant
 > suppression de l'original (14 252 fichiers, SHA-256 identiques). Gardé parce que c'est
 > **le seul enregistrement existant** des approches de Roissy — le trafic visé par D48 — :
 > la station n'archive pas le groupe `gros-porteurs`. Trace aussi dans
@@ -2895,3 +2896,31 @@ quoi les NOTAM de Saint-Cyr auraient été affichés comme ceux d'Orly.
 - **La mise en page du panneau** : la première version de la ligne débordait (345 px dans un
   panneau de 276) et coupait **toutes** les listes de la section. Trouvé à l'écran, mesuré,
   corrigé.
+
+### D50 — Les corpus du laboratoire sont rangés sous `audio/`, datés du prélèvement *(23/09)*
+
+Demandé par le propriétaire, *« si ça ne casse rien »*. `whisper-lab/` n'est pas sous git,
+et ses dix dossiers audio portaient des noms d'usage (`corpus/`, `orly/`, `suites/`…) qui ne
+disaient ni la date ni ce qu'ils contenaient.
+
+**La règle** : tout l'audio sous `whisper-lab/audio/`, un dossier par corpus, nommé
+`AAAA-MM-JJ-groupe-contenu`. **La date est celle du prélèvement sur la station**, pas celle
+des enregistrements : le jeu de test, tiré le 15/09, contient des clips du 12, du 14 et du
+15/09. Le groupe est celui de la station quand il y en a un. Les résultats, scripts et
+journaux restent à la racine.
+
+**Les documents datés gardent les anciens noms** — ils décrivent ce qui a été fait à
+l'époque. La table de correspondance est dans `whisper-lab/CORPUS.md`, qui est désormais
+l'index complet du laboratoire. Seuls les passages qui donnent un chemin **à utiliser
+aujourd'hui** ont été corrigés : la commande de l'outil d'annotation (doc 09) et la
+disponibilité du corpus par canal (doc 24).
+
+**Vérifié** : sauvegarde des scripts avant ; outil d'annotation arrêté pendant l'opération,
+fichier d'annotations inchangé (même empreinte, 55 annotations) ; dossiers renommés sur le
+même disque, rien copié ni supprimé ; chemins réécrits dans 21 scripts, qui se compilent
+tous ; les 18 chemins qu'ils citent existent ; l'outil présente les mêmes 60 clips ;
+`note-modeles.py` rend **les mêmes scores** ; 21 + 19 tests au vert.
+
+> **Une erreur corrigée en route** : la première passe datait cinq dossiers du 12/09, date
+> du plus ancien clip. Le laboratoire a été créé le 15/09 à 10:58, et tout ce qu'il contient
+> a été prélevé à partir de ce jour-là. Renommés au 15/09 avant publication de l'index.
