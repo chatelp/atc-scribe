@@ -3535,3 +3535,32 @@ Complément sans transcription : les indicatifs **confirmés par l'ADS-B** fourn
 étiquettes partielles gratuites sur de vraies transmissions de la station.
 
 **Plan détaillé** : `27-augmentation-donnees.md` (24/09), à la demande du propriétaire.
+
+### Q44 — Le bloc de la Freebox remplacé : le parasite de nuit disparaît-il ? *(ouverte, 24/09)*
+
+Complément de la station, 24/09 après-midi (`whisper-lab/echanges-station/complement-2026-09-24-apres-midi.md`) :
+le propriétaire a remplacé **vers 16:15** le bloc d'alimentation CPL de la Freebox par une
+alimentation classique. D41 l'avait désigné **par élimination** comme source du parasite de nuit,
+après le retrait des adaptateurs CPL.
+
+- **Le brouillage de jour n'a pas baissé**, mesuré par la station en rejouant la captation du
+  22/09 (16:42–18:50, 132–133 MHz) : 17 % puis 27 % d'ouvertures sans parole, dans la fourchette
+  normale de jour (18–34 %), l'écart changeant de sens selon l'heure.
+- **Pour la nuit, la station conclut aussi à la mise hors de cause**, le bloc étant branché
+  24 h/24 alors que le parasite ne sort que de 22 h à 7 h. C'est un raisonnement, pas encore une
+  mesure : **cette nuit est la première sans ce bloc.**
+- **Mesure passive côté Mac, cette nuit** : le taux de morceaux rejetés sans parole par le sidecar,
+  heure par heure (la courbe de D27), relevé toutes les dix minutes dans
+  `whisper-lab/journaux/2026-09-24-nuit-surveillance.log`. Repères : 96–98 % à 2–3 h la nuit du
+  20 au 21 ; **64 % en moyenne** de 21:08 à 08:56 la nuit dernière ; **6 % en journée** le 24
+  (175 rejets pour 2 751 transcriptions de 08:56 à 21:11).
+
+**Trou dans les données de co-atc du 24/09** : de **16:38:22 à 18:50:07**, `aero.mp3` portait le
+groupe 132–133 MHz, pas `gros-porteurs`. La base ne le dit nulle part (`frequency_id` reste
+`aero-melange`) ; **à exclure de toute analyse de `gros-porteurs`.** co-atc s'est reconnecté seul
+aux trois bascules (16:35, 16:38, 18:50), première transcription 0 à 12 s après chaque coupure.
+
+**Cohérence avec 28** : en journée, le sidecar ne rejette que 6 % des morceaux du mélange, alors
+que 125,825 et 126,425 s'ouvrent plus d'une fois sur deux sans parole. Le mélange colle ces
+ouvertures à la parole des autres canaux : elles ne sont pas rejetées, **elles partent au modèle**
+(Q41).
