@@ -3428,3 +3428,28 @@ co-atc, bases du 23 et du 24, en lecture seule).
 - **Petits défauts logiciels** : une perte à 02:02 (connexion coupée pendant l'envoi, non
   rejouée) ; les journaux du sidecar partent sur la sortie standard de co-atc, jetée au
   lancement, ce qui empêche de dater les 2 690 rejets.
+
+### Q42 — Nettoyer l'audio avant la reconnaissance, sans IA *(ouverte, 24/09)*
+
+Question du propriétaire : *« il n'y a pas des techniques non IA pour améliorer fortement la
+qualité audio, supprimer les parasites, clarifier la voix en amont de la reconnaissance ? »*
+
+**Ce qui existe déjà, vérifié le 24/09** :
+- à la station, chaque canal est filtré en passe-bande par RTLSDR-Airband (`highpass = 300`,
+  `lowpass = 2700`) ;
+- `filtre-voix` publie `aero-clair.mp3` : passe-bande 300–2 800 Hz, compresseur, limiteur
+  (`/opt/adsb/filtre-voix.sh`). **co-atc écoute `aero.mp3`, le brut.** L'effet de
+  `aero-clair` sur la reconnaissance **n'a jamais été mesuré** ;
+- le détecteur de voix du sidecar refuse les morceaux sans parole (jusqu'à 98 % la nuit,
+  D27), mais ne retire pas le bruit des morceaux acceptés (Q41).
+
+**Ce qu'un filtre audio ne peut pas faire** : rendre un son que le squelch a coupé (Q37),
+ni empêcher le squelch de s'ouvrir sur le parasite secteur (01-station). Ces deux-là se
+traitent à la source.
+
+**Réserve de principe, non mesurée ici** : ce qui s'entend mieux ne se transcrit pas
+forcément mieux. Le modèle anglais est affiné sur de vrais enregistrements VHF (ATCO2),
+bruit compris ; un débruiteur spectral laisse des artefacts qu'il n'a jamais rencontrés.
+**À mesurer sur le jeu annoté**, en précision et en rappel (`filtres.py`, D45) : brut,
+chaîne d'`aero-clair`, débruitage spectral, peigne coupe-bande à 100 Hz, normalisation de
+niveau, et ne garder que la parole (Q41).
