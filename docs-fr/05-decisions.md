@@ -3228,6 +3228,16 @@ battements sur les trois autres. Bruits estimés voisins (−40,8 dBFS contre �
 démarrage, puis environ un par relevé de 15 s. Démarrage
 ou vrai épisode de trafic faible : à trancher dans les fichiers par canal.
 
+**Tranché à 11:03 sur le premier fichier fini** (10:47:31 → 11:00:00, quatre fichiers de 748,7 s,
+lisibles, sans trou) : **ce n'est pas le démarrage.** Un second épisode a lieu de 10:55 à 10:57
+(162 battements sur 125,825), et **126,425 bat aussi** (244 battements de 10:56 à 10:57, puis 44 à
+11:02) ; 124,350 et 124,625 jamais. Les coupures courtes comptées dans l'audio tombent aux mêmes
+minutes que les compteurs de la station (125,825 : 16 à 10:47, 13 à 10:49, 12 à 10:55, 12 à
+10:56) : les deux mesures se confirment. **Deux fréquences qui battent à la même minute**
+suggèrent une cause commune plutôt que deux émetteurs faibles — hypothèse, non vérifiée, à
+confronter aux trois heures complètes et au niveau des autres canaux au même instant
+(écrêtage, D42).
+
 **Remède possible, côté station, non appliqué** (configuration de production : accord
 explicite du propriétaire requis) : baisser le seuil du squelch **sur 125,825 seulement**,
 et mesurer avant/après à la même heure — coupures courtes, et ouvertures sur le bruit
