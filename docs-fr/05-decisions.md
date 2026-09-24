@@ -3506,3 +3506,5 @@ numériques de 30 à 310 ms, en grappes, Q37) ; le canal (bande 300–2 700 Hz, 
 
 Complément sans transcription : les indicatifs **confirmés par l'ADS-B** fournissent des
 étiquettes partielles gratuites sur de vraies transmissions de la station.
+
+**Plan détaillé** : `27-augmentation-donnees.md` (24/09), à la demande du propriétaire.
