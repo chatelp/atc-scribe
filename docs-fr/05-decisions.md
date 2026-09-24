@@ -3468,3 +3468,41 @@ auditeurs. `aero.mp3` reste inchangé ; un flux « pour la reconnaissance » s'a
 côté si la mesure le justifie. Côté Mac ne resterait que le tri de la parole (Q41), qui
 dépend du détecteur de voix du sidecar. co-atc ne traite pas l'audio : il lit le flux
 qu'on lui désigne.
+
+### Q43 — Dégrader un corpus déjà transcrit pour affiner un modèle *(ouverte, 24/09)*
+
+Idée du propriétaire : *« dégrader un corpus texte/audio déjà mappé avec le type de bruit,
+parasite, hachage qu'on rencontre sur ma station pour créer ou affiner un modèle ? Ça
+m'éviterait d'avoir à retranscrire à la main des heures de captation. »*
+
+C'est l'**augmentation de données** (simulation du canal), une technique classique de
+l'entraînement de la reconnaissance. Elle rejoint la voie n° 1 de Q30 — un meilleur modèle
+acoustique sur les chiffres, par un affinage maison (stratégie C de Q1), **jamais tenté** —
+en retirant son principal obstacle, l'annotation.
+
+**Ce que la station fournit sans rien transcrire** : du bruit réel en quantité (jusqu'à 98 %
+des ouvertures de squelch la nuit sont sans parole, D27) ; la forme du hachage (silences
+numériques de 30 à 310 ms, en grappes, Q37) ; le canal (bande 300–2 700 Hz, AM, MP3,
+écrêtage D42–D43, quatre fréquences mélangées qui se chevauchent).
+
+**Deux cibles qui correspondent à des défauts mesurés** :
+- **l'invention**, défaut dominant (D44 : 59 à 93 % d'insertions) — des clips de bruit de la
+  station étiquetés *vides* apprennent au modèle à se taire ;
+- **les chiffres** (Q30) — les corpus de phraséologie en sont pleins.
+
+**Limites** :
+- les corpus transcrits disponibles sont anglais (ATCOSIM, simulé et propre ; ATCO2 ;
+  UWB-ATCC), sous licences non commerciales à vérifier ; **aucun corpus ATC français public**
+  (03). Ils n'apprennent ni les balises de Paris, ni le mélange français-anglais, ni les
+  pilotes pressés qui se chevauchent ;
+- **le hachage piège l'étiquetage** : garder le texte complet sur un son dont des mots ont
+  été coupés apprend au modèle à deviner — c'est-à-dire à inventer. Il faut retirer de
+  l'étiquette les mots entièrement coupés, ce qui demande leur position dans le temps ;
+- **l'évaluation reste humaine** : on n'échappe pas à un jeu annoté de la station, mais
+  quelques centaines de clips au plus, pas des heures (55 annotés à ce jour) ;
+- **le calcul** : affiner un large-v3 sur un Mac de 24 Go est à la limite, non mesuré ;
+  une méthode allégée, un modèle plus petit ou quelques heures de GPU louées (données
+  publiques, bruit sans parole) sont les options.
+
+Complément sans transcription : les indicatifs **confirmés par l'ADS-B** fournissent des
+étiquettes partielles gratuites sur de vraies transmissions de la station.
