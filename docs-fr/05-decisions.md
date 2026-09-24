@@ -3448,8 +3448,23 @@ ni empêcher le squelch de s'ouvrir sur le parasite secteur (01-station). Ces de
 traitent à la source.
 
 **Réserve de principe, non mesurée ici** : ce qui s'entend mieux ne se transcrit pas
-forcément mieux. Le modèle anglais est affiné sur de vrais enregistrements VHF (ATCO2),
-bruit compris ; un débruiteur spectral laisse des artefacts qu'il n'a jamais rencontrés.
+forcément mieux ; un débruiteur spectral laisse des artefacts qu'aucun des deux modèles n'a
+rencontrés. *Précision apportée sur objection du propriétaire* : les deux modèles sont des
+Whisper généralistes à la base (large-v3). **L'anglais** (`jlvdoorn/whisper-large-v3-atco2-asr`,
+converti par sfabriece) y ajoute un **affinage sur ATCO2**, un corpus de vraies
+communications de contrôle aérien ; sa fiche annonce ~17 % de WER sur ATCO2 contre 37 à 55 %
+pour large-v3 d'origine. La taille de ce corpus d'affinage n'est pas vérifiée. **Le français**
+(bofenghuang) est un généraliste francophone, **sans aucune radio ni aviation**. La réponse
+peut donc différer d'un modèle à l'autre : **mesurer les deux**.
+
 **À mesurer sur le jeu annoté**, en précision et en rappel (`filtres.py`, D45) : brut,
 chaîne d'`aero-clair`, débruitage spectral, peigne coupe-bande à 100 Hz, normalisation de
 niveau, et ne garder que la parole (Q41).
+
+**Où ça s'implanterait**, proposé le 24/09 par le propriétaire : **à la station**, en
+service, comme `filtre-voix`. C'est le seul endroit où les fréquences sont encore séparées
+(squelch, filtre par canal, peigne sur les seuls canaux touchés), et ça profite à tous les
+auditeurs. `aero.mp3` reste inchangé ; un flux « pour la reconnaissance » s'ajouterait à
+côté si la mesure le justifie. Côté Mac ne resterait que le tri de la parole (Q41), qui
+dépend du détecteur de voix du sidecar. co-atc ne traite pas l'audio : il lit le flux
+qu'on lui désigne.
