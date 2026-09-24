@@ -3238,6 +3238,14 @@ suggèrent une cause commune plutôt que deux émetteurs faibles — hypothèse,
 confronter aux trois heures complètes et au niveau des autres canaux au même instant
 (écrêtage, D42).
 
+**Analyse des 3 h 13 complètes : `28-gros-porteurs-par-canal.md`.** Deux canaux sains (124,350,
+124,625 : 0 et 64 battements, environ 80 % de parole dans le temps ouvert), deux faibles
+(125,825, 126,425 : 1 950 et 8 919 battements, 31 et 38 % de parole, plus de la moitié des
+ouvertures sans parole) — les deux que le mélange relève déjà (`ampfactor` 1,4 et 1,3). Le
+battement vient par épisodes sur toute la période. Méthode corrigée en route : une coupure
+courte **isolée** est le plus souvent un changement d'interlocuteur ; seules les coupures **en
+grappes** suivent les compteurs de la station.
+
 **Remède possible, côté station, non appliqué** (configuration de production : accord
 explicite du propriétaire requis) : baisser le seuil du squelch **sur 125,825 seulement**,
 et mesurer avant/après à la même heure — coupures courtes, et ouvertures sur le bruit
