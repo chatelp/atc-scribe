@@ -3402,3 +3402,29 @@ aujourd'hui : la contribution amont de D49 reste possible.
 **À trancher par le propriétaire** : quels aéroports (la mesure plaide pour Orly et De Gaulle,
 les autres apportant peu) ; la météo de chacun ou du seul principal (Windy, API privée : 3
 requêtes par aéroport toutes les 10 minutes) ; la présentation de plusieurs METAR.
+
+### Q41 — Ce que la nuit du 23 au 24/09 apprend sur la transcription *(ouverte, 24/09)*
+
+Mesuré sur les 1 459 transmissions transcrites du 23/09 21:08 au 24/09 09:00 (journal de
+co-atc, bases du 23 et du 24, en lecture seule).
+
+- **Du bruit est envoyé au modèle.** 11 % des morceaux (163) sont coupés à la limite de
+  30 s ; ils portent **28 % de l'audio traité** (82 min sur 288) pour une médiane de **6,5 s
+  de parole sur 30**. Aux heures calmes (5 h–7 h), 4,5 à 6,6 min de parole pour 17 à 29 min
+  d'audio. Et le sidecar a rejeté **2 690 morceaux sans parole** sur la même période (26 la
+  veille au soir). Hypothèse, non vérifiée : le squelch s'ouvre sur du bruit (Q37).
+- **Ce bruit fait inventer le modèle.** Des boucles (« Focter Nion Focter Nion… ») dans
+  **23 % des morceaux coupés à 30 s**, contre 7 à 8 % ailleurs. Le détecteur de parole du
+  sidecar ne sert qu'à accepter ou refuser le morceau entier : accepté, **tout l'audio part
+  au modèle, bruit compris**. Piste : ne décoder que les passages de parole. Mesurable hors
+  production sur le jeu annoté (09).
+- **La limite de 30 s coupe des transmissions** : sur le flux mélangé, quatre fréquences
+  laissent rarement 600 ms de silence. Remède structurel connu : le flux par fréquence (D2).
+- **Attente derrière le changement de modèle** : 102 décodages plus lents que le temps réel
+  (jusqu'à 43 s pour 8,7 s d'audio), le modèle français de la seconde lecture étant chargé à
+  tour de rôle avec l'anglais. Sans perte cette nuit, 4 pertes au pic de l'après-midi du 23.
+- **L'association s'améliore avec la longueur** : 6 % des morceaux de moins d'une seconde
+  de parole associés, 19 % au-delà de 8 s.
+- **Petits défauts logiciels** : une perte à 02:02 (connexion coupée pendant l'envoi, non
+  rejouée) ; les journaux du sidecar partent sur la sortie standard de co-atc, jetée au
+  lancement, ce qui empêche de dater les 2 690 rejets.
