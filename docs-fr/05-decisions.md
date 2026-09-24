@@ -3337,11 +3337,23 @@ rotation, et sur un fichier plus ancien auquel manquent des colonnes ajoutées d
 le correctif, les deux échouent (vérifié par mutation). Le binaire reconstruit a été
 relancé à 21:08, `vcs.modified=false`.
 
-**Ce qui reste non observé** : un passage de minuit réel avec ce correctif. Surveillance
+**Ce qui restait non observé** : un passage de minuit réel avec ce correctif. Surveillance
 passive cette nuit — `whisper-lab/scripts/surveillance-nuit.sh` écrit une ligne toutes
 les dix minutes dans `journaux/2026-09-23-nuit-surveillance.log` (processus, mémoire,
 fichier du jour, transcriptions, erreurs, disque). À lire demain : le compte de
 transcriptions du fichier du 24 doit croître dès 00:10, et `no_such_table` rester à 0.
+
+**Observé le 24/09** : rotation à **00:00:49**, fichier du 23 fermé dans la foulée, 0 « no
+such table », 0 écriture refusée. Le fichier du 24 a reçu **831 transcriptions de 00:00 à
+08:56** (157 dans la première heure, 32 à 35 au creux de 1 h à 3 h) et 619 000 positions
+ADS-B. co-atc et le sidecar ont tenu toute la nuit sur les mêmes processus, co-atc entre 260
+et 350 Mo. Seule perte côté transcription : **une** transmission à 02:02:27, requête coupée
+par le sidecar pendant l'envoi (*« write: connection reset »*) — cause probable, non
+vérifiée : une connexion gardée ouverte que le sidecar venait de fermer, que Go ne rejoue
+pas pour un POST. Aucune perte par dépassement de file au pic du matin. Côté station, l'ADS-B
+a manqué deux minutes à 01:41 (station injoignable) et une trentaine de secondes à 08:26
+(`aircraft.json` en 404, conteneurs non redémarrés) ; les deux fois, reprise sans
+intervention.
 
 **Leçon de méthode.** Une seconde voie qui fait la même chose que la première masque le
 trou de la première : les constructeurs créaient les tables au démarrage, donc rien ne
