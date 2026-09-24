@@ -3219,6 +3219,15 @@ co-atc :
   juste pour ce qu'elle mesure et aveugle à ce défaut. Il faut lui adjoindre le compte des
   coupures courtes en silence numérique.
 
+**Confirmé le 24/09 par les compteurs de RTLSDR-Airband**, pendant l'enregistrement continu
+par canal demandé à la station (`whisper-lab/echanges-station/`, accord du propriétaire,
+`stats_filepath` ajouté). En 6 minutes, de 10:47:28 à 10:53 : **125,825 compte 296 ouvertures
+de squelch et 341 battements** (`channel_flappy_counter`), contre 14 à 38 ouvertures et 0 à 35
+battements sur les trois autres. Bruits estimés voisins (−40,8 dBFS contre −40,6 à −42,8).
+**Le battement vient par épisodes** : 332 des 341 dans les deux minutes et demie qui suivent le
+démarrage, puis environ un par relevé de 15 s. Démarrage
+ou vrai épisode de trafic faible : à trancher dans les fichiers par canal.
+
 **Remède possible, côté station, non appliqué** (configuration de production : accord
 explicite du propriétaire requis) : baisser le seuil du squelch **sur 125,825 seulement**,
 et mesurer avant/après à la même heure — coupures courtes, et ouvertures sur le bruit
