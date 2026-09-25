@@ -3680,3 +3680,17 @@ sources, étiqueter chaque transcription avec la fréquence et la `version`.
 dans un navigateur) — co-atc corrigera l'heure quand même, en comptant les trames ; et pour la
 micro-coupure d'`aero.mp3`, **la cause d'abord**, avant que les flux séparés tournent en permanence.
 Réponse à la station : `whisper-lab/echanges-station/reponse-atc-scribe-2026-09-25-soir.md`.
+
+**La cause de la micro-coupure, selon la station** (25/09 au soir, lecture du code de
+RTLSDR-Airband 5.0.12 ; `whisper-lab/echanges-station/reponse-station-2026-09-25-soir-coupures.md`) :
+un seul fil encode et envoie toutes les sorties, le mélange compris, toutes les 1/8 s ; chaque flux
+séparé lui ajoute un encodage MP3 et un envoi à Icecast. Quand il prend plus de 1/16 s de retard, le
+mélangeur superpose le lot suivant à celui qui n'est pas parti : **le mélange saute 125 ms**
+(superposition, pas silence). Compteur `output_overrun_count` : **0 en 30 min sans flux, 10 en
+60 min avec 4 à 8 flux**. Remède candidat : l'option `multiple_output_threads`, qui donne au
+mélange son propre fil — essai d'environ 1 h 30 **quand le propriétaire n'écoute pas** (8 flux sans
+lecteur avec un seul fil ; 8 flux et 8 lecteurs avec fils séparés ; aucun flux avec fils séparés,
+pour vérifier qu'`aero.mp3` ne change pas). **Pas de flux séparés en permanence tant que ce n'est
+pas réglé.** Tampon des `aero-<id>.mp3` : **environ 4 ko (3 à 4 s)**, à la mise en service.
+Pour co-atc : ces sauts ne touchent pas les flux séparés ; sur `aero.mp3`, ils ne coûtent que
+125 ms de son chacun, et le comptage des trames contre l'horloge les verra.
