@@ -3477,6 +3477,14 @@ sur le Mac à ces heures. Et le coût du mélange est mesuré (doc 28, section 4
 environ quatre fois plus d'avions justes** que dans le mélange, aux mêmes heures, à précision
 égale.
 
+**Mesure lancée le 25/09 à 20 h 40** (accord du propriétaire) : « ne donner au modèle que la
+parole », hors ligne, sur les 2 075 morceaux acceptés de l'enregistrement par canal du 24/09 —
+passages de parole du détecteur élargis de 0,3 s ou de 1,0 s, recollés, modèle de production,
+jugés à l'ADS-B contre la référence (235,8 avions justes). Le tri retire 20 % de l'audio à 0,3 s
+(1 722 morceaux touchés), 11 % à 1,0 s (715). Sur le flux par canal, le bruit envoyé au modèle est
+bien moindre que sur le mélange : 35 morceaux seulement atteignent 30 s. Scripts :
+`whisper-lab/scripts/station/q41-parole-seule.py`, `q41-juger.py`.
+
 ### Q42 — Nettoyer l'audio avant la reconnaissance, sans IA *(ouverte, 24/09)*
 
 Question du propriétaire : *« il n'y a pas des techniques non IA pour améliorer fortement la
@@ -3666,3 +3674,9 @@ sources, étiqueter chaque transcription avec la fréquence et la `version`.
 - les commandes en GET seront fermées **le 26/09 au soir** (405, et `Content-Type:
   application/json` obligatoire en POST). **Sans effet pour nous** : ni co-atc ni les scripts du
   laboratoire n'appellent `/radio/` (vérifié le 25/09 au soir).
+
+**Décisions du propriétaire, 25/09 au soir** : **réduire le tampon des seuls `aero-<id>.mp3`**
+(`aero.mp3` inchangé ; coût accepté : une ou deux secondes de plus au démarrage d'une écoute seule
+dans un navigateur) — co-atc corrigera l'heure quand même, en comptant les trames ; et pour la
+micro-coupure d'`aero.mp3`, **la cause d'abord**, avant que les flux séparés tournent en permanence.
+Réponse à la station : `whisper-lab/echanges-station/reponse-atc-scribe-2026-09-25-soir.md`.
