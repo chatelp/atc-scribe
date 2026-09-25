@@ -3594,7 +3594,7 @@ que 125,825 et 126,425 s'ouvrent plus d'une fois sur deux sans parole. Le mélan
 ouvertures à la parole des autres canaux : elles ne sont pas rejetées, **elles partent au modèle**
 (Q41).
 
-### Q45 — Choisir les fréquences une par une à la station, par une API claire *(ouverte, 25/09)*
+### Q45 — Choisir les fréquences une par une à la station, par une API claire *(en grande partie faite le 25/09 ; restent les flux séparés)*
 
 Demande du propriétaire : *« compléter les groupes par des fréquences spécifiques […] avec une API
 claire pour switcher les fréquences sur la station »*. Aujourd'hui `radio-ctl` ne bascule que sur
@@ -3611,3 +3611,11 @@ automatique pour les essais, les actions en POST et JSON seulement, et un état 
 (×4 d'avions justes, doc 28) ; et le trou du 24/09 (16:38–18:50, un autre groupe transcrit sans
 que co-atc le sache) disparaît si co-atc étiquette chaque transcription avec la `version` de l'état.
 **co-atc ne bascule jamais la station de lui-même.**
+
+**Mis en place par la station le 25/09** (`whisper-lab/echanges-station/reponse-selection-frequences.md`,
+lu en lecture seule) : catalogue de 68 fréquences, sélection libre (fenêtre utilisable **2,08 MHz**,
+écart minimal 12,5 kHz, 8 fréquences au plus), vérification, retour automatique, **réglages de squelch
+et de niveau par fréquence** (`/radio/reglage`), état versionné et daté — les routes nouvelles en
+POST et JSON seulement. **Restent** : les flux séparés par fréquence (« phase 3, après mesure du
+processeur ») ; et les anciennes routes, qui basculent encore sur une simple lecture (GET), par
+compatibilité avec le pupitre.
