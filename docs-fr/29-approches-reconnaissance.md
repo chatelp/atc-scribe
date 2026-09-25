@@ -1,6 +1,6 @@
 # Améliorer la reconnaissance : toutes les approches, où on en est
 
-*Document de référence, état au 25 septembre 2026, 21 h 30. Il se lit sans jargon ; chaque ligne
+*Document de référence, état au 25 septembre 2026, 22 h 15. Il se lit sans jargon ; chaque ligne
 renvoie au document qui détaille la mesure. À tenir à jour à chaque résultat.*
 
 ## Ce qu'on cherche, et comment on juge
@@ -37,7 +37,7 @@ ne portent aucun indicatif (47 %).
 | 7 | Coller les transmissions consécutives avant de transcrire | nul ou négatif | ❌ (doc 12) |
 | 8 | Laisser le modèle deviner la langue | 16 à 28 % d'erreurs ; remplacé par la langue connue de chaque fréquence | ❌ (doc 13) |
 | 9 | Les réglages internes du modèle contre l'invention | aucun ne sépare l'invention de la bonne transcription | ❌ (D45) |
-| 9 bis | Ne donner au modèle que la parole (avec 1 s de marge autour) | 249 avions justes contre 236, et l'invention presque divisée par deux ; trop serré, on coupe les indicatifs | ⏳ prometteur, marge à régler (Q41) |
+| 9 bis | Ne donner au modèle que la parole | l'invention baisse avec la marge (presque divisée par deux à 1 s) ; les avions justes ne bougent pas au-delà du bruit, mais la fréquence faible 125,825 en perd à toutes les marges | ⏳ pas adopté en l'état (Q41) |
 
 ### B. Du texte à l'avion
 
@@ -57,7 +57,7 @@ ne portent aucun indicatif (47 %).
 
 | | Approche | Ce qui a été mesuré | Verdict |
 |---|---|---|---|
-| 19 | **Recevoir chaque fréquence séparément au lieu du mélange** | **4 fois plus d'avions justes** (235 contre 60), précision égale — le gain le plus fort mesuré à ce jour | ⏳ demandé à la station (Q45) |
+| 19 | **Recevoir chaque fréquence séparément au lieu du mélange** | **4 fois plus d'avions justes** (235 contre 60), précision égale — le gain le plus fort mesuré à ce jour | ⏳ co-atc prêt et essayé sur une station simulée (D57) ; la station doit d'abord régler les micro-coupures d'`aero.mp3` (Q45) |
 | 20 | Comprendre le hachage | c'est le squelch, sur **deux** fréquences faibles, par épisodes ; pas de coût mesurable sur l'association | ⏳ essai de réglage à faire (Q37, doc 28) |
 | 21 | Chasser le parasite de nuit | toujours là ; le bloc de la Freebox est innocenté | ⏳ coupable inconnu (Q44) |
 | 22 | Baisser le gain de la réception | ça écrête, mais baisser le gain n'est pas le remède | ❌ (D42, D43) |
@@ -84,8 +84,9 @@ ne portent aucun indicatif (47 %).
 
 ## Ce qui reste à tester, par ordre d'intérêt
 
-1. **La réception séparée par fréquence, en permanence** (Q45) : le gain est déjà mesuré, reste à
-   l'installer à la station et à brancher co-atc dessus.
+1. **La réception séparée par fréquence, en permanence** (Q45) : le gain est déjà mesuré, et co-atc
+   sait suivre la station (D57). Reste à la station de régler les micro-coupures, puis l'essai
+   sur la vraie station.
 2. **Un quatrième essai d'entraînement, s'il vaut la peine** : repartir de l'essai 2 (le modèle
    entier), avec **beaucoup moins de clips de silence** pour qu'il ne se taise plus sur la parole
    faible, un apprentissage plus doux, puis le vocabulaire de Paris (vos indicatifs par synthèse
@@ -95,9 +96,9 @@ ne portent aucun indicatif (47 %).
    entier, avec l'aide de l'outil d'annotation. Sans lui, on ne juge que l'indicatif.
 4. **Le squelch des deux fréquences faibles**, essayé avec retour automatique et jugé sur les
    compteurs de la station.
-5. **Ne donner au modèle que la parole** : premier essai prometteur le 25/09 (+5 % d'avions justes,
-   invention presque divisée par deux, Q41) ; reste à régler la marge et à confirmer sur un
-   autre jour, puis à le mettre dans le sidecar.
+5. **Ne donner au modèle que la parole** : mesuré le 25/09 (Q41) — l'invention baisse nettement,
+   les avions justes ne gagnent rien de mesurable, et la fréquence faible en perd. À reprendre
+   avec un détecteur de voix plus sensible pour ce tri, jugé sur un autre jour.
 6. **Garder les deux modèles en mémoire** : l'attente derrière le modèle français fait perdre des
    transmissions aux heures chargées (6 le matin du 25/09).
 7. **Le nettoyage du son par filtres**, mesuré hors ligne avant tout réglage de la station (Q42).
