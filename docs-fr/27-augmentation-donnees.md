@@ -305,3 +305,40 @@ jugement du clip seul (41 %) peuvent servir d'étiquette vide.**
 **Décision de passage** : la chaîne reproduit le canal de la station sur tout ce qui a pu être mesuré ;
 les deux écarts restants tiennent à la façon de parler et à des références partielles. **On passe à
 l'étape 3.**
+
+### Mini-essai 1 — ATCOSIM seul : **meilleur sur l'imitation, deux fois pire sur la station** *(25/09)*
+
+Les poids d'origine du modèle anglais de co-atc (`jlvdoorn/whisper-large-v3-atco2-asr`, 3,2 Go,
+téléchargés avec l'accord du propriétaire), affinés 500 pas (LoRA sur toute l'attention, codeur et
+décodeur, 31,5 M paramètres, 49 min sur le Mac, co-atc arrêté) sur 1 100 clips ATCOSIM dégradés au
+bruit du **15/09** et 120 clips de bruit seul étiquetés vides. Scripts : `whisper-lab/scripts/
+entrainement/mini-essai-*.py` ; résultats : `resultats/entrainement/2026-09-25-mini-essai-*`.
+
+**Contrôle d'abord** : les poids d'origine, reconvertis sans entraînement, rendent **la même
+transcription que la production sur 97,5 % des 720 clips** de la grille. Les écarts qui suivent
+viennent de l'entraînement, pas de la conversion.
+
+| | Production | Mini-essai 1 |
+|---|---|---|
+| Grille (ATCOSIM de test) : indicatif lu juste, sain / faible 0 dB | 86 % / 27 % | **90 % / 31 %** |
+| Grille : texte écrit sur du bruit seul | 37 % | **6 %** |
+| **Station, 24/09, avions justes à l'ADS-B (4 canaux, parole)** | **236** | **104** |
+| Station : précision, 125,825 | 67 % | 34 % |
+| Station : texte écrit sur les ouvertures sans parole | 20 à 44 % | 7 à 10 % |
+
+**Le modèle a pris le vocabulaire d'ATCOSIM.** Sur les 2 075 transmissions de la station :
+*« rhein »* 355 fois (le secteur « Rhein Radar » d'ATCOSIM), *« is identified »* 205 fois,
+*« lufthansa »* 487 fois contre 242, des compagnies disparues (*« sabena »*, *« alitalia »*) — et
+*« air france »* 64 fois contre 194. Il n'invente presque plus sur le bruit, mais il entend
+ATCOSIM partout, et les indicatifs de Paris se perdent.
+
+**Leçons** :
+- **l'imitation ne suffit pas pour juger** : son vocabulaire est celui d'ATCOSIM, elle flattait le
+  modèle. Seule la station a démasqué le défaut — le point d'arrêt de l'étape 5 était indispensable ;
+- **le bruit, lui, s'apprend** : moins d'invention sur le bruit seul, ici comme à la station ;
+- **le défaut est dans la moitié qui rédige** (le décodeur), qui a appris les phrases d'ATCOSIM.
+
+**Suite, lancée le 25/09 à 14:25** : **mini-essai 2**, un mélange de corpus (500 ATCOSIM dégradés,
+500 UWB-ATCC et 100 ATCO2 tels quels, les mêmes 120 vides), choix du propriétaire ; puis **mini-essai
+3**, le même mélange en n'adaptant que la moitié qui écoute (le codeur), remède direct au défaut
+observé. Même entraînement, même jugement.
