@@ -72,6 +72,7 @@ ne portent aucun indicatif (47 %).
 | 27 | Mini-essai 2 : un mélange de trois corpus | 191 avions justes (essai 1 : 104 ; production : 236) ; invente toujours moins sur le bruit ; la fréquence faible 125,825 perd encore la moitié de ses avions | ❌ en l'état, mais la bonne direction |
 | 28 | Mini-essai 3 : le mélange, en n'entraînant que « l'oreille » (pas la rédaction) | 158 avions justes, moins bien que l'essai 2 sur les quatre fréquences ; plus lent (textes à rallonge) | ❌ |
 | 28 bis | Ce que les essais 2 et 3 ont en commun | sur les fréquences faibles, ils rendent **vide un tiers à la moitié des morceaux qui contiennent de la parole** (8 % en production) : la leçon « se taire sur le bruit » déborde sur la parole faible | à corriger au prochain essai |
+| 28 ter | L'invention sur le bruit, là où elle compte | la baisse mesurée porte sur des ouvertures que co-atc n'envoie déjà pas au modèle ; sur les morceaux qu'il transcrit vraiment, **pas de gain** (texte trop long : 10,7 % production, 12,1 % essai 2) | ❌ l'acquis apparent ne tient pas |
 
 ### E. Qui parle, contrôleur ou pilote
 
@@ -87,8 +88,8 @@ ne portent aucun indicatif (47 %).
 2. **Un quatrième essai d'entraînement, s'il vaut la peine** : repartir de l'essai 2 (le modèle
    entier), avec **beaucoup moins de clips de silence** pour qu'il ne se taise plus sur la parole
    faible, un apprentissage plus doux, puis le vocabulaire de Paris (vos indicatifs par synthèse
-   vocale). Aucun des trois essais ne bat la production : c'est un chantier de fond, pas un gain
-   rapide.
+   vocale). Aucun des trois essais ne bat la production, et leur baisse d'invention sur le bruit
+   est déjà obtenue par le détecteur de voix : c'est un chantier de fond, pas un gain rapide.
 3. **Un jeu de test fiable** : une centaine de transmissions des fréquences visées, transcrites en
    entier, avec l'aide de l'outil d'annotation. Sans lui, on ne juge que l'indicatif.
 4. **Le squelch des deux fréquences faibles**, essayé avec retour automatique et jugé sur les

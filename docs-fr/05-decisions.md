@@ -3560,7 +3560,8 @@ Complément sans transcription : les indicatifs **confirmés par l'ADS-B** fourn
 **État au 25/09 au soir** : étapes 0 à 2 faites, trois mini-essais de 500 pas jugés sur la
 station du 24/09 (doc 27). **Aucun ne bat la production** (236 avions justes) : ATCOSIM seul 104,
 mélange de corpus 191, mélange en n'entraînant que l'oreille 158. Tous inventent moins sur le
-bruit ; mais les essais 2 et 3 **rendent vide un tiers à la moitié des morceaux de parole** des
+bruit seul — mais sur des ouvertures que le détecteur de voix écarte déjà en production (D27) ;
+sur les morceaux vraiment transcrits, pas de gain mesurable. Et les essais 2 et 3 **rendent vide un tiers à la moitié des morceaux de parole** des
 fréquences faibles (8 % en production) — le silence appris déborde sur la parole faible. La
 question reste ouverte : un essai de plus n'aurait de sens qu'avec beaucoup moins de clips vides,
 et la réception séparée par fréquence (Q45, ×4) passe avant.
