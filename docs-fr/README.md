@@ -38,6 +38,7 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `26-ce-que-co-atc-interprete.md` | **référence** : ce que co-atc comprend et affiche, par la voix et par l'ADS-B, vérifié dans le code — état au 23/09 |
 | `27-augmentation-donnees.md` | **plan** : affiner le modèle anglais sur des corpus transcrits dégradés au bruit de la station (Q43) — étapes, juges, points d'arrêt |
 | `28-gros-porteurs-par-canal.md` | les quatre canaux de `gros-porteurs` enregistrés séparément le 24/09 : deux sains, deux faibles qui battent et s'ouvrent sur du bruit (Q37, Q41) |
+| `29-approches-reconnaissance.md` | **référence** : toutes les approches pour améliorer la reconnaissance, ce qui est mesuré, adopté, écarté, et ce qui reste à tester — sans jargon |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
 
 > Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas
