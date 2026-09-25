@@ -241,3 +241,67 @@ doc 21 a vu. **Ce n'est pas elle qui trie la banque** : le tri est fait par le d
 
 **Étape suivante : la 2**, la chaîne de dégradation et sa validation, avec pour référence ce que
 le modèle actuel écrit sur ce bruit (doc 28, section 4).
+
+### Étape 2 — chaîne de dégradation : **validée**, avec deux écarts expliqués *(25/09)*
+
+`whisper-lab/scripts/degradation.py`, réglée sur l'empreinte de la station mesurée par canal
+(`scripts/empreinte-station.py`, enregistrement du 24/09) et jugée sur une **grille** : 120 clips de
+test d'ATCOSIM à plusieurs niveaux de bruit, plus 120 ouvertures sans parole de la banque, transcrits
+par le modèle anglais actuel (sidecar d'essai, co-atc arrêté à 10:12 à la demande du propriétaire).
+Résultats : `resultats/2026-09-25-grille-analyse.json`.
+
+**La chaîne**, dans l'ordre du trajet : bruit réel de la banque sous la voix ; bande 300–2 700 Hz ;
+niveau de la station ; **limiteur** à −3 dB (et compression 1,25 sur les canaux faibles) ; coupures
+de squelch rejouées d'après de vrais schémas de la station ; 8 kHz, MP3 16 kbit/s, retour à 16 kHz.
+Deux profils : **sain**, bruit injecté de +5 à +20 dB ; **faible**, de −5 à +5 dB.
+
+**Trois corrections apportées par la mesure elle-même** :
+- **pas d'écrêtage dans le son des canaux** (0 %) : celui de D42 est radio, l'étape est retirée ;
+- **un limiteur est indispensable** : sans lui, 38 % des clips « sains » écrêtaient ; la station a ses
+  crêtes à −3,4 à −5 dB, sa voix 8 à 12 dB au-dessus du niveau médian — reproduits (−2,9 à −5,2 dB) ;
+- **la mesure « voix contre bruit » de la station sature** sous +5 dB injectés (elle rend 0 à 2 dB) :
+  elle ne pouvait pas régler seule les canaux faibles. C'est la grille qui a fixé les niveaux.
+
+**À la mesure** (même règle que la station) :
+
+| | Niveau voix | Crêtes | Aigus 1,5–2,6 kHz | Voix/bruit, médiane |
+|---|---|---|---|---|
+| Station, 124,350 (sain) | −24,1 | −3,8 | 0,173 | 0,8 |
+| Grille, sain +10 dB | −24,2 | −3,1 | **0,171** | 4,5 |
+| Station, 125,825 · 126,425 (faibles) | −21,3 · −21,6 | −5,0 · −4,5 | **0,246 · 0,229** | 0,4 · 0,35 |
+| Grille, faible 0 dB | −21,9 | −5,2 | **0,260** | 0,8 |
+
+**Au comportement du modèle actuel** :
+
+| Condition | Taux d'erreur | Chiffres de l'indicatif justes | Sorties vides |
+|---|---|---|---|
+| ATCOSIM propre | 12 % | 99 % | 0 % |
+| sain +10 dB | 38 % | **86 %** | **0 %** |
+| faible 0 dB | 79 % | **27 %** | **12 %** |
+| faible 0 dB, hachage forcé | 88 % | 14 % | 33 % |
+
+- **L'écart sain/faible est celui de la station** : 27 / 86 = **0,31**, contre **0,33** pour les
+  avions justes par transmission à l'ADS-B (124,350 contre 125,825 et 126,425, doc 28).
+- **Sorties vides sur la parole** : station 0,4 % (sain), 7,6 à 8,2 % (faibles) ; grille 0 % et 12 %.
+- **Sur le bruit seul**, à règle égale (le détecteur ne trouve pas 0,25 s de parole dans le clip) : la
+  grille reçoit du texte sur **37 %** des clips (3,2 mots), la station sur **34 à 44 %** (2,4 à 3,1 mots).
+- Le spectre, l'écart sain/faible, les sorties vides et le comportement sur le bruit **se recoupent** :
+  sain autour de +10 dB, faible autour de 0 dB.
+
+**Deux écarts, qui ne viennent pas du canal** :
+- **Les boucles** : 6 à 10 % sur la parole de la station, presque 0 sur la grille. ATCOSIM, ce sont
+  des instructions isolées de 3 s ; la station, des échanges où le collationnement répète l'instruction,
+  que la règle des boucles compte aussi. C'est **la façon de parler**, pas le bruit — prévu dans le plan.
+- **Les insertions** face aux 15 transmissions anglaises annotées (71 %) : **14 des 15 références sont
+  partielles**, ce que l'annotateur n'a pas entendu compte comme une insertion. Non comparable.
+  La part de **substitutions**, elle, est proche : 26 % à la station, 24 % pour sain +10 dB.
+
+**Trouvé pour l'étape 3 — à corriger avant d'étiqueter** : **59 % des clips de la banque de bruit
+contiennent de la parole** pour le détecteur jugeant le clip seul (0,25 s ou plus), alors qu'ils
+n'en contenaient pas jugés dans l'heure entière. Ce sont vraisemblablement des voix faibles. Étiquetés
+« vides », ils apprendraient au modèle à ignorer de la vraie parole. **Seuls les clips sans parole au
+jugement du clip seul (41 %) peuvent servir d'étiquette vide.**
+
+**Décision de passage** : la chaîne reproduit le canal de la station sur tout ce qui a pu être mesuré ;
+les deux écarts restants tiennent à la façon de parler et à des références partielles. **On passe à
+l'étape 3.**
