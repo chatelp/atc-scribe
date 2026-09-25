@@ -3619,3 +3619,15 @@ et de niveau par fréquence** (`/radio/reglage`), état versionné et daté — 
 POST et JSON seulement. **Restent** : les flux séparés par fréquence (« phase 3, après mesure du
 processeur ») ; et les anciennes routes, qui basculent encore sur une simple lecture (GET), par
 compatibilité avec le pupitre.
+
+**Décision du propriétaire, 25/09 au soir : des flux séparés sur toute écoute**, groupe ou sélection
+libre (`http://audio.lan/aero-<id>.mp3`, MP3 mono 8 kHz pris avant le mélangeur, adresses dans
+`/radio/etat`). Calendrier de la station : mesure du processeur, limite de sources Icecast portée à
+12, construction derrière un interrupteur. Les commandes en GET seront fermées (405) après une
+semaine d'observation. Nouveau : `GET /radio/mesures` (bruit, seuil, ouvertures et battements du
+squelch par fréquence, 10 min glissantes). **Réponse d'atc-scribe** aux six questions de la station
+(`whisper-lab/echanges-station/reponse-atc-scribe-flux-separes.md`) : 32 kbit/s suffit, niveau natif
+conservé, 13 flux au plus, aucune commande en GET chez nous, pas de flux filtrés, et le retard de
+16 s corrigé côté co-atc. **À faire côté co-atc** : retirer les options `-reconnect` de ffmpeg pour
+ces flux (elles bouclent sur le 404 d'Icecast), suivre `/radio/etat` pour ouvrir et fermer les
+sources, étiqueter chaque transcription avec la fréquence et la `version`.
