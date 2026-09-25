@@ -114,6 +114,35 @@ func (p *LocalProcessor) run() {
 	buf := make([]byte, frame*2)
 
 	seg := newSegmenter(rate, p.config.Local)
+	// Transmissions are dated by where they sit in the stream (stream_clock.go):
+	// those cut while a server's burst is still arriving wait until it is in.
+	clock := newStreamClock(rate)
+	type cut struct {
+		pcm  []byte
+		mark leadAt
+	}
+	var waiting []cut
+	var replays replayFilter
+	// release sends what waits for a date, once the clock knows it -- or at
+	// once when forced, at a reconnection, while the clock is still the old
+	// connection's.
+	release := func(now time.Time, force bool) {
+		if len(waiting) == 0 || !(force || clock.settled() || now.Sub(waiting[0].mark.at) > maxWaitForDate) {
+			return
+		}
+		for _, c := range waiting {
+			date := clock.date(c.mark)
+			if !replays.fresh(date) {
+				p.logger.Info("Transmission replayed by a reconnection, not transcribed again",
+					String("dated", date.Format("15:04:05.000")))
+				continue
+			}
+			go p.send(c.pcm, rate, date)
+		}
+		waiting = waiting[:0]
+	}
+	var lastData time.Time
+	var lastMark leadAt
 	for {
 		select {
 		case <-p.ctx.Done():
@@ -138,11 +167,32 @@ func (p *LocalProcessor) run() {
 			}
 		}
 
-		if pcm := seg.push(buf[:n]); pcm != nil {
-			go p.send(pcm, rate, time.Now())
+		now := time.Now()
+		if !lastData.IsZero() && now.Sub(lastData) > reconnectGap {
+			// A gap in delivery is a reconnection. A transmission it interrupted
+			// ends there, dated by the old connection's clock: glued to the new
+			// connection's audio, whose burst starts in the past, it was dated
+			// forty seconds early in a test (docs-fr/05-decisions.md, D57).
+			if seg.speaking {
+				if pcm := seg.close(); pcm != nil {
+					waiting = append(waiting, cut{pcm, lastMark})
+				}
+			}
+			seg.pre = seg.pre[:0]
+			release(now, true)
 		}
+		clock.received(n/2, now)
+		lastData, lastMark = now, clock.mark(now)
+		if pcm := seg.push(buf[:n]); pcm != nil {
+			waiting = append(waiting, cut{pcm, lastMark})
+		}
+		// A stream that never settles still gets transcribed, dated as best known.
+		release(now, false)
 	}
 }
+
+// maxWaitForDate bounds how long a transmission waits for a burst to end.
+const maxWaitForDate = 10 * time.Second
 
 // send posts one transmission and stores whatever comes back.
 func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
