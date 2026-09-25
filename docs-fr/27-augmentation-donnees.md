@@ -1,8 +1,8 @@
 # Plan — affiner la reconnaissance par augmentation de données
 
 *Note de projet du 24 septembre 2026. L'idée est celle du propriétaire (Q43) ; ce document
-dit ce qu'on ferait, dans quel ordre, et à quoi on saurait que ça marche. **Rien n'est
-commencé.***
+dit ce qu'on ferait, dans quel ordre, et à quoi on saurait que ça marche. **Étapes 0 et 1
+faites la nuit du 24 au 25/09 : voir « État au 25/09 » à la fin.***
 
 ## En une phrase
 
@@ -176,3 +176,68 @@ chercher : réalisme ou étiquetage.
 - [ATCOSIM, TU Graz](https://www.spsc.tugraz.at/databases-and-tools/atcosim-air-traffic-control-simulation-speech-corpus.html)
 - [UWB-ATCC](https://huggingface.co/datasets/Jzuluaga/uwb_atcc)
 - [ATCO2, échantillon d'une heure](https://huggingface.co/datasets/Jzuluaga/atco2_corpus_1h)
+
+## État au 25/09 au matin
+
+### Préparation (24/09 au soir, accord du propriétaire)
+
+- **Corpus téléchargés sur le disque externe** (`whisper-lab/corpus-externes`) : ATCOSIM 2,2 Go,
+  UWB-ATCC 0,7 Go, ATCO2 une heure 0,1 Go. Transcriptions en chiffres épelés (*« lufthansa four
+  three nine three descend to flight level two seven zero »*), la forme que lit la grammaire.
+  ATCO2 : accord complet non trouvé dans la copie, usage accepté par le propriétaire sur la base
+  des conditions affichées (recherche, développement et évaluation de la reconnaissance ATC
+  anglaise).
+- **Environnement d'entraînement séparé**, sur le disque externe (`.venv-entrainement`, 1,1 Go) :
+  torch 2.14, transformers 5.17, peft 0.21, datasets 5.0.1, accelerate 1.15.
+
+### Étape 0 — faisabilité : **passée**
+
+Sans aucun téléchargement de poids : les deux tailles viennent du cache du disque externe
+(`whisper-medium.en` affiné ATC de jacktol ; l'architecture large-v3 prise sur le modèle français
+de bofenghuang — on mesure le coût d'un pas, pas la qualité). Affinage léger LoRA (q, v), 20 pas
+sur des clips ATCOSIM, puis fusion, conversion MLX et transcription par `mlx_whisper`.
+
+**Premier essai, 22:32 : échec des deux tailles**, mémoire graphique saturée à 30 Go avec un lot
+de 4 et sans rien d'autre (l'attention du codeur sur 1 500 trames, gardée pour la rétropropagation).
+**Second essai, 01:13, co-atc tournant à côté** — lot de 2, points de reprise
+(`gradient_checkpointing`), mémoire graphique plafonnée à 0,6 fois la recommandation (~10,7 Go)
+pour qu'un dépassement échoue net plutôt que de faire swapper la production :
+
+| | Medium | Large (taille du modèle anglais de co-atc) |
+|---|---|---|
+| Paramètres, dont entraînables | 764 M, 9,4 M | 1 543 M, 15,7 M |
+| Secondes par pas | **2,5** | **4,8** |
+| Mémoire graphique max | 5,6 Go | 9,1 Go |
+| Perte avant → après 20 pas | 0,92 → 0,30 | 1,75 → 0,25 |
+| Fusion et sauvegarde / conversion MLX | 4,5 s / 7,3 s | 21,6 s / 12,7 s |
+| Transcription par le modèle converti (référence : *lufthansa four three nine three descend to flight level two seven zero*) | *lufthansa four three nine three descend flight level two seven zero* | *luftanzer four three nine three descent flight level two seven zero* |
+
+**Aucune perte de transmission pendant les deux essais** (0 dépassement de délai). **Ordre de
+grandeur** : 4 000 pas de large en ~5 h 20, une nuit. La perte ne mesure ici que l'apprentissage
+de 36 clips, pas une qualité.
+
+**Mesuré au passage** : un **second modèle en inférence** à côté de la production (la
+transcription par canal) a fait tomber co-atc de 6,4 à 1,8 fois le temps réel et **perdre 2
+transmissions** (24/09 21:38). L'entraînement long se fera co-atc arrêté, ou à pertes acceptées.
+
+### Étape 1 — banque de bruit : **faite**
+
+`/Volumes/Crucial X8/whisper-corpus/banque-bruit/` : **5 267 ouvertures de squelch sans parole,
+4 h 51 de bruit réel, 546 Mo**, un WAV 16 kHz chacune, décrites dans `manifeste.jsonl`. Empreinte
+dans `resultats/2026-09-24-empreinte-bruit.json` :
+
+| Source | Canaux | Ouvertures sans parole | Minutes |
+|---|---|---|---|
+| 24/09, `gros-porteurs`, jour | 124,350 · 124,625 | 6 % · 9 % | 4 |
+| | **125,825 · 126,425** | **61 % · 50 %** | **81** |
+| 15/09, 132–133, nuit | les quatre du parasite (132,733 · 132,825 · 133,000 · 133,250) | **96 à 99 %** | 127 |
+| | 132,275 · 132,500 · 132,783 | 73 % · 85 % · 8 % | 44 |
+| 15/09, `orly-approche`, jour | cinq canaux | 6 à 51 % | 35 |
+
+Durées médianes de 1 à 5 s. **Réserve** : la mesure du peigne à 100 Hz (harmoniques contre points
+intermédiaires) reste négative partout, un peu moins sur les canaux du parasite (−1,7 à −2,9 dB
+contre −3,8 le jour) ; elle est trop grossière pour confirmer le peigne que l'analyse spectrale du
+doc 21 a vu. **Ce n'est pas elle qui trie la banque** : le tri est fait par le détecteur de voix.
+
+**Étape suivante : la 2**, la chaîne de dégradation et sa validation, avec pour référence ce que
+le modèle actuel écrit sur ce bruit (doc 28, section 4).
