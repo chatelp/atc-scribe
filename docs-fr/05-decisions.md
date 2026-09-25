@@ -3647,3 +3647,22 @@ conservé, 13 flux au plus, aucune commande en GET chez nous, pas de flux filtr�
 16 s corrigé côté co-atc. **À faire côté co-atc** : retirer les options `-reconnect` de ffmpeg pour
 ces flux (elles bouclent sur le 404 d'Icecast), suivre `/radio/etat` pour ouvrir et fermer les
 sources, étiqueter chaque transcription avec la fréquence et la `version`.
+
+**Mise à jour de la station, 25/09 à 20 h 20** (`whisper-lab/echanges-station/reponse-station-2026-09-25-20h20.md`) :
+- **feu vert technique** : 8 flux séparés lus ensemble pendant 20 min, 10 % d'un cœur au pire, sans
+  interruption ni débordement. Reste la construction ; la station préviendra quand `/radio/etat`
+  donnera les adresses. Six bascules d'essai entre 18 h 29 et 20 h 16 (versions 12 à 17) — sans
+  effet pour nous, co-atc était arrêté ;
+- **deux corrections à notre réponse** : les flux seront en **débit variable, 8 à 13 kbit/s**
+  (réglages LAME fixes de RTLSDR-Airband ; l'étiquette `icy-br=32` d'Icecast est fausse) — c'est
+  l'encodage exact des fichiers du 24/09, donc des mesures ×4. Et le tampon d'Icecast (64 ko)
+  vaut **50 à 65 s de son passé, pas 16 s** : toute la fenêtre ADS-B de ±60 s. **La correction
+  de l'heure devient obligatoire** : compter les trames décodées (576 échantillons = 72 ms) contre
+  l'horloge depuis la connexion, ou réduire le tampon des seuls `aero-<id>.mp3` (décision du
+  propriétaire) ;
+- **`aero.mp3` a une micro-coupure de 125 ms toutes les 5 à 10 min** quand les flux séparés
+  tournent ; les flux séparés n'en ont pas. C'est un changement du flux écouté chaque jour :
+  **au propriétaire de l'accepter ou non** ;
+- les commandes en GET seront fermées **le 26/09 au soir** (405, et `Content-Type:
+  application/json` obligatoire en POST). **Sans effet pour nous** : ni co-atc ni les scripts du
+  laboratoire n'appellent `/radio/` (vérifié le 25/09 au soir).
