@@ -20,8 +20,9 @@ type Frequency struct {
 	StreamURL       string    `json:"stream_url"`  // Relative URL path to stream from our server
 	StreamPort      int       `json:"stream_port"` // Port to use for streaming (for load distribution)
 	LastActive      time.Time `json:"last_active,omitempty"`
-	Order           int       `json:"order"`            // Order for display/sorting
-	TranscribeAudio bool      `json:"transcribe_audio"` // Whether to transcribe audio for this frequency
+	Order           int       `json:"order"`             // Order for display/sorting
+	TranscribeAudio bool      `json:"transcribe_audio"`  // Whether to transcribe audio for this frequency
+	Runtime         bool      `json:"runtime,omitempty"` // Added while the server runs, not from the configuration
 }
 
 // Stream represents the resources for a single active client's connection to an audio feed.

@@ -261,6 +261,21 @@ func (m *TranscriptionManager) StartTranscriptionWithExternalAudio(
 	return nil
 }
 
+// SetFrequencyLanguage records the expected language of a frequency that was
+// not in the catalogue at startup. It applies to transcriptions started after it.
+func (m *TranscriptionManager) SetFrequencyLanguage(frequencyID, language string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.transcriptionConfig.FrequencyLanguages == nil {
+		m.transcriptionConfig.FrequencyLanguages = map[string]string{}
+	}
+	if language == "" {
+		delete(m.transcriptionConfig.FrequencyLanguages, frequencyID)
+		return
+	}
+	m.transcriptionConfig.FrequencyLanguages[frequencyID] = language
+}
+
 // StopTranscription stops transcription for a frequency
 func (m *TranscriptionManager) StopTranscription(frequencyID string) {
 	m.mu.Lock()

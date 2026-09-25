@@ -79,6 +79,10 @@ func (r *Router) Routes() http.Handler {
 			// configuration says -- a mixed stream's contents can change while the
 			// server runs. See internal/frequencies/label.go.
 			router.Put("/frequencies/{id}/label", r.handler.PutFrequencyLabel)
+			// Streams added and removed while the server runs, for a station that
+			// publishes one per channel. See internal/frequencies/runtime_sources.go.
+			router.Put("/sources/{id}", r.handler.PutSource)
+			router.Delete("/sources/{id}", r.handler.DeleteSource)
 
 			// Audio stream route
 			router.Get("/stream/{id}", r.handler.StreamAudio)
