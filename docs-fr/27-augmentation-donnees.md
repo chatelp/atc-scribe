@@ -404,5 +404,22 @@ se perdent les avions de 125,825 et de 126,425, bien plus que dans le vocabulair
 - **l'oreille seule n'est pas le remède** : entraîner une moitié sans l'autre dégrade l'ensemble ;
 - **le poids du silence est trop fort** : 120 vides pour 1 100 clips parlés font taire le modèle
   sur la parole faible. Un prochain essai devrait en mettre moins, ou n'y mettre que du bruit franc ;
-- **aucun des trois essais ne bat la production** ; le meilleur (l'essai 2) reste à 81 %. Le seul
-  acquis net est la baisse de l'invention sur le bruit, et elle vient en partie de ce silence.
+- **aucun des trois essais ne bat la production** ; le meilleur (l'essai 2) reste à 81 %.
+
+**Correction le même soir : la baisse de l'invention sur le bruit vaut moins qu'elle n'en a
+l'air.** Elle est mesurée sur les ouvertures de moins de 0,25 s de parole — or **co-atc ne les
+envoie jamais au modèle** : le détecteur de voix les écarte avant (`min_speech_seconds` = 0,25,
+D27). Ce gain-là, la production l'a déjà, sans entraînement. Sur les 2 075 morceaux qu'elle
+transcrit vraiment, un indicateur d'invention — plus de mots que la parole n'en permet
+(plus de 4 mots par seconde de parole, plus 4) :
+
+| Morceaux acceptés par le détecteur de voix | Production | Essai 2 | Essai 3 |
+|---|---|---|---|
+| Texte trop long pour la parole, tous morceaux (2 075) | 10,7 % | 12,1 % | 9,3 % |
+| Morceaux avec moins d'une seconde de parole (137) : avec texte | 78 % | 36 % | 31 % |
+| Les mêmes : texte trop long | 32 % | 18 % | 11 % |
+
+Sur l'ensemble, **aucun gain** ; il ne reste qu'une réserve plus grande sur les morceaux à très peu
+de parole — où l'on ne sait pas, sans transcription de référence, si se taire est juste. Le vrai
+problème de l'invention en production est **le bruit à l'intérieur des morceaux acceptés** (Q41),
+et les essais ne l'ont pas réglé.
