@@ -3261,6 +3261,13 @@ et mesurer avant/après à la même heure — coupures courtes, et ouvertures su
 `salves.py` plus les coupures courtes) et `scripts/station/hachage-par-frequence.py` (quelle
 fréquence est coupée).
 
+
+**Précision de la station, 25/09** : un réglage de squelch par `/radio/reglage` (ou le crayon du
+tableau de bord) **ne vaut que pour la sélection libre**. Pour changer le squelch de 125,825 ou
+126,425 **dans le groupe `gros-porteurs`**, il faut modifier son gabarit, **sur décision du
+propriétaire**. La station attend une **proposition chiffrée** : fréquence, valeur, et preuves
+tirées de `/radio/mesures` (bruit, seuil, part du temps ouvert, ouvertures et battements, sur 10 min
+glissantes) — elle l'appliquera alors au gabarit.
 ### Q38 — Les mots accentués sont coupés en deux par l'analyse *(répondue le 23/09 : corrigé, voir la suite)*
 
 Trouvé en écrivant les tests de D55 : le découpage en mots ne garde que `a-z`, `0-9` et le
