@@ -59,7 +59,10 @@ func (l *labels) nameFor(id, configured string) string {
 // SetLabel records what a frequency is currently carrying, overriding the name
 // from the configuration until it is cleared with an empty string.
 func (s *Service) SetLabel(id, text string) error {
-	if _, ok := s.frequenciesConfig[id]; !ok {
+	s.sourcesMu.RLock()
+	_, ok := s.frequenciesConfig[id]
+	s.sourcesMu.RUnlock()
+	if !ok {
 		return fmt.Errorf("no frequency with id %q", id)
 	}
 	return s.labels.Set(id, text)

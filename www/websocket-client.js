@@ -39,6 +39,7 @@ class WebSocketClient {
             phase_change: [],
             clearance_issued: [],
             frequency_status: [],
+            frequencies_changed: [],
             state_change: [],
             reconnect_scheduled: [],
             open: [],
@@ -188,6 +189,8 @@ class WebSocketClient {
                     this._notifyListeners('phase_change', message.data);
                 } else if (message.type === 'frequency_status') {
                     this._notifyListeners('frequency_status', message.data);
+                } else if (message.type === 'frequencies_changed') {
+                    this._notifyListeners('frequencies_changed', message.data);
                 }
             } catch (error) {
                 this._recordParseError();

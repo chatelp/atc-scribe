@@ -3225,6 +3225,12 @@ async initAircraftDataSource() {
                 this.handleFrequencyStatusChange(data);
             });
 
+            // A source added or removed while the server runs -- a station that
+            // publishes one stream per channel changes them as it switches.
+            wsClient.addEventListener('frequencies_changed', () => {
+                this.refreshAudioFrequencies();
+            });
+
             // Aircraft events are now handled as phase changes (T/O and T/D)
             
             wsClient.addEventListener('open', () => {
@@ -5208,6 +5214,25 @@ async initAircraftDataSource() {
         },
 
         // Renamed from connectToAllFrequencies to reflect its new role
+        // Fetch the list again after a source was added or removed: prepare what
+        // is new, release what left. Transcriptions already on the page stay.
+        async refreshAudioFrequencies() {
+            try {
+                const response = await fetch(this.audioApiUrl);
+                if (!response.ok) return;
+                const data = await response.json();
+                const next = (data && data.frequencies) || [];
+                const kept = new Set(next.map(f => String(f.id)));
+                this.audioFrequencies.forEach(f => {
+                    if (!kept.has(String(f.id)) && audioClient) audioClient.cleanupFrequency(String(f.id));
+                });
+                this.audioFrequencies = next;
+                this.prepareAllFrequencies();
+            } catch (e) {
+                console.error('Failed to refresh frequencies:', e);
+            }
+        },
+
         prepareAllFrequencies() {
             // REMOVED: this.initAudioContext(); // Ensure audio context is ready - This was causing the error.
             // The audioClient.prepareFrequency (called below) handles context initialization.

@@ -21,6 +21,7 @@ const (
 	MessageTypeFilterUpdate            = "filter_update"             // Client sends filter preferences
 	MessageTypeSimulationControlUpdate = "simulation_control_update" // Client updates simulation controls
 	MessageTypeFrequencyStatus         = "frequency_status"          // Frequency connection status changes
+	MessageTypeFrequenciesChanged      = "frequencies_changed"       // A source was added or removed while running
 )
 
 // Message represents a WebSocket message

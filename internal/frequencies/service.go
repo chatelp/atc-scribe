@@ -50,6 +50,7 @@ func NewStreamProcessor(
 	ctx context.Context,
 	id string,
 	audioURL string,
+	ffmpegReconnect bool,
 	client *Client,
 	config *cfg.Config,
 	logger *logger.Logger,
@@ -65,6 +66,7 @@ func NewStreamProcessor(
 		ReconnectDelay:           time.Duration(config.Frequencies.ReconnectIntervalSecs) * time.Second,
 		FFmpegTimeoutSecs:        config.Frequencies.FFmpegTimeoutSecs,
 		FFmpegReconnectDelaySecs: config.Frequencies.FFmpegReconnectDelaySecs,
+		NoFFmpegReconnect:        !ffmpegReconnect,
 	}
 
 	audioProcessor, err := audio.NewCentralAudioProcessor(
@@ -476,6 +478,12 @@ type Service struct {
 	wsServer             *websocket.Server               // WebSocket server for broadcasting status updates
 	connectionStatus     map[string]connectionStatusInfo // Track connection status per frequency
 	statusMu             sync.RWMutex                    // Mutex for connectionStatus map
+
+	// Sources can be added and removed while the server runs (runtime_sources.go),
+	// so frequenciesConfig is guarded; runtime marks the sources that were added.
+	sourcesMu sync.RWMutex
+	runtime   map[string]bool
+	changeMu  sync.Mutex // one add or remove at a time
 }
 
 // connectionStatusInfo stores the current connection status and error for a frequency
@@ -618,6 +626,7 @@ func NewService(
 		labels:               newLabels(),
 		client:               NewClient(0, logger),
 		frequenciesConfig:    freqsConfig,
+		runtime:              map[string]bool{},
 		bufferSize:           bufferSize,
 		config:               config,
 		logger:               logger.Named("freq-service"),
@@ -638,78 +647,14 @@ func (s *Service) Start(ctx context.Context) error {
 	s.logger.Info("Starting frequencies service with persistent connections")
 
 	// Start a stream processor for each configured frequency
-	for id, freqConfig := range s.frequenciesConfig {
-		s.logger.Info("Starting stream processor for frequency",
-			String("id", id),
-			String("name", freqConfig.Name),
-			String("url", freqConfig.URL))
-
-		processor, err := NewStreamProcessor(
-			s.ctx,
-			id,
-			freqConfig.URL,
-			s.client,
-			s.config,
-			s.logger,
-		)
-
-		if err != nil {
-			s.logger.Error("Failed to create stream processor",
-				String("id", id),
-				Error(err))
-			// Broadcast failure status
-			s.broadcastFrequencyStatus(id, audio.StatusFailed, err.Error())
-			continue
-		}
-
-		// Set status callback to broadcast status changes via WebSocket
-		processor.audioProcessor.SetStatusCallback(s.broadcastFrequencyStatus)
-
-		err = processor.Start()
-		if err != nil {
-			s.logger.Error("Failed to start stream processor",
-				String("id", id),
-				Error(err))
-			// Broadcast failure status
-			s.broadcastFrequencyStatus(id, audio.StatusFailed, err.Error())
-			continue
-		}
-
-		s.streamsMu.Lock()
-		s.activeStreams[id] = processor
-		s.streamsMu.Unlock()
-
-		// Start transcription with external audio if enabled
-		frequency := &Frequency{
-			ID:              id,
-			Name:            freqConfig.Name,
-			URL:             freqConfig.URL,
-			TranscribeAudio: freqConfig.TranscribeAudio,
-		}
-
-		if frequency.TranscribeAudio {
-			s.logger.Info("Starting transcription with external audio for frequency",
-				String("id", id),
-				String("name", freqConfig.Name),
-				Bool("transcribe_audio", freqConfig.TranscribeAudio))
-
-			if err := s.transcriptionManager.StartTranscriptionWithExternalAudio(
-				s.ctx,
-				frequency.ID,
-				frequency.Name,
-				frequency.TranscribeAudio,
-				processor.audioProcessor,
-			); err != nil {
-				s.logger.Error("Failed to start transcription with external audio for frequency",
-					String("id", id),
-					Error(err))
-			}
-		} else {
-			s.logger.Info("Transcription not enabled for frequency",
-				String("id", id),
-				String("name", freqConfig.Name),
-				Bool("transcribe_audio", freqConfig.TranscribeAudio))
-		}
+	s.sourcesMu.RLock()
+	configured := make([]*cfg.FrequencyConfig, 0, len(s.frequenciesConfig))
+	for _, freqConfig := range s.frequenciesConfig {
+		configured = append(configured, freqConfig)
+	}
+	s.sourcesMu.RUnlock()
+	for _, freqConfig := range configured {
+		s.startSource(freqConfig)
 	}
 
 	s.logger.Info("All frequency stream processors started")
@@ -726,6 +671,86 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// startSource connects to one frequency's stream and, if it is to be
+// transcribed, starts its transcription. A failure is logged and broadcast
+// rather than returned: one unreachable stream must not keep the others down.
+func (s *Service) startSource(freqConfig *cfg.FrequencyConfig) bool {
+	id := freqConfig.ID
+	s.logger.Info("Starting stream processor for frequency",
+		String("id", id),
+		String("name", freqConfig.Name),
+		String("url", freqConfig.URL))
+
+	processor, err := NewStreamProcessor(
+		s.ctx,
+		id,
+		freqConfig.URL,
+		freqConfig.ReconnectsInFFmpeg(),
+		s.client,
+		s.config,
+		s.logger,
+	)
+
+	if err != nil {
+		s.logger.Error("Failed to create stream processor",
+			String("id", id),
+			Error(err))
+		// Broadcast failure status
+		s.broadcastFrequencyStatus(id, audio.StatusFailed, err.Error())
+		return false
+	}
+
+	// Set status callback to broadcast status changes via WebSocket
+	processor.audioProcessor.SetStatusCallback(s.broadcastFrequencyStatus)
+
+	err = processor.Start()
+	if err != nil {
+		s.logger.Error("Failed to start stream processor",
+			String("id", id),
+			Error(err))
+		// Broadcast failure status
+		s.broadcastFrequencyStatus(id, audio.StatusFailed, err.Error())
+		return false
+	}
+
+	s.streamsMu.Lock()
+	s.activeStreams[id] = processor
+	s.streamsMu.Unlock()
+
+	// Start transcription with external audio if enabled
+	frequency := &Frequency{
+		ID:              id,
+		Name:            freqConfig.Name,
+		URL:             freqConfig.URL,
+		TranscribeAudio: freqConfig.TranscribeAudio,
+	}
+
+	if frequency.TranscribeAudio {
+		s.logger.Info("Starting transcription with external audio for frequency",
+			String("id", id),
+			String("name", freqConfig.Name),
+			Bool("transcribe_audio", freqConfig.TranscribeAudio))
+
+		if err := s.transcriptionManager.StartTranscriptionWithExternalAudio(
+			s.ctx,
+			frequency.ID,
+			frequency.Name,
+			frequency.TranscribeAudio,
+			processor.audioProcessor,
+		); err != nil {
+			s.logger.Error("Failed to start transcription with external audio for frequency",
+				String("id", id),
+				Error(err))
+		}
+	} else {
+		s.logger.Info("Transcription not enabled for frequency",
+			String("id", id),
+			String("name", freqConfig.Name),
+			Bool("transcribe_audio", freqConfig.TranscribeAudio))
+	}
+	return true
 }
 
 // Stop stops all stream processors and cleans up resources.
@@ -901,7 +926,9 @@ func (s *Service) GetAudioStream(ctx context.Context, id string, clientID string
 	defer cancel()
 
 	// Check if the frequency exists
+	s.sourcesMu.RLock()
 	freqConfig, ok := s.frequenciesConfig[id]
+	s.sourcesMu.RUnlock()
 	if !ok {
 		return nil, "", fmt.Errorf("frequency configuration not found: %s", id)
 	}
@@ -967,6 +994,7 @@ func (s *Service) GetAudioStream(ctx context.Context, id string, clientID string
 				s.ctx,
 				id,
 				freqConfig.URL,
+				freqConfig.ReconnectsInFFmpeg(),
 				s.client,
 				s.config,
 				s.logger,
@@ -1013,7 +1041,6 @@ func (s *Service) GetAudioStream(ctx context.Context, id string, clientID string
 // as "active" status is per-client and not centrally tracked in the same way.
 // We can indicate a general "available" status based on config existence.
 func (s *Service) GetAllFrequencies() []*Frequency { // frequencies.Frequency from models.go
-	// No RLock needed as s.frequenciesConfig is read-only after NewService
 	var result []*Frequency
 
 	// Get a snapshot of connection statuses
@@ -1024,6 +1051,8 @@ func (s *Service) GetAllFrequencies() []*Frequency { // frequencies.Frequency fr
 	}
 	s.statusMu.RUnlock()
 
+	s.sourcesMu.RLock()
+	defer s.sourcesMu.RUnlock()
 	for _, fc := range s.frequenciesConfig {
 		streamURL, streamPort := s.buildStreamInfo(fc.ID)
 
@@ -1047,6 +1076,7 @@ func (s *Service) GetAllFrequencies() []*Frequency { // frequencies.Frequency fr
 			LastError:       lastError,
 			Order:           fc.Order,
 			TranscribeAudio: fc.TranscribeAudio,
+			Runtime:         s.runtime[fc.ID],
 		})
 	}
 
@@ -1059,6 +1089,8 @@ func (s *Service) GetAllFrequencies() []*Frequency { // frequencies.Frequency fr
 }
 
 func (s *Service) GetFrequencyByID(id string) (*Frequency, bool) {
+	s.sourcesMu.RLock()
+	defer s.sourcesMu.RUnlock()
 	fc, ok := s.frequenciesConfig[id]
 	if !ok {
 		return nil, false
@@ -1087,6 +1119,7 @@ func (s *Service) GetFrequencyByID(id string) (*Frequency, bool) {
 		Status:          status,
 		LastError:       lastError,
 		TranscribeAudio: fc.TranscribeAudio,
+		Runtime:         s.runtime[fc.ID],
 	}, true
 }
 
@@ -1134,7 +1167,3 @@ func (s *Service) broadcastFrequencyStatus(frequencyID string, status audio.Conn
 
 	s.wsServer.Broadcast(message)
 }
-
-// AddFrequency and RemoveFrequency could be implemented to modify s.frequenciesConfig
-// if dynamic updates to available frequencies are needed. For now, assuming static config.
-// They would require s.mu to protect s.frequenciesConfig if made concurrent-safe.
