@@ -3456,6 +3456,12 @@ co-atc, bases du 23 et du 24, en lecture seule).
   rejouée) ; les journaux du sidecar partent sur la sortie standard de co-atc, jetée au
   lancement, ce qui empêche de dater les 2 690 rejets.
 
+**Complément du 25/09.** Les pertes au pic du matin sont maintenant comptées : **6 transmissions
+perdues** par dépassement du délai de 60 s (06:51, deux ; 07:28, quatre), rien d'autre ne tournant
+sur le Mac à ces heures. Et le coût du mélange est mesuré (doc 28, section 4) : **canal par canal,
+environ quatre fois plus d'avions justes** que dans le mélange, aux mêmes heures, à précision
+égale.
+
 ### Q42 — Nettoyer l'audio avant la reconnaissance, sans IA *(ouverte, 24/09)*
 
 Question du propriétaire : *« il n'y a pas des techniques non IA pour améliorer fortement la
@@ -3536,7 +3542,7 @@ Complément sans transcription : les indicatifs **confirmés par l'ADS-B** fourn
 
 **Plan détaillé** : `27-augmentation-donnees.md` (24/09), à la demande du propriétaire.
 
-### Q44 — Le bloc de la Freebox remplacé : le parasite de nuit disparaît-il ? *(ouverte, 24/09)*
+### Q44 — Le bloc de la Freebox remplacé : le parasite de nuit disparaît-il ? *(répondue le 25/09 : **non**)*
 
 Complément de la station, 24/09 après-midi (`whisper-lab/echanges-station/complement-2026-09-24-apres-midi.md`) :
 le propriétaire a remplacé **vers 16:15** le bloc d'alimentation CPL de la Freebox par une
@@ -3559,6 +3565,21 @@ après le retrait des adaptateurs CPL.
 groupe 132–133 MHz, pas `gros-porteurs`. La base ne le dit nulle part (`frequency_id` reste
 `aero-melange`) ; **à exclure de toute analyse de `gros-porteurs`.** co-atc s'est reconnecté seul
 aux trois bascules (16:35, 16:38, 18:50), première transcription 0 à 12 s après chaque coupure.
+
+**Mesuré la nuit du 24 au 25/09 : le parasite est toujours là.** Part des morceaux rejetés sans
+parole par le sidecar, heure par heure (relevés toutes les dix minutes ; co-atc arrêté de 21:55 à
+22:35 pour la transcription par canal, l'heure de 22 h est donc partielle) :
+
+| | 22 h | 23 h | 0 h | 1 h | 2 h | 3 h | 4 h | 5 h | 6 h | 7 h |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Nuit du 24 au 25** (sans le bloc) | 43 % | 36 % | 39 % | **87 %** | **91 %** | **87 %** | 51 % | 26 % | 14 % | 8 % |
+| Nuit du 20 au 21 (D27, avec le bloc) | 61 % | 61 % | 86 % | 88 % | **96 %** | **98 %** | 95 % | 72 % | 47 % | 26 % |
+
+Au cœur de la nuit, de 1 h à 4 h, **87 à 91 % de rejets, comme avant** : le bloc de la Freebox
+n'était pas la source du parasite de nuit, ce que la station concluait par raisonnement. La courbe
+paraît **plus étroite** (0 h et 4–7 h nettement plus bas), mais une nuit contre une nuit, avec un
+trafic et des conditions différents (17 instances de co-atc la nuit du 20, sans effet sur le taux
+d'après D26), ne permet pas d'en tirer un changement. Le parasite reste sans coupable.
 
 **Cohérence avec 28** : en journée, le sidecar ne rejette que 6 % des morceaux du mélange, alors
 que 125,825 et 126,425 s'ouvrent plus d'une fois sur deux sans parole. Le mélange colle ces
