@@ -3485,6 +3485,21 @@ jugés à l'ADS-B contre la référence (235,8 avions justes). Le tri retire 20 
 bien moindre que sur le mélange : 35 morceaux seulement atteignent 30 s. Scripts :
 `whisper-lab/scripts/station/q41-parole-seule.py`, `q41-juger.py`.
 
+**Premier résultat, 25/09 à 21 h 24** (`whisper-lab/resultats/station/2026-09-25-q41-jugement.json`) :
+
+| Ce qu'on donne au modèle | Avions justes (vrais) | Texte trop long pour la parole | Parole rendue vide, 125,825 / 126,425 |
+|---|---|---|---|
+| Tout le morceau (référence) | 235,8 | 10,7 % | 8,2 / 7,6 % |
+| La parole, élargie de 0,3 s | 199,4 | 1,8 % | 5,1 / 9,1 % |
+| **La parole, élargie de 1,0 s** | **248,6** | **5,9 %** | 4,5 / 6,0 % |
+
+Par canal, à 1,0 s : 124,350 **146,6** (85 %) contre 134,4 (78 %) ; 124,625 18,0 contre 18,2 ;
+125,825 **40,2** (61 %) contre 47,8 (67 %) ; 126,425 **43,8** (77 %) contre 35,4 (63 %).
+**Sans entraînement, un peu plus d'avions justes (+5 %) et l'indicateur d'invention presque
+divisé par deux** ; trop serré (0,3 s), l'invention disparaît presque mais les débuts
+d'indicatifs sont coupés. Réserves : une seule matinée, et 125,825 recule quand les autres
+avancent. Balayage lancé à 21 h 30 : 0,6, 1,5 et 2,5 s.
+
 ### Q42 — Nettoyer l'audio avant la reconnaissance, sans IA *(ouverte, 24/09)*
 
 Question du propriétaire : *« il n'y a pas des techniques non IA pour améliorer fortement la

@@ -1,6 +1,6 @@
 # Améliorer la reconnaissance : toutes les approches, où on en est
 
-*Document de référence, état au 25 septembre 2026, 20 h. Il se lit sans jargon ; chaque ligne
+*Document de référence, état au 25 septembre 2026, 21 h 30. Il se lit sans jargon ; chaque ligne
 renvoie au document qui détaille la mesure. À tenir à jour à chaque résultat.*
 
 ## Ce qu'on cherche, et comment on juge
@@ -37,6 +37,7 @@ ne portent aucun indicatif (47 %).
 | 7 | Coller les transmissions consécutives avant de transcrire | nul ou négatif | ❌ (doc 12) |
 | 8 | Laisser le modèle deviner la langue | 16 à 28 % d'erreurs ; remplacé par la langue connue de chaque fréquence | ❌ (doc 13) |
 | 9 | Les réglages internes du modèle contre l'invention | aucun ne sépare l'invention de la bonne transcription | ❌ (D45) |
+| 9 bis | Ne donner au modèle que la parole (avec 1 s de marge autour) | 249 avions justes contre 236, et l'invention presque divisée par deux ; trop serré, on coupe les indicatifs | ⏳ prometteur, marge à régler (Q41) |
 
 ### B. Du texte à l'avion
 
@@ -94,8 +95,9 @@ ne portent aucun indicatif (47 %).
    entier, avec l'aide de l'outil d'annotation. Sans lui, on ne juge que l'indicatif.
 4. **Le squelch des deux fréquences faibles**, essayé avec retour automatique et jugé sur les
    compteurs de la station.
-5. **Ne donner au modèle que la parole** : aujourd'hui, un morceau accepté part au modèle avec son
-   bruit, et c'est là qu'il invente (Q41).
+5. **Ne donner au modèle que la parole** : premier essai prometteur le 25/09 (+5 % d'avions justes,
+   invention presque divisée par deux, Q41) ; reste à régler la marge et à confirmer sur un
+   autre jour, puis à le mettre dans le sidecar.
 6. **Garder les deux modèles en mémoire** : l'attente derrière le modèle français fait perdre des
    transmissions aux heures chargées (6 le matin du 25/09).
 7. **Le nettoyage du son par filtres**, mesuré hors ligne avant tout réglage de la station (Q42).
