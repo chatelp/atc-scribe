@@ -338,7 +338,34 @@ ATCOSIM partout, et les indicatifs de Paris se perdent.
 - **le bruit, lui, s'apprend** : moins d'invention sur le bruit seul, ici comme à la station ;
 - **le défaut est dans la moitié qui rédige** (le décodeur), qui a appris les phrases d'ATCOSIM.
 
-**Suite, lancée le 25/09 à 14:25** : **mini-essai 2**, un mélange de corpus (500 ATCOSIM dégradés,
+**Suite, lancée le 25/09 à 14:19** : **mini-essai 2**, un mélange de corpus (500 ATCOSIM dégradés,
 500 UWB-ATCC et 100 ATCO2 tels quels, les mêmes 120 vides), choix du propriétaire ; puis **mini-essai
 3**, le même mélange en n'adaptant que la moitié qui écoute (le codeur), remède direct au défaut
 observé. Même entraînement, même jugement.
+
+### Mini-essai 2 — le mélange de corpus : **presque le double de l'essai 1, encore sous la production** *(25/09)*
+
+Même entraînement que l'essai 1 (500 pas, toute l'attention), une seule chose change : les
+données — 500 clips ATCOSIM dégradés, 500 UWB-ATCC et 100 ATCO2 tels quels (vraie radio), les
+mêmes 120 vides.
+
+| Avions justes à l'ADS-B, 24/09 (précision) | Production | Essai 1 | **Essai 2** |
+|---|---|---|---|
+| 124,350 | 134 (78 %) | 70 (72 %) | **115 (77 %)** |
+| 124,625 | 18 (79 %) | 11 (68 %) | **22 (85 %)** |
+| 125,825 | 48 (67 %) | 7 (34 %) | **24 (57 %)** |
+| 126,425 | 35 (63 %) | 16 (60 %) | **30 (72 %)** |
+| **Total** | **236** | **104** | **191** |
+| Texte écrit sur les ouvertures sans parole | 20–44 % | 7–10 % | 6–20 % |
+| Grille : indicatif lu juste, sain / faible +5 dB | 86 / 59 % | 90 / 66 % | 92 / 71 % |
+
+**Diluer ATCOSIM a presque doublé l'essai 1** et gardé l'essentiel de la baisse d'invention sur
+le bruit ; 124,625 dépasse même la production. **Mais il reste 19 % sous la production**, et la
+fréquence faible 125,825 perd la moitié de ses avions : le vocabulaire dérive encore. La grille,
+elle, le donne aussi bon que l'essai 1 — elle ne voit pas cette dérive (même leçon).
+
+**Mini-essai 3** (le même mélange, en n'adaptant que la moitié qui écoute) : **suspendu à 16:30**,
+avant son démarrage automatique. La mémoire du Mac débordait sur le disque (mémoire d'échange à
+35–38 Go, 12 Go libres), à cause de deux programmes étrangers aux essais — une fuite de Nextcloud
+(225 Go), puis un programme du propriétaire (`dbibackend`, 98 Go). Il sera lancé à la main quand
+la mémoire sera revenue à la normale.

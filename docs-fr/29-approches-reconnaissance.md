@@ -1,6 +1,6 @@
 # Améliorer la reconnaissance : toutes les approches, où on en est
 
-*Document de référence, état au 25 septembre 2026 après-midi. Il se lit sans jargon ; chaque ligne
+*Document de référence, état au 25 septembre 2026, 17 h. Il se lit sans jargon ; chaque ligne
 renvoie au document qui détaille la mesure. À tenir à jour à chaque résultat.*
 
 ## Ce qu'on cherche, et comment on juge
@@ -69,8 +69,8 @@ ne portent aucun indicatif (47 %).
 | 24 | Peut-on entraîner sur ce Mac ? | oui : ~5 s par pas, 9 Go de mémoire ; reconversion pour co-atc réussie | ✅ |
 | 25 | Faire sonner des enregistrements propres comme la station | l'imitation reproduit la station sur tout ce qui se mesure | ✅ |
 | 26 | Mini-essai 1 : un seul corpus, le modèle entier | invente **4 à 6 fois moins** sur du bruit, mais **deux fois moins d'avions justes** : il a appris le vocabulaire du corpus (« Rhein », « Lufthansa ») et perdu celui de Paris | ❌ en l'état |
-| 27 | Mini-essai 2 : un mélange de trois corpus | résultat attendu le 25/09 vers 16 h 45 | ⏳ |
-| 28 | Mini-essai 3 : le mélange, en n'entraînant que « l'oreille » (pas la rédaction) | résultat attendu le 25/09 vers 19 h | ⏳ |
+| 27 | Mini-essai 2 : un mélange de trois corpus | 191 avions justes (essai 1 : 104 ; production : 236) ; invente toujours moins sur le bruit ; la fréquence faible 125,825 perd encore la moitié de ses avions | ❌ en l'état, mais la bonne direction |
+| 28 | Mini-essai 3 : le mélange, en n'entraînant que « l'oreille » (pas la rédaction) | suspendu le 25/09 : mémoire du Mac saturée par d'autres programmes | ⏳ |
 
 ### E. Qui parle, contrôleur ou pilote
 
