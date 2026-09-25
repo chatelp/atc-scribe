@@ -3402,6 +3402,91 @@ trou de la première : les constructeurs créaient les tables au démarrage, don
 manquait *au démarrage*, et c'est le seul moment qu'on regarde. Un test doit écrire ce que
 le programme écrit, pas un substitut.
 
+### D57 — co-atc suit la station fréquence par fréquence, par son interface *(25/09)*
+
+Accord du propriétaire le 25/09 au soir : *« oui, commence le code co-atc »*, pour être prêt quand
+la station ouvrira ses flux séparés (Q45) — le gain le plus fort mesuré à ce jour, ×4 d'avions
+justes (doc 28).
+
+**Le partage suit D36.** co-atc ne lit pas `/radio/etat` : personne d'autre ne l'a. Il gagne un
+mécanisme générique, et la politique reste dehors, dans un petit programme à part.
+
+**Dans co-atc (contribuable en amont tel quel)** :
+- **des sources ajoutées et retirées en marche** : `PUT /api/v1/sources/{id}` et `DELETE`, derrière
+  l'authentification comme les autres écritures (`internal/frequencies/runtime_sources.go`). Les
+  sources de la configuration ne se remplacent ni ne se retirent ainsi. Renvoyer la même source ne
+  change rien ; un nouveau nom ou un nouveau rang **ne reconnecte pas** (une reconnexion coûte du
+  son) ; une nouvelle adresse, langue ou décision de transcrire, si. La page web redessine la liste
+  d'elle-même (message `frequencies_changed`) ;
+- **`ffmpeg_reconnect = false`** par source : ffmpeg ne relance plus lui-même un flux fini ou en
+  404 — le piège signalé par la station ; co-atc le relance après `reconnect_interval_secs` ;
+- **la datation par la position dans le flux** (`internal/transcription/stream_clock.go`) : le
+  tampon d'Icecast livre 50 à 65 s de son passé en une seconde, et l'amont datait tout à
+  l'arrivée. L'horloge compte le son reçu contre l'horloge murale ; les transmissions coupées
+  pendant le tampon attendent qu'il soit passé pour être datées ; une reconnexion (un trou de plus
+  de 2 s) repart de zéro, et **ce qu'elle rejoue n'est pas transcrit deux fois** ;
+- **un bug de l'amont corrigé** : arrêter un flux pouvait faire planter co-atc (la boucle de
+  surveillance lisait un minuteur que l'arrêt venait de mettre à nil). Rare au démarrage et à
+  l'arrêt, il devenait certain avec des sources retirées à chaque changement de groupe — le test
+  l'a déclenché du premier coup ;
+- **un second défaut de l'amont, trouvé par l'essai** : entre ffmpeg et la transcription, un
+  anneau de **64 Ko (1,3 s de son)** sans garde. Quand ffmpeg décode le tampon d'Icecast d'un coup,
+  il réécrit ce que la transcription n'a pas lu, sans que personne le sache — et l'ordre même des
+  données pouvait se mélanger. Remplacé par des positions qui ne bouclent pas, **4 Mo (87 s)**, et
+  un lecteur dépassé qui saute au plus ancien encore tenu en le journalisant
+  (`internal/audio/multireader.go`) ;
+- **une transmission coupée par une reconnexion** restait ouverte et se voyait collée au début du
+  tampon de la nouvelle connexion — **datée 40 s trop tôt** à l'essai, pire qu'un doublon puisqu'une
+  mauvaise heure peut l'attacher au mauvais avion. Un trou de réception la clôt désormais telle
+  quelle, datée par l'horloge de l'ancienne connexion.
+
+**Hors de co-atc (propre à cette station)** : `cmd/radio-ctl-sync`, qui lit `/radio/etat` et
+`/radio/frequences` toutes les 10 s et **ne bascule jamais la station**. Une fréquence de la
+sélection qui a un `flux` devient une source ; `langue` `mixte` est lue en anglais (la porte
+française de D24 fait le reste) ; `transcrire` vient du catalogue ; le rang suit la fréquence, pas
+la place dans la sélection ; récepteur arrêté, aucune source. Station injoignable : les sources
+restent telles quelles. Avec `-mix-id`, l'étiquette du flux mélangé suit aussi la sélection (D36).
+
+**Essai de bout en bout, sans toucher la vraie station** : une station simulée
+(`whisper-lab/scripts/station/station-simulee.py`) rejoue l'enregistrement par canal du 24/09
+comme Icecast — **64 Ko de tampon, soit 47,5 s de son** à la connexion, puis le direct au rythme
+des trames —, avec `/radio/etat` au format réel. co-atc de test (port 8011, base à part, modèle de
+production), liaison, changements de groupe. Premier essai, 116 transmissions jugées contre
+l'heure en direct simulée (`station-simulee-verifier.py`) :
+
+| | Transmissions | Écart à l'heure en direct (médian / max) | Avec la datation à l'arrivée |
+|---|---|---|---|
+| Arrivées dans le tampon | 14 | **0,4 s / 1,8 s** | 17,9 s / 54,1 s |
+| Arrivées en direct | 102 | 0,5 s / 1,2 s | idem |
+
+La base garde l'heure à la seconde, d'où l'essentiel de ces écarts. Aucun plantage. Une adresse
+en 404 est retentée **toutes les 5 s**, sans boucle.
+
+**Quatre essais, trois défauts trouvés et corrigés en chemin** (`whisper-lab/resultats/station/
+2026-09-25-station-simulee-essai-{1..4}.txt`) :
+- essai 1 : au changement de groupe, les canaux restés à l'antenne étaient reconnectés, parce que
+  leur rang avait changé — rang par fréquence, et un rang nouveau ne reconnecte plus. Essai 2 :
+  125,825 et 126,425 gardent leur connexion à travers deux changements de groupe ;
+- essai 2 : 4 transmissions seulement arrivaient du tampon, le reste perdu dans l'anneau de 64 Ko
+  — anneau remplacé. Essai 3 : **9 transmissions du tampon rien qu'à la première connexion** ;
+- essai 3 : une coupure réseau en pleine transmission l'a collée au tampon rejoué — **datée 40 s
+  trop tôt**, et transcrite deux fois — trou de réception clos. Essai 4, même coupure : la
+  transmission interrompue **une seule fois, à son heure** ; sa copie rejouée est écartée.
+
+| Essai 4 (tout corrigé) | Transmissions | Écart à l'heure en direct (médian / max) | Datation à l'arrivée |
+|---|---|---|---|
+| Arrivées dans le tampon | 13 | **0,6 s / 1,05 s** | 27,4 s / 56,5 s |
+| Arrivées en direct | 80 | 0,6 s / 1,06 s | idem |
+
+Les « doublons » que le vérificateur signale encore (un par essai 2 et 4) sont deux transmissions
+voisines découpées autrement que dans la référence, sur des canaux jamais reconnectés — pas des
+rejeux. **Reste à faire** : le même essai sur la vraie station, quand ses flux séparés seront en
+service (après le réglage des micro-coupures d'`aero.mp3`, Q45).
+
+**Pas fait** : étiqueter chaque transcription de la `version` de la station (promis à la station le
+25/09). Pour un flux par canal, la fréquence suffit ; la liaison journalise chaque version. À
+reprendre si le flux mélangé reste en service.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(ouverte, 23/09)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
@@ -3495,10 +3580,25 @@ bien moindre que sur le mélange : 35 morceaux seulement atteignent 30 s. Script
 
 Par canal, à 1,0 s : 124,350 **146,6** (85 %) contre 134,4 (78 %) ; 124,625 18,0 contre 18,2 ;
 125,825 **40,2** (61 %) contre 47,8 (67 %) ; 126,425 **43,8** (77 %) contre 35,4 (63 %).
-**Sans entraînement, un peu plus d'avions justes (+5 %) et l'indicateur d'invention presque
-divisé par deux** ; trop serré (0,3 s), l'invention disparaît presque mais les débuts
-d'indicatifs sont coupés. Réserves : une seule matinée, et 125,825 recule quand les autres
-avancent. Balayage lancé à 21 h 30 : 0,6, 1,5 et 2,5 s.
+~~Sans entraînement, un peu plus d'avions justes (+5 %)~~ — **corrigé par le balayage du même soir** :
+
+| Marge autour de la parole | Avions justes | Texte trop long | 125,825 |
+|---|---|---|---|
+| Tout le morceau (référence) | 235,8 | 10,7 % | 47,8 |
+| 0,3 s | 199,4 | 1,8 % | 33,0 |
+| 0,6 s | 221,0 | 3,8 % | 35,6 |
+| 1,0 s | 248,6 | 5,9 % | 40,2 |
+| 1,5 s | 231,8 | 7,1 % | 38,8 |
+| 2,5 s | 226,6 | 9,6 % | 40,4 |
+
+**Le gain d'avions justes à 1,0 s est du bruit** : les largeurs voisines tombent sous la
+référence, le compte varie de ±15 entre réglages presque identiques. **Ce qui tient** :
+l'indicateur d'invention baisse régulièrement quand la marge se resserre (presque divisé par
+deux à 1 s) sans perte mesurable d'avions justes au-dessus de 0,6 s ; à 0,3 s, la perte est
+nette. **Et 125,825, la fréquence faible, perd à toutes les largeurs** (33 à 40 contre 48) :
+explication probable, non vérifiée — le détecteur de voix manque une partie de la parole faible,
+et la couper retire de vrais mots. **Pas adopté en l'état** : à reprendre avec un détecteur plus
+sensible pour le tri que pour l'acceptation, et à juger sur un autre jour.
 
 ### Q42 — Nettoyer l'audio avant la reconnaissance, sans IA *(ouverte, 24/09)*
 
@@ -3669,7 +3769,9 @@ squelch par fréquence, 10 min glissantes). **Réponse d'atc-scribe** aux six qu
 conservé, 13 flux au plus, aucune commande en GET chez nous, pas de flux filtrés, et le retard de
 16 s corrigé côté co-atc. **À faire côté co-atc** : retirer les options `-reconnect` de ffmpeg pour
 ces flux (elles bouclent sur le 404 d'Icecast), suivre `/radio/etat` pour ouvrir et fermer les
-sources, étiqueter chaque transcription avec la fréquence et la `version`.
+sources, étiqueter chaque transcription avec la fréquence et la `version`. **Fait le 25/09 au soir,
+sauf la `version` : voir D57** — essayé de bout en bout sur une station simulée, pas encore sur la
+vraie.
 
 **Mise à jour de la station, 25/09 à 20 h 20** (`whisper-lab/echanges-station/reponse-station-2026-09-25-20h20.md`) :
 - **feu vert technique** : 8 flux séparés lus ensemble pendant 20 min, 10 % d'un cœur au pire, sans
