@@ -2948,6 +2948,14 @@ reprendre sur la station pour relancer `amorce-adsb.py` ou `depouille-nuit-gain.
 deux modèles français absents du laboratoire. Dans le dépôt, seuls les pointeurs à usage
 courant suivent : un commentaire du sidecar, les docs 09 et 26.
 
+
+**Complété le 25/09** (demande du propriétaire, *« organise tout bien dans le projet lab »*) :
+un sous-dossier par chantier sous `scripts/`, `resultats/` et `journaux/` — `station` (doc 28),
+`entrainement` (doc 27), `exploitation` — et des liens sous `whisper-lab/entrainement/` vers les
+données lourdes, qui restent sur le disque externe (le disque interne n'en reçoit rien : le
+laboratoire y pèse 2,0 Go). 90 fichiers déplacés par `scripts/exploitation/ranger-2026-09-25.py`,
+qui a réécrit toutes les références à leurs anciens chemins, jusque dans ce dossier ; tous les
+scripts se compilent, la chaîne de dégradation se recharge. Index : `whisper-lab/CORPUS.md`.
 ### Q36 — Remplacer Windy par aviationweather.gov : ce qu'on perdrait *(en attente, décidé le 23/09 : Windy reste)*
 
 Question du propriétaire : *« est-on sûr qu'on ne perd rien au niveau données ? »*. Mesuré
@@ -3249,8 +3257,8 @@ grappes** suivent les compteurs de la station.
 **Remède possible, côté station, non appliqué** (configuration de production : accord
 explicite du propriétaire requis) : baisser le seuil du squelch **sur 125,825 seulement**,
 et mesurer avant/après à la même heure — coupures courtes, et ouvertures sur le bruit
-(`salves.py`). Outils rangés dans le laboratoire : `scripts/hachage-coupures-courtes.py` (la règle de
-`salves.py` plus les coupures courtes) et `scripts/hachage-par-frequence.py` (quelle
+(`salves.py`). Outils rangés dans le laboratoire : `scripts/station/hachage-coupures-courtes.py` (la règle de
+`salves.py` plus les coupures courtes) et `scripts/station/hachage-par-frequence.py` (quelle
 fréquence est coupée).
 
 ### Q38 — Les mots accentués sont coupés en deux par l'analyse *(répondue le 23/09 : corrigé, voir la suite)*
@@ -3365,8 +3373,8 @@ le correctif, les deux échouent (vérifié par mutation). Le binaire reconstrui
 relancé à 21:08, `vcs.modified=false`.
 
 **Ce qui restait non observé** : un passage de minuit réel avec ce correctif. Surveillance
-passive cette nuit — `whisper-lab/scripts/surveillance-nuit.sh` écrit une ligne toutes
-les dix minutes dans `journaux/2026-09-23-nuit-surveillance.log` (processus, mémoire,
+passive cette nuit — `whisper-lab/scripts/exploitation/surveillance-nuit.sh` écrit une ligne toutes
+les dix minutes dans `journaux/exploitation/2026-09-23-nuit-surveillance.log` (processus, mémoire,
 fichier du jour, transcriptions, erreurs, disque). À lire demain : le compte de
 transcriptions du fichier du 24 doit croître dès 00:10, et `no_such_table` rester à 0.
 
@@ -3557,7 +3565,7 @@ après le retrait des adaptateurs CPL.
   mesure : **cette nuit est la première sans ce bloc.**
 - **Mesure passive côté Mac, cette nuit** : le taux de morceaux rejetés sans parole par le sidecar,
   heure par heure (la courbe de D27), relevé toutes les dix minutes dans
-  `whisper-lab/journaux/2026-09-24-nuit-surveillance.log`. Repères : 96–98 % à 2–3 h la nuit du
+  `whisper-lab/journaux/exploitation/2026-09-24-nuit-surveillance.log`. Repères : 96–98 % à 2–3 h la nuit du
   20 au 21 ; **64 % en moyenne** de 21:08 à 08:56 la nuit dernière ; **6 % en journée** le 24
   (175 rejets pour 2 751 transcriptions de 08:56 à 21:11).
 

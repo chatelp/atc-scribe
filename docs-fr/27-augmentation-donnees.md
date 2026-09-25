@@ -78,7 +78,7 @@ sont **des estimations, pas des mesures**.
 ### 0 — Faisabilité *(½ jour)* — point d'arrêt
 
 - Environnement d'entraînement séparé ; corpus téléchargés **hors dépôt**
-  (`whisper-lab/corpus-externes/`), licences lues et notées.
+  (`whisper-lab/entrainement/corpus-externes/`), licences lues et notées.
 - **Essai minuscule** : 50 pas d'affinage léger (LoRA) sur large-v3, puis sur large-v3-turbo et
   medium ; mémoire maximale et secondes par pas relevées.
 - **Aller-retour complet** : poids affinés → conversion MLX → chargement par un sidecar d'essai,
@@ -94,7 +94,7 @@ sont **des estimations, pas des mesures**.
 - **Empreinte mesurée, par canal** : spectre moyen, niveau de bruit, distribution des coupures
   de squelch (durée, espacement, grappes), taux d'écrêtage, taux de chevauchement dans le
   mélange.
-- Livrable : `resultats/empreinte-station.json`.
+- Livrable : `resultats/entrainement/empreinte-station.json`.
 
 ### 2 — Chaîne de dégradation, et preuve qu'elle ressemble *(1 à 2 jours)* — point d'arrêt
 
@@ -181,7 +181,7 @@ chercher : réalisme ou étiquetage.
 
 ### Préparation (24/09 au soir, accord du propriétaire)
 
-- **Corpus téléchargés sur le disque externe** (`whisper-lab/corpus-externes`) : ATCOSIM 2,2 Go,
+- **Corpus téléchargés sur le disque externe** (`whisper-lab/entrainement/corpus-externes`) : ATCOSIM 2,2 Go,
   UWB-ATCC 0,7 Go, ATCO2 une heure 0,1 Go. Transcriptions en chiffres épelés (*« lufthansa four
   three nine three descend to flight level two seven zero »*), la forme que lit la grammaire.
   ATCO2 : accord complet non trouvé dans la copie, usage accepté par le propriétaire sur la base
@@ -224,7 +224,7 @@ transmissions** (24/09 21:38). L'entraînement long se fera co-atc arrêté, ou 
 
 `/Volumes/Crucial X8/whisper-corpus/banque-bruit/` : **5 267 ouvertures de squelch sans parole,
 4 h 51 de bruit réel, 546 Mo**, un WAV 16 kHz chacune, décrites dans `manifeste.jsonl`. Empreinte
-dans `resultats/2026-09-24-empreinte-bruit.json` :
+dans `resultats/entrainement/2026-09-24-empreinte-bruit.json` :
 
 | Source | Canaux | Ouvertures sans parole | Minutes |
 |---|---|---|---|
@@ -244,11 +244,11 @@ le modèle actuel écrit sur ce bruit (doc 28, section 4).
 
 ### Étape 2 — chaîne de dégradation : **validée**, avec deux écarts expliqués *(25/09)*
 
-`whisper-lab/scripts/degradation.py`, réglée sur l'empreinte de la station mesurée par canal
-(`scripts/empreinte-station.py`, enregistrement du 24/09) et jugée sur une **grille** : 120 clips de
+`whisper-lab/scripts/entrainement/degradation.py`, réglée sur l'empreinte de la station mesurée par canal
+(`scripts/entrainement/empreinte-station.py`, enregistrement du 24/09) et jugée sur une **grille** : 120 clips de
 test d'ATCOSIM à plusieurs niveaux de bruit, plus 120 ouvertures sans parole de la banque, transcrits
 par le modèle anglais actuel (sidecar d'essai, co-atc arrêté à 10:12 à la demande du propriétaire).
-Résultats : `resultats/2026-09-25-grille-analyse.json`.
+Résultats : `resultats/entrainement/2026-09-25-grille-analyse.json`.
 
 **La chaîne**, dans l'ordre du trajet : bruit réel de la banque sous la voix ; bande 300–2 700 Hz ;
 niveau de la station ; **limiteur** à −3 dB (et compression 1,25 sur les canaux faibles) ; coupures

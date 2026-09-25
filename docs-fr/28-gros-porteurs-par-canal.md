@@ -7,8 +7,8 @@ squelch de RTLSDR-Airband toutes les 15 s (`stats_filepath`). Rien d'autre n'a c
 station ; `aero.mp3` a été coupé deux fois quelques secondes, au début et à la fin.*
 
 Données : `whisper-lab/audio/2026-09-24-gros-porteurs-par-canal/` (16 fichiers, 63 Mo, index
-dans `CORPUS.md`). Analyse : `whisper-lab/scripts/par-canal-analyse.py`, résultat dans
-`resultats/2026-09-24-par-canal.json`.
+dans `CORPUS.md`). Analyse : `whisper-lab/scripts/station/par-canal-analyse.py`, résultat dans
+`resultats/station/2026-09-24-par-canal.json`.
 
 ## En bref
 
@@ -93,8 +93,8 @@ ouvertures tirées au hasard par canal, `ecoute/sans-parole-125825.mp3` et
 
 ## 4. Transcrit canal par canal : quatre fois plus d'avions justes que le mélange
 
-*Mesuré la nuit du 24 au 25/09* (`whisper-lab/scripts/par-canal-transcrire.py` puis
-`par-canal-apparier.py`, résultats `resultats/2026-09-24-apparier-*.txt`).
+*Mesuré la nuit du 24 au 25/09* (`whisper-lab/scripts/station/par-canal-transcrire.py` puis
+`par-canal-apparier.py`, résultats `resultats/station/2026-09-24-apparier-*.txt`).
 
 **Protocole.** Les quatre fichiers par canal (10:47:31 → 14:00:00) découpés **exactement comme
 le segmenteur de co-atc** (fin sur 600 ms de silence, 400 ms au moins, 30 s au plus, 200 ms
