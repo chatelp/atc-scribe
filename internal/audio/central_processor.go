@@ -51,6 +51,7 @@ type CentralAudioProcessor struct {
 	channels                 int
 	ffmpegTimeoutSecs        int // FFmpeg connection timeout in seconds
 	ffmpegReconnectDelaySecs int // FFmpeg reconnect delay in seconds
+	noFFmpegReconnect        bool
 	ffmpegCmd                *exec.Cmd
 	ffmpegStdout             io.ReadCloser
 	srtReader                *SRTReader // Native SRT reader (used instead of ffmpeg for srt://)
@@ -81,6 +82,13 @@ type CentralProcessorConfig struct {
 	ReconnectDelay           time.Duration
 	FFmpegTimeoutSecs        int // FFmpeg connection timeout in seconds (0 = no timeout)
 	FFmpegReconnectDelaySecs int // FFmpeg reconnect delay in seconds
+
+	// NoFFmpegReconnect leaves reconnecting to this processor, which restarts
+	// ffmpeg after ReconnectDelay, instead of asking ffmpeg to do it. ffmpeg's
+	// own reconnection retries a stream that has ended or answers 404 in a tight
+	// loop, which is right for a stream that always exists and wrong for one a
+	// station creates and removes as it changes what it listens to.
+	NoFFmpegReconnect bool
 }
 
 // NewCentralAudioProcessor creates a new central audio processor.
@@ -111,6 +119,7 @@ func NewCentralAudioProcessor(
 		channels:                 config.Channels,
 		ffmpegTimeoutSecs:        config.FFmpegTimeoutSecs,
 		ffmpegReconnectDelaySecs: config.FFmpegReconnectDelaySecs,
+		noFFmpegReconnect:        config.NoFFmpegReconnect,
 		sourceType:               srcType,
 		multiReader:              multiReader,
 		ctx:                      procCtx,
@@ -377,36 +386,8 @@ func (p *CentralAudioProcessor) startFFmpeg() error {
 		String("path", p.ffmpegPath),
 		String("url", p.audioURL))
 
-	// HTTP stream configuration - optimized for low latency with reconnection
-	args := []string{
-		"-loglevel", "error",  // Minimal logging
-		"-fflags", "nobuffer", // Disable input buffering
-		"-flags", "low_delay", // Enable low delay mode
-	}
-
-	// Add timeout if configured (convert seconds to microseconds)
-	if p.ffmpegTimeoutSecs > 0 {
-		timeoutMicros := p.ffmpegTimeoutSecs * 1000000
-		args = append(args, "-timeout", fmt.Sprintf("%d", timeoutMicros))
-	}
-
-	// Add reconnection settings
-	args = append(args,
-		"-reconnect", "1",           // Enable reconnection
-		"-reconnect_at_eof", "1",    // Reconnect at end of file
-		"-reconnect_streamed", "1",  // Reconnect for streamed inputs
-		"-reconnect_delay_max", fmt.Sprintf("%d", p.ffmpegReconnectDelaySecs), // Configurable reconnect delay
-		"-i", p.audioURL,            // Input URL
-		"-f", p.format,              // Output format (should be s16le for raw PCM)
-		"-acodec", "pcm_s16le",      // Audio codec
-		"-ac", fmt.Sprintf("%d", p.channels),    // Channels
-		"-ar", fmt.Sprintf("%d", p.sampleRate),  // Sample rate
-		"-flush_packets", "1",       // Flush packets immediately
-		"pipe:1",                    // Output to stdout
-	)
-
 	// Create ffmpeg command with enhanced arguments
-	p.ffmpegCmd = exec.CommandContext(p.ctx, p.ffmpegPath, args...)
+	p.ffmpegCmd = exec.CommandContext(p.ctx, p.ffmpegPath, p.ffmpegArgs()...)
 
 	// Get stdout pipe
 	var err error
@@ -424,6 +405,42 @@ func (p *CentralAudioProcessor) startFFmpeg() error {
 	go p.processFFmpegOutput()
 
 	return nil
+}
+
+// ffmpegArgs is ffmpeg's command line for this processor's stream.
+func (p *CentralAudioProcessor) ffmpegArgs() []string {
+	// HTTP stream configuration - optimized for low latency with reconnection
+	args := []string{
+		"-loglevel", "error",  // Minimal logging
+		"-fflags", "nobuffer", // Disable input buffering
+		"-flags", "low_delay", // Enable low delay mode
+	}
+
+	// Add timeout if configured (convert seconds to microseconds)
+	if p.ffmpegTimeoutSecs > 0 {
+		timeoutMicros := p.ffmpegTimeoutSecs * 1000000
+		args = append(args, "-timeout", fmt.Sprintf("%d", timeoutMicros))
+	}
+
+	// Add reconnection settings
+	if !p.noFFmpegReconnect {
+		args = append(args,
+			"-reconnect", "1", // Enable reconnection
+			"-reconnect_at_eof", "1", // Reconnect at end of file
+			"-reconnect_streamed", "1", // Reconnect for streamed inputs
+			"-reconnect_delay_max", fmt.Sprintf("%d", p.ffmpegReconnectDelaySecs), // Configurable reconnect delay
+		)
+	}
+	args = append(args,
+		"-i", p.audioURL,            // Input URL
+		"-f", p.format,              // Output format (should be s16le for raw PCM)
+		"-acodec", "pcm_s16le",      // Audio codec
+		"-ac", fmt.Sprintf("%d", p.channels),    // Channels
+		"-ar", fmt.Sprintf("%d", p.sampleRate),  // Sample rate
+		"-flush_packets", "1",       // Flush packets immediately
+		"pipe:1",                    // Output to stdout
+	)
+	return args
 }
 
 // stopFFmpeg stops the ffmpeg process
@@ -534,14 +551,18 @@ func (p *CentralAudioProcessor) processFFmpegOutput() {
 
 // startMonitoring starts monitoring the audio source (ffmpeg or SRT)
 func (p *CentralAudioProcessor) startMonitoring() {
-	p.monitorTicker = time.NewTicker(5 * time.Second)
+	// The loop keeps its own copy: Stop sets p.monitorTicker to nil, and reading
+	// the field here raced with that and crashed on the nil ticker -- once per
+	// stop, at worst, which removing sources at runtime makes routine.
+	ticker := time.NewTicker(5 * time.Second)
+	p.monitorTicker = ticker
 
 	go func() {
 		for {
 			select {
 			case <-p.ctx.Done():
 				return
-			case <-p.monitorTicker.C:
+			case <-ticker.C:
 				p.mu.Lock()
 				if p.sourceType == sourceTypeSRT {
 					// Monitor SRT connection

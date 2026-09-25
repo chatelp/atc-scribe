@@ -10,10 +10,17 @@ import (
 )
 
 // MultiReader implements a reader that can be consumed by multiple goroutines
+//
+// Positions are counted from the first byte ever written and never wrap; only
+// the storage does. Upstream kept wrapped indices and 64 KB, 1.3 s at 24 kHz:
+// a writer that ran more than that ahead of a reader -- ffmpeg decoding an
+// Icecast burst of 50 to 65 s in a fraction of a second -- overwrote what the
+// reader had not read, and the reader could not tell. A reader that falls
+// behind now skips to the oldest data still held, and the loss is logged.
 type MultiReader struct {
 	buffer     []byte // Circular buffer for audio data
 	bufferSize int    // Size of the circular buffer
-	writeIndex int    // Current write position in the buffer
+	written    int64  // Bytes written since the start; the next one goes at written % bufferSize
 	readers    map[string]*readerState
 	mu         sync.RWMutex // Mutex for thread safety
 	ctx        context.Context
@@ -24,20 +31,24 @@ type MultiReader struct {
 
 // readerState tracks the state of each reader
 type readerState struct {
-	readIndex int        // Current read position in the circular buffer
-	readCond  *sync.Cond // Condition variable for signaling new data
-	closed    bool
+	pos      int64      // Next byte to read, counted like MultiReader.written
+	readCond *sync.Cond // Condition variable for signaling new data
+	closed   bool
+	skipped  int64 // bytes lost to falling behind, for the log
 }
+
+// multiReaderBytes holds 87 s of 24 kHz mono s16le, so that a whole Icecast
+// burst reaches a reader that reads a little slower than ffmpeg decodes.
+const multiReaderBytes = 4 << 20
 
 // NewMultiReader creates a new multi-reader
 func NewMultiReader(ctx context.Context, logger *logger.Logger) *MultiReader {
-	bufferSize := 1024 * 64 // 64KB buffer for low latency (about 1.3 seconds at 24kHz mono)
+	bufferSize := multiReaderBytes
 	readerCtx, readerCancel := context.WithCancel(ctx)
 
 	mr := &MultiReader{
 		buffer:     make([]byte, bufferSize),
 		bufferSize: bufferSize,
-		writeIndex: 0,
 		readers:    make(map[string]*readerState),
 		ctx:        readerCtx,
 		cancel:     readerCancel,
@@ -59,15 +70,19 @@ func (mr *MultiReader) Write(p []byte) (n int, err error) {
 
 	// Copy data to the circular buffer
 	n = len(p)
-	for i := 0; i < n; i++ {
-		mr.buffer[mr.writeIndex] = p[i]
-		mr.writeIndex = (mr.writeIndex + 1) % mr.bufferSize
+	for done := 0; done < n; {
+		at := int(mr.written % int64(mr.bufferSize))
+		c := copy(mr.buffer[at:], p[done:])
+		done += c
+		mr.written += int64(c)
 	}
 
-	// Notify all readers that new data is available
+	// Notify all readers that new data is available. Broadcast, not Signal: a
+	// read that timed out leaves a waiter behind, and Signal could wake that one
+	// instead of the reader actually waiting.
 	for _, reader := range mr.readers {
 		if !reader.closed && reader.readCond != nil {
-			reader.readCond.Signal()
+			reader.readCond.Broadcast()
 		}
 	}
 
@@ -91,9 +106,9 @@ func (mr *MultiReader) CreateReader(id string) io.ReadCloser {
 	// Create a new reader state
 	readerMutex := &sync.Mutex{}
 	reader := &readerState{
-		readIndex: mr.writeIndex,             // Start reading from current write position
-		readCond:  sync.NewCond(readerMutex), // Condition variable for signaling
-		closed:    false,
+		pos:      mr.written,                // Start reading from current write position
+		readCond: sync.NewCond(readerMutex), // Condition variable for signaling
+		closed:   false,
 	}
 
 	mr.readers[id] = reader
@@ -182,15 +197,14 @@ func (mrc *multiReaderClient) Read(p []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 
-	// Get current read position and buffer size
-	readIndex := reader.readIndex
-	writeIndex := mrc.mr.writeIndex
-	bufferSize := mrc.mr.bufferSize
+	// Get current read position
+	pos := reader.pos
+	written := mrc.mr.written
 	readCond := reader.readCond
 	mrc.mr.mu.RUnlock()
 
 	// If there's no data available, wait for it
-	if readIndex == writeIndex {
+	if pos == written {
 		// Wait for data with a timeout
 		waitChan := make(chan struct{})
 
@@ -213,56 +227,38 @@ func (mrc *multiReaderClient) Read(p []byte) (n int, err error) {
 			// Longer timeout, and return EOF to signal connection should be reestablished
 			return 0, io.EOF
 		}
-
-		// Re-check state after waiting
-		mrc.mr.mu.RLock()
-		reader, exists = mrc.mr.readers[mrc.id]
-		if !exists || reader.closed || mrc.mr.closed {
-			mrc.mr.mu.RUnlock()
-			return 0, io.EOF
-		}
-		readIndex = reader.readIndex
-		writeIndex = mrc.mr.writeIndex
-		mrc.mr.mu.RUnlock()
 	}
 
-	// Calculate how much data is available
-	var available int
-	if writeIndex > readIndex {
-		available = writeIndex - readIndex
-	} else {
-		available = bufferSize - readIndex + writeIndex
-	}
-
-	// Limit to buffer size
-	if available > len(p) {
-		available = len(p)
-	}
-
-	// Copy data from circular buffer to output buffer
-	copied := 0
-	for copied < available {
-		// Calculate contiguous chunk size
-		chunkSize := available - copied
-		if readIndex+chunkSize > bufferSize {
-			chunkSize = bufferSize - readIndex
-		}
-
-		// Lock for reading from buffer
-		mrc.mr.mu.RLock()
-		copy(p[copied:copied+chunkSize], mrc.mr.buffer[readIndex:readIndex+chunkSize])
-		mrc.mr.mu.RUnlock()
-
-		copied += chunkSize
-		readIndex = (readIndex + chunkSize) % bufferSize
-	}
-
-	// Update read position
 	mrc.mr.mu.Lock()
-	if reader, exists := mrc.mr.readers[mrc.id]; exists && !reader.closed {
-		reader.readIndex = readIndex
+	defer mrc.mr.mu.Unlock()
+	reader, exists = mrc.mr.readers[mrc.id]
+	if !exists || reader.closed || mrc.mr.closed {
+		return 0, io.EOF
 	}
-	mrc.mr.mu.Unlock()
+	size := int64(mrc.mr.bufferSize)
+	if behind := mrc.mr.written - reader.pos; behind > size {
+		// Overwritten before it was read: skip to the oldest byte still held,
+		// keeping sample alignment.
+		skip := (behind - size + 1) &^ 1
+		reader.pos += skip
+		reader.skipped += skip
+		mrc.mr.logger.Warn("Audio reader fell behind, oldest audio dropped",
+			logger.String("reader_id", mrc.id), logger.Int("bytes", int(skip)),
+			logger.Int("bytes_dropped_so_far", int(reader.skipped)))
+	}
+
+	// Copy what is available, in at most two pieces around the end of storage
+	copied := 0
+	for copied < len(p) && reader.pos < mrc.mr.written {
+		at := int(reader.pos % size)
+		end := mrc.mr.bufferSize
+		if left := mrc.mr.written - reader.pos; int64(end-at) > left {
+			end = at + int(left)
+		}
+		c := copy(p[copied:], mrc.mr.buffer[at:end])
+		copied += c
+		reader.pos += int64(c)
+	}
 
 	return copied, nil
 }

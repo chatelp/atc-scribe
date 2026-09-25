@@ -271,6 +271,17 @@ type FrequencyConfig struct {
 	// rather than detecting: measured detection here is wrong on 16% of French
 	// and 28% of English transmissions. Empty falls back to [transcription] language.
 	Language string `toml:"language"`
+
+	// FFmpegReconnect lets ffmpeg reconnect by itself when the stream ends. Unset
+	// means true, as upstream always did. Set it to false for a stream that may
+	// disappear -- ffmpeg would retry it in a loop; co-atc then restarts it after
+	// reconnect_interval_secs instead.
+	FFmpegReconnect *bool `toml:"ffmpeg_reconnect"`
+}
+
+// ReconnectsInFFmpeg reports whether ffmpeg should reconnect by itself.
+func (f FrequencyConfig) ReconnectsInFFmpeg() bool {
+	return f.FFmpegReconnect == nil || *f.FFmpegReconnect
 }
 
 // FlightPhasesConfig contains settings for flight phase detection
