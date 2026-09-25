@@ -1,8 +1,9 @@
 # Plan — affiner la reconnaissance par augmentation de données
 
 *Note de projet du 24 septembre 2026. L'idée est celle du propriétaire (Q43) ; ce document
-dit ce qu'on ferait, dans quel ordre, et à quoi on saurait que ça marche. **Étapes 0 et 1
-faites la nuit du 24 au 25/09 : voir « État au 25/09 » à la fin.***
+dit ce qu'on ferait, dans quel ordre, et à quoi on saurait que ça marche. **Étapes 0 à 2
+faites, trois mini-essais jugés le 25/09 : voir « État au 25/09 » à la fin. Aucun ne bat la
+production.***
 
 ## En une phrase
 
@@ -177,7 +178,7 @@ chercher : réalisme ou étiquetage.
 - [UWB-ATCC](https://huggingface.co/datasets/Jzuluaga/uwb_atcc)
 - [ATCO2, échantillon d'une heure](https://huggingface.co/datasets/Jzuluaga/atco2_corpus_1h)
 
-## État au 25/09 au matin
+## État au 25/09 au soir
 
 ### Préparation (24/09 au soir, accord du propriétaire)
 
@@ -364,8 +365,44 @@ le bruit ; 124,625 dépasse même la production. **Mais il reste 19 % sous la pr
 fréquence faible 125,825 perd la moitié de ses avions : le vocabulaire dérive encore. La grille,
 elle, le donne aussi bon que l'essai 1 — elle ne voit pas cette dérive (même leçon).
 
-**Mini-essai 3** (le même mélange, en n'adaptant que la moitié qui écoute) : **suspendu à 16:30**,
-avant son démarrage automatique. La mémoire du Mac débordait sur le disque (mémoire d'échange à
-35–38 Go, 12 Go libres), à cause de deux programmes étrangers aux essais — une fuite de Nextcloud
-(225 Go), puis un programme du propriétaire (`dbibackend`, 98 Go). Il sera lancé à la main quand
-la mémoire sera revenue à la normale.
+### Mini-essai 3 — l'oreille seule : **moins bien que l'essai 2, partout** *(25/09)*
+
+Le même mélange que l'essai 2, mais la LoRA ne touche que l'attention du **codeur** (la moitié qui
+écoute) : 10,5 M paramètres entraînables au lieu de 31,5 M, 46 min. Remède direct supposé au défaut
+de l'essai 1 : la moitié qui rédige ne peut plus prendre le vocabulaire des corpus. Lancé à 16:52,
+une fois la mémoire du Mac revenue à la normale (il avait été suspendu à 16:30 : fuite de Nextcloud
+à 225 Go, puis `dbibackend` à 98 Go, mémoire d'échange à 35–38 Go).
+
+| Avions justes à l'ADS-B, 24/09 (précision) | Production | Essai 1 | Essai 2 | **Essai 3** |
+|---|---|---|---|---|
+| 124,350 | 134 (78 %) | 70 (72 %) | 115 (77 %) | **105 (77 %)** |
+| 124,625 | 18 (79 %) | 11 (68 %) | 22 (85 %) | **14 (66 %)** |
+| 125,825 | 48 (67 %) | 7 (34 %) | 24 (57 %) | **18 (53 %)** |
+| 126,425 | 35 (63 %) | 16 (60 %) | 30 (72 %) | **21 (65 %)** |
+| **Total** | **236** | **104** | **191** | **158** |
+| **Parole rendue vide**, 125,825 / 126,425 | 8 % / 8 % | — | 34 % / 27 % | **47 % / 32 %** |
+| Texte écrit sur les ouvertures sans parole | 20–44 % | 7–10 % | 6–20 % | 0–20 % |
+| Grille : indicatif lu juste, sain / faible +5 dB | 86 / 59 % | 90 / 66 % | 92 / 71 % | **89 / 52 %** |
+| Grille : texte écrit sur du bruit seul | 37 % | 6 % | 14 % | 14 % |
+| Calcul par morceau à la station, moyenne / plus de 5 s | 1,2 s / 1,9 % | — | 2,1 s / 11,9 % | 3,2 s / 21 % * |
+
+\* mesuré sur les 628 premiers morceaux.
+
+**L'essai 3 fait moins bien que l'essai 2 sur les quatre fréquences**, et même sur la grille, que
+les essais 1 et 2 battaient tous deux. La perte sur la mise de côté, pourtant, a baissé autant
+qu'ailleurs (3,42 → 1,06) : il a appris ses données sans que ça se transporte à la station.
+**Explication probable, non mesurée** : la moitié qui rédige reçoit une écoute modifiée qu'elle n'a
+pas appris à lire ; elle écrit plus souvent des textes à rallonge (le calcul s'allonge d'autant) ou
+se tait.
+
+**Le fait nouveau, commun aux essais 2 et 3** : sur les deux fréquences faibles, **ils rendent vide
+un tiers à la moitié des morceaux qui contiennent de la parole** (8 % pour la production). La leçon
+« se taire sur le bruit », apprise des 120 clips vides, déborde sur la parole faible : c'est là que
+se perdent les avions de 125,825 et de 126,425, bien plus que dans le vocabulaire.
+
+**Leçons** :
+- **l'oreille seule n'est pas le remède** : entraîner une moitié sans l'autre dégrade l'ensemble ;
+- **le poids du silence est trop fort** : 120 vides pour 1 100 clips parlés font taire le modèle
+  sur la parole faible. Un prochain essai devrait en mettre moins, ou n'y mettre que du bruit franc ;
+- **aucun des trois essais ne bat la production** ; le meilleur (l'essai 2) reste à 81 %. Le seul
+  acquis net est la baisse de l'invention sur le bruit, et elle vient en partie de ce silence.

@@ -1,6 +1,6 @@
 # Améliorer la reconnaissance : toutes les approches, où on en est
 
-*Document de référence, état au 25 septembre 2026, 17 h. Il se lit sans jargon ; chaque ligne
+*Document de référence, état au 25 septembre 2026, 20 h. Il se lit sans jargon ; chaque ligne
 renvoie au document qui détaille la mesure. À tenir à jour à chaque résultat.*
 
 ## Ce qu'on cherche, et comment on juge
@@ -70,7 +70,8 @@ ne portent aucun indicatif (47 %).
 | 25 | Faire sonner des enregistrements propres comme la station | l'imitation reproduit la station sur tout ce qui se mesure | ✅ |
 | 26 | Mini-essai 1 : un seul corpus, le modèle entier | invente **4 à 6 fois moins** sur du bruit, mais **deux fois moins d'avions justes** : il a appris le vocabulaire du corpus (« Rhein », « Lufthansa ») et perdu celui de Paris | ❌ en l'état |
 | 27 | Mini-essai 2 : un mélange de trois corpus | 191 avions justes (essai 1 : 104 ; production : 236) ; invente toujours moins sur le bruit ; la fréquence faible 125,825 perd encore la moitié de ses avions | ❌ en l'état, mais la bonne direction |
-| 28 | Mini-essai 3 : le mélange, en n'entraînant que « l'oreille » (pas la rédaction) | suspendu le 25/09 : mémoire du Mac saturée par d'autres programmes | ⏳ |
+| 28 | Mini-essai 3 : le mélange, en n'entraînant que « l'oreille » (pas la rédaction) | 158 avions justes, moins bien que l'essai 2 sur les quatre fréquences ; plus lent (textes à rallonge) | ❌ |
+| 28 bis | Ce que les essais 2 et 3 ont en commun | sur les fréquences faibles, ils rendent **vide un tiers à la moitié des morceaux qui contiennent de la parole** (8 % en production) : la leçon « se taire sur le bruit » déborde sur la parole faible | à corriger au prochain essai |
 
 ### E. Qui parle, contrôleur ou pilote
 
@@ -83,9 +84,11 @@ ne portent aucun indicatif (47 %).
 
 1. **La réception séparée par fréquence, en permanence** (Q45) : le gain est déjà mesuré, reste à
    l'installer à la station et à brancher co-atc dessus.
-2. **Les mini-essais 2 et 3**. Si « l'oreille seule » garde les avions justes tout en inventant
-   moins, on passe à un vrai entraînement : plus de données, apprentissage plus doux, puis le
-   vocabulaire de Paris (vos indicatifs par synthèse vocale).
+2. **Un quatrième essai d'entraînement, s'il vaut la peine** : repartir de l'essai 2 (le modèle
+   entier), avec **beaucoup moins de clips de silence** pour qu'il ne se taise plus sur la parole
+   faible, un apprentissage plus doux, puis le vocabulaire de Paris (vos indicatifs par synthèse
+   vocale). Aucun des trois essais ne bat la production : c'est un chantier de fond, pas un gain
+   rapide.
 3. **Un jeu de test fiable** : une centaine de transmissions des fréquences visées, transcrites en
    entier, avec l'aide de l'outil d'annotation. Sans lui, on ne juge que l'indicatif.
 4. **Le squelch des deux fréquences faibles**, essayé avec retour automatique et jugé sur les
