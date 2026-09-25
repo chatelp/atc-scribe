@@ -3593,3 +3593,21 @@ d'après D26), ne permet pas d'en tirer un changement. Le parasite reste sans co
 que 125,825 et 126,425 s'ouvrent plus d'une fois sur deux sans parole. Le mélange colle ces
 ouvertures à la parole des autres canaux : elles ne sont pas rejetées, **elles partent au modèle**
 (Q41).
+
+### Q45 — Choisir les fréquences une par une à la station, par une API claire *(ouverte, 25/09)*
+
+Demande du propriétaire : *« compléter les groupes par des fréquences spécifiques […] avec une API
+claire pour switcher les fréquences sur la station »*. Aujourd'hui `radio-ctl` ne bascule que sur
+l'un des dix groupes, **et une simple lecture de `/radio/mode/<nom>` bascule la station**
+(`do_POST = do_GET`).
+
+Demande détaillée rédigée pour l'agent de la station :
+`whisper-lab/echanges-station/demande-selection-frequences.md` — un catalogue des fréquences comme
+source unique, les groupes comme sélections nommées, la sélection libre avec ses règles (fenêtre,
+centre, écartement), des **flux séparés par fréquence** en option (`/aero-<id>.mp3`), un retour
+automatique pour les essais, les actions en POST et JSON seulement, et un état versionné et daté.
+
+**Pourquoi co-atc en a besoin** : le gain le mieux mesuré du projet est la réception par canal
+(×4 d'avions justes, doc 28) ; et le trou du 24/09 (16:38–18:50, un autre groupe transcrit sans
+que co-atc le sache) disparaît si co-atc étiquette chaque transcription avec la `version` de l'état.
+**co-atc ne bascule jamais la station de lui-même.**
