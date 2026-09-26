@@ -392,6 +392,18 @@ func (tt *TrajectoryTracker) GetRunwayScoresFor(airport string, n int) []RunwayS
 	return nil
 }
 
+// AlignedAirport returns the followed airport on one of whose runway axes the
+// aircraft was seen, "" if none -- the stronger of the two ways an aircraft is
+// given an airport (airportFor).
+func (tt *TrajectoryTracker) AlignedAirport(hex string) string {
+	tt.mu.RLock()
+	defer tt.mu.RUnlock()
+	if at, ok := tt.aircraft[hex]; ok {
+		return at.airport
+	}
+	return ""
+}
+
 // AirportOf returns the followed airport an aircraft is being judged against,
 // as of its last derived state; the principal when it has none yet.
 func (tt *TrajectoryTracker) AirportOf(hex string) *PhaseReference {

@@ -55,6 +55,9 @@ func TestAnAircraftOnARunwayAxisIsThatAirports(t *testing.T) {
 	if !tt.runwayTrackerFor("ZZZZ").HasData() || tt.runwayTrackerFor("YYYY").HasData() {
 		t.Error("the approach should count as runway evidence for ZZZZ only")
 	}
+	if got := tt.AlignedAirport("a00010"); got != "ZZZZ" {
+		t.Errorf("aligned airport = %q, want ZZZZ", got)
+	}
 }
 
 // Off every runway axis, the nearest airport stands in.
@@ -64,6 +67,9 @@ func TestOffTheAxesTheNearestAirportStandsIn(t *testing.T) {
 	tt.DeterminePhase(ac, nil, nil)
 	if got := tt.AirportOf("a00011").Airport; got != "YYYY" {
 		t.Errorf("airport = %s, want the nearest, YYYY", got)
+	}
+	if got := tt.AlignedAirport("a00011"); got != "" {
+		t.Errorf("aligned airport = %q, want none: the nearest is only a stand-in", got)
 	}
 }
 

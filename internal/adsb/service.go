@@ -868,9 +868,15 @@ func (s *Service) GetRunwayInUseScoresFor(airport string, n int) []RunwayScore {
 
 // phaseAirport is the followed airport a phase of this aircraft belongs to: the
 // one it is judged against, for the phases that are about an airport. Cruise
-// and the rest belong to none, and so does a takeoff or landing farther than
-// airport_range_nm from it -- a light aircraft touching down at an airfield
-// nobody follows is not landing at the nearest one that is.
+// and the rest belong to none, and so does a takeoff or landing away from the
+// airport -- a light aircraft touching down at an airfield nobody follows is
+// not landing at the nearest one that is.
+//
+// "Away" is airport_range_nm, except for an aircraft seen on one of the
+// airport's runway axes: the receiver loses airliners a few hundred feet up, so
+// the last position of a landing is a minute old, 5 to 7.5 NM out (measured on
+// 26/09 at Orly and De Gaulle). Such an aircraft is allowed the approach
+// distance, approach_max_distance_nm.
 func (s *Service) phaseAirport(a *Aircraft, phase string) string {
 	switch phase {
 	case "APP", "ARR", "DEP", "CLB", "T/O", "T/D":
@@ -878,15 +884,24 @@ func (s *Service) phaseAirport(a *Aircraft, phase string) string {
 		return ""
 	}
 	ref := s.ref.load()
+	aligned := ""
 	if s.trajectoryTracker != nil {
 		ref = s.trajectoryTracker.AirportOf(a.Hex)
+		aligned = s.trajectoryTracker.AlignedAirport(a.Hex)
 	}
 	if phase == "T/O" || phase == "T/D" {
 		if a.ADSB == nil {
 			return ""
 		}
 		lat, lon, ok := a.ADSB.Position()
-		if !ok || MetersToNM(Haversine(lat, lon, ref.Lat, ref.Lon)) > s.flightPhasesConfig.AirportRangeNM {
+		if !ok {
+			return ""
+		}
+		limit := s.flightPhasesConfig.AirportRangeNM
+		if aligned == ref.Airport {
+			limit = math.Max(limit, float64(s.flightPhasesConfig.ApproachMaxDistanceNM))
+		}
+		if MetersToNM(Haversine(lat, lon, ref.Lat, ref.Lon)) > limit {
 			return ""
 		}
 	}
