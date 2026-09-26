@@ -599,6 +599,16 @@ propre Terminal fait apparaître la demande.
 > son journal. La veille distingue donc bien les deux cas. **La station a aussi ses chutes**
 > (26/09 : 00:25, 00:51, 04:48, 06:43, 12:56) ; son réseau passe par un maillage Wi-Fi que le
 > propriétaire garde en l'état (pas de boîtiers EBM68).
+>
+> **26/09, 15:51 : un programme orphelin perd le réseau local.** La veille, lancée à 10:57 par une
+> session de travail, reçoit « No route to host » dès 15:51:05 — l'instant où l'application Claude
+> redémarre et où cette session disparaît — pendant que `curl` passe ; le journal de macOS rattache
+> chaque refus à `com.anthropic.claude-code`. **Aucune demande d'autorisation n'apparaît**, et un
+> Python lancé depuis la nouvelle session joint la station sans difficulté. Un programme dont
+> l'application lanceuse a disparu garde son rattachement à elle, et macOS lui refuse le réseau
+> local sans rien demander. Règle de plus pour co-atc : **tout ce qui doit durer se lance depuis le
+> Terminal ou launchd, jamais depuis une session de travail**, que l'application peut redémarrer à
+> tout moment.
 
 Relevé au passage, sans lien avec Q21 mais à corriger : le Mac porte **deux adresses
 sur 192.168.1.0/24**, `en0` Ethernet en `.28` et `en1` Wi-Fi en `.48`, et le cache ARP
