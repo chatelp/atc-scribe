@@ -34,3 +34,11 @@ basma,DGX,1,1
 kreml,SZN,1,1
 pilato,PCH,1,1
 benavis,PVD,1,1
+#
+# Releve du 26/09/2026 sur la capture par canal du 24/09. "France" sans "Air" :
+# 157 fois contre 314 "Air France" -- a Paris le controleur et l'equipage disent
+# souvent "France 89SR". Au moins 11 transmissions deja rattachees a 11 Air France
+# par les chiffres ou les lettres seuls (compte minimal : textes tronques). Mesure
+# contre le ciel melange : +14 avions justes, precision 84 -> 85 % (D61).
+# "France Soleil" reste Transavia : la forme a deux mots est cherchee d'abord.
+france,AFR,11,11

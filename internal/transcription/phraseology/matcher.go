@@ -494,13 +494,14 @@ func absF(x float64) float64 {
 func (m *Matcher) operatorsIn(text string) map[string][][2]int {
 	toks := tokenize(text)
 	out := map[string][][2]int{}
-	for i := range toks {
+	for i := 0; i < len(toks); i++ {
 		for n := 2; n >= 1; n-- {
 			if i+n > len(toks) {
 				continue
 			}
 			if code, ok := m.telephony[normalizeName(strings.Join(toks[i:i+n], " "))]; ok {
 				out[code] = append(out[code], [2]int{i, i + n})
+				i += n - 1 // "Air France" is one name, not "Air France" and "France"
 				break
 			}
 		}
