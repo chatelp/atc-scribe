@@ -3908,3 +3908,37 @@ seule) : premier paquet **2,75 s** après la connexion, 2 800 octets (≈ 2,6 s 
 des paquets de 1 400 octets toutes les 1,4 s, **8,5 kbit/s**. `radio-ctl-sync` n'ouvre plus que
 les flux `flux_present` à l'adresse donnée. **Reste** : le premier essai réel de co-atc sur ces
 flux.
+
+
+### Q46 — Les indicatifs à lettres échappent presque à l'association *(ouverte, 26/09)*
+
+Relevé par le propriétaire pendant le premier essai sur les flux séparés (123,875, Orly Approche) :
+*« j'ai eu un Uniform Echo que moi-même j'ai compris à l'oreille, l'avion est bien là, mais il n'a
+pas réussi à retranscrire l'indicatif »*. L'avion est à l'ADS-B : **VLG7UE**, « Vueling Seven
+Uniform Echo », à 6 700 ft à l'est d'Orly.
+
+**Deux causes, dont une de structure.** La transcription a mal rendu l'indicatif. Mais même bien
+transcrit, **l'association ne s'appuie que sur un nombre d'au moins trois chiffres** (Q30 : en
+dessous, le hasard égale la vérité) ; les lettres épelées n'ajoutent qu'un bonus à un score déjà
+acquis par les chiffres, ou presque (`internal/transcription/phraseology/matcher.go`). « 7UE » n'a
+qu'un chiffre.
+
+**Mesuré sur la capture ADS-B de référence du 24/09** (1 408 indicatifs distincts) :
+
+| Forme de l'indicatif | Part | Exemple |
+|---|---|---|
+| **lettres, moins de 3 chiffres** | **59 %** | AFR11NQ, VLG7UE, EZY36VJ |
+| chiffres seuls, 3 ou plus | 24 % | AFR1234 |
+| lettres, 3 chiffres ou plus | 7 % | — |
+| autres (immatriculations, militaires) | 7 % | F-GXXX |
+| chiffres seuls, moins de 3 | 2 % | — |
+
+Même proportion en direct le 26/09 à 13:41 (91 indicatifs : 59 %). **L'association ne voit
+vraiment qu'un tiers des avions.** Le point de départ de Q30 (≈ 8 % de transmissions reliées) se
+lit autrement : la plupart des indicatifs entendus ne pouvaient pas être reliés.
+
+**Piste** : compter les lettres épelées comme les chiffres. « 7UE » a 10 × 26 × 26 = 6 760
+combinaisons, plus que les 1 000 de trois chiffres : une règle « au moins trois caractères,
+lettres comprises » serait au moins aussi sûre contre le hasard. **À mesurer avant de décider**,
+sur les transcriptions par canal du 24/09 avec le contrôle par ciel mélangé : avions justes gagnés,
+précision.
