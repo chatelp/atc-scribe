@@ -540,7 +540,7 @@ propre Terminal fait apparaître la demande.
 > distingue pas les deux. **Relancer trois fois avant de diagnostiquer** coûte trente
 > secondes ; j'ai écrit deux conclusions fausses pour les avoir économisées.
 
-### Q22 — Le Mac est sur le même sous-réseau deux fois *(nouvelle, 16/09 ; **toujours vrai le 26/09**)*
+### Q22 — Le Mac est sur le même sous-réseau deux fois *(nouvelle, 16/09 ; toujours vrai le 26/09, mais **pas la cause de la panne du 25/09** : voir la fin)*
 
 > **26/09 : de nouveau suspect.** Le 25/09 au soir, depuis le Mac, six coupures de lectures
 > longues d'`aero.mp3` (21:54 – 22:24), puis « No route to host » vers la station de 22:24:40 à
@@ -567,6 +567,30 @@ propre Terminal fait apparaître la demande.
 > programme refusé**, qui descend de `claude-code` 2.1.281 (démarré le 25/09 à 09:44, pas de mise à
 > jour la nuit). Cette demande-là n'explique donc pas directement la panne ; la piste de la
 > confidentialité reste la première, sans être établie. La veille tranchera à la prochaine panne.
+>
+> **Établi le 26/09 par le journal de macOS** (`/usr/bin/log show` ; dans le shell de cette
+> session, `log` est une commande intégrée de zsh qui masque l'outil — la première recherche, la
+> veille au soir, n'avait donc rien lu) :
+> - **22:24:24** : `en0 link INACTIVE` — le câble décroche ; le Wi-Fi (`en1`) était inactif, **le
+>   double adressage n'a pas joué** ;
+> - **22:24:28 – 22:24:30** : lien revenu, bail DHCP `.28` retrouvé, routes réappliquées ;
+>   à 22:24:29, macOS **recharge les règles « Réseau local »** (95 règles d'applications) ;
+> - **de 22:24:40 à 23:48** : `LocalNetwork: found bundle id com.anthropic.claude-code by PID`
+>   **2 376 fois, toutes les 2 s** — au rythme exact des tentatives de l'enregistrement, et **jamais
+>   avant la chute du lien**. macOS rattache la connexion à l'application qui a lancé le
+>   programme, **Claude Code**, et la refuse : « No route to host ». Le ssh de 22:51, lancé depuis
+>   le Terminal (déjà autorisé), passait ;
+> - **26/09, 08:42** : même contrôle, accès accordé — la demande trouvée en attente ce matin avait
+>   été acceptée.
+>
+> **Cause probable** : Claude Code s'était mis à jour le 25/09 à 08:08 (2.1.281), identité neuve
+> pour macOS ; l'accès tenait jusqu'au rechargement des règles provoqué par la chute du lien. Les
+> six silences d'avant 22:24 ne sont pas expliqués (aucun changement de lien journalisé).
+> **Conséquences** : (1) co-atc lancé depuis Claude Code hérite de cette fragilité — une mise à
+> jour de Claude Code plus une chute du câble, et co-atc ne reçoit plus rien, sans erreur visible,
+> jusqu'à ce qu'on réponde à macOS ; **co-atc doit être lancé depuis le Terminal du propriétaire
+> (ou un agent launchd), pas depuis la session de travail** ; (2) **les chutes du lien Ethernet
+> (doc 20 : dix par nuit) déclenchent tout** — câble, prise ou port du commutateur à vérifier.
 
 Relevé au passage, sans lien avec Q21 mais à corriger : le Mac porte **deux adresses
 sur 192.168.1.0/24**, `en0` Ethernet en `.28` et `en1` Wi-Fi en `.48`, et le cache ARP
