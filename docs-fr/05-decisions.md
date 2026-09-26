@@ -3584,7 +3584,7 @@ Vérifié sur une instance de test : la case décochée depuis la page arrive au
 (« Server settings changed from the panel ») et se relit au redémarrage. **Contribuable en amont** :
 les règles et le mécanisme sont génériques.
 
-### D59 — Le ciel de chaque fréquence : le secteur *(26/09 — construit, désactivé jusqu'à la validation)*
+### D59 — Le ciel de chaque fréquence : le secteur *(26/09 — construit, **validé le soir même et en service par défaut**)*
 
 Suite de la piste 3 de Q46 (mesurée sur l'approche de Roissy : hasard divisé par deux, avions
 justes en plus). **Décisions du propriétaire, 26/09** : les tailles par défaut, et une copie dans
@@ -3623,9 +3623,26 @@ acceptée (0,6). `radio-ctl-sync` attribue aéroport et nature depuis la copie d
 68 fréquences). **Vérifié sur le flux réel de 123,875 (Orly Approche)** : le ciel passe de 74 à
 29 avions, contre 32 comptés indépendamment sur l'ADS-B de la station.
 
-**Reste** : la séance de validation — co-atc sur des flux séparés choisis (les gros-porteurs, ou
-Orly Approche avec trois fréquences de Roissy), un autre jour, mesurée ensuite avec et sans
-secteur ; puis l'activation. Et apprendre des données les secteurs des fréquences de contrôle.
+**Séance de validation, 26/09 de 16:44 à 18:35** : co-atc de test sur quatre flux séparés choisis
+par le propriétaire (123,875 Orly Approche, 124,350 et 125,825 De Gaulle, 124,625 Paris Contrôle
+sans secteur), secteur **désactivé** pendant l'enregistrement, 681 transmissions ; mesurée ensuite
+hors ligne (`cmd/phraseology -db`, règles en service dont l'attente de D60 et « France » de D61,
+cinq ciels mélangés ; `whisper-lab/resultats/station/2026-09-26-validation-secteur/mesure/`) :
+
+| | Rattachés | Hasard | Avions justes | Précision |
+|---|---|---|---|---|
+| sans secteur | 120 | 10,6 | 109,4 | 91 % |
+| **avec secteur** | 115 | **4,4** | **110,6** | **96 %** |
+
+Par fréquence : 123,875 (Orly) 4,2 → 5,6 justes, hasard 1,8 → 0,4 ; 124,350 66,2 → 67,8, hasard
+6,8 → 2,2 ; 125,825 20,2 → 19,2, hasard 2,8 → 1,8 ; 124,625 inchangée (pas de secteur). **Le
+résultat du 24/09 se confirme un autre jour et sur un autre aéroport** : hasard divisé par 2,4,
+autant d'avions justes. **Activé par défaut** (`DefaultMatchingRules`), désactivable au panneau.
+
+Au passage : Orly ne rattache que 6 transmissions sur 129 (124,350 : 73 sur 307) — la séance a
+coïncidé avec le hachage de 123,875 (Q47).
+
+**Reste** : apprendre des données les secteurs des fréquences de contrôle.
 
 ### D60 — Une transmission sans avion attend une minute que l'ADS-B le décode *(26/09)*
 

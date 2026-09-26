@@ -197,11 +197,12 @@ func TestWithoutAHookTheAirportCannotChange(t *testing.T) {
 
 // Letters and approximate airline names are on until changed from the panel:
 // the owner's decision of 26/09, after they measured +27% true matches (Q46).
+// Sectors too, once validated on 26/09 (D59).
 func TestMatchingRulesDefaultToLettersAndApproximateNamesOn(t *testing.T) {
 	r := newRuntimeIn(t, t.TempDir())
 	got := r.Matching()
 	if !got.Letters || !got.ApproxOperators || got.MinDigits != 3 || !got.ContextLetters || !got.ContextDigits ||
-		got.ContextNames || got.OneDigitOff || got.Sectors {
+		got.ContextNames || got.OneDigitOff || !got.Sectors {
 		t.Errorf("got %+v", got)
 	}
 	if got.Sector["approach"] != (SectorSize{RadiusNM: 60, MaxAltFt: 20000}) || got.Sector["ground"] != (SectorSize{RadiusNM: 5, MaxAltFt: 1500}) {

@@ -70,9 +70,11 @@ type MatchingRules struct {
 	ContextNames   bool `json:"context_names"`
 
 	// Sectors compares a transmission only with the aircraft its frequency can
-	// be talking to, for the frequencies that name an airport and a kind. Off
-	// until validated on another day; the radii and ceilings were agreed with
-	// the owner on 26/09 (approach measured on 24/09: chance halved).
+	// be talking to, for the frequencies that name an airport and a kind. The
+	// radii and ceilings were agreed with the owner on 26/09. Measured on 24/09
+	// on De Gaulle approach, then on 26/09 on Orly and three De Gaulle
+	// frequencies: chance divided by 2.4, as many right aircraft, precision
+	// 91% -> 96% (docs-fr/05-decisions.md, D59).
 	Sectors bool                  `json:"sectors"`
 	Sector  map[string]SectorSize `json:"sector"`
 }
@@ -95,13 +97,14 @@ func DefaultSectorSizes() map[string]SectorSize {
 
 // DefaultMatchingRules are the rules in force until changed from the panel:
 // letters, approximate names, and an aircraft just heard named by its last
-// letters or digits, decided by the owner on 26/09 after Q46.
+// letters or digits, decided by the owner on 26/09 after Q46; and each
+// frequency's sector, once validated on 26/09 (D59).
 func DefaultMatchingRules(minDigits int) MatchingRules {
 	if minDigits <= 0 {
 		minDigits = 3
 	}
 	return MatchingRules{Letters: true, ApproxOperators: true, MinDigits: minDigits,
-		ContextLetters: true, ContextDigits: true, Sector: DefaultSectorSizes()}
+		ContextLetters: true, ContextDigits: true, Sectors: true, Sector: DefaultSectorSizes()}
 }
 
 func (m MatchingRules) validate() error {
