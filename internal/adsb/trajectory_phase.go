@@ -179,7 +179,8 @@ func (tt *TrajectoryTracker) ruleApproach(aircraft *Aircraft, d *DerivedState) s
 	}
 
 	// Check runway alignment using the latest position
-	ref := tt.ref.load()
+	ref := tt.refOf(d)
+	rt := tt.runwayTrackerFor(ref.Airport)
 	runwayInfo := DetectRunwayApproach(lat, lon, NumberOrZero(adsb.Track), d.AltMean, ref.Runways, *cfg)
 	if runwayInfo == nil || !runwayInfo.OnApproach {
 		return ""
@@ -188,7 +189,7 @@ func (tt *TrajectoryTracker) ruleApproach(aircraft *Aircraft, d *DerivedState) s
 	// Filter by active runway — suppress approaches to non-active runways
 	// (e.g. perpendicular cross-runway during a base turn). During startup
 	// grace (no data), IsActiveRunway returns true for all.
-	if tt.runwayTracker != nil && !tt.runwayTracker.IsActiveRunway(runwayInfo.RunwayID) {
+	if rt != nil && !rt.IsActiveRunway(runwayInfo.RunwayID) {
 		tt.logger.Debug("Approach rejected (runway not active)",
 			logger.String("hex", aircraft.Hex),
 			logger.String("runway", runwayInfo.RunwayID),
@@ -207,8 +208,8 @@ func (tt *TrajectoryTracker) ruleApproach(aircraft *Aircraft, d *DerivedState) s
 	}
 
 	// Record evidence for runway-in-use detection
-	if tt.runwayTracker != nil {
-		tt.runwayTracker.RecordEvent(runwayInfo.RunwayID, RunwayEventApproach, aircraft.Hex)
+	if rt != nil {
+		rt.RecordEvent(runwayInfo.RunwayID, RunwayEventApproach, aircraft.Hex)
 	}
 
 	return "APP"
@@ -263,11 +264,12 @@ func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, take
 
 	// Check runway departure heading (used by both paths)
 	adsb := aircraft.ADSB
+	ref := tt.refOf(d)
+	rt := tt.runwayTrackerFor(ref.Airport)
 	var departureInfo *RunwayDepartureInfo
 	if adsb != nil {
 		lat, lon, hasPosition := adsb.Position()
 		if hasPosition {
-			ref := tt.ref.load()
 			departureInfo = DetectRunwayDeparture(
 				lat, lon, NumberOrZero(adsb.Track),
 				ref.Runways, ref.Lat, ref.Lon, *cfg,
@@ -279,8 +281,8 @@ func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, take
 	if tt.hasRecentTakeoff(aircraft, takeoffTime) {
 		// (a) On runway departure heading
 		if departureInfo != nil && departureInfo.OnDeparture {
-			if tt.runwayTracker != nil {
-				tt.runwayTracker.RecordEvent(departureInfo.RunwayID, RunwayEventClimb, aircraft.Hex)
+			if rt != nil {
+				rt.RecordEvent(departureInfo.RunwayID, RunwayEventClimb, aircraft.Hex)
 			}
 			return "CLB"
 		}
@@ -297,8 +299,8 @@ func (tt *TrajectoryTracker) ruleClimb(aircraft *Aircraft, d *DerivedState, take
 	if departureInfo != nil && departureInfo.OnDeparture &&
 		d.AltMean <= float64(cfg.DepartureAltitudeFt) &&
 		d.DistToAirportNM <= cfg.AirportRangeNM {
-		if tt.runwayTracker != nil {
-			tt.runwayTracker.RecordEvent(departureInfo.RunwayID, RunwayEventClimb, aircraft.Hex)
+		if rt != nil {
+			rt.RecordEvent(departureInfo.RunwayID, RunwayEventClimb, aircraft.Hex)
 		}
 		return "CLB"
 	}
@@ -414,7 +416,7 @@ func (tt *TrajectoryTracker) singlePointPhase(aircraft *Aircraft) string {
 		if track == 0 && NumberOrZero(adsb.MagHeading) != 0 {
 			track = NumberOrZero(adsb.MagHeading)
 		}
-		ref := tt.ref.load()
+		ref := tt.airportFor(nil, lat, lon, track, alt)
 		distToAirport := MetersToNM(Haversine(lat, lon, ref.Lat, ref.Lon))
 		if distToAirport <= cfg.AirportRangeNM {
 			departureInfo := DetectRunwayDeparture(
@@ -423,7 +425,7 @@ func (tt *TrajectoryTracker) singlePointPhase(aircraft *Aircraft) string {
 			)
 			if departureInfo != nil && departureInfo.OnDeparture {
 				// Extra confidence: matches the known active runway
-				if tt.runwayTracker != nil && tt.runwayTracker.IsActiveRunway(departureInfo.RunwayID) {
+				if rt := tt.runwayTrackerFor(ref.Airport); rt != nil && rt.IsActiveRunway(departureInfo.RunwayID) {
 					return "CLB"
 				}
 				// No active runway data yet — still accept if geometry matches
@@ -471,7 +473,7 @@ func (tt *TrajectoryTracker) fewPointsAirbornePhase(
 			track = NumberOrZero(aircraft.ADSB.MagHeading)
 		}
 		if track != 0 {
-			ref := tt.ref.load()
+			ref := tt.refOf(d)
 			departureInfo := DetectRunwayDeparture(
 				lat, lon, track,
 				ref.Runways, ref.Lat, ref.Lon, *tt.phasesConfig,
@@ -493,6 +495,15 @@ func (tt *TrajectoryTracker) fewPointsAirbornePhase(
 	}
 
 	return "UNK"
+}
+
+// refOf returns the airport a derived state was measured against: the principal
+// for a state computed before any airport was chosen.
+func (tt *TrajectoryTracker) refOf(d *DerivedState) *PhaseReference {
+	if d != nil && d.ref != nil {
+		return d.ref
+	}
+	return tt.ref.load()
 }
 
 // hasRecentTakeoff determines if an aircraft has taken off from our airport recently.

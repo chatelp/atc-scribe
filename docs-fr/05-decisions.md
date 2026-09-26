@@ -3692,7 +3692,42 @@ rien de plus. **Fait** : une ligne dans `assets/spoken-operators.csv`. « France
 Transavia, la forme à deux mots étant cherchée d'abord. Au passage, la recherche des noms ne relit
 plus le second mot d'une forme à deux mots : « Air France » surlignait aussi « France » seul.
 
-### Q40 — Plusieurs aéroports de référence, pas un seul *(ouverte, 23/09)*
+### D62 — Orly et De Gaulle suivis ensemble *(26/09)*
+
+**Demande du propriétaire, 26/09** : dans l'interface, seuls les axes de piste de Saint-Cyr
+apparaissaient (l'instance de test lisait l'aéroport de sa configuration, `LFPZ`, et non le
+réglage de production, `LFPO`), mais surtout **un seul aéroport à la fois** : Q40 n'avait jamais
+été codée. **Choix du propriétaire**, sur recommandation : Orly et De Gaulle ; la météo du seul
+aéroport principal ; la phase affichée avec son aéroport.
+
+**Ce qui est fait** (générique, contribuable ; un seul aéroport suivi = comportement inchangé) :
+
+- **Réglage** : `reference_airport` reste l'aéroport principal (météo, champs d'API à aéroport
+  unique) ; `also_airports`, au plus trois, sont suivis en plus — cases « Also follow » au
+  panneau. Un réglage enregistré avant reste valide.
+- **Attribution de chaque avion** (`internal/adsb/airport_attribution.go`) : l'aéroport **dont il
+  suit un axe de piste prolongé**, dans un sens ou dans l'autre (approche ou montée initiale),
+  avec les tolérances d'approche déjà configurées — 10 NM du seuil, 0,5 NM de l'axe, cap à 30°,
+  **sous 5 000 ft** (au-dessus, survoler un axe ne dit rien) ; cette attribution est gardée pour
+  le reste du vol. À défaut, l'aéroport suivi le plus proche, réévalué à chaque mise à jour.
+  Toutes les règles de phase (APP, CLB, DEP, ARR, atterrissage à la perte du signal) mesurent
+  ensuite contre cet aéroport.
+- **Piste en service par aéroport** : les identifiants de piste ne portent pas leur aéroport
+  (LFPO et LFPB ont tous deux 07-25) ; chaque aéroport a son propre compteur.
+- **Phase et aéroport enregistrés ensemble** : colonne `airport` ajoutée à `phase_changes` (les
+  bases existantes la reçoivent à l'ouverture) ; vide pour la croisière, et pour un décollage ou
+  un atterrissage à plus de `airport_range_nm` (5 NM) de l'aéroport — un avion léger qui se pose
+  à Toussus n'atterrit pas à Orly. Transmise dans l'API et les messages temps réel.
+- **Page** : axes de piste de tous les aéroports suivis ; sous la phase, son aéroport (seulement
+  quand plusieurs sont suivis) ; dans les alertes (« ICE547 → DEP LFPG ») ; la piste en service de
+  chacun dans la barre du bas.
+
+**Vérifié en direct** sur une seconde instance d'essai (port 8012, sans audio, ADS-B de la
+station), à côté de la séance de validation : `/station` rend les deux aéroports (3 et 4 pistes),
+la carte trace leurs axes, les premières alertes portent leur aéroport, la piste en service de
+De Gaulle (26R) s'établit en quelques minutes.
+
+### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
 CDG »*, puis *« à vrai dire la question serait pour n aéroports »*. D49 avait noté la

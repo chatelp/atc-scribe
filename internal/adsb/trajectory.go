@@ -138,6 +138,12 @@ type DerivedState struct {
 	DistTrendNMPerSec float64 // OLS regression slope of distance vs time (negative = approaching)
 	BearingToAirport  float64 // Current bearing to the reference airport (degrees)
 
+	// Airport is the followed airport these were measured against, the one the
+	// aircraft is flying to or from (airportFor); ref is that airport, for the
+	// rules that need its runways.
+	Airport string
+	ref     *PhaseReference
+
 	// Data quality indicators
 	ValidPointCount   int     // Number of valid snapshots in the analysis window
 	WindowDurationSec float64 // Time span from oldest to newest valid snapshot (seconds)
@@ -169,6 +175,10 @@ type AircraftTrajectory struct {
 	Prediction   TrajectoryPrediction // Hindcast + forecast predictions
 	DirtyDerived bool                 // True when new snapshots have been added since last compute
 	LastSeen     time.Time            // Tracks staleness for cleanup
+
+	// airport is the followed airport on whose runway axis the aircraft was
+	// last seen, "" until then (airportFor).
+	airport string
 }
 
 // NewAircraftTrajectory creates a ring buffer with the given capacity.
@@ -258,15 +268,21 @@ type TrajectoryConfig struct {
 // on the same goroutine, while a background cleanup goroutine periodically purges
 // stale entries under a write lock.
 type TrajectoryTracker struct {
-	mu            sync.RWMutex
-	aircraft      map[string]*AircraftTrajectory
-	config        TrajectoryConfig
-	ref           *phaseRef // the airport phases are judged against, shared with the service
-	phasesConfig  *config.FlightPhasesConfig
-	runwayTracker *RunwayInUseTracker
-	logger        *logger.Logger
-	stopCh        chan struct{}
-	wg            sync.WaitGroup
+	mu           sync.RWMutex
+	aircraft     map[string]*AircraftTrajectory
+	config       TrajectoryConfig
+	ref          *phaseRef // the airports phases are judged against, shared with the service
+	phasesConfig *config.FlightPhasesConfig
+	logger       *logger.Logger
+
+	// One runway-in-use tracker per followed airport: runway ends are named
+	// without their airport (LFPO and LFPB both have 07-25), and the evidence of
+	// one airport says nothing of another's.
+	runwayMu       sync.RWMutex
+	runwayTrackers map[string]*RunwayInUseTracker
+	newRunways     func() *RunwayInUseTracker
+	stopCh         chan struct{}
+	wg             sync.WaitGroup
 }
 
 // NewTrajectoryTracker creates and starts the tracker with the given configuration.
@@ -282,18 +298,20 @@ func NewTrajectoryTracker(
 		config:       cfg,
 		ref:          ref,
 		phasesConfig: phasesConfig,
-		runwayTracker: NewRunwayInUseTracker(
-			phasesConfig.RunwayInUseWindowMinutes,
-			phasesConfig.RunwayInUseApproachWeight,
-			phasesConfig.RunwayInUseLandingWeight,
-			phasesConfig.RunwayInUseClimbWeight,
-			phasesConfig.RunwayInUseDecayRate,
-			log,
-		),
+		newRunways: func() *RunwayInUseTracker {
+			return NewRunwayInUseTracker(
+				phasesConfig.RunwayInUseWindowMinutes,
+				phasesConfig.RunwayInUseApproachWeight,
+				phasesConfig.RunwayInUseLandingWeight,
+				phasesConfig.RunwayInUseClimbWeight,
+				phasesConfig.RunwayInUseDecayRate,
+				log,
+			)
+		},
 		logger: log.Named("trajectory"),
 		stopCh: make(chan struct{}),
 	}
-	tt.runwayTracker.SetRunwayData(ref.load().Runways)
+	tt.resetRunwayTrackers()
 	tt.wg.Add(1)
 	go tt.cleanupLoop()
 	tt.logger.Info("Trajectory tracker started",
@@ -304,17 +322,43 @@ func NewTrajectoryTracker(
 	return tt
 }
 
-// referenceChanged is called by the service after it has stored a new reference.
-// The evidence of which runway is in use belonged to the previous airport: kept,
-// it would decay over the next hour while pointing at runways that no longer
-// exist in the data.
+// referenceChanged is called by the service after it has stored new airports.
+// The evidence of which runway is in use belonged to the previous airports:
+// kept, it would decay over the next hour while pointing at runways that no
+// longer exist in the data. An airport still followed keeps its own.
 func (tt *TrajectoryTracker) referenceChanged() {
-	ref := tt.ref.load()
-	tt.runwayTracker.Reset()
-	tt.runwayTracker.SetRunwayData(ref.Runways)
-	tt.logger.Info("Phase reference changed",
-		logger.String("airport", ref.Airport),
-		logger.Int("runway_pairs", len(ref.Runways.RunwayThresholds)))
+	tt.resetRunwayTrackers()
+	for _, ref := range tt.ref.all() {
+		tt.logger.Info("Phase reference changed",
+			logger.String("airport", ref.Airport),
+			logger.Int("runway_pairs", len(ref.Runways.RunwayThresholds)))
+	}
+}
+
+// resetRunwayTrackers gives each followed airport a runway-in-use tracker,
+// keeping the one of an airport already followed.
+func (tt *TrajectoryTracker) resetRunwayTrackers() {
+	tt.runwayMu.Lock()
+	defer tt.runwayMu.Unlock()
+	next := map[string]*RunwayInUseTracker{}
+	for _, ref := range tt.ref.all() {
+		if old, ok := tt.runwayTrackers[ref.Airport]; ok {
+			next[ref.Airport] = old
+			continue
+		}
+		rt := tt.newRunways()
+		rt.SetRunwayData(ref.Runways)
+		next[ref.Airport] = rt
+	}
+	tt.runwayTrackers = next
+}
+
+// runwayTrackerFor returns the runway-in-use tracker of a followed airport, nil
+// for one that is not followed.
+func (tt *TrajectoryTracker) runwayTrackerFor(airport string) *RunwayInUseTracker {
+	tt.runwayMu.RLock()
+	defer tt.runwayMu.RUnlock()
+	return tt.runwayTrackers[airport]
 }
 
 // Stop shuts down the background cleanup goroutine and waits for it to finish.
@@ -325,19 +369,39 @@ func (tt *TrajectoryTracker) Stop() {
 }
 
 // RecordRunwayLanding records a landing event for runway-in-use detection.
-// Called by the service when a T/D is detected near a runway threshold.
-func (tt *TrajectoryTracker) RecordRunwayLanding(runwayID string, hex string) {
-	if tt.runwayTracker != nil {
-		tt.runwayTracker.RecordEvent(runwayID, RunwayEventLanding, hex)
+// Called by the service when a T/D is detected near a runway threshold of
+// airport.
+func (tt *TrajectoryTracker) RecordRunwayLanding(airport, runwayID string, hex string) {
+	if rt := tt.runwayTrackerFor(airport); rt != nil {
+		rt.RecordEvent(runwayID, RunwayEventLanding, hex)
 	}
 }
 
-// GetRunwayScores returns the top N runway-in-use scores for external consumers.
+// GetRunwayScores returns the top N runway-in-use scores of the principal
+// airport, for external consumers.
 func (tt *TrajectoryTracker) GetRunwayScores(n int) []RunwayScore {
-	if tt.runwayTracker != nil {
-		return tt.runwayTracker.GetTopScores(n)
+	return tt.GetRunwayScoresFor(tt.ref.load().Airport, n)
+}
+
+// GetRunwayScoresFor returns the top N runway-in-use scores of a followed
+// airport.
+func (tt *TrajectoryTracker) GetRunwayScoresFor(airport string, n int) []RunwayScore {
+	if rt := tt.runwayTrackerFor(airport); rt != nil {
+		return rt.GetTopScores(n)
 	}
 	return nil
+}
+
+// AirportOf returns the followed airport an aircraft is being judged against,
+// as of its last derived state; the principal when it has none yet.
+func (tt *TrajectoryTracker) AirportOf(hex string) *PhaseReference {
+	tt.mu.RLock()
+	at, ok := tt.aircraft[hex]
+	tt.mu.RUnlock()
+	if ok && at.Derived.ref != nil {
+		return at.Derived.ref
+	}
+	return tt.ref.load()
 }
 
 // Ingest adds a new snapshot for the given aircraft. If the aircraft has no
@@ -666,10 +730,11 @@ func (tt *TrajectoryTracker) computeDerivedState(at *AircraftTrajectory) {
 		return
 	}
 
-	// ── Current distance and bearing to the reference airport ──
-	// One load for the whole computation: a reference changed mid-way would
+	// ── Current distance and bearing to the airport this aircraft is about ──
+	// One choice for the whole computation: an airport changed mid-way would
 	// otherwise mix two airports in a single state.
-	ref := tt.ref.load()
+	ref := tt.airportFor(at, latest.Lat, latest.Lon, latest.Track, latest.AltBaro)
+	d.Airport, d.ref = ref.Airport, ref
 	d.DistToAirportNM = MetersToNM(Haversine(latest.Lat, latest.Lon, ref.Lat, ref.Lon))
 	d.BearingToAirport = CalculateBearing(latest.Lat, latest.Lon, ref.Lat, ref.Lon)
 

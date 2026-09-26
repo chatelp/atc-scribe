@@ -524,11 +524,15 @@
 
             const zoom = this.getZoom();
             if (zoom < 9) return;
-            const thresholdsMap = this.runwayData.runway_thresholds || {};
-            const extensionsMap = this.runwayData.runway_extensions || {};
             const showLabels = zoom >= 10;
             const showExtensions = zoom >= 11;
             const lineWeight = Math.max(4, Math.min(8, zoom - 6));
+
+            // One airport, or every airport followed (docs-fr/05-decisions.md, Q40).
+            const sets = Array.isArray(this.runwayData) ? this.runwayData : [this.runwayData];
+            sets.forEach((runwayData) => {
+            const thresholdsMap = (runwayData && runwayData.runway_thresholds) || {};
+            const extensionsMap = (runwayData && runwayData.runway_extensions) || {};
 
             Object.keys(thresholdsMap).forEach((runwayId) => {
                 const thresholds = thresholdsMap[runwayId];
@@ -580,6 +584,7 @@
                         state.source.addFeature(lineExt);
                     });
                 }
+            });
             });
         }
 

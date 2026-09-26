@@ -49,6 +49,7 @@ type ServerState struct {
 // runways phase detection can actually use.
 type ReferenceState struct {
 	Airport    string                       `json:"airport"`
+	Also       []string                     `json:"also,omitempty"` // followed besides it, in force
 	Name       string                       `json:"name,omitempty"`
 	DistanceNM float64                      `json:"distance_nm"` // from the receiver
 	Runways    int                          `json:"runways"`
@@ -281,11 +282,18 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var next config.RuntimeSettings
-	if err := json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&next); err != nil {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 8192))
+	if err != nil {
 		http.Error(w, "invalid settings: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	var next config.RuntimeSettings
+	var present map[string]json.RawMessage
+	if err := json.Unmarshal(body, &next); err != nil {
+		http.Error(w, "invalid settings: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	_ = json.Unmarshal(body, &present)
 
 	// Absent fields keep their current value rather than becoming zero, so a
 	// client that only wants to change the log level does not silently set the
@@ -299,6 +307,11 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if next.ReferenceAirport == "" {
 		next.ReferenceAirport = current.ReferenceAirport
+	}
+	// An empty list is a choice -- the reference airport alone -- so only an
+	// absent one keeps the airports in force.
+	if _, ok := present["also_airports"]; !ok {
+		next.AlsoAirports = current.AlsoAirports
 	}
 	if next.Matching == nil {
 		next.Matching = current.Matching
@@ -320,6 +333,7 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 		logger.Int("db_retention_days", next.DBRetentionDays),
 		logger.String("log_level", next.LogLevel),
 		logger.String("reference_airport", next.ReferenceAirport),
+		logger.String("also_airports", strings.Join(next.AlsoAirports, ",")),
 		logger.Bool("match_letters", next.Matching.Letters),
 		logger.Bool("match_approx_operators", next.Matching.ApproxOperators),
 		logger.Int("match_min_digits", next.Matching.MinDigits),
@@ -340,6 +354,9 @@ func (h *Handler) referenceState() *ReferenceState {
 	st := &ReferenceState{
 		Airport:    code,
 		Candidates: h.refService.HomeAirportCandidates(referenceCandidateRangeNM),
+	}
+	for _, ref := range h.adsbService.PhaseReferences()[1:] {
+		st.Also = append(st.Also, ref.Airport)
 	}
 	for _, c := range st.Candidates {
 		if c.Code == code {

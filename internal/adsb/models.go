@@ -207,6 +207,7 @@ type PositionMinimal struct {
 type PhaseChange struct {
 	ID        int       `json:"id"`
 	Phase     string    `json:"phase"`
+	Airport   string    `json:"airport,omitempty"` // the followed airport it was judged against; "" for cruise
 	Timestamp time.Time `json:"timestamp"`
 	ADSBId    *int      `json:"adsb_id"`
 }
@@ -219,6 +220,7 @@ type PhaseChangeInsert struct {
 	Timestamp time.Time `json:"timestamp"`
 	ADSBId    *int      `json:"adsb_id"`
 	EventType string    `json:"event_type"` // "takeoff", "landing", or "" for normal phase changes
+	Airport   string    `json:"airport,omitempty"`
 }
 
 // PhaseData represents the phase information for an aircraft

@@ -261,14 +261,14 @@ func NewService(
 	}
 
 	service := &Service{
-		client:             client,
-		storage:            storage,
-		fetchInterval:      fetchInterval,
-		logger:             logger.Named("adsb"),
-		stopCh:             make(chan struct{}),
-		stationLat:         stationCfg.Latitude,
-		stationLon:         stationCfg.Longitude,
-		stationElevFeet:    float64(stationCfg.ElevationFeet),
+		client:          client,
+		storage:         storage,
+		fetchInterval:   fetchInterval,
+		logger:          logger.Named("adsb"),
+		stopCh:          make(chan struct{}),
+		stationLat:      stationCfg.Latitude,
+		stationLon:      stationCfg.Longitude,
+		stationElevFeet: float64(stationCfg.ElevationFeet),
 		// Until the reference airport is known the receiver stands in for it,
 		// which is upstream's behaviour exactly.
 		ref: newPhaseRef(PhaseReference{
@@ -820,18 +820,91 @@ func (s *Service) SetReferenceService(refService ReferenceService) {
 //
 // A reference without a position falls back to the receiver, as upstream did.
 func (s *Service) SetPhaseReference(r PhaseReference) {
-	if r.Lat == 0 && r.Lon == 0 {
-		r.Lat, r.Lon = s.stationLat, s.stationLon
+	s.SetPhaseReferences([]PhaseReference{r})
+}
+
+// SetPhaseReferences follows several airports at once, the principal first: each
+// aircraft is judged against the one whose runway axis it flies, else the
+// nearest (airportFor). The principal alone falls back to the receiver when it
+// has no position; a further airport without one is left out.
+func (s *Service) SetPhaseReferences(refs []PhaseReference) {
+	if len(refs) == 0 {
+		refs = []PhaseReference{{}}
 	}
-	s.ref.store(r)
+	out := make([]PhaseReference, 0, len(refs))
+	for i, r := range refs {
+		if r.Lat == 0 && r.Lon == 0 {
+			if i > 0 {
+				continue
+			}
+			r.Lat, r.Lon = s.stationLat, s.stationLon
+		}
+		out = append(out, r)
+	}
+	s.ref.storeAll(out)
 	if s.trajectoryTracker != nil {
 		s.trajectoryTracker.referenceChanged()
 	}
 }
 
-// PhaseReference returns the airport phases are currently judged against.
+// PhaseReference returns the principal airport phases are judged against.
 func (s *Service) PhaseReference() PhaseReference {
 	return *s.ref.load()
+}
+
+// PhaseReferences returns every airport followed, the principal first.
+func (s *Service) PhaseReferences() []PhaseReference {
+	return append([]PhaseReference(nil), s.ref.all()...)
+}
+
+// GetRunwayInUseScoresFor returns the top N runway-in-use scores of a followed
+// airport.
+func (s *Service) GetRunwayInUseScoresFor(airport string, n int) []RunwayScore {
+	if s.trajectoryTracker != nil {
+		return s.trajectoryTracker.GetRunwayScoresFor(airport, n)
+	}
+	return nil
+}
+
+// phaseAirport is the followed airport a phase of this aircraft belongs to: the
+// one it is judged against, for the phases that are about an airport. Cruise
+// and the rest belong to none, and so does a takeoff or landing farther than
+// airport_range_nm from it -- a light aircraft touching down at an airfield
+// nobody follows is not landing at the nearest one that is.
+func (s *Service) phaseAirport(a *Aircraft, phase string) string {
+	switch phase {
+	case "APP", "ARR", "DEP", "CLB", "T/O", "T/D":
+	default:
+		return ""
+	}
+	ref := s.ref.load()
+	if s.trajectoryTracker != nil {
+		ref = s.trajectoryTracker.AirportOf(a.Hex)
+	}
+	if phase == "T/O" || phase == "T/D" {
+		if a.ADSB == nil {
+			return ""
+		}
+		lat, lon, ok := a.ADSB.Position()
+		if !ok || MetersToNM(Haversine(lat, lon, ref.Lat, ref.Lon)) > s.flightPhasesConfig.AirportRangeNM {
+			return ""
+		}
+	}
+	return ref.Airport
+}
+
+// landingRunway finds the runway an aircraft touching down is aligned with,
+// among every followed airport's; the nearest threshold wins.
+func (s *Service) landingRunway(lat, lon, track, alt float64) (string, *RunwayApproachInfo) {
+	var airport string
+	var best *RunwayApproachInfo
+	for _, ref := range s.ref.all() {
+		info := DetectRunwayApproach(lat, lon, track, alt, ref.Runways, s.flightPhasesConfig)
+		if info != nil && info.OnApproach && (best == nil || info.DistanceToThreshold < best.DistanceToThreshold) {
+			airport, best = ref.Airport, info
+		}
+	}
+	return airport, best
 }
 
 // GetRunwayData returns the runways of the reference airport.
@@ -1123,13 +1196,13 @@ func (s *Service) filterByAirportGrounded(aircraft []*Aircraft) []*Aircraft {
 			filtered = append(filtered, a)
 		} else if a.ADSB != nil && a.ADSB.HasPosition() {
 			lat, lon, _ := a.ADSB.Position()
-			// Distance from the reference airport: an aircraft on the ground is
-			// interesting when it is on that airport, wherever the receiver is.
-			ref := s.ref.load()
-			distMeters := Haversine(lat, lon, ref.Lat, ref.Lon)
-			distNM := MetersToNM(distMeters)
-			if distNM <= airportRangeNM {
-				filtered = append(filtered, a)
+			// Distance from the followed airports: an aircraft on the ground is
+			// interesting when it is on one of them, wherever the receiver is.
+			for _, ref := range s.ref.all() {
+				if MetersToNM(Haversine(lat, lon, ref.Lat, ref.Lon)) <= airportRangeNM {
+					filtered = append(filtered, a)
+					break
+				}
 			}
 		}
 	}
@@ -1358,12 +1431,9 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 				if s.trajectoryTracker != nil && a.ADSB != nil {
 					lat, lon, ok := a.ADSB.Position()
 					if ok {
-						runwayInfo := DetectRunwayApproach(
-							lat, lon, NumberOrZero(a.ADSB.Track),
-							a.ADSB.AltBaro.Float64(), s.ref.load().Runways, s.flightPhasesConfig,
-						)
-						if runwayInfo != nil && runwayInfo.OnApproach {
-							s.trajectoryTracker.RecordRunwayLanding(runwayInfo.RunwayID, a.Hex)
+						airport, runwayInfo := s.landingRunway(lat, lon, NumberOrZero(a.ADSB.Track), a.ADSB.AltBaro.Float64())
+						if runwayInfo != nil {
+							s.trajectoryTracker.RecordRunwayLanding(airport, runwayInfo.RunwayID, a.Hex)
 						}
 					}
 				}
@@ -1436,6 +1506,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 					Timestamp: now,
 					ADSBId:    adsbId,
 					EventType: eventType,
+					Airport:   s.phaseAirport(a, newPhase),
 				})
 			}
 		}
@@ -1488,7 +1559,12 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 		if !hasPosition {
 			continue
 		}
+		// The airport the aircraft was being judged against: with several
+		// followed, the one it was flying to.
 		ref := s.ref.load()
+		if s.trajectoryTracker != nil {
+			ref = s.trajectoryTracker.AirportOf(aircraft.Hex)
+		}
 		distanceFromAirport := MetersToNM(Haversine(
 			lat, lon,
 			ref.Lat, ref.Lon,
@@ -1505,7 +1581,7 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 					aircraft.ADSB.AltBaro.Float64(), ref.Runways, s.flightPhasesConfig,
 				)
 				if runwayInfo != nil && runwayInfo.OnApproach {
-					s.trajectoryTracker.RecordRunwayLanding(runwayInfo.RunwayID, aircraft.Hex)
+					s.trajectoryTracker.RecordRunwayLanding(ref.Airport, runwayInfo.RunwayID, aircraft.Hex)
 				}
 			}
 
@@ -1522,6 +1598,7 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 				Timestamp: now,
 				ADSBId:    adsbId,
 				EventType: "signal_lost_landing",
+				Airport:   ref.Airport,
 			})
 
 			s.logger.Info("Signal lost aircraft marked as landed",
@@ -1575,6 +1652,7 @@ func (s *Service) processPhaseChangesBatch(aircraft []*Aircraft, immediatePhaseC
 				Phase:     finalPhase,
 				Timestamp: time.Now().UTC(),
 				ADSBId:    adsbTargetIDs[a.Hex],
+				Airport:   s.phaseAirport(a, finalPhase),
 			})
 		}
 	}
@@ -1742,6 +1820,7 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				"phase":      change.Phase,
 				"prev_phase": previousPhase,
 				"transition": previousPhase + " → " + change.Phase,
+				"airport":    change.Airport,
 				"altitude":   aircraft.ADSB.AltBaro.Float64(),
 				"on_ground":  aircraft.OnGround,
 				"timestamp":  change.Timestamp.Format(time.RFC3339),
@@ -1812,6 +1891,7 @@ func (s *Service) sendImmediateGroundTransitionAlerts(phaseChanges []PhaseChange
 					"phase":      change.Phase,
 					"prev_phase": previousPhase,
 					"transition": previousPhase + " → " + change.Phase,
+					"airport":    change.Airport,
 					"altitude":   aircraft.ADSB.AltBaro.Float64(),
 					"on_ground":  aircraft.OnGround,
 					"timestamp":  change.Timestamp.Format(time.RFC3339),
@@ -1842,6 +1922,7 @@ func (s *Service) sendImmediateGroundTransitionAlerts(phaseChanges []PhaseChange
 					"phase":      change.Phase,
 					"prev_phase": previousPhase,
 					"transition": previousPhase + " → " + change.Phase,
+					"airport":    change.Airport,
 					"altitude":   aircraft.ADSB.AltBaro.Float64(),
 					"on_ground":  aircraft.OnGround,
 					"timestamp":  change.Timestamp.Format(time.RFC3339),

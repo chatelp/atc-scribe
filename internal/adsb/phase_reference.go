@@ -24,12 +24,18 @@ type PhaseReference struct {
 	Runways RunwayData
 }
 
-// phaseRef holds the reference behind an atomic pointer. It can be changed from
-// the settings panel while the fetch goroutine is classifying aircraft, and a
-// phase computed half against one airport and half against another would be
-// worse than either. Readers load it once and use that copy throughout.
+// phaseRef holds the airports behind an atomic pointer, the principal first. They
+// can be changed from the settings panel while the fetch goroutine is
+// classifying aircraft, and a phase computed half against one set and half
+// against another would be worse than either. Readers load once and use that
+// copy throughout.
+//
+// Several airports can be followed at once -- Orly and De Gaulle, 13 NM apart,
+// seen from one receiver. Each aircraft is judged against one of them, the one
+// it is flying to or from (airportFor); with a single airport, everything is as
+// before.
 type phaseRef struct {
-	p atomic.Pointer[PhaseReference]
+	p atomic.Pointer[[]PhaseReference]
 }
 
 func newPhaseRef(initial PhaseReference) *phaseRef {
@@ -38,13 +44,27 @@ func newPhaseRef(initial PhaseReference) *phaseRef {
 	return r
 }
 
+// load returns the principal airport.
 func (r *phaseRef) load() *PhaseReference {
-	if v := r.p.Load(); v != nil {
-		return v
+	if v := r.p.Load(); v != nil && len(*v) > 0 {
+		return &(*v)[0]
 	}
 	return &PhaseReference{}
 }
 
+// all returns every airport followed, the principal first. Never empty.
+func (r *phaseRef) all() []PhaseReference {
+	if v := r.p.Load(); v != nil && len(*v) > 0 {
+		return *v
+	}
+	return []PhaseReference{{}}
+}
+
 func (r *phaseRef) store(v PhaseReference) {
-	r.p.Store(&v)
+	r.storeAll([]PhaseReference{v})
+}
+
+func (r *phaseRef) storeAll(v []PhaseReference) {
+	c := append([]PhaseReference(nil), v...)
+	r.p.Store(&c)
 }

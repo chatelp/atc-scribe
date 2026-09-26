@@ -186,6 +186,13 @@ func initDatabase(db *sql.DB, log *logger.Logger) error {
 	if err != nil {
 		return fmt.Errorf("failed to create phase_changes table: %w", err)
 	}
+	// The airport a phase was judged against, when several are followed
+	// (docs-fr/05-decisions.md, Q40). Empty for cruise, and on rows written
+	// before the column existed.
+	if _, err := db.Exec(`ALTER TABLE phase_changes ADD COLUMN airport TEXT`); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column name") {
+		return fmt.Errorf("failed to add phase_changes.airport: %w", err)
+	}
 
 	// Create indexes for efficient querying
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_adsb_targets_aircraft_hex ON adsb_targets(aircraft_hex)`)
@@ -592,10 +599,10 @@ func (s *AircraftStorage) getRecentPhaseHistoryBatch(hexCodes []string, limit in
 
 	// Query to get recent phase history for each aircraft
 	query := fmt.Sprintf(`
-		SELECT hex, id, phase, timestamp, adsb_id
+		SELECT hex, id, phase, timestamp, adsb_id, airport
 		FROM (
 			SELECT
-				hex, id, phase, timestamp, adsb_id,
+				hex, id, phase, timestamp, adsb_id, COALESCE(airport, '') AS airport,
 				ROW_NUMBER() OVER (PARTITION BY hex ORDER BY timestamp DESC) as rn
 			FROM phase_changes
 			WHERE hex IN (%s)
@@ -616,8 +623,9 @@ func (s *AircraftStorage) getRecentPhaseHistoryBatch(hexCodes []string, limit in
 		var hex, phase, timestampStr string
 		var id int
 		var adsbId sql.NullInt64
+		var airport string
 
-		if err := rows.Scan(&hex, &id, &phase, &timestampStr, &adsbId); err != nil {
+		if err := rows.Scan(&hex, &id, &phase, &timestampStr, &adsbId, &airport); err != nil {
 			return nil, fmt.Errorf("failed to scan phase history row: %w", err)
 		}
 
@@ -630,6 +638,7 @@ func (s *AircraftStorage) getRecentPhaseHistoryBatch(hexCodes []string, limit in
 		phaseChange := adsb.PhaseChange{
 			ID:        id,
 			Phase:     phase,
+			Airport:   airport,
 			Timestamp: timestamp,
 		}
 
@@ -1529,7 +1538,7 @@ func (s *AircraftStorage) InsertPhaseChange(hex, flight, phase string, timestamp
 func (s *AircraftStorage) GetPhaseHistory(hex string) ([]adsb.PhaseChange, error) {
 
 	rows, err := s.db.Query(`
-		SELECT id, phase, timestamp, adsb_id
+		SELECT id, phase, timestamp, adsb_id, COALESCE(airport, '')
 		FROM phase_changes
 		WHERE hex = ?
 		ORDER BY timestamp DESC
@@ -1545,7 +1554,7 @@ func (s *AircraftStorage) GetPhaseHistory(hex string) ([]adsb.PhaseChange, error
 		var timestampStr string
 		var adsbId sql.NullInt64
 
-		if err := rows.Scan(&phase.ID, &phase.Phase, &timestampStr, &adsbId); err != nil {
+		if err := rows.Scan(&phase.ID, &phase.Phase, &timestampStr, &adsbId, &phase.Airport); err != nil {
 			return nil, fmt.Errorf("failed to scan phase change row: %w", err)
 		}
 
@@ -1579,7 +1588,7 @@ func (s *AircraftStorage) GetPhaseHistory(hex string) ([]adsb.PhaseChange, error
 func (s *AircraftStorage) GetCurrentPhase(hex string) (*adsb.PhaseChange, error) {
 
 	row := s.db.QueryRow(`
-		SELECT id, phase, timestamp, adsb_id
+		SELECT id, phase, timestamp, adsb_id, COALESCE(airport, '')
 		FROM phase_changes
 		WHERE hex = ?
 		ORDER BY timestamp DESC
@@ -1590,7 +1599,7 @@ func (s *AircraftStorage) GetCurrentPhase(hex string) (*adsb.PhaseChange, error)
 	var timestampStr string
 	var adsbId sql.NullInt64
 
-	if err := row.Scan(&phase.ID, &phase.Phase, &timestampStr, &adsbId); err != nil {
+	if err := row.Scan(&phase.ID, &phase.Phase, &timestampStr, &adsbId, &phase.Airport); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // No phase changes found
 		}
@@ -1763,7 +1772,7 @@ func (s *AircraftStorage) GetCurrentPhasesBatch(hexCodes []string) (map[string]*
 
 	// Use GROUP BY + JOIN pattern instead of ROW_NUMBER() for better performance
 	query := fmt.Sprintf(`
-		SELECT p.hex, p.id, p.phase, p.timestamp, p.adsb_id
+		SELECT p.hex, p.id, p.phase, p.timestamp, p.adsb_id, COALESCE(p.airport, '')
 		FROM phase_changes p
 		INNER JOIN (
 			SELECT hex, MAX(timestamp) as max_ts
@@ -1782,11 +1791,11 @@ func (s *AircraftStorage) GetCurrentPhasesBatch(hexCodes []string) (map[string]*
 
 	result := make(map[string]*adsb.PhaseChange)
 	for rows.Next() {
-		var hex, phase, timestampStr string
+		var hex, phase, timestampStr, airport string
 		var id int
 		var adsbId *int
 
-		if err := rows.Scan(&hex, &id, &phase, &timestampStr, &adsbId); err != nil {
+		if err := rows.Scan(&hex, &id, &phase, &timestampStr, &adsbId, &airport); err != nil {
 			return nil, fmt.Errorf("failed to scan phase row: %w", err)
 		}
 
@@ -1798,6 +1807,7 @@ func (s *AircraftStorage) GetCurrentPhasesBatch(hexCodes []string) (map[string]*
 		result[hex] = &adsb.PhaseChange{
 			ID:        id,
 			Phase:     phase,
+			Airport:   airport,
 			Timestamp: timestamp,
 			ADSBId:    adsbId,
 		}
@@ -1881,8 +1891,8 @@ func (s *AircraftStorage) InsertPhaseChangesBatch(changes []adsb.PhaseChangeInse
 
 	// Prepare the insert statement
 	stmt, err := tx.Prepare(`
-		INSERT INTO phase_changes (hex, flight, phase, timestamp, adsb_id)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO phase_changes (hex, flight, phase, timestamp, adsb_id, airport)
+		VALUES (?, ?, ?, ?, ?, NULLIF(?, ''))
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare phase change insert statement: %w", err)
@@ -1897,6 +1907,7 @@ func (s *AircraftStorage) InsertPhaseChangesBatch(changes []adsb.PhaseChangeInse
 			change.Phase,
 			change.Timestamp.Format(time.RFC3339),
 			change.ADSBId,
+			change.Airport,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert phase change for %s: %w", change.Hex, err)

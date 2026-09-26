@@ -150,14 +150,16 @@ func TestChangingReferenceForgetsRunwayEvidence(t *testing.T) {
 	tt := newTestTracker(t, PhaseReference{
 		Airport: "ZZZZ", Lat: airportLat, Lon: airportLon, Runways: testRunways()})
 	approachFromWest(tt) // records an approach on 09
-	if !tt.runwayTracker.HasData() {
+	if !tt.runwayTrackerFor("ZZZZ").HasData() {
 		t.Fatal("precondition: the approach should have left runway evidence")
 	}
+	tt.ref.store(PhaseReference{Airport: "YYYY", Lat: airportLat, Lon: airportLon, Runways: testRunways()})
 	tt.referenceChanged()
-	if tt.runwayTracker.HasData() {
+	rt := tt.runwayTrackerFor("YYYY")
+	if rt.HasData() {
 		t.Error("runway evidence should be dropped when the reference changes")
 	}
-	if !tt.runwayTracker.IsActiveRunway("anything") {
+	if !rt.IsActiveRunway("anything") {
 		t.Error("with no evidence left, every runway should be accepted again")
 	}
 }
