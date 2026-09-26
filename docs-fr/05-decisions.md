@@ -540,7 +540,17 @@ propre Terminal fait apparaître la demande.
 > distingue pas les deux. **Relancer trois fois avant de diagnostiquer** coûte trente
 > secondes ; j'ai écrit deux conclusions fausses pour les avoir économisées.
 
-### Q22 — Le Mac est sur le même sous-réseau deux fois *(nouvelle, 16/09)*
+### Q22 — Le Mac est sur le même sous-réseau deux fois *(nouvelle, 16/09 ; **toujours vrai le 26/09**)*
+
+> **26/09 : de nouveau suspect.** Le 25/09 au soir, depuis le Mac, six coupures de lectures
+> longues d'`aero.mp3` (21:54 – 22:24), puis « No route to host » vers la station de 22:24:40 à
+> 23:48 — la station, elle, joignait le Mac sans un échec, et un ssh du Mac est passé à 22:51
+> (Q45). Relevé le 26/09 à 10:35 : **`en0` Ethernet en `.28` et `en1` Wi-Fi en `.24`**, la
+> station en ARP sur `en0` seulement à cet instant. Une veille tourne pour trancher entre Q21 et
+> Q22 à la prochaine panne (`whisper-lab/scripts/exploitation/veille-liaison.py` : connexion
+> toutes les 5 s, et à la première erreur, `curl` au même instant plus la route, l'ARP et les
+> interfaces). **Recommandation au propriétaire, inchangée depuis le 16/09 : couper le Wi-Fi du
+> Mac tant qu'il est relié par câble** — un réglage système, qui lui revient.
 
 Relevé au passage, sans lien avec Q21 mais à corriger : le Mac porte **deux adresses
 sur 192.168.1.0/24**, `en0` Ethernet en `.28` et `en1` Wi-Fi en `.48`, et le cache ARP
@@ -3830,3 +3840,11 @@ de notre côté, non expliquées : six silences de 15 s ou plus sur notre lectur
 T2 (21:54 – 22:24), alors que le Mac joignait l'ADS-B de la station sans erreur ; puis « No route
 to host » vers la station de 22:24:40 à 23:48, la station n'ayant pas redémarré. Réponse :
 `whisper-lab/echanges-station/reponse-atc-scribe-2026-09-26-essai-fils.md`.
+
+**Réponse de la station, 26/09 au matin** (`whisper-lab/echanges-station/reponse-station-2026-09-26-matin.md`) :
+**le comptage de trames avait raison**. Un dépassement compté retarde le lot du mélangeur de
+1/8 s au plus, **sans perte ni superposition** dans le cas courant — la station avait surestimé
+l'effet. Les fils séparés restent retenus (ils suppriment même ce retard). **Les deux anomalies
+sont côté Mac** : pendant nos six silences, Caddy (le proxy devant Icecast) note une réponse
+interrompue *vers* notre client ; pendant le « No route to host », la station pingait le Mac
+sans un échec et un ssh du Mac vers elle a réussi à 22:51. Voir Q22.
