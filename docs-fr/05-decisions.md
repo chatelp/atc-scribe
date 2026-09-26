@@ -3942,3 +3942,12 @@ combinaisons, plus que les 1 000 de trois chiffres : une règle « au moins troi
 lettres comprises » serait au moins aussi sûre contre le hasard. **À mesurer avant de décider**,
 sur les transcriptions par canal du 24/09 avec le contrôle par ciel mélangé : avions justes gagnés,
 précision.
+
+**Le même avion a reparlé quelques minutes plus tard**, transcrit *« speed 200 welling seven uniform
+make on »* : « welling » pour Vueling, « seven uniform » exact, « echo » devenu « make on ». Dans le
+ciel à cet instant (91 indicatifs), **un seul commence par « 7U » : VLG7UE**, et trois vols seulement
+sont de Vueling (VUELING est bien dans `assets/airlines.dat`). L'information pour trouver l'avion
+était dans la transcription ; c'est l'association qui la jette. La mesure devra donc essayer aussi :
+un nom d'exploitant approché (« welling »), une lettre manquante tolérée, et le rapprochement vers le
+mot de l'alphabet aéronautique le plus proche après une lettre épelée (« make on » -> « echo ») —
+chacun jugé contre le hasard.
