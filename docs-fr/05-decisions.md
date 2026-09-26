@@ -4352,7 +4352,7 @@ qualité/distance »). Restent possibles :
 **Pour trancher** : rapprocher chaque transmission hachée de la distance de l'avion qui parle (à
 transcrire et associer, avec l'ADS-B de la même heure). Diaphonie de 126,425 : non concluant.
 
-### Q48 — De l'écho entre 125,825 et 126,425 : image de la clé ou fréquences couplées ? *(ouverte, 26/09 — **l'image de la clé devient peu probable**)*
+### Q48 — De l'écho entre 125,825 et 126,425 : image de la clé ou fréquences couplées ? *(26/09 — **tranchée : fréquences couplées par le contrôle**)*
 
 **Signalé par le propriétaire à l'écoute**, le 26/09 vers 20:30, sur 125,825 + 126,425 (centre choisi
 par la station : 126,125, le milieu) : « il y a de l'écho, les deux fréquences semblent recevoir la
@@ -4392,5 +4392,24 @@ rend toujours miroirs les deux extrêmes d'une sélection.
 
 Pas d'image mesurable à ±0,49, ±0,975 ni ±1,03 MHz. **L'explication la plus probable devient un
 couplage des deux approches de De Gaulle par le contrôle**, défait vers 20:33, au moment de notre
-bascule. À vérifier sans bascule : si l'écho revient plus tard dans la soirée avec le centre à
-126,200, c'est le couplage. Aucune règle de centre à changer en attendant.
+bascule.
+
+**Tranché le soir même, sans bascule.** L'écho revient à 20:45, la configuration n'ayant pas bougé
+depuis 20:32 (version 29, centre 126,200) :
+- 18 transmissions sur 20 sur les deux fréquences ;
+- ouvertures de squelch corrélées à 0,95, décalage d'environ 70 ms ;
+- à 20:35, avec la même configuration, 2 sur 22.
+
+L'agent de la station a vérifié la configuration générée : **chaque canal a sa propre sortie**, aucune
+n'est dupliquée. **126,575, miroir de 125,825, ne s'est jamais ouverte** (0 ouverture en 17,6 min).
+Un phénomène qui va et vient sans changement de configuration, c'est le **couplage des deux
+approches par le contrôle** (regroupement de secteurs en soirée), pas la clé. **Aucune règle de
+centre à changer.**
+
+Conséquences :
+- **à l'écoute**, avec deux fréquences couplées, n'en activer qu'une dans co-atc ;
+- **pour la mesure**, une transmission couplée est transcrite deux fois. Il faut dédoublonner les
+  paires simultanées avant de compter les avions justes d'une séance sur des fréquences couplées.
+
+**Les parasites entendus en même temps** viennent de 125,825 : environ 15 battements de squelch
+par minute sur du bruit (Q37, chronique), contre 0 sur 126,425.
