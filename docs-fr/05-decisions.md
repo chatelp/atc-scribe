@@ -551,6 +551,15 @@ propre Terminal fait apparaître la demande.
 > toutes les 5 s, et à la première erreur, `curl` au même instant plus la route, l'ARP et les
 > interfaces). **Recommandation au propriétaire, inchangée depuis le 16/09 : couper le Wi-Fi du
 > Mac tant qu'il est relié par câble** — un réglage système, qui lui revient.
+>
+> **Plus tard le 26/09 : Q21 plutôt que Q22.** La station fait remarquer qu'un ssh parti de ce même
+> Mac, par la même adresse `.28`, a réussi à 22:51 en pleine panne — même machine, même double
+> réseau : une cause propre au programme est plus probable. Et **le propriétaire a trouvé ce matin
+> une demande d'autorisation « Réseau local » de macOS en attente.** Le refus de la confidentialité
+> remonte précisément en « No route to host » (Q21). Le programme en panne était
+> l'enregistrement de contrôle, lancé par le Python du laboratoire
+> (`~/.pyenv/versions/3.12.3/bin/python3.12`). Non établi : de quel programme venait la demande.
+> La veille note désormais, en cas d'échec, le programme refusé et son parent.
 
 Relevé au passage, sans lien avec Q21 mais à corriger : le Mac porte **deux adresses
 sur 192.168.1.0/24**, `en0` Ethernet en `.28` et `en1` Wi-Fi en `.48`, et le cache ARP
