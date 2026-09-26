@@ -4002,3 +4002,30 @@ indicatifs. La production, elle, envoie tout ; `-every` fait de même. Les mesur
 (Q30, doc 28…) sont peu touchées : +4 avions justes sur 236 le 24/09 avec les règles actuelles.
 
 **Décidé le 26/09 (D58)** : les deux règles sont activées, et réglables depuis le panneau.
+
+**Pistes suivantes, relevées le 26/09 sur les 1 672 transmissions du 24/09 restées sans avion**
+(`whisper-lab/scripts/station/q46-abreviations.py` ; hasard estimé en remplaçant les avions
+rattachés sur la même fréquence dans les 5 minutes par ceux d'une autre fréquence, un à un) :
+
+| Ce que la transmission contient | Même fréquence | Hasard | Net |
+|---|---|---|---|
+| les **dernières lettres** d'un avion rattaché juste avant (« Sierra Bravo ») | 17 | 1,3 | **≈ 16, propre** |
+| les **deux derniers chiffres** d'un avion rattaché juste avant (« cinq quatre ») | 22 | 13,3 | ≈ 9, bruité |
+| le **nom de sa compagnie** seulement | 90 | 50,7 | ≈ 39, bruité |
+
+1. **Le contexte de l'échange** : après le premier contact, pilote et contrôleur abrègent. co-atc
+   garde déjà les avions entendus récemment sur la fréquence, mais seulement pour départager des
+   ex-æquo. Les lettres de fin sont une piste propre (+16, soit +5 %) ; le nom seul et les deux
+   chiffres demandent une condition de plus (un seul avion de la compagnie récemment sur la
+   fréquence).
+2. **Les immatriculations** : 52 immatriculations françaises (F + 4 lettres) le 24/09, **écartées
+   entièrement** par l'association (`matcher.go` : ni chiffres ni lettres après le préfixe). Elles
+   comptent surtout sur les fréquences locales (Saint-Cyr, Toussus, transit d'Orly), épelées
+   (« Fox Golf Alpha Bravo Charlie ») ou abrégées (« Fox Bravo Charlie »). À mesurer sur un
+   enregistrement d'une fréquence locale : le corpus du 24/09 est l'approche de CDG.
+3. **Le ciel propre à chaque fréquence** : l'association compare à une centaine d'avions ; sur
+   Orly Approche, seuls ceux qui descendent vers Orly sont plausibles. Moins de candidats, moins de
+   hasard (24 % des rattachements le 24/09, 97 sur 403), et des indices plus faibles (« 7U » seul)
+   deviendraient acceptables. À mesurer, avec le service de chaque fréquence du catalogue.
+4. **Une lettre mal entendue** (« make on » pour « echo ») : tolérer une lettre fausse quand la
+   compagnie est nommée. Petit gain attendu, à mesurer contre le hasard.
