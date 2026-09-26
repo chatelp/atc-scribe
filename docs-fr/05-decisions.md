@@ -4029,3 +4029,48 @@ rattachés sur la même fréquence dans les 5 minutes par ceux d'une autre fréq
    deviendraient acceptables. À mesurer, avec le service de chaque fréquence du catalogue.
 4. **Une lettre mal entendue** (« make on » pour « echo ») : tolérer une lettre fausse quand la
    compagnie est nommée. Petit gain attendu, à mesurer contre le hasard.
+
+**Pistes 1 et 3 mesurées le 26/09** (choix du propriétaire ; `cmd/phraseology` : `-context-letters`,
+`-context-digits`, `-context-names`, `-context-swap`, `-sectors`, `-positions`, `-partial` ;
+résultats `whisper-lab/resultats/station/2026-09-26-q46-pistes/`). Référence : les règles en
+service (D58) avec la mémoire de 2 minutes de la production, **307 avions justes, 76 %**.
+
+*Le fil de l'échange.* Le contrôle par ciel mélangé est **trop indulgent** pour ces règles :
+chaque transmission du contrôle tire son ciel à un autre moment, où les avions que ce contrôle
+vient de rattacher ne sont presque jamais, et la règle n'y joue pas. Contrôle équitable ajouté :
+le vrai ciel, avec la mémoire d'**une autre** fréquence (des avions présents, qui ne lui parlent pas).
+
+| Règle ajoutée | Rattachés, sa fréquence | Rattachés, mémoire d'une autre (hasard) | Gain net |
+|---|---|---|---|
+| — | 405 | 403 | — |
+| dernières lettres d'un avion entendu | 413 | 403 | **+8, sans hasard** |
+| deux derniers chiffres (un seul avion récent finit ainsi) | 419 | 404 | **+13** |
+| nom seul (un seul avion récent de la compagnie) | 482 | 412 | +68 au-dessus du hasard |
+
+Le nom seul rapporte le plus, mais **sa justesse échappe à l'ADS-B** : l'avion désigné est
+toujours dans le ciel, et un autre avion de la même compagnie, pas encore rattaché, peut être
+celui qui parle. À juger à l'oreille sur un échantillon avant toute activation.
+
+*Le secteur de la fréquence.* Positions reconstituées des traces heatmap de la station
+(`adsb-2026-09-24-par-canal-positions.json`, 84 687 points). Sur 124,350, 95 % des avions
+rattachés sont à moins de 37 NM de Roissy et sous 16 000 ft ; le ciel entier compte 123 avions à
+10:00 UTC, dont 27 dans 40 NM sous 15 000 ft. Un avion sans position connue est gardé.
+
+| Secteur (approche / Paris Contrôle DG) | Avions justes | Hasard | Précision | 125,825 |
+|---|---|---|---|---|
+| aucun (référence) | 307,0 | 98,0 | 76 % | 57 |
+| 45 NM, 17 000 ft / 60 NM, 27 000 ft | 319,0 | 53,0 | 86 % | 46 |
+| **60 NM, 20 000 ft / 80 NM, 30 000 ft** | **330,8** | **61,2** | **84 %** | 52 |
+| + partie vol amputée acceptée (0,6) | 346,6 | 68,4 | 84 % | 52 |
+| **+ dernières lettres + deux derniers chiffres** | **367,6** | 68,4 | **84 %** | 55 |
+
+**Bilan des règles propres ensemble : +20 % d'avions justes et 8 points de précision** (307 ->
+368, 76 % -> 84 %), sans le nom seul. Réserves : les bornes du secteur ont été choisies en voyant
+les données de 124,350 (deux nombres par type de fréquence, risque de sur-ajustement faible mais
+réel) — **à confirmer sur un autre jour et un autre aéroport** (l'essai d'Orly du 26/09) ;
+125,825 perd encore quelques avions justes (57 -> 55).
+
+**Ce que demande la production** : le secteur de chaque fréquence (aéroport, rayon, tranche
+d'altitude) porté par la source — pour les flux séparés, `radio-ctl-sync` le déduirait du champ
+`service` du catalogue de la station (« Approche De Gaulle », « Orly Approche », « croisière haute
+FL360-380 ») ; les positions dans le ciel que reçoit l'association ; et les réglages au panneau.
