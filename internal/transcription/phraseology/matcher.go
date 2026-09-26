@@ -74,6 +74,19 @@ type Matcher struct {
 	// default, pending measurement (alnum.go, docs-fr/05-decisions.md Q46).
 	AlnumCallsigns bool
 	FuzzyOperators bool
+
+	// ContextLetters, ContextNames and ContextDigits accept an abbreviated
+	// callsign for an aircraft heard recently on the frequency: its last
+	// letters, its airline alone when it is the only one of that airline, its
+	// last two digits when no other ends so. Off by default (context.go, Q46).
+	ContextLetters bool
+	ContextNames   bool
+	ContextDigits  bool
+
+	// PartialFlightScore is what a flight part missing its last letter weighs
+	// ("seven uniform" for 7UE). 0 means the default of 0.5, under the floor;
+	// worth raising only where the sky is cut to the frequency's sector.
+	PartialFlightScore float64
 }
 
 // NewMatcher builds the spoken-name index from OpenFlights' airlines.dat, which
@@ -270,6 +283,8 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 		heardRecently[cs] = true
 	}
 
+	byContext := m.contextScores(r, fleet, heardRecently, spokenOperators)
+
 	type scored struct {
 		ac     Aircraft
 		score  float64
@@ -313,10 +328,17 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 
 		if letters != "" {
 			for _, g := range alnum {
-				if s, reason := alnumScore(g.text, digits+letters); s > score {
+				s, reason := alnumScore(g.text, digits+letters)
+				if s == 0.5 && m.PartialFlightScore > 0 {
+					s = m.PartialFlightScore
+				}
+				if s > score {
 					score, why, words = s, []string{reason}, [][2]int{g.word}
 				}
 			}
+		}
+		if c, ok := byContext[ac.Callsign]; ok && c.score > score {
+			score, why, words = c.score, []string{c.why}, nil
 		}
 
 		// A number the transmission repeats is stronger evidence than one heard

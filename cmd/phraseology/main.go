@@ -31,6 +31,9 @@ import (
 
 // Experimental matcher rules, set from flags (docs-fr/05-decisions.md, Q46).
 var optAlnum, optFuzzyOperators, optEvery bool
+var optCtxLetters, optCtxNames, optCtxDigits, optContextSwap bool
+var optPartial float64
+var optPositions, optSectors string
 
 func main() {
 	in := flag.String("in", "", "JSON array of objects holding transcripts")
@@ -52,6 +55,13 @@ func main() {
 	flag.BoolVar(&optAlnum, "alnum", false, "read a number followed by spelled letters as one flight part, 7UE (Q46, to be measured)")
 	flag.BoolVar(&optFuzzyOperators, "fuzzy-operators", false, "accept an airline name heard roughly, among the operators in the sky (Q46, to be measured)")
 	flag.BoolVar(&optEvery, "every", false, "send every transmission to the matcher, as production does, not only those with a two-digit group")
+	flag.BoolVar(&optCtxLetters, "context-letters", false, "accept the last letters of an aircraft heard recently on the frequency (needs -context)")
+	flag.BoolVar(&optCtxNames, "context-names", false, "accept the airline alone when one aircraft of it was heard recently (needs -context)")
+	flag.BoolVar(&optCtxDigits, "context-digits", false, "accept the last two digits of an aircraft heard recently (needs -context)")
+	flag.Float64Var(&optPartial, "partial", 0, "weight of a flight part missing its last letter (default 0.5)")
+	flag.StringVar(&optPositions, "positions", "", "ADS-B positions (heatmap.py output) for -sectors")
+	flag.StringVar(&optSectors, "sectors", "", "JSON: frequency -> {lat, lon, radius_nm, max_alt_ft}; the sky is cut to it")
+	flag.BoolVar(&optContextSwap, "context-swap", false, "also rerun with each frequency given another frequency's recent aircraft: the chance level of the context rules")
 	from := flag.String("from", "", "with -db: only transmissions at or after this RFC3339 time")
 	to := flag.String("to", "", "with -db: only transmissions before this RFC3339 time")
 	union := flag.Bool("union", false, "with -capture: group passes by recording and accept a match from any of them — measures two models together, controls included")
@@ -196,6 +206,8 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 	matcher.MinDigits = minDigits
 	matcher.FuzzyDigits = fuzzy
 	matcher.AlnumCallsigns, matcher.FuzzyOperators = optAlnum, optFuzzyOperators
+	matcher.ContextLetters, matcher.ContextNames, matcher.ContextDigits = optCtxLetters, optCtxNames, optCtxDigits
+	matcher.PartialFlightScore = optPartial
 
 	// Every ADS-B sighting, sorted, so each transmission can binary-search its
 	// own moment instead of re-querying 300 times over 300k rows.
