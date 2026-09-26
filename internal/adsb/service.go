@@ -890,10 +890,16 @@ func (s *Service) phaseAirport(a *Aircraft, phase string) string {
 		aligned = s.trajectoryTracker.AlignedAirport(a.Hex)
 	}
 	if phase == "T/O" || phase == "T/D" {
-		if a.ADSB == nil {
-			return ""
+		var lat, lon float64
+		ok := false
+		if a.ADSB != nil {
+			lat, lon, ok = a.ADSB.Position()
 		}
-		lat, lon, ok := a.ADSB.Position()
+		// Measured on 26/09: the landings at Orly and De Gaulle were detected a
+		// minute after the last position, when aircraft.json had dropped it.
+		if !ok && s.trajectoryTracker != nil {
+			lat, lon, ok = s.trajectoryTracker.LastPosition(a.Hex, 2*time.Minute)
+		}
 		if !ok {
 			return ""
 		}

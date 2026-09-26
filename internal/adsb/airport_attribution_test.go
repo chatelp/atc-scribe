@@ -100,3 +100,17 @@ func TestAnAxisCountsOnlyLow(t *testing.T) {
 		t.Errorf("airport = %s, want the nearest, YYYY: at 12 000 ft the axis is not evidence", got)
 	}
 }
+
+// A landing is detected after the receiver stopped decoding positions: the
+// last one the trajectory holds stands in, while it is recent.
+func TestTheLastPositionIsKeptForALanding(t *testing.T) {
+	tt := newTwoAirportTracker(t)
+	fly(tt, "a00014", 4.90, 4.92, 2500, 2200, 90, 140)
+	lat, lon, ok := tt.LastPosition("a00014", 2*time.Minute)
+	if !ok || lat != airportLat || lon < 4.919 || lon > 4.921 {
+		t.Errorf("last position = %v, %v (%v), want the last point flown", lat, lon, ok)
+	}
+	if _, _, ok := tt.LastPosition("a00014", time.Nanosecond); ok {
+		t.Error("a position older than the limit must not stand in")
+	}
+}
