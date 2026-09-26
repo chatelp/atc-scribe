@@ -3564,6 +3564,12 @@ suivante, sans redémarrage**, et se garde dans `runtime-settings.json` comme le
 
 Chaque ligne du panneau porte son chiffre mesuré. Un réglage hors bornes est refusé avec le reste
 du changement ; un fichier de réglages antérieur garde ses valeurs et reçoit ces défauts.
+
+**Complété le 26/09, décision du propriétaire après les mesures de la piste 1 (Q46)** : trois
+réglages de plus, pour un avion entendu sur la fréquence dans les deux dernières minutes —
+**ses dernières lettres** (« Sierra Bravo », +8) et **ses deux derniers chiffres** (« cinq
+quatre », +13) sont **activés** ; **sa compagnie seule** (+68, justesse invérifiable à l'ADS-B)
+est proposée **désactivée**, en attendant une vérification à l'oreille.
 Vérifié sur une instance de test : la case décochée depuis la page arrive au serveur, se journalise
 (« Server settings changed from the panel ») et se relit au redémarrage. **Contribuable en amont** :
 les règles et le mécanisme sont génériques.
