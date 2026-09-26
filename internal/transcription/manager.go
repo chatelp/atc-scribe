@@ -8,6 +8,7 @@ import (
 
 	"github.com/yegors/co-atc/internal/audio"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
+	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
 )
@@ -259,6 +260,14 @@ func (m *TranscriptionManager) StartTranscriptionWithExternalAudio(
 	m.processors[frequencyID] = processor
 
 	return nil
+}
+
+// SetMatchingRules gives the association rules in force, read for every
+// transmission. Called before post-processing starts.
+func (m *TranscriptionManager) SetMatchingRules(rules func() phraseology.Rules) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.postProcessingConfig.Rules = rules
 }
 
 // SetFrequencyLanguage records the expected language of a frequency that was

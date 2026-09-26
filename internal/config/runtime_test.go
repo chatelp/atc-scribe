@@ -131,3 +131,54 @@ func TestWithoutAHookTheAirportCannotChange(t *testing.T) {
 		t.Error("without a hook, changing the airport must be refused")
 	}
 }
+
+// Letters and approximate airline names are on until changed from the panel:
+// the owner's decision of 26/09, after they measured +27% true matches (Q46).
+func TestMatchingRulesDefaultToLettersAndApproximateNamesOn(t *testing.T) {
+	r := newRuntimeIn(t, t.TempDir())
+	got := r.Matching()
+	want := MatchingRules{Letters: true, ApproxOperators: true, MinDigits: 3}
+	if got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestMatchingRulesChangedFromThePanelSurviveARestart(t *testing.T) {
+	dir := t.TempDir()
+	r := newRuntimeIn(t, dir)
+	next := r.Settings()
+	next.Matching.Letters, next.Matching.MinDigits = false, 4
+	if err := r.Apply(next); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got := newRuntimeIn(t, dir).Matching(); got.Letters || got.MinDigits != 4 || !got.ApproxOperators {
+		t.Errorf("after a restart: %+v", got)
+	}
+}
+
+func TestAMatchingRuleOutOfRangeIsRefusedWhole(t *testing.T) {
+	r := newRuntimeIn(t, t.TempDir())
+	next := r.Settings()
+	next.Matching.MinDigits = 1
+	next.LogLevel = "debug"
+	if err := r.Apply(next); err == nil {
+		t.Fatal("one digit should be refused")
+	}
+	if r.Settings().LogLevel != "info" || r.Matching().MinDigits != 3 {
+		t.Error("nothing of a refused change should be applied")
+	}
+}
+
+// A file saved before matching rules existed keeps its other settings and
+// gets the default rules.
+func TestAnOlderSettingsFileGetsTheDefaultRules(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, RuntimeSettingsFile),
+		[]byte(`{"db_retention_days": 30, "log_level": "warn"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := newRuntimeIn(t, dir)
+	if r.Settings().DBRetentionDays != 30 || !r.Matching().Letters {
+		t.Errorf("got %+v, matching %+v", r.Settings(), r.Matching())
+	}
+}

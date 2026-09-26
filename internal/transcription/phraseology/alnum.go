@@ -120,3 +120,23 @@ func consonants(w string) string {
 	}
 	return string(out)
 }
+
+// Rules are the association rules that can be changed while the server runs,
+// from the settings panel.
+type Rules struct {
+	Letters         bool // AlnumCallsigns
+	ApproxOperators bool // FuzzyOperators
+	MinDigits       int  // 0 keeps the matcher's own
+	OneDigitOff     bool // FuzzyDigits
+}
+
+// WithRules returns a copy of the matcher applying r. The copy shares the
+// airline tables, which are only ever read.
+func (m *Matcher) WithRules(r Rules) *Matcher {
+	c := *m
+	c.AlnumCallsigns, c.FuzzyOperators, c.FuzzyDigits = r.Letters, r.ApproxOperators, r.OneDigitOff
+	if r.MinDigits > 0 {
+		c.MinDigits = r.MinDigits
+	}
+	return &c
+}

@@ -601,6 +601,41 @@
                                             </div>
                                         </template>
 
+                                        <!-- How a transmission is tied to an aircraft. Each rule was measured
+                                             against a shuffled sky before being offered here (docs-fr/05-decisions.md,
+                                             Q30 and Q46); a change applies to the next transmission. -->
+                                        <template x-if="draft.matching">
+                                            <div class="grid gap-1.5 min-w-0">
+                                                <span class="text-sm">Callsign matching</span>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.letters" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">Letters in flight numbers</span>: "seven uniform echo" read as 7UE.
+                                                        59% of callsigns have letters. Measured +27% matched aircraft, precision 73% to 76%.</span>
+                                                </label>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.approx_operators" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">Airline heard roughly</span>: "welling" taken for Vueling,
+                                                        among the airlines in the sky only. Few matches on its own; rescues half-heard ones.</span>
+                                                </label>
+                                                <div class="flex items-center justify-between gap-2.5">
+                                                    <span class="text-xs">Shortest flight number</span>
+                                                    <select x-model.number="draft.matching.min_digits" @change="save()" :disabled="busy"
+                                                            class="bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                        <option value="2">2 digits</option>
+                                                        <option value="3">3 digits</option>
+                                                        <option value="4">4 digits</option>
+                                                    </select>
+                                                </div>
+                                                <div class="text-xs opacity-60 leading-snug">
+                                                    With 2 digits, chance matches about as often as the truth (measured); 3 is the default.
+                                                </div>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.one_digit_off" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">Accept one digit off</span>: measured 81% noise. For experiments only.</span>
+                                                </label>
+                                            </div>
+                                        </template>
+
                                         <!-- Access: the first-run question, answerable again. Stacked rather
                                              than side by side, for the same narrow panel. Switching reloads the
                                              page, since what this browser may see changes with it. -->

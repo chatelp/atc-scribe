@@ -26,6 +26,7 @@ import (
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/templating"
 	"github.com/yegors/co-atc/internal/transcription"
+	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"github.com/yegors/co-atc/internal/weather"
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
@@ -324,6 +325,12 @@ func main() {
 	// so the map can show which targets the controller is actually talking to.
 	adsbService.SetVoiceIndex(newVoiceIndex(context.Background(), transcriptionStorage, 5*time.Second, log))
 	frequenciesService := frequencies.NewService(cfg, log, wsServer, transcriptionStorage, sqliteStorage, clearanceStorage, templateService, fleet)
+	// The association rules from the settings panel, read for every transmission.
+	frequenciesService.SetMatchingRules(func() phraseology.Rules {
+		m := runtimeSettings.Matching()
+		return phraseology.Rules{Letters: m.Letters, ApproxOperators: m.ApproxOperators,
+			MinDigits: m.MinDigits, OneDigitOff: m.OneDigitOff}
+	})
 
 	// Update templating service with frequencies service
 	templateService = templating.NewService(

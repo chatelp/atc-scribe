@@ -5745,7 +5745,7 @@ async initAircraftDataSource() {
 function serverSettings() {
     return {
         state: null,
-        draft: { log_level: 'info', db_retention_days: 7, reference_airport: '' },
+        draft: { log_level: 'info', db_retention_days: 7, reference_airport: '', matching: null },
         newAccount: null, // { username, password } while the first account is being typed
         busy: false,
         error: '',
@@ -5764,6 +5764,7 @@ function serverSettings() {
                     log_level: this.state.settings.log_level,
                     db_retention_days: this.state.settings.db_retention_days,
                     reference_airport: this.state.settings.reference_airport,
+                    matching: this.state.settings.matching ? { ...this.state.settings.matching } : null,
                 };
             } catch (e) {
                 this.error = 'Server state unreachable: ' + e.message;
@@ -5801,13 +5802,16 @@ function serverSettings() {
                         log_level: this.draft.log_level,
                         db_retention_days: days,
                         reference_airport: this.draft.reference_airport,
+                        matching: this.draft.matching,
                     }),
                 });
                 if (r.status === 401) { this.flash('Sign in to change server settings.', true); return; }
                 if (!r.ok) {
                     this.flash((await r.text()).trim() || ('Refused (' + r.status + ')'), true);
-                    // A refused airport must not stay selected as if it were in force.
+                    // A refused airport must not stay selected as if it were in force,
+                    // nor a refused matching rule stay ticked.
                     this.draft.reference_airport = this.state.settings.reference_airport;
+                    if (this.state.settings.matching) this.draft.matching = { ...this.state.settings.matching };
                     return;
                 }
                 const airportChanged = this.state.settings.reference_airport !== this.draft.reference_airport;

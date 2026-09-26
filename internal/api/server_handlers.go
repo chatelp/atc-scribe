@@ -300,6 +300,9 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 	if next.ReferenceAirport == "" {
 		next.ReferenceAirport = current.ReferenceAirport
 	}
+	if next.Matching == nil {
+		next.Matching = current.Matching
+	}
 
 	if err := h.runtime.Apply(next); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -316,7 +319,11 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 		logger.String("by", by),
 		logger.Int("db_retention_days", next.DBRetentionDays),
 		logger.String("log_level", next.LogLevel),
-		logger.String("reference_airport", next.ReferenceAirport))
+		logger.String("reference_airport", next.ReferenceAirport),
+		logger.Bool("match_letters", next.Matching.Letters),
+		logger.Bool("match_approx_operators", next.Matching.ApproxOperators),
+		logger.Int("match_min_digits", next.Matching.MinDigits),
+		logger.Bool("match_one_digit_off", next.Matching.OneDigitOff))
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(h.runtime.Settings()); err != nil {

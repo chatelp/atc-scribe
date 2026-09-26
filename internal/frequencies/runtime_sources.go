@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	cfg "github.com/yegors/co-atc/internal/config"
+	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"github.com/yegors/co-atc/internal/websocket"
 )
 
@@ -164,4 +165,10 @@ func (s *Service) announceSources() {
 		Type: websocket.MessageTypeFrequenciesChanged,
 		Data: map[string]interface{}{},
 	})
+}
+
+// SetMatchingRules gives transcription the association rules in force, read
+// for every transmission. Called before Start.
+func (s *Service) SetMatchingRules(rules func() phraseology.Rules) {
+	s.transcriptionManager.SetMatchingRules(rules)
 }
