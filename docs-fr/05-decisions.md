@@ -4352,7 +4352,7 @@ qualité/distance »). Restent possibles :
 **Pour trancher** : rapprocher chaque transmission hachée de la distance de l'avion qui parle (à
 transcrire et associer, avec l'ADS-B de la même heure). Diaphonie de 126,425 : non concluant.
 
-### Q48 — Deux fréquences symétriques autour du centre de la clé s'entendent l'une l'autre *(ouverte, 26/09)*
+### Q48 — De l'écho entre 125,825 et 126,425 : image de la clé ou fréquences couplées ? *(ouverte, 26/09 — **l'image de la clé devient peu probable**)*
 
 **Signalé par le propriétaire à l'écoute**, le 26/09 vers 20:30, sur 125,825 + 126,425 (centre choisi
 par la station : 126,125, le milieu) : « il y a de l'écho, les deux fréquences semblent recevoir la
@@ -4376,6 +4376,21 @@ dépendrait donc de l'écart au centre et de la force du signal. **Non prouvé**
 deux secteurs par le contrôle, défait par hasard à 20:33, reste possible ; la contre-épreuve est de
 revenir quelques minutes au centre symétrique.
 
-**Conséquence si c'est confirmé** : la règle de centre de la station (le milieu des fréquences)
-rend toujours miroirs les deux extrêmes d'une sélection. Un centre décalé, qui évite qu'un miroir
-tombe sur une fréquence choisie, serait à discuter avec le propriétaire et l'agent de la station.
+**Conséquence si c'était confirmé** : la règle de centre de la station (le milieu des fréquences)
+rend toujours miroirs les deux extrêmes d'une sélection.
+
+**Réserves de l'agent de la station, vérifiées le soir même** :
+- la clé a un tuner **R820T**, à fréquence intermédiaire basse, alors que l'image symétrique autour
+  du centre est la signature des récepteurs à fréquence intermédiaire nulle : sur une R820T, on
+  l'attend faible ;
+- **les extrêmes de presque tous les groupes sont en miroir** (de-gaulle-sol, le-bourget,
+  orly-approche, en-route-et-descente-cdg…), sans écho jamais entendu ;
+- **nuit du 15-16/09**, 132,275 (forte, Paris arrivées) et 133,250 en miroir exact (±0,49 autour
+  de 132,7625), canal par canal (`par-canal.json`). Sur 285 transmissions de 132,275, 5 seulement
+  ont une transmission simultanée sur 133,250, et aucune au texte semblable. C'est autant qu'une
+  paire non miroir (132,783 : 6 sur 35).
+
+Pas d'image mesurable à ±0,49, ±0,975 ni ±1,03 MHz. **L'explication la plus probable devient un
+couplage des deux approches de De Gaulle par le contrôle**, défait vers 20:33, au moment de notre
+bascule. À vérifier sans bascule : si l'écho revient plus tard dans la soirée avec le centre à
+126,200, c'est le couplage. Aucune règle de centre à changer en attendant.
