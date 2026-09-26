@@ -373,3 +373,85 @@ func TestNoMatchStoresNoEvidence(t *testing.T) {
 		t.Errorf("callsign %q with evidence %v, want neither", r.Callsign, r.CallsignEvidence)
 	}
 }
+
+// movingFleet is a sky the test changes between two passes, as the receiver
+// decodes an aircraft that has already spoken.
+type movingFleet struct{ now []phraseology.Aircraft }
+
+func (f *movingFleet) Fleet() []phraseology.Aircraft { return f.now }
+
+// Heard on 26/09 on CDG approach: the first call came 17 s before the receiver
+// decoded the aircraft at all, 39 s before its callsign. The transmission waits,
+// and is attached on the pass where the aircraft appears -- values included.
+func TestATransmissionWaitsForItsAircraftToBeDecoded(t *testing.T) {
+	sky := &movingFleet{now: []phraseology.Aircraft{{Callsign: "DLH4AB", Hex: "3c4b26", AltitudeFt: 9000}}}
+	proc, txStore, _ := newTestProcessor(t, sky)
+	id := store(t, txStore, "lufthansa bien bonjour air algerie one two one four descending flight level one one zero")
+
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+	if r := reread(t, txStore, id); r.Callsign != "" {
+		t.Fatalf("callsign %q before the aircraft was decoded", r.Callsign)
+	}
+
+	sky.now = append(sky.now, phraseology.Aircraft{Callsign: "DAH1214", Hex: "452134", AltitudeFt: 12150})
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+	if r := reread(t, txStore, id); r.Callsign != "DAH1214" || len(r.CallsignEvidence) == 0 {
+		t.Errorf("callsign %q, evidence %v: want DAH1214 with its words", r.Callsign, r.CallsignEvidence)
+	}
+	values, err := proc.valueStorage.ValuesByTranscription([]int64{id})
+	if err != nil {
+		t.Fatalf("ValuesByTranscription: %v", err)
+	}
+	if len(values[id]) == 0 {
+		t.Fatal("the flight level was not stored")
+	}
+	for _, v := range values[id] {
+		if v.Callsign != "DAH1214" {
+			t.Errorf("value %s filed under %q, want DAH1214", v.Text, v.Callsign)
+		}
+	}
+	if len(proc.pending) != 0 {
+		t.Errorf("%d transmissions still waiting after the match", len(proc.pending))
+	}
+}
+
+// Past retryFor the transmission is let go: an aircraft appearing later is a
+// coincidence more often than the speaker.
+func TestAWaitingTransmissionIsDroppedAfterAMinute(t *testing.T) {
+	sky := &movingFleet{now: []phraseology.Aircraft{{Callsign: "BAW572", Hex: "400a1b", AltitudeFt: 37000}}}
+	proc, txStore, _ := newTestProcessor(t, sky)
+	clock := time.Date(2026, 9, 26, 14, 46, 0, 0, time.UTC)
+	proc.now = func() time.Time { return clock }
+	id := store(t, txStore, "air algerie one two one four descending flight level one one zero")
+
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+	clock = clock.Add(retryFor + time.Second)
+	sky.now = append(sky.now, phraseology.Aircraft{Callsign: "DAH1214", Hex: "452134", AltitudeFt: 12150})
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+	if r := reread(t, txStore, id); r.Callsign != "" {
+		t.Errorf("callsign %q attached after the retry window", r.Callsign)
+	}
+	if len(proc.pending) != 0 {
+		t.Errorf("%d transmissions still waiting past the window", len(proc.pending))
+	}
+}
+
+// Without ADS-B there is no sky to wait for.
+func TestNothingWaitsWithoutADSB(t *testing.T) {
+	proc, txStore, _ := newTestProcessor(t, nil)
+	store(t, txStore, "air algerie one two one four descending flight level one one zero")
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+	if len(proc.pending) != 0 {
+		t.Errorf("%d transmissions waiting with no ADS-B", len(proc.pending))
+	}
+}

@@ -52,6 +52,34 @@ type GrammarProcessor struct {
 	// never do more than that.
 	recentMu sync.Mutex
 	recent   map[string][]heard
+
+	// Transmissions no aircraft could be found for, tried again against each new
+	// sky for retryFor. Touched only from the annotation loop.
+	pending []pendingMatch
+	now     func() time.Time
+}
+
+// retryFor is how long a transmission left without an aircraft is tried again.
+//
+// A first call on a frequency is made as the aircraft enters the sector, which
+// is often where it enters the receiver's range too: on 26/09 "Air Algerie one
+// two one four" was heard on CDG approach 17 s before the receiver first decoded
+// the aircraft, 39 s before its callsign. Matching once, as the transmission is
+// stored, finds 343 right aircraft on the 24/09 capture; letting the sky run 60 s
+// longer finds 372, at the same 84% (docs-fr/05-decisions.md, D60).
+const retryFor = 60 * time.Second
+
+// maxPending bounds the retry list: at one transmission a second, a minute of
+// them.
+const maxPending = 200
+
+// pendingMatch is a transmission waiting for its aircraft to be decoded.
+type pendingMatch struct {
+	record    *sqlite.TranscriptionRecord
+	result    phraseology.Result
+	processed string
+	speaker   string
+	first     time.Time
 }
 
 // heard is one aircraft named on a frequency at a moment.
@@ -103,6 +131,7 @@ func NewGrammarProcessor(
 		config:               config,
 		interval:             interval,
 		recent:               map[string][]heard{},
+		now:                  time.Now,
 		logger:               log.Named("grammar-processor"),
 	}, nil
 }
@@ -207,7 +236,7 @@ func (p *GrammarProcessor) processNextBatch() error {
 	if err != nil {
 		return fmt.Errorf("failed to get unprocessed transcriptions: %w", err)
 	}
-	if len(records) == 0 {
+	if len(records) == 0 && len(p.pending) == 0 {
 		return nil
 	}
 
@@ -216,6 +245,9 @@ func (p *GrammarProcessor) processNextBatch() error {
 		sky = p.fleet.Fleet()
 	}
 
+	// The waiting ones first: they are older, and a new transmission must not be
+	// tried twice against the same sky.
+	p.retryPending(sky)
 	for _, record := range records {
 		p.annotate(record, sky)
 	}
@@ -226,8 +258,9 @@ func (p *GrammarProcessor) processNextBatch() error {
 //
 // Every record is marked processed, including the ones the grammar could make
 // nothing of. Leaving a record unprocessed would mean retrying it on every tick
-// for the life of the database, and the grammar is deterministic: a second attempt
-// on the same text yields the same nothing.
+// for the life of the database. The grammar is deterministic, but the sky is not:
+// a transmission left without an aircraft is tried again for a minute, from
+// memory (retryPending).
 func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []phraseology.Aircraft) {
 	result := phraseology.Parse(record.Content)
 
@@ -238,6 +271,96 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 
 	speaker := string(result.Speaker)
 
+	match, callsign, source, evidence := p.match(record, result, sky)
+
+	if err := p.transcriptionStorage.UpdateMatchedTranscription(
+		record.ID, processed, speaker, callsign, source, evidence,
+	); err != nil {
+		p.logger.Error("Failed to update annotated transcription",
+			logger.Int64("id", record.ID), logger.Error(err))
+		return
+	}
+
+	if callsign != "" {
+		p.attached(record, match, callsign, source, 0)
+	} else if p.fleet != nil {
+		p.pending = append(p.pending, pendingMatch{record, result, processed, speaker, p.now()})
+		if n := len(p.pending) - maxPending; n > 0 {
+			p.pending = p.pending[n:]
+		}
+	}
+
+	p.storeValues(record, result, callsign)
+	p.storeClearances(record, result, callsign)
+	p.broadcast(record, processed, speaker, callsign, source, evidence)
+}
+
+// retryPending tries the transmissions left without an aircraft against the
+// current sky, and forgets those older than retryFor. A late match is written
+// and broadcast as the first would have been; the page replaces the transmission
+// by its id.
+func (p *GrammarProcessor) retryPending(sky []phraseology.Aircraft) {
+	if len(p.pending) == 0 {
+		return
+	}
+	now := p.now()
+	kept := p.pending[:0]
+	for _, pm := range p.pending {
+		waited := now.Sub(pm.first)
+		if waited > retryFor {
+			continue
+		}
+		match, callsign, source, evidence := p.match(pm.record, pm.result, sky)
+		if callsign == "" {
+			kept = append(kept, pm)
+			continue
+		}
+		if err := p.transcriptionStorage.UpdateMatchedTranscription(
+			pm.record.ID, pm.processed, pm.speaker, callsign, source, evidence,
+		); err != nil {
+			p.logger.Error("Failed to update a late match",
+				logger.Int64("id", pm.record.ID), logger.Error(err))
+			continue
+		}
+		p.attached(pm.record, match, callsign, source, waited)
+		if p.valueStorage != nil {
+			if err := p.valueStorage.SetCallsign(pm.record.ID, callsign); err != nil {
+				p.logger.Error("Failed to attach values to a late match",
+					logger.Int64("id", pm.record.ID), logger.Error(err))
+			}
+		}
+		p.storeClearances(pm.record, pm.result, callsign)
+		p.broadcast(pm.record, pm.processed, pm.speaker, callsign, source, evidence)
+	}
+	for i := len(kept); i < len(p.pending); i++ {
+		p.pending[i] = pendingMatch{} // let the dropped records go
+	}
+	p.pending = kept
+}
+
+// attached remembers and logs a transmission attached to an aircraft, late by
+// waited when it was found on a retry.
+func (p *GrammarProcessor) attached(record *sqlite.TranscriptionRecord, match phraseology.Match, callsign, source string, waited time.Duration) {
+	p.remember(record.FrequencyID, record.CreatedAt, callsign)
+	fields := []logger.Field{
+		logger.Int64("id", record.ID),
+		logger.String("callsign", callsign),
+		logger.String("from", source),
+		logger.String("hex", match.Hex),
+		logger.Float64("score", match.Score),
+		logger.String("why", match.Reason),
+	}
+	if waited > 0 {
+		fields = append(fields, logger.Duration("late", waited.Round(time.Second)))
+	}
+	p.logger.Info("Attached a transmission to an aircraft", fields...)
+}
+
+// match finds the aircraft a transmission was about, from its primary reading
+// and its second one, in the sky given. It returns the match, the ADS-B
+// callsign, which reading named it, and where its words sit in the displayed
+// text; an empty callsign when none could be named.
+func (p *GrammarProcessor) match(record *sqlite.TranscriptionRecord, result phraseology.Result, sky []phraseology.Aircraft) (phraseology.Match, string, string, [][2]int) {
 	callsign, source := "", ""
 	var match phraseology.Match
 	// Where the words that named the aircraft sit in the text displayed for the
@@ -317,29 +440,7 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 			evidence = secondResult.RawSpans(second.Words)
 		}
 	}
-
-	if err := p.transcriptionStorage.UpdateMatchedTranscription(
-		record.ID, processed, speaker, callsign, source, evidence,
-	); err != nil {
-		p.logger.Error("Failed to update annotated transcription",
-			logger.Int64("id", record.ID), logger.Error(err))
-		return
-	}
-
-	if callsign != "" {
-		p.remember(record.FrequencyID, record.CreatedAt, callsign)
-		p.logger.Info("Attached a transmission to an aircraft",
-			logger.Int64("id", record.ID),
-			logger.String("callsign", callsign),
-			logger.String("from", source),
-			logger.String("hex", match.Hex),
-			logger.Float64("score", match.Score),
-			logger.String("why", match.Reason))
-	}
-
-	p.storeValues(record, result, callsign)
-	p.storeClearances(record, result, callsign)
-	p.broadcast(record, processed, speaker, callsign, source, evidence)
+	return match, callsign, source, evidence
 }
 
 // recentlyHeard returns the aircraft named on this frequency in the last two

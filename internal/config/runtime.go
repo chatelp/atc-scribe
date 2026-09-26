@@ -134,7 +134,7 @@ func (m *MatchingRules) withSectorDefaults() {
 // ADS-B service and the weather service -- so the server wires them in.
 type ReferenceAirportHook struct {
 	Validate func(code string) error // no side effect: refuse before anything moves
-	Apply    func(code string)        // cannot fail once Validate has passed
+	Apply    func(code string)       // cannot fail once Validate has passed
 }
 
 // Runtime holds the live values and persists changes.

@@ -54,6 +54,7 @@ ne portent aucun indicatif (47 %).
 | 17 bis | **Lire les indicatifs à lettres** (« seven uniform echo » = 7UE ; « welling » = Vueling) — 59 % des indicatifs en ont | **+27 % d'avions justes** (240 -> 303 puis 306), précision 73 -> 76 %, sur les quatre fréquences | ✅ en service, réglable depuis le panneau (D58) |
 | 17 ter | **Le fil de l'échange** : un avion entendu il y a moins de 2 minutes, rappelé par ses dernières lettres ou ses deux derniers chiffres | +8 et +13 avions justes, presque sans hasard ; la compagnie seule +68 mais invérifiable à l'ADS-B | ✅ lettres et chiffres en service ; compagnie seule désactivée (D58) |
 | 17 quater | **Le secteur de chaque fréquence** : ne comparer qu'aux avions qu'elle peut avoir en ligne | hasard divisé par deux sur l'approche de Roissy ; avec le fil de l'échange, +20 % d'avions justes et précision 76 -> 84 % | ⏳ construit, à valider un autre jour avant activation (D59) |
+| 17 quinquies | **Attendre l'avion** : une transmission sans avion est retentée une minute, le temps que l'ADS-B décode un avion qui vient d'entrer en portée (premier appel « Air Algerie 1214 » du 26/09) | **+29 avions justes (+8 %)** sans perte de précision ; les chiffres précédents lisaient déjà le ciel 60 s après la transmission | ✅ construit, en service au prochain lancement (D60) |
 | 18 | Une petite IA pour l'association | évaluée sur le papier le 23/09 ; protocole prêt, avec contrôle par ciel mélangé | 🔲 |
 
 ### C. La réception, à la station

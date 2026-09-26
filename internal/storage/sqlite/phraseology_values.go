@@ -93,6 +93,17 @@ func (s *PhraseologyStorage) StoreValues(values []PhraseologyValue) error {
 	return tx.Commit()
 }
 
+// SetCallsign files the values of a transmission under the aircraft it was
+// attached to after they were stored -- when the aircraft was decoded after it
+// spoke.
+func (s *PhraseologyStorage) SetCallsign(transcriptionID int64, callsign string) error {
+	lockSQLiteWrite()
+	defer unlockSQLiteWrite()
+	_, err := s.db.Exec(`UPDATE phraseology_values SET callsign = ? WHERE transcription_id = ?`,
+		callsign, transcriptionID)
+	return err
+}
+
 // ValuesByTranscription returns the values of the given transcriptions, keyed by
 // transcription id. One query for the whole page rather than one per row.
 func (s *PhraseologyStorage) ValuesByTranscription(ids []int64) (map[int64][]PhraseologyValue, error) {

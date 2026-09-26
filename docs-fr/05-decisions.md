@@ -3621,6 +3621,50 @@ acceptée (0,6). `radio-ctl-sync` attribue aéroport et nature depuis la copie d
 Orly Approche avec trois fréquences de Roissy), un autre jour, mesurée ensuite avec et sans
 secteur ; puis l'activation. Et apprendre des données les secteurs des fréquences de contrôle.
 
+### D60 — Une transmission sans avion attend une minute que l'ADS-B le décode *(26/09)*
+
+**Le cas, signalé par le propriétaire pendant la séance de validation** : sur 125,825 à 16:46:27,
+« Lufthansa bien bonjour Air Algerie one two one four descending flight level one one zero… »,
+transcrit correctement, n'est rattaché à aucun avion alors que DAH1214 est bien dans le ciel.
+Relevé dans la base de la séance : **l'avion n'existait pas encore pour co-atc**. La station
+reçoit son adresse (452134) à 16:46:44, sans indicatif ni position ; l'indicatif arrive à 16:47:06,
+la position à 16:47:18 — à 69 NM à l'est-sud-est de la station, au FL120, transpondeur ADS-B
+version 0. Le rattachement avait été tenté à la passe suivant la transcription (16:46:57), une fois,
+et jamais repris. Quatre minutes plus tard, « only call sign Algerie one two one four » est
+rattaché sans difficulté (chiffres exacts, 0,9).
+
+**Ce n'est pas un accident** : le premier appel sur une fréquence se fait à l'entrée du secteur,
+souvent là où l'avion entre aussi dans la portée du récepteur ADS-B.
+
+**Mesuré** sur la capture du 24/09 (règles en service et secteurs, la mesure `tout-propre` de
+Q46), en bornant le ciel à *n* secondes après le début de la transmission (option `-after` de
+`cmd/phraseology`, résultats `whisper-lab/resultats/station/2026-09-26-apres-transmission/`) :
+
+| Ciel lu jusqu'à | Avions justes | Hasard | Précision |
+|---|---|---|---|
+| 0 s | 326,4 | 66,6 | 83 % |
+| 15 s — **la production aujourd'hui**, en ordre de grandeur (durée + décodage + passe de 10 s) | **343,4** | 67,6 | 84 % |
+| 30 s | 361,0 | 68,0 | 84 % |
+| 60 s — **ce que publient Q46, D58 et D59** | 367,6 | 68,4 | 84 % |
+| 75 s — **15 s + une minute d'attente** | **372,4** | 68,6 | 84 % |
+
+**Deux conclusions.** Les chiffres publiés jusqu'ici lisaient le ciel ±60 s autour de la
+transmission : ils prêtaient à la production des avions décodés après coup, environ 7 % d'avions
+justes de trop (343 au lieu de 368). Et une minute d'attente rattrape tout : **+29 avions justes
+(+8 %), sans perte de précision, hasard +1**. L'ADS-B du 24/09 est échantillonné à la seconde
+(écart médian entre deux points d'un même avion : 1 s), la mesure n'est pas faussée par son pas.
+
+**Ce qui est fait** (`grammar_processor.go`) : une transmission restée sans avion est gardée en
+mémoire et retentée à chaque passe (10 s) contre le ciel du moment, pendant 60 s ; au-delà elle est
+abandonnée. Un rattachement tardif s'écrit et se diffuse comme le premier — la page remplace la
+transmission par son identifiant, les valeurs (niveaux, caps) déjà enregistrées passent sous
+l'indicatif, les clairances s'écrivent à ce moment-là. Le journal le signale par `late`. Rien en
+base, rien au panneau : l'attente se perd au redémarrage, sans conséquence. Pas de réglage : la
+mesure ne montre pas de coût. Contribuable tel quel.
+
+**Pas encore vu en service** : la séance de validation tourne sur l'ancien binaire ; le
+prochain lancement le portera.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(ouverte, 23/09)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
