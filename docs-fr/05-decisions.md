@@ -3888,3 +3888,15 @@ l'effet. Les fils séparés restent retenus (ils suppriment même ce retard). **
 sont côté Mac** : pendant nos six silences, Caddy (le proxy devant Icecast) note une réponse
 interrompue *vers* notre client ; pendant le « No route to host », la station pingait le Mac
 sans un échec et un ssh du Mac vers elle a réussi à 22:51. Voir Q22.
+
+**Phase 3 en service le 26/09 à 11:16 (version 23)** (`whisper-lab/echanges-station/reponse-station-2026-09-26-13h45-phase3.md`) :
+un flux par fréquence sur toute écoute, `http://audio.lan/aero-<id>.mp3`, adresse stable ;
+`/radio/etat` donne `flux_url` et `flux_present` par fréquence et un bloc `flux_separes` ; tampon de
+4 096 octets sur les seuls `aero-<id>.mp3` (`aero.mp3` garde 65 535, décision du propriétaire) ;
+`multiple_output_threads` partout ; une fréquence seule à niveau ≠ 1 porte ce niveau dans son flux
+(`ampfactor_canal`). **Les commandes en GET restent ouvertes** (fermeture annulée par le
+propriétaire). **Mesuré depuis le Mac le 26/09 vers 14 h** sur `aero-123875.mp3` (Orly approche,
+seule) : premier paquet **2,75 s** après la connexion, 2 800 octets (≈ 2,6 s de son ancien), puis
+des paquets de 1 400 octets toutes les 1,4 s, **8,5 kbit/s**. `radio-ctl-sync` n'ouvre plus que
+les flux `flux_present` à l'adresse donnée. **Reste** : le premier essai réel de co-atc sur ces
+flux.
