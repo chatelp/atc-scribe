@@ -3910,7 +3910,7 @@ les flux `flux_present` à l'adresse donnée. **Reste** : le premier essai réel
 flux.
 
 
-### Q46 — Les indicatifs à lettres échappent presque à l'association *(ouverte, 26/09)*
+### Q46 — Les indicatifs à lettres échappent presque à l'association *(ouverte, 26/09 ; mesurée : +27 % d'avions justes)*
 
 Relevé par le propriétaire pendant le premier essai sur les flux séparés (123,875, Orly Approche) :
 *« j'ai eu un Uniform Echo que moi-même j'ai compris à l'oreille, l'avion est bien là, mais il n'a
@@ -3951,3 +3951,31 @@ sont de Vueling (VUELING est bien dans `assets/airlines.dat`). L'information pou
 un nom d'exploitant approché (« welling »), une lettre manquante tolérée, et le rapprochement vers le
 mot de l'alphabet aéronautique le plus proche après une lettre épelée (« make on » -> « echo ») —
 chacun jugé contre le hasard.
+
+**Mesuré le 26/09** (`cmd/phraseology`, options `-alnum`, `-fuzzy-operators`, `-every` ;
+résultats `whisper-lab/resultats/station/2026-09-26-q46/`). Deux règles, désactivées par défaut :
+**chiffres et lettres ensemble** (« seven uniform echo » lu 7UE ; la partie vol entière pèse comme
+trois chiffres exacts, 0,9 ; amputée de sa dernière lettre, 0,5, sous le seuil de 0,6, donc
+seulement avec une autre preuve) et **nom d'exploitant approché** (une lettre d'écart, deux pour les
+noms longs, ou mêmes consonnes : « welling » = VUELING), cherché parmi les seuls exploitants du ciel.
+
+| 24/09, 4 fréquences, contrôle par ciel mélangé | Avions justes | Hasard | Précision |
+|---|---|---|---|
+| Règles actuelles | 239,6 | 88,4 | 73 % |
+| **+ chiffres et lettres** | **303,4** (+27 %) | 97,6 | **76 %** |
+| + nom approché | 306,0 (+28 %) | 97,0 | 76 % |
+
+Le gain se retrouve **sur les quatre fréquences** (124,350 : 137 -> 163 ; 124,625 : 20 -> 28 ;
+125,825 : 48 -> 56 ; 126,425 : 35 -> 57), et la précision monte : ce n'est pas du bruit. Le nom
+approché ajoute peu en nombre, mais c'est lui qui sauve l'exemple du propriétaire. Sur l'essai
+d'Orly du 26/09 (40 transmissions couvertes par l'ADS-B) : 2 avions -> 4, dont **VLG7UE deux fois** —
+à 13:37 (« holding seven uniform echo », partie vol entière) et à 13:42 (« welling seven uniform
+make on », partie vol amputée + nom approché) ; la troisième (« holding seven uniform make on »,
+sans nom) reste à juste titre sans avion.
+
+**Un défaut de mesure trouvé en chemin** : l'outil de mesure n'appelait l'association que si la
+transmission contenait un groupe d'au moins deux chiffres — ce qui cachait précisément ces
+indicatifs. La production, elle, envoie tout ; `-every` fait de même. Les mesures antérieures
+(Q30, doc 28…) sont peu touchées : +4 avions justes sur 236 le 24/09 avec les règles actuelles.
+
+**À décider par le propriétaire** : activer les deux règles en production.
