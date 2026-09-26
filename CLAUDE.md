@@ -44,6 +44,11 @@ Le projet est destiné à un dépôt public : **code, commentaires, noms de vari
 messages de commit et README en anglais**. Les documents de `docs-fr/` et les échanges
 avec le propriétaire sont **en français**.
 
+**Tout ce qui s'adresse au propriétaire est en français, sans exception** : les réponses, mais
+aussi les courtes notes d'avancement entre deux commandes pendant un long travail, et les
+messages à l'agent de la station. Le 25/09, une nuit de code a fait glisser ces notes en anglais,
+et il a dû le rappeler.
+
 ## Méthode
 
 - **Mesurer avant de conclure.** C'est la culture de ce projet : chaque affirmation
