@@ -591,6 +591,14 @@ propre Terminal fait apparaître la demande.
 > jusqu'à ce qu'on réponde à macOS ; **co-atc doit être lancé depuis le Terminal du propriétaire
 > (ou un agent launchd), pas depuis la session de travail** ; (2) **les chutes du lien Ethernet
 > (doc 20 : dix par nuit) déclenchent tout** — câble, prise ou port du commutateur à vérifier.
+>
+> **Recoupé par la station le 26/09** : son ping vers le Mac (toutes les 10 s) passe à 297 ms à
+> 22:24:29 et 346 ms à 22:24:39, puis 7 ms, sans perte — cohérent avec la chute d'`en0`. Et la
+> veille a vu, le 26/09, une panne d'une autre nature : **12:56:33, Python et `curl` en échec au
+> même instant, retour après 50 s** — le câble de la station, tombé de 12:56:34 à 12:57:45 selon
+> son journal. La veille distingue donc bien les deux cas. **La station a aussi ses chutes**
+> (26/09 : 00:25, 00:51, 04:48, 06:43, 12:56) ; son réseau passe par un maillage Wi-Fi que le
+> propriétaire garde en l'état (pas de boîtiers EBM68).
 
 Relevé au passage, sans lien avec Q21 mais à corriger : le Mac porte **deux adresses
 sur 192.168.1.0/24**, `en0` Ethernet en `.28` et `en1` Wi-Fi en `.48`, et le cache ARP
