@@ -3811,3 +3811,22 @@ pour vérifier qu'`aero.mp3` ne change pas). **Pas de flux séparés en permanen
 pas réglé.** Tampon des `aero-<id>.mp3` : **environ 4 ko (3 à 4 s)**, à la mise en service.
 Pour co-atc : ces sauts ne touchent pas les flux séparés ; sur `aero.mp3`, ils ne coûtent que
 125 ms de son chacun, et le comptage des trames contre l'horloge les verra.
+
+**L'essai de la station, 25/09 de 21 h 19 à 22 h 49** (`whisper-lab/echanges-station/
+reponse-station-2026-09-25-22h55-essai-fils.md`) : avec un seul fil et 8 flux, **2 dépassements en
+20 min** (12 en 80 min sur deux essais, environ un toutes les 7 min) ; avec `multiple_output_threads`,
+**aucun en 40 min**, 8 flux et 8 lecteurs ; l'option seule ne change rien à `aero.mp3` ni au
+processeur. Retenu par la station, à la décision du propriétaire : l'option avec chaque
+configuration à flux séparés, et le tampon réduit sur les seuls `aero-<id>.mp3`. Rien n'est encore
+en service.
+
+**Notre comptage de trames ne confirme pas les 2 sauts de T1** (`whisper-lab/resultats/station/
+2026-09-25-horloge-essai-fils.txt`) : sur la fenêtre T1, le son reçu d'`aero.mp3` suit l'horloge du
+Mac à ±50 ms sans décrochage, où deux sauts donneraient −250 ms ; la dérive entre horloges
+(+3 à +37 ppm) ne peut pas les cacher. Soit un dépassement compté ne raccourcit pas le mélange,
+soit la mesure a un défaut non vu — non tranché, et sans conséquence pratique : avec les fils
+séparés il n'y en a plus, et co-atc date le son par sa place dans le flux (D57). Deux anomalies
+de notre côté, non expliquées : six silences de 15 s ou plus sur notre lecture d'`aero.mp3` pendant
+T2 (21:54 – 22:24), alors que le Mac joignait l'ADS-B de la station sans erreur ; puis « No route
+to host » vers la station de 22:24:40 à 23:48, la station n'ayant pas redémarré. Réponse :
+`whisper-lab/echanges-station/reponse-atc-scribe-2026-09-26-essai-fils.md`.
