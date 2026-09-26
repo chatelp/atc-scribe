@@ -37,9 +37,13 @@ import (
 
 // The station's state, as much of it as this program needs.
 type stationState struct {
-	Airband   string `json:"airband"`
-	Version   int    `json:"version"`
-	Since     string `json:"depuis"`
+	Airband  string `json:"airband"`
+	Version  int    `json:"version"`
+	Since    string `json:"depuis"`
+	Separate *struct {
+		Active  bool     `json:"actifs"`
+		Missing []string `json:"manquants"`
+	} `json:"flux_separes"`
 	Selection struct {
 		Name     string    `json:"nom"`
 		Title    string    `json:"titre"`
@@ -54,6 +58,11 @@ type channel struct {
 	Service     string  `json:"service"`
 	Language    string  `json:"langue"`
 	Stream      string  `json:"flux"`
+	StreamURL   string  `json:"flux_url"`
+	// Present is whether the mount is on Icecast right now. Since 26/09 the
+	// station says so; before, a channel with a stream path was assumed live.
+	Present     *bool    `json:"flux_present"`
+	ChannelGain *float64 `json:"ampfactor_canal"`
 }
 
 // The station's catalogue says which channels are worth transcribing.
@@ -78,22 +87,26 @@ type source struct {
 // wanted turns the station's state into the sources co-atc should have, by id.
 func wanted(st stationState, cat catalogue, streams string) map[string]source {
 	out := map[string]source{}
-	if st.Airband != "running" {
-		return out // the receiver is off or lent to another program: no streams
+	if st.Airband != "running" || (st.Separate != nil && !st.Separate.Active) {
+		return out // the receiver is off, lent to another program, or streams are off
 	}
 	transcribe := map[string]bool{}
 	for _, c := range cat.Channels {
 		transcribe[c.ID] = c.Transcribe == nil || *c.Transcribe
 	}
 	for _, c := range st.Selection.Channels {
-		if c.ID == "" || c.Stream == "" {
-			continue
+		if c.ID == "" || c.Stream == "" || (c.Present != nil && !*c.Present) {
+			continue // no stream, or not on Icecast yet: opened when it appears
+		}
+		url := c.StreamURL
+		if url == "" {
+			url = strings.TrimRight(streams, "/") + "/" + strings.TrimLeft(c.Stream, "/")
 		}
 		t, known := transcribe[c.ID]
 		out[c.ID] = source{
 			Name:         label(c.Designation + " " + c.Service),
 			FrequencyMHz: c.MHz,
-			URL:          strings.TrimRight(streams, "/") + "/" + strings.TrimLeft(c.Stream, "/"),
+			URL:          url,
 			// By frequency, not by position in the selection: a channel keeps its
 			// place when others join or leave.
 			Order:           int(c.MHz*1000 + 0.5),
@@ -258,6 +271,15 @@ func (s *syncer) once() error {
 	if st.Version != s.lastVersion {
 		log.Printf("station version %d since %s: %s, %d channels", st.Version, st.Since,
 			st.Selection.Title, len(st.Selection.Channels))
+		for _, c := range st.Selection.Channels {
+			if c.ChannelGain != nil && *c.ChannelGain != 1 {
+				// a lone channel's level is applied to its own stream too
+				log.Printf("  %s: channel level x%.2f in its stream", c.ID, *c.ChannelGain)
+			}
+		}
+		if st.Separate != nil && len(st.Separate.Missing) > 0 {
+			log.Printf("  streams expected but not on Icecast: %v", st.Separate.Missing)
+		}
 		s.lastVersion = st.Version
 		if s.mixID != "" {
 			if err := s.coatcCall("PUT", "/api/v1/frequencies/"+url.PathEscape(s.mixID)+"/label",
