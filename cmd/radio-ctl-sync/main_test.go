@@ -96,3 +96,28 @@ func TestThePlanOnlyTouchesWhatChanged(t *testing.T) {
 		t.Errorf("after a co-atc restart all 3 are set again, got %v", set)
 	}
 }
+
+// Since 26/09 the station gives each stream's full address and says whether the
+// mount exists yet (trimmed from /radio/etat, version 25).
+const stateWithPresenceJSON = `{"airband": "running", "version": 25, "depuis": "2026-09-26T13:04:52+02:00",
+ "flux_separes": {"actifs": true, "attendus": 2, "presents": 1, "manquants": ["124.350"]},
+ "selection": {"titre": "Selection libre", "frequences": [
+   {"designation": "123.875", "mhz": 123.875, "id": "123875", "service": "Orly approche", "langue": "mixte",
+    "flux": "/aero-123875.mp3", "flux_url": "http://audio.lan/aero-123875.mp3", "flux_present": true, "ampfactor_canal": 1.1},
+   {"designation": "124.350", "mhz": 124.35, "id": "124350", "service": "CDG approche", "langue": "en",
+    "flux": "/aero-124350.mp3", "flux_url": "http://audio.lan/aero-124350.mp3", "flux_present": false}]}}`
+
+func TestOnlyStreamsOnIcecastAreOpened(t *testing.T) {
+	var st stationState
+	if err := json.Unmarshal([]byte(stateWithPresenceJSON), &st); err != nil {
+		t.Fatal(err)
+	}
+	w := wanted(st, catalogue{}, "http://ignored")
+	if len(w) != 1 || w["123875"].URL != "http://audio.lan/aero-123875.mp3" {
+		t.Errorf("only the present stream, at the address the station gives: %v", w)
+	}
+	st.Separate.Active = false
+	if w := wanted(st, catalogue{}, "http://ignored"); len(w) != 0 {
+		t.Errorf("streams switched off at the station: nothing to open, got %v", w)
+	}
+}
