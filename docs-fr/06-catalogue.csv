@@ -45,7 +45,7 @@ mhz,service,crete_db,mediane_db,ecart_db,statut,langue_attendue,transcrire
 127.475,"Toussus ATIS",21.8,21.1,0.7,"porteuse permanente",?,non
 127.750,"Orly Depart",34.9,3.9,31.0,"identifiee",mixte,oui
 127.850,"Reims Controle - secteur KN",43.9,0.1,43.8,"identifiee",mixte,oui
-128.142,"8.33 - designateur 128.140, jamais cherche",42.5,0.9,41.6,"absente de l AIP",?,oui
+128.142,"PARIS Controle, secteur US (8.33 - designateur 128.140, eAIP GEN 3.4, ACS H24)",42.5,0.9,41.6,"identifiee eAIP (AIRAC 03/09/2026), a confirmer a l ecoute",mixte,oui
 128.225,"De Gaulle ATIS (FR)",16.6,15.3,1.3,"porteuse permanente",?,non
 128.950,"Villacoublay Tour (LFPV)",32.4,-5.0,37.4,"identifiee",fr,oui
 129.525,"Chavenay Tour (LFPX)",39.4,10.3,29.1,"identifiee",fr,oui
@@ -65,5 +65,5 @@ mhz,service,crete_db,mediane_db,ecart_db,statut,langue_attendue,transcrire
 135.400,"Paris Controle - secteur DO",30.4,22.3,8.1,"identifiee",en,oui
 135.500,"jamais cataloguee - des. 135.505",35.7,0.5,35.2,"non identifiee",?,oui
 135.550,"jamais cataloguee - des. 135.555",35.4,3.1,32.3,"non identifiee",?,oui
-135.967,"8.33 - designateur 135.965, jamais cherche",39.9,6.3,33.6,"absente de l AIP",?,oui
+135.967,"BREST Controle, secteurs MS/ZS (8.33 - designateur 135.965, eAIP GEN 3.4, ACS H24)",39.9,6.3,33.6,"identifiee eAIP (AIRAC 03/09/2026), a confirmer a l ecoute",mixte,oui
 136.275,"De Gaulle Approche",30.3,14.0,16.3,"identifiee",en,oui
