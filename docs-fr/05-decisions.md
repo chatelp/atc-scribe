@@ -3733,6 +3733,22 @@ station), à côté de la séance de validation : `/station` rend les deux aéro
 la carte trace leurs axes, les premières alertes portent leur aéroport, la piste en service de
 De Gaulle (26R) s'établit en quelques minutes.
 
+**Mesuré sur 32 min d'essai** (17:36–18:08, 585 changements de phase) : APP 12 Orly / 7 De Gaulle,
+ARR 29 / 13, DEP 21 / 15, CLB 3 / 0. **Les 19 approches sont toutes plus près de leur aéroport que
+de l'autre**, la plus lointaine à 11 NM (IBE05SF, De Gaulle, 26 NM d'Orly). **Mais aucun des 41
+atterrissages ni des 14 décollages n'avait d'aéroport** :
+- 23 n'ont aucune position ;
+- la plupart des autres sont des avions légers de Saint-Cyr et de Toussus, **à juste titre sans
+  aéroport** (le plus proche aurait donné Orly, à 13 NM) ;
+- mais les avions de ligne aussi : la station les perd à quelques centaines de pieds, et la dernière
+  position d'un atterrissage date d'une minute, **5 à 7,5 NM** avant le seuil (AFR1655, AFR36KQ,
+  AFR1855, IBE0579, DAH1108) — au-delà des 5 NM d'`airport_range_nm`.
+
+Corrigé (`33a62ac`) : un avion vu sur un axe de piste de son aéroport garde celui-ci jusqu'à
+`approach_max_distance_nm` (10 NM). Rejoué sur les mêmes données : AFR1655, IBE0579 et DASSAULT à De
+Gaulle, DAH1108 à Orly ; Saint-Cyr et Toussus restent sans aéroport. Vérification en direct en
+cours.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
