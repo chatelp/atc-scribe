@@ -137,9 +137,12 @@ func TestWithoutAHookTheAirportCannotChange(t *testing.T) {
 func TestMatchingRulesDefaultToLettersAndApproximateNamesOn(t *testing.T) {
 	r := newRuntimeIn(t, t.TempDir())
 	got := r.Matching()
-	want := MatchingRules{Letters: true, ApproxOperators: true, MinDigits: 3, ContextLetters: true, ContextDigits: true}
-	if got != want {
-		t.Errorf("got %+v, want %+v", got, want)
+	if !got.Letters || !got.ApproxOperators || got.MinDigits != 3 || !got.ContextLetters || !got.ContextDigits ||
+		got.ContextNames || got.OneDigitOff || got.Sectors {
+		t.Errorf("got %+v", got)
+	}
+	if got.Sector["approach"] != (SectorSize{RadiusNM: 60, MaxAltFt: 20000}) || got.Sector["ground"] != (SectorSize{RadiusNM: 5, MaxAltFt: 1500}) {
+		t.Errorf("sector sizes: %+v", got.Sector)
 	}
 }
 
@@ -180,5 +183,31 @@ func TestAnOlderSettingsFileGetsTheDefaultRules(t *testing.T) {
 	r := newRuntimeIn(t, dir)
 	if r.Settings().DBRetentionDays != 30 || !r.Matching().Letters {
 		t.Errorf("got %+v, matching %+v", r.Settings(), r.Matching())
+	}
+}
+
+// The sizes are the operator's to change, within bounds, and the change is kept.
+func TestSectorSizesChangeWithinBoundsAndPersist(t *testing.T) {
+	dir := t.TempDir()
+	r := newRuntimeIn(t, dir)
+	next := r.Settings()
+	next.Matching.Sectors = true
+	next.Matching.Sector["tower"] = SectorSize{RadiusNM: 20, MaxAltFt: 8000}
+	if err := r.Apply(next); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	got := newRuntimeIn(t, dir).Matching()
+	if !got.Sectors || got.Sector["tower"] != (SectorSize{RadiusNM: 20, MaxAltFt: 8000}) || got.Sector["approach"].RadiusNM != 60 {
+		t.Errorf("after a restart: %+v", got)
+	}
+	bad := r.Settings()
+	bad.Matching.Sector["ground"] = SectorSize{RadiusNM: 0, MaxAltFt: 1500}
+	if err := r.Apply(bad); err == nil {
+		t.Error("a zero radius should be refused")
+	}
+	edited := r.Matching()
+	edited.Sector["approach"] = SectorSize{RadiusNM: 1, MaxAltFt: 1000}
+	if r.Matching().Sector["approach"].RadiusNM != 60 {
+		t.Error("editing a copy must not change the rules in force")
 	}
 }

@@ -38,6 +38,10 @@ type PostProcessingConfig struct {
 	// transmission, so that a change from the settings panel applies to the
 	// next one. Nil keeps the matcher as MinDigits configured it.
 	Rules func() phraseology.Rules
+
+	// SectorOf, when set, gives the part of the sky a frequency can be talking
+	// to, read for every transmission; false means the whole sky.
+	SectorOf func(frequencyID string) (phraseology.Sector, bool)
 }
 
 // PostProcessingResult represents the structured result from the LLM

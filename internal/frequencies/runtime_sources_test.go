@@ -161,3 +161,38 @@ func TestMalformedSourcesAreRefused(t *testing.T) {
 		t.Errorf("nothing refused should be listed: %d frequencies", n)
 	}
 }
+
+// A sector is read at each match: changing it keeps the connection.
+func TestASectorIsSetAndChangedWithoutReconnecting(t *testing.T) {
+	s, base := newSourcesService(t)
+	src := channel(base, "123875")
+	src.SectorAirport, src.SectorKind = "LFPO", "approach"
+	if err := s.AddSource(src); err != nil {
+		t.Fatalf("AddSource: %v", err)
+	}
+	if a, k := s.SectorOf("123875"); a != "LFPO" || k != "approach" {
+		t.Errorf("SectorOf = %q, %q", a, k)
+	}
+	before := processorOf(s, "123875")
+	src.SectorKind = "departure"
+	if err := s.AddSource(src); err != nil {
+		t.Fatalf("AddSource: %v", err)
+	}
+	if processorOf(s, "123875") != before {
+		t.Error("a new sector should not reconnect")
+	}
+	if _, k := s.SectorOf("123875"); k != "departure" {
+		t.Errorf("kind = %q, want departure", k)
+	}
+	for name, spoil := range map[string]func(*cfg.FrequencyConfig){
+		"unknown kind":         func(f *cfg.FrequencyConfig) { f.SectorKind = "cruise" },
+		"airport without kind": func(f *cfg.FrequencyConfig) { f.SectorKind = "" },
+		"lowercase airport":    func(f *cfg.FrequencyConfig) { f.SectorAirport = "lfpo" },
+	} {
+		f := src
+		spoil(&f)
+		if err := s.AddSource(f); err == nil {
+			t.Errorf("%s: should be refused", name)
+		}
+	}
+}

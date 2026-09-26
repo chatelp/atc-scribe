@@ -5764,7 +5764,8 @@ function serverSettings() {
                     log_level: this.state.settings.log_level,
                     db_retention_days: this.state.settings.db_retention_days,
                     reference_airport: this.state.settings.reference_airport,
-                    matching: this.state.settings.matching ? { ...this.state.settings.matching } : null,
+                    // A deep copy: the sector sizes are edited in place by the inputs.
+                    matching: this.state.settings.matching ? JSON.parse(JSON.stringify(this.state.settings.matching)) : null,
                 };
             } catch (e) {
                 this.error = 'Server state unreachable: ' + e.message;
@@ -5811,7 +5812,7 @@ function serverSettings() {
                     // A refused airport must not stay selected as if it were in force,
                     // nor a refused matching rule stay ticked.
                     this.draft.reference_airport = this.state.settings.reference_airport;
-                    if (this.state.settings.matching) this.draft.matching = { ...this.state.settings.matching };
+                    if (this.state.settings.matching) this.draft.matching = JSON.parse(JSON.stringify(this.state.settings.matching));
                     return;
                 }
                 const airportChanged = this.state.settings.reference_airport !== this.draft.reference_airport;

@@ -23,6 +23,8 @@ type Frequency struct {
 	Order           int       `json:"order"`             // Order for display/sorting
 	TranscribeAudio bool      `json:"transcribe_audio"`  // Whether to transcribe audio for this frequency
 	Runtime         bool      `json:"runtime,omitempty"` // Added while the server runs, not from the configuration
+	SectorAirport   string    `json:"sector_airport,omitempty"`
+	SectorKind      string    `json:"sector_kind,omitempty"`
 }
 
 // Stream represents the resources for a single active client's connection to an audio feed.

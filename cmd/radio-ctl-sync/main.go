@@ -19,6 +19,8 @@ package main
 import (
 	"bytes"
 	"context"
+	_ "embed"
+	"encoding/csv"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -73,6 +75,43 @@ type catalogue struct {
 	} `json:"frequences"`
 }
 
+// The station's table of its 68 frequencies, 26/09/2026: for each, the airport
+// it serves and its kind, from the eAIP (GEN 3.4 and AD 2.18, AIRAC 03/09/2026)
+// or, where the eAIP is silent, the station's catalogue and listening. Copied
+// from the station agent's reply (docs-fr/05-decisions.md, Q46); a channel it
+// does not list gets no sector, which leaves co-atc the whole sky.
+//
+//go:embed secteurs-frequences.csv
+var sectorsCSV string
+
+var sectorTable = loadSectorTable(sectorsCSV)
+
+// sectorKinds maps the table's kinds to co-atc's. Control sectors are left out:
+// the eAIP publishes only their organisation's limits, and those mislead --
+// 124.625 is filed with the upper centre, above FL195, while the aircraft
+// matched on it on 24/09 flew at 15,700 ft median.
+var sectorKinds = map[string]string{"approche": "approach", "depart": "departure", "tour": "tower", "sol": "ground", "prevol": "ground"}
+
+func loadSectorTable(data string) map[string][2]string {
+	rows, err := csv.NewReader(strings.NewReader(data)).ReadAll()
+	if err != nil || len(rows) < 2 {
+		log.Printf("sector table unreadable: %v", err)
+		return nil
+	}
+	col := map[string]int{}
+	for i, name := range rows[0] {
+		col[name] = i
+	}
+	out := map[string][2]string{}
+	for _, r := range rows[1:] {
+		id, airport, kind := r[col["id"]], r[col["terrain"]], sectorKinds[r[col["nature"]]]
+		if kind != "" && len(airport) == 4 && strings.ToUpper(airport) == airport {
+			out[id] = [2]string{airport, kind}
+		}
+	}
+	return out
+}
+
 // source is what co-atc's PUT /api/v1/sources/{id} takes.
 type source struct {
 	Name            string  `json:"name"`
@@ -82,6 +121,8 @@ type source struct {
 	TranscribeAudio bool    `json:"transcribe_audio"`
 	Language        string  `json:"language"`
 	FFmpegReconnect bool    `json:"ffmpeg_reconnect"`
+	SectorAirport   string  `json:"sector_airport,omitempty"`
+	SectorKind      string  `json:"sector_kind,omitempty"`
 }
 
 // wanted turns the station's state into the sources co-atc should have, by id.
@@ -115,6 +156,8 @@ func wanted(st stationState, cat catalogue, streams string) map[string]source {
 			// A channel's mount disappears when the station stops listening to
 			// it; ffmpeg's own reconnection would retry its 404 in a loop.
 			FFmpegReconnect: false,
+			SectorAirport:   sectorTable[c.ID][0],
+			SectorKind:      sectorTable[c.ID][1],
 		}
 	}
 	return out

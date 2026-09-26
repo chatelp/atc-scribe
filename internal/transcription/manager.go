@@ -270,6 +270,14 @@ func (m *TranscriptionManager) SetMatchingRules(rules func() phraseology.Rules) 
 	m.postProcessingConfig.Rules = rules
 }
 
+// SetSectors gives the sector of each frequency, read for every transmission.
+// Called before post-processing starts.
+func (m *TranscriptionManager) SetSectors(sectorOf func(frequencyID string) (phraseology.Sector, bool)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.postProcessingConfig.SectorOf = sectorOf
+}
+
 // SetFrequencyLanguage records the expected language of a frequency that was
 // not in the catalogue at startup. It applies to transcriptions started after it.
 func (m *TranscriptionManager) SetFrequencyLanguage(frequencyID, language string) {

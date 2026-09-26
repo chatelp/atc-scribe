@@ -1077,6 +1077,8 @@ func (s *Service) GetAllFrequencies() []*Frequency { // frequencies.Frequency fr
 			Order:           fc.Order,
 			TranscribeAudio: fc.TranscribeAudio,
 			Runtime:         s.runtime[fc.ID],
+			SectorAirport:   fc.SectorAirport,
+			SectorKind:      fc.SectorKind,
 		})
 	}
 
@@ -1120,6 +1122,8 @@ func (s *Service) GetFrequencyByID(id string) (*Frequency, bool) {
 		LastError:       lastError,
 		TranscribeAudio: fc.TranscribeAudio,
 		Runtime:         s.runtime[fc.ID],
+		SectorAirport:   fc.SectorAirport,
+		SectorKind:      fc.SectorKind,
 	}, true
 }
 

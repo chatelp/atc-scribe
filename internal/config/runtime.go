@@ -62,6 +62,29 @@ type MatchingRules struct {
 	ContextLetters bool `json:"context_letters"`
 	ContextDigits  bool `json:"context_digits"`
 	ContextNames   bool `json:"context_names"`
+
+	// Sectors compares a transmission only with the aircraft its frequency can
+	// be talking to, for the frequencies that name an airport and a kind. Off
+	// until validated on another day; the radii and ceilings were agreed with
+	// the owner on 26/09 (approach measured on 24/09: chance halved).
+	Sectors bool                  `json:"sectors"`
+	Sector  map[string]SectorSize `json:"sector"`
+}
+
+// SectorSize is how far and how high a kind of frequency reaches.
+type SectorSize struct {
+	RadiusNM float64 `json:"radius_nm"`
+	MaxAltFt float64 `json:"max_alt_ft"`
+}
+
+// DefaultSectorSizes are the radii and ceilings agreed on 26/09.
+func DefaultSectorSizes() map[string]SectorSize {
+	return map[string]SectorSize{
+		"approach":  {RadiusNM: 60, MaxAltFt: 20000},
+		"departure": {RadiusNM: 60, MaxAltFt: 20000},
+		"tower":     {RadiusNM: 15, MaxAltFt: 6000},
+		"ground":    {RadiusNM: 5, MaxAltFt: 1500},
+	}
 }
 
 // DefaultMatchingRules are the rules in force until changed from the panel:
@@ -72,14 +95,38 @@ func DefaultMatchingRules(minDigits int) MatchingRules {
 		minDigits = 3
 	}
 	return MatchingRules{Letters: true, ApproxOperators: true, MinDigits: minDigits,
-		ContextLetters: true, ContextDigits: true}
+		ContextLetters: true, ContextDigits: true, Sector: DefaultSectorSizes()}
 }
 
 func (m MatchingRules) validate() error {
 	if m.MinDigits < 2 || m.MinDigits > 4 {
 		return fmt.Errorf("matching.min_digits must be 2, 3 or 4, got %d", m.MinDigits)
 	}
+	for kind, size := range m.Sector {
+		if !SectorKinds[kind] {
+			return fmt.Errorf("matching.sector: unknown kind %q", kind)
+		}
+		if size.RadiusNM < 1 || size.RadiusNM > 250 {
+			return fmt.Errorf("matching.sector.%s.radius_nm must be between 1 and 250, got %g", kind, size.RadiusNM)
+		}
+		if size.MaxAltFt < 500 || size.MaxAltFt > 60000 {
+			return fmt.Errorf("matching.sector.%s.max_alt_ft must be between 500 and 60000, got %g", kind, size.MaxAltFt)
+		}
+	}
 	return nil
+}
+
+// withSectorDefaults fills the kinds a saved file does not mention, so that a
+// kind added later has a size without anyone having to set it.
+func (m *MatchingRules) withSectorDefaults() {
+	if m.Sector == nil {
+		m.Sector = map[string]SectorSize{}
+	}
+	for kind, size := range DefaultSectorSizes() {
+		if _, ok := m.Sector[kind]; !ok {
+			m.Sector[kind] = size
+		}
+	}
 }
 
 // ReferenceAirportHook validates and applies a change of reference airport. The
@@ -138,6 +185,7 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 		r.settings.ReferenceAirport = a
 	}
 	if saved.Matching != nil {
+		saved.Matching.withSectorDefaults()
 		if err := saved.Matching.validate(); err != nil {
 			r.log.Warn("Ignoring saved matching rules", logger.Error(err))
 		} else {
@@ -182,10 +230,21 @@ func (r *Runtime) Settings() RuntimeSettings {
 	defer r.mu.RUnlock()
 	s := r.settings
 	if s.Matching != nil {
-		m := *s.Matching
+		m := s.Matching.clone()
 		s.Matching = &m
 	}
 	return s
+}
+
+// clone copies the rules, sizes included: a caller that edits its copy must
+// not change the rules in force.
+func (m MatchingRules) clone() MatchingRules {
+	c := m
+	c.Sector = make(map[string]SectorSize, len(m.Sector))
+	for k, v := range m.Sector {
+		c.Sector[k] = v
+	}
+	return c
 }
 
 // Matching returns the association rules in force. It is read for every
@@ -193,7 +252,7 @@ func (r *Runtime) Settings() RuntimeSettings {
 func (r *Runtime) Matching() MatchingRules {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return *r.settings.Matching
+	return r.settings.Matching.clone()
 }
 
 // DBRetentionDays is read on every retention tick rather than captured once, so a
@@ -220,6 +279,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 	if next.Matching == nil {
 		return fmt.Errorf("matching rules missing")
 	}
+	next.Matching.withSectorDefaults()
 	if err := next.Matching.validate(); err != nil {
 		return err
 	}
@@ -249,7 +309,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		hook.Apply(next.ReferenceAirport)
 	}
 
-	m := *next.Matching
+	m := next.Matching.clone()
 	next.Matching = &m
 	r.mu.Lock()
 	r.settings = next
@@ -279,6 +339,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		logger.Bool("match_one_digit_off", m.OneDigitOff),
 		logger.Bool("match_context_letters", m.ContextLetters),
 		logger.Bool("match_context_digits", m.ContextDigits),
-		logger.Bool("match_context_names", m.ContextNames))
+		logger.Bool("match_context_names", m.ContextNames),
+		logger.Bool("match_sectors", m.Sectors))
 	return nil
 }

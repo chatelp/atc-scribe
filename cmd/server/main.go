@@ -325,6 +325,25 @@ func main() {
 	// so the map can show which targets the controller is actually talking to.
 	adsbService.SetVoiceIndex(newVoiceIndex(context.Background(), transcriptionStorage, 5*time.Second, log))
 	frequenciesService := frequencies.NewService(cfg, log, wsServer, transcriptionStorage, sqliteStorage, clearanceStorage, templateService, fleet)
+	// Each frequency's sector: its airport and kind, the sizes from the settings
+	// panel, the airport's position from the reference data. Off unless the
+	// panel says so, and for a frequency that names no airport.
+	frequenciesService.SetSectors(func(id string) (phraseology.Sector, bool) {
+		m := runtimeSettings.Matching()
+		if !m.Sectors {
+			return phraseology.Sector{}, false
+		}
+		code, kind := frequenciesService.SectorOf(id)
+		size, known := m.Sector[kind]
+		if code == "" || !known || refService == nil {
+			return phraseology.Sector{}, false // no reference data: no airport to draw around
+		}
+		ap := refService.GetAirport(code)
+		if ap == nil {
+			return phraseology.Sector{}, false
+		}
+		return phraseology.Sector{Lat: ap.Latitude, Lon: ap.Longitude, RadiusNM: size.RadiusNM, MaxAltFt: size.MaxAltFt}, true
+	})
 	// The association rules from the settings panel, read for every transmission.
 	frequenciesService.SetMatchingRules(func() phraseology.Rules {
 		m := runtimeSettings.Matching()
