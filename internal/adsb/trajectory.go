@@ -404,6 +404,29 @@ func (tt *TrajectoryTracker) AlignedAirport(hex string) string {
 	return ""
 }
 
+// LastPosition returns the aircraft's last valid position no older than maxAge.
+// A landing is often detected after the receiver has stopped decoding
+// positions -- aircraft.json drops a position after a minute -- and this is
+// where the aircraft last was.
+func (tt *TrajectoryTracker) LastPosition(hex string, maxAge time.Duration) (float64, float64, bool) {
+	tt.mu.RLock()
+	defer tt.mu.RUnlock()
+	at, ok := tt.aircraft[hex]
+	if !ok {
+		return 0, 0, false
+	}
+	var last *TrajectorySnapshot
+	at.ForEachSnapshot(func(snap *TrajectorySnapshot) {
+		if snap.Valid {
+			last = snap
+		}
+	})
+	if last == nil || time.Since(last.Timestamp) > maxAge {
+		return 0, 0, false
+	}
+	return last.Lat, last.Lon, true
+}
+
 // AirportOf returns the followed airport an aircraft is being judged against,
 // as of its last derived state; the principal when it has none yet.
 func (tt *TrajectoryTracker) AirportOf(hex string) *PhaseReference {
