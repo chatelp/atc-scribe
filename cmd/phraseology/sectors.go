@@ -102,3 +102,25 @@ func nm(lat1, lon1, lat2, lon2 float64) float64 {
 		math.Cos(lat1*r)*math.Cos(lat2*r)*math.Sin((lon2-lon1)*r/2)*math.Sin((lon2-lon1)*r/2)
 	return 3440.1 * 2 * math.Asin(math.Sqrt(a))
 }
+
+// loadDBSectors reads the same sectors file for a co-atc database, whose
+// sightings carry their own positions, and turns it into the sectors
+// production applies.
+func loadDBSectors(path string) (map[string]phraseology.Sector, error) {
+	if path == "" {
+		return nil, nil
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var raw map[string]sector
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return nil, fmt.Errorf("sectors: %w", err)
+	}
+	out := map[string]phraseology.Sector{}
+	for freq, sc := range raw {
+		out[freq] = phraseology.Sector{Lat: sc.Lat, Lon: sc.Lon, RadiusNM: sc.RadiusNM, MaxAltFt: sc.MaxAltFt}
+	}
+	return out, nil
+}

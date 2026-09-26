@@ -80,7 +80,7 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 
 	fleetAt := func(at time.Time, freq string) []phraseology.Aircraft {
 		lo := sort.Search(len(sky), func(i int) bool { return sky[i].T >= at.Unix()-int64(windowSec) })
-		hi := sort.Search(len(sky), func(i int) bool { return sky[i].T > at.Unix()+int64(windowSec) })
+		hi := sort.Search(len(sky), func(i int) bool { return sky[i].T > at.Unix()+int64(afterSeconds(windowSec)) })
 		seen := map[string]phraseology.Aircraft{}
 		for _, p := range sky[lo:hi] {
 			if p.Flight == "" {
