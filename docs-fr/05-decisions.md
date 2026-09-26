@@ -4264,5 +4264,15 @@ hachage. Même seuil (SNR 10), même niveau de canal (×1,10) aux deux moments.
   (126,425 − 2,56) ; à midi 126,425 était à 3 MHz du centre, très atténuée par le filtre du
   tuner, maintenant à 1,6 MHz, juste hors de la bande passante.
 
-**Reste** : la contre-épreuve — même heure, 123,875 recentrée — et les niveaux de bruit par
-canal côté station. Ne pas basculer pendant une séance ; transmis à l'agent de la station.
+**Relevés de la station** (agent de la station, 26/09) :
+- compteurs d'airband de 16:44 à 17:24 : sur 123,875, 603 ouvertures de 0,37 s en moyenne,
+  alors que son bruit de fond est le plus bas des quatre (−41,9 dBFS). C'est la signature d'un
+  brouilleur intermittent, pas d'une perte de sensibilité. 125,825 bat de façon chronique, même
+  dans `gros-porteurs` (Q37) : c'est un témoin imparfait ;
+- **aucun retard du mélangeur** en 66 min (`output_overrun_count` à 0, 257 relevés) ;
+- pourtant `aero.mp3` est haché à 17:50 : salves de 0,6 s en médiane, 54 % de moins d'1 s, contre
+  4,4 s et 17 % à 16:46. **La cause est côté réception**, pas dans le mélange.
+
+**Reste** : la contre-épreuve. Le retour automatique de 18:45 remet 123,875 seule, recentrée ;
+enregistrement de 18:46 à 19:30, comparé à 17:01–17:21, avec les compteurs par canal de la
+station relevés à la minute. Et la diaphonie de 126,425 : les transcriptions ne tranchent pas.
