@@ -1,5 +1,10 @@
 # atc-scribe — instructions permanentes
 
+> **Langue, avant tout le reste : tout ce qui s'adresse au propriétaire est en français**, y
+> compris chaque courte note d'avancement entre deux commandes pendant un long travail. Seuls le
+> code, ses commentaires et les messages de commit sont en anglais. Rappelé deux fois les 25 et
+> 26/09 : c'est dans les notes intermédiaires que la dérive vers l'anglais se produit.
+
 > **Disposition du dépôt.** Ce dépôt **est** un fork de `yegors/co-atc` : son historique
 > est celui de l'amont, qui reste accessible via le remote `upstream`. Le travail se fait
 > sur la branche `local`.
