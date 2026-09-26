@@ -62,6 +62,12 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 	matcher.MinDigits = minDigits
 	matcher.FuzzyDigits = fuzzy
 	matcher.AlnumCallsigns, matcher.FuzzyOperators = optAlnum, optFuzzyOperators
+	matcher.ContextLetters, matcher.ContextNames, matcher.ContextDigits = optCtxLetters, optCtxNames, optCtxDigits
+	matcher.PartialFlightScore = optPartial
+	inSector, err := loadSectors(optPositions, optSectors)
+	if err != nil {
+		return err
+	}
 
 	// Capture filenames carry station local time; ADS-B carries UTC.
 	toUTC := func(local string) (time.Time, bool) {
@@ -72,7 +78,7 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		return t.Add(-time.Duration(offsetHours) * time.Hour).UTC(), true
 	}
 
-	fleetAt := func(at time.Time) []phraseology.Aircraft {
+	fleetAt := func(at time.Time, freq string) []phraseology.Aircraft {
 		lo := sort.Search(len(sky), func(i int) bool { return sky[i].T >= at.Unix()-int64(windowSec) })
 		hi := sort.Search(len(sky), func(i int) bool { return sky[i].T > at.Unix()+int64(windowSec) })
 		seen := map[string]phraseology.Aircraft{}
@@ -84,6 +90,9 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		}
 		out := make([]phraseology.Aircraft, 0, len(seen))
 		for _, a := range seen {
+			if inSector != nil && !inSector(freq, a, at) {
+				continue
+			}
 			out = append(out, a)
 		}
 		return out
@@ -236,7 +245,7 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		b := get(real, u.key)
 		b.total++
 
-		m, text, candidate, matched := tryAll(u.texts, fleetAt(u.at), recent("real|"+u.key, u.at))
+		m, text, candidate, matched := tryAll(u.texts, fleetAt(u.at, u.freq), recent("real|"+u.key, u.at))
 		if !candidate {
 			continue
 		}
@@ -256,7 +265,7 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 				cb.candidates++
 			}
 			ck := fmt.Sprintf("ctrl%d|%s", s, u.key)
-			cm, _, _, cok := tryAll(u.texts, fleetAt(pick(s, i)), recent(ck, u.at))
+			cm, _, _, cok := tryAll(u.texts, fleetAt(pick(s, i), u.freq), recent(ck, u.at))
 			if cok {
 				remember(ck, u.at, cm.Callsign)
 				cb.matched++
@@ -269,6 +278,30 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+
+	// The shuffled sky cannot judge the context rules: each control transmission
+	// draws its sky at another moment, so the aircraft its own run just matched
+	// are rarely in it, and a context rule almost never fires there. The fair
+	// control keeps the real sky and hands each frequency the recent aircraft of
+	// another one -- aircraft that are there, but not talking to it. What the
+	// context rules win in that run is chance.
+	swapped := map[string]int{}
+	if optContextSwap && contextSec > 0 {
+		for _, u := range units {
+			other := ""
+			for j, k := range keys {
+				if k == u.key {
+					other = keys[(j+1)%len(keys)]
+				}
+			}
+			if other == "" || other == u.key {
+				continue
+			}
+			if _, _, _, ok := tryAll(u.texts, fleetAt(u.at, u.freq), recent("real|"+other, u.at)); ok {
+				swapped[u.key]++
+			}
+		}
+	}
 
 	fmt.Printf("\n%-12s %-9s %6s %6s %8s %8s %9s %8s\n",
 		"passe", "freq", "trans", "cand", "apparies", "hasard", "precision", "vrais")
@@ -290,6 +323,12 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		parts := strings.SplitN(k, "|", 2)
 		fmt.Printf("%-12s %-9s %6d %6d %8d %8.1f %8.0f%% %8.1f\n",
 			parts[0], parts[1], r.total, r.candidates, r.matched, chance, prec, vrais)
+	}
+	if len(swapped) > 0 {
+		fmt.Println("\nmatched with another frequency's recent aircraft (context rules at chance level):")
+		for _, k := range keys {
+			fmt.Printf("  %-22s %6d   (own frequency: %d)\n", k, swapped[k], real[k].matched)
+		}
 	}
 	return nil
 }
