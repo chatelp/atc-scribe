@@ -3612,7 +3612,7 @@ relire le document 24 : l'affirmation « ne tranchent pas » était fausse.)
 | approche, départ | 60 NM | 20 000 ft | mesuré le 24/09 (approche de Roissy) |
 | tour | 15 NM | 6 000 ft | à mesurer |
 | sol, prévol | 5 NM | 1 500 ft | à mesurer |
-| secteurs de contrôle | — | — | **pas de filtre** : l'eAIP ne publie que les limites de l'organisme, et elles trompent (124,625 rangée au contrôle supérieur, au-dessus du FL195, où les avions reconnus le 24/09 volaient à 15 700 ft en médiane) ; à apprendre des données |
+| secteurs de contrôle | — | — | **pas de filtre** : l'eAIP ne publie pas les limites des secteurs, et son rangement ACC/UAC ne dit rien de l'altitude (124,625 y est rangée en UAC, alors que les avions reconnus le 24/09 volaient à 15 700 ft en médiane ; les bornes FL195/FL660 d'abord portées au tableau étaient une déduction, retirée par l'agent de la station le 26/09) ; à apprendre des données |
 
 **Ce qui est construit** (commit `3fc52d6`, générique et contribuable, sauf la table) : une
 fréquence peut nommer son aéroport et sa nature (configuration, ou API des sources) ; avec le
