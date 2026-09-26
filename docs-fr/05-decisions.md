@@ -4413,3 +4413,22 @@ Conséquences :
 
 **Les parasites entendus en même temps** viennent de 125,825 : environ 15 battements de squelch
 par minute sur du bruit (Q37, chronique), contre 0 sur 126,425.
+
+**Sur toute la séance De Gaulle** (26/09, 20:26–22:20, 795 transmissions), part des transmissions de
+125,825 qui ont une jumelle sur 126,425 à 1,5 s près, par quart d'heure :
+- 30 % à 20:26 (la séparation de 20:33 comprise) ;
+- 65 à 76 % de 20:41 à 21:41 ;
+- 35 % à 21:56, 62 % à 22:11.
+
+Le couplage domine la soirée. Sur les 149 rattachements faits en direct, 21 concernent le même
+avion au même instant sur les deux fréquences : **128 rattachements distincts**. Mesure hors ligne,
+règles en service, cinq ciels mélangés (`whisper-lab/resultats/station/2026-09-26-seance-cdg/mesure/`) :
+
+| | Rattachés | Hasard | Avions justes | Précision |
+|---|---|---|---|---|
+| sans secteur | 147 | 17,8 | 129,2 | 88 % |
+| avec secteur | 143 | 12,8 | 130,2 | 91 % |
+
+Troisième confirmation des secteurs (D59), avec un gain plus faible : le hasard baisse de 28 %, et
+non d'un facteur 2,4. Les deux fréquences sont des approches de De Gaulle, dont le ciel est déjà
+concentré le soir. Avant les doublons, 125,825 donne 49 avions justes et 126,425 en donne 81.
