@@ -137,7 +137,7 @@ func TestWithoutAHookTheAirportCannotChange(t *testing.T) {
 func TestMatchingRulesDefaultToLettersAndApproximateNamesOn(t *testing.T) {
 	r := newRuntimeIn(t, t.TempDir())
 	got := r.Matching()
-	want := MatchingRules{Letters: true, ApproxOperators: true, MinDigits: 3}
+	want := MatchingRules{Letters: true, ApproxOperators: true, MinDigits: 3, ContextLetters: true, ContextDigits: true}
 	if got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}

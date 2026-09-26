@@ -128,6 +128,9 @@ type Rules struct {
 	ApproxOperators bool // FuzzyOperators
 	MinDigits       int  // 0 keeps the matcher's own
 	OneDigitOff     bool // FuzzyDigits
+	ContextLetters  bool
+	ContextDigits   bool
+	ContextNames    bool
 }
 
 // WithRules returns a copy of the matcher applying r. The copy shares the
@@ -135,6 +138,7 @@ type Rules struct {
 func (m *Matcher) WithRules(r Rules) *Matcher {
 	c := *m
 	c.AlnumCallsigns, c.FuzzyOperators, c.FuzzyDigits = r.Letters, r.ApproxOperators, r.OneDigitOff
+	c.ContextLetters, c.ContextDigits, c.ContextNames = r.ContextLetters, r.ContextDigits, r.ContextNames
 	if r.MinDigits > 0 {
 		c.MinDigits = r.MinDigits
 	}
