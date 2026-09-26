@@ -305,6 +305,20 @@ func (s *Service) checkHomeAirport(code string) (*AirportInfo, []*RunwayInfo, er
 	return airport, runways, nil
 }
 
+// AirportRunways returns an airport's position, its runways as phase detection
+// reads them, and their extended centrelines -- for an airport followed besides
+// the principal one, which keeps its own copy in the home fields. Refused on the
+// same terms as SetHomeAirport.
+func (s *Service) AirportRunways(code string) (*AirportInfo, adsb.RunwayData, map[string]map[string][]RunwayExtensionPoint, error) {
+	code = strings.ToUpper(strings.TrimSpace(code))
+	airport, runways, err := s.checkHomeAirport(code)
+	if err != nil {
+		return nil, adsb.RunwayData{}, nil, err
+	}
+	data := runwayDataFor(code, runways)
+	return airport, data, runwayExtensionsFor(data, s.extensionLengthNM), nil
+}
+
 // AirportCandidate is an airport the settings panel can offer as reference.
 type AirportCandidate struct {
 	Code       string  `json:"code"`

@@ -29,6 +29,12 @@ type RuntimeSettings struct {
 	// receiver sits on is not always the one worth watching.
 	ReferenceAirport string `json:"reference_airport"`
 
+	// AlsoAirports are followed besides the reference airport: each aircraft is
+	// judged against the one whose runway axis it flies, else the nearest. Orly
+	// and De Gaulle are 13 NM apart and a receiver near Paris sees both
+	// (docs-fr/05-decisions.md, Q40). The weather stays the reference airport's.
+	AlsoAirports []string `json:"also_airports,omitempty"`
+
 	// Matching is how a transmission is tied to an aircraft. Absent from a file
 	// saved before it existed, which then means the defaults.
 	Matching *MatchingRules `json:"matching,omitempty"`
@@ -129,12 +135,54 @@ func (m *MatchingRules) withSectorDefaults() {
 	}
 }
 
-// ReferenceAirportHook validates and applies a change of reference airport. The
-// config package cannot do either itself -- it takes the reference data, the
-// ADS-B service and the weather service -- so the server wires them in.
+// MaxAlsoAirports bounds the airports followed besides the reference one. Two
+// or three is what one receiver can watch; each costs a runway tracker, and the
+// measurement of 23/09 found little beyond Orly and De Gaulle.
+const MaxAlsoAirports = 3
+
+// ReferenceAirports returns the airports followed, the reference one first.
+func (s RuntimeSettings) ReferenceAirports() []string {
+	if s.ReferenceAirport == "" {
+		return nil
+	}
+	return append([]string{s.ReferenceAirport}, s.AlsoAirports...)
+}
+
+// normalizeAlso uppercases the further airports and drops blanks, repeats and
+// the reference airport itself.
+func normalizeAlso(principal string, codes []string) []string {
+	var out []string
+	seen := map[string]bool{principal: true}
+	for _, c := range codes {
+		c = normalizeAirport(c)
+		if c == "" || seen[c] {
+			continue
+		}
+		seen[c] = true
+		out = append(out, c)
+	}
+	return out
+}
+
+func sameAirports(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// ReferenceAirportHook validates and applies a change of reference airports,
+// the reference one first. The config package cannot do either itself -- it
+// takes the reference data, the ADS-B service and the weather service -- so the
+// server wires them in.
 type ReferenceAirportHook struct {
-	Validate func(code string) error // no side effect: refuse before anything moves
-	Apply    func(code string)       // cannot fail once Validate has passed
+	Validate func(codes []string) error // no side effect: refuse before anything moves
+	Apply    func(codes []string)       // cannot fail once Validate has passed
 }
 
 // Runtime holds the live values and persists changes.
@@ -183,6 +231,11 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 	}
 	if a := normalizeAirport(saved.ReferenceAirport); a != "" {
 		r.settings.ReferenceAirport = a
+		also := normalizeAlso(a, saved.AlsoAirports)
+		if len(also) > MaxAlsoAirports {
+			also = also[:MaxAlsoAirports]
+		}
+		r.settings.AlsoAirports = also
 	}
 	if saved.Matching != nil {
 		saved.Matching.withSectorDefaults()
@@ -197,7 +250,8 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 		logger.String("path", r.path),
 		logger.Int("db_retention_days", r.settings.DBRetentionDays),
 		logger.String("log_level", r.settings.LogLevel),
-		logger.String("reference_airport", r.settings.ReferenceAirport))
+		logger.String("reference_airport", r.settings.ReferenceAirport),
+		logger.String("also_airports", strings.Join(r.settings.AlsoAirports, ",")))
 	return r
 }
 
@@ -214,14 +268,18 @@ func (r *Runtime) SetReferenceAirportHook(h ReferenceAirportHook) {
 	r.airportHook = &h
 }
 
-// UseReferenceAirport records the airport actually in force at startup, when the
-// one saved from the panel turned out unusable and the server fell back. It is
-// not written to disk: the saved choice stays, and each start says in the log
-// why it was not used.
-func (r *Runtime) UseReferenceAirport(code string) {
+// UseReferenceAirports records the airports actually in force at startup, the
+// reference one first, when some saved from the panel turned out unusable and
+// the server fell back or left them out. It is not written to disk: the saved
+// choice stays, and each start says in the log why it was not used.
+func (r *Runtime) UseReferenceAirports(codes []string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.settings.ReferenceAirport = normalizeAirport(code)
+	if len(codes) == 0 {
+		return
+	}
+	r.settings.ReferenceAirport = normalizeAirport(codes[0])
+	r.settings.AlsoAirports = normalizeAlso(r.settings.ReferenceAirport, codes[1:])
 }
 
 // Settings returns a copy of the values in force.
@@ -284,12 +342,16 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		return err
 	}
 
-	// The reference airport is checked with the rest, before anything is applied.
+	// The reference airports are checked with the rest, before anything is applied.
 	next.ReferenceAirport = normalizeAirport(next.ReferenceAirport)
+	next.AlsoAirports = normalizeAlso(next.ReferenceAirport, next.AlsoAirports)
+	if len(next.AlsoAirports) > MaxAlsoAirports {
+		return fmt.Errorf("also_airports: %d at most, got %d", MaxAlsoAirports, len(next.AlsoAirports))
+	}
 	r.mu.RLock()
-	current, hook := r.settings.ReferenceAirport, r.airportHook
+	current, hook := r.settings.ReferenceAirports(), r.airportHook
 	r.mu.RUnlock()
-	airportChanged := next.ReferenceAirport != current
+	airportChanged := !sameAirports(next.ReferenceAirports(), current)
 	if airportChanged {
 		if next.ReferenceAirport == "" {
 			return fmt.Errorf("reference_airport cannot be empty")
@@ -297,7 +359,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		if hook == nil {
 			return fmt.Errorf("reference_airport cannot be changed while the server runs in this configuration")
 		}
-		if err := hook.Validate(next.ReferenceAirport); err != nil {
+		if err := hook.Validate(next.ReferenceAirports()); err != nil {
 			return fmt.Errorf("reference_airport: %w", err)
 		}
 	}
@@ -306,7 +368,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		return fmt.Errorf("failed to set log level: %w", err)
 	}
 	if airportChanged {
-		hook.Apply(next.ReferenceAirport)
+		hook.Apply(next.ReferenceAirports())
 	}
 
 	m := next.Matching.clone()
@@ -333,6 +395,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		logger.Int("db_retention_days", next.DBRetentionDays),
 		logger.String("log_level", next.LogLevel),
 		logger.String("reference_airport", next.ReferenceAirport),
+		logger.String("also_airports", strings.Join(next.AlsoAirports, ",")),
 		logger.Bool("match_letters", m.Letters),
 		logger.Bool("match_approx_operators", m.ApproxOperators),
 		logger.Int("match_min_digits", m.MinDigits),

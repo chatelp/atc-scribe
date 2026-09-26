@@ -255,8 +255,9 @@ func main() {
 	} else {
 		adsbService.SetReferenceService(&refAdapter{service: refService})
 		refAirport = &referenceAirport{ref: refService, adsb: adsbService, log: log}
-		effectiveAirport = refAirport.start(runtimeSettings.Settings().ReferenceAirport, cfg.Station.AirportCode)
-		runtimeSettings.UseReferenceAirport(effectiveAirport)
+		inForce := refAirport.start(runtimeSettings.Settings().ReferenceAirports(), cfg.Station.AirportCode)
+		runtimeSettings.UseReferenceAirports(inForce)
+		effectiveAirport = inForce[0]
 		log.Info("Reference data loaded",
 			logger.Int("aircraft_count", refService.AircraftCount()),
 			logger.Int("airline_count", refService.AirlineCount()))

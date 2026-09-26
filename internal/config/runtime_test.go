@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/yegors/co-atc/pkg/logger"
@@ -22,18 +23,80 @@ func newRuntimeIn(t *testing.T, dir string) *Runtime {
 	return NewRuntime(cfg, filepath.Join(dir, "config.toml"), log)
 }
 
-// recorder is a hook that accepts LFPO and LFPG and remembers what it applied.
+// recorder is a hook that accepts LFPO, LFPG and LFPB and remembers what it
+// applied, each call's airports joined by "+".
 type recorder struct{ applied []string }
 
 func (r *recorder) hook() ReferenceAirportHook {
 	return ReferenceAirportHook{
-		Validate: func(code string) error {
-			if code == "LFPO" || code == "LFPG" {
-				return nil
+		Validate: func(codes []string) error {
+			for _, code := range codes {
+				if code != "LFPO" && code != "LFPG" && code != "LFPB" {
+					return errors.New("unknown airport " + code)
+				}
 			}
-			return errors.New("unknown airport " + code)
+			return nil
 		},
-		Apply: func(code string) { r.applied = append(r.applied, code) },
+		Apply: func(codes []string) { r.applied = append(r.applied, strings.Join(codes, "+")) },
+	}
+}
+
+// Orly and De Gaulle together (Q40): applied in one call, the reference first,
+// and kept across a restart.
+func TestFurtherAirportsAreAppliedAndPersisted(t *testing.T) {
+	dir := t.TempDir()
+	r := newRuntimeIn(t, dir)
+	rec := &recorder{}
+	r.SetReferenceAirportHook(rec.hook())
+
+	next := r.Settings()
+	next.ReferenceAirport = "LFPO"
+	next.AlsoAirports = []string{" lfpg ", "LFPO", "", "LFPG"} // as typed: repeats, blanks, the reference itself
+	if err := r.Apply(next); err != nil {
+		t.Fatalf("Orly with De Gaulle should be accepted: %v", err)
+	}
+	if len(rec.applied) != 1 || rec.applied[0] != "LFPO+LFPG" {
+		t.Errorf("the hook should have applied LFPO+LFPG once, got %v", rec.applied)
+	}
+	after := newRuntimeIn(t, dir).Settings()
+	if got := strings.Join(after.ReferenceAirports(), "+"); got != "LFPO+LFPG" {
+		t.Errorf("after a restart, want LFPO+LFPG, got %s", got)
+	}
+
+	// Dropping De Gaulle is a change too.
+	next = r.Settings()
+	next.AlsoAirports = nil
+	if err := r.Apply(next); err != nil {
+		t.Fatal(err)
+	}
+	if rec.applied[len(rec.applied)-1] != "LFPO" {
+		t.Errorf("want LFPO alone applied, got %v", rec.applied)
+	}
+}
+
+func TestOneBadFurtherAirportRefusesTheChange(t *testing.T) {
+	r := newRuntimeIn(t, t.TempDir())
+	rec := &recorder{}
+	r.SetReferenceAirportHook(rec.hook())
+	next := r.Settings()
+	next.ReferenceAirport = "LFPO"
+	next.AlsoAirports = []string{"LFPG", "ZZZZ"}
+	if err := r.Apply(next); err == nil {
+		t.Fatal("an unknown further airport must refuse the whole change")
+	}
+	if len(rec.applied) != 0 || r.Settings().ReferenceAirport != "LFPZ" {
+		t.Errorf("nothing should have moved: applied %v, reference %s", rec.applied, r.Settings().ReferenceAirport)
+	}
+}
+
+func TestAtMostThreeFurtherAirports(t *testing.T) {
+	r := newRuntimeIn(t, t.TempDir())
+	r.SetReferenceAirportHook((&recorder{}).hook())
+	next := r.Settings()
+	next.ReferenceAirport = "LFPO"
+	next.AlsoAirports = []string{"LFPG", "LFPB", "LFPN", "LFPV"}
+	if err := r.Apply(next); err == nil {
+		t.Error("four further airports must be refused")
 	}
 }
 

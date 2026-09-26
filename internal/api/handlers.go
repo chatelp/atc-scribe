@@ -889,7 +889,10 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 		AirportCode      string             `json:"airport_code"`
 		Runways          interface{}        `json:"runways,omitempty"`
 		RunwayInUse      []adsb.RunwayScore `json:"runway_in_use,omitempty"`
-		FetchErrors      []string           `json:"fetch_errors,omitempty"`
+		// Every airport followed, the reference one first, with its runways and
+		// runway in use; Runways and RunwayInUse above are the first's.
+		Airports    []stationAirport `json:"airports,omitempty"`
+		FetchErrors []string         `json:"fetch_errors,omitempty"`
 		// Weather configuration flags
 		FetchMETAR  bool `json:"fetch_metar"`
 		FetchTAF    bool `json:"fetch_taf"`
@@ -922,6 +925,9 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 	// Add runway-in-use scores
 	if scores := h.adsbService.GetRunwayInUseScores(3); len(scores) > 0 {
 		stationCfg.RunwayInUse = scores
+	}
+	if h.refService != nil {
+		stationCfg.Airports = h.stationAirports()
 	}
 
 	// Add fetch errors to response if any occurred
@@ -1022,11 +1028,44 @@ func (h *Handler) GetWeatherData(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, weatherData)
 }
 
+// stationAirport is one followed airport as the map draws it.
+type stationAirport struct {
+	Code        string             `json:"code"`
+	Name        string             `json:"name,omitempty"`
+	Latitude    float64            `json:"latitude"`
+	Longitude   float64            `json:"longitude"`
+	Principal   bool               `json:"principal"`
+	Runways     interface{}        `json:"runways"`
+	RunwayInUse []adsb.RunwayScore `json:"runway_in_use,omitempty"`
+}
+
+// stationAirports lists every airport followed, the reference one first.
+func (h *Handler) stationAirports() []stationAirport {
+	var out []stationAirport
+	for i, ref := range h.adsbService.PhaseReferences() {
+		a := stationAirport{Code: ref.Airport, Latitude: ref.Lat, Longitude: ref.Lon, Principal: i == 0,
+			RunwayInUse: h.adsbService.GetRunwayInUseScoresFor(ref.Airport, 3)}
+		if i == 0 {
+			a.Runways = h.buildRunwayResponse()
+		} else if _, data, ext, err := h.refService.AirportRunways(ref.Airport); err == nil {
+			a.Runways = runwayResponse(data, ext)
+		}
+		if info := h.refService.GetAirport(ref.Airport); info != nil {
+			a.Name = info.Name
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
 // buildRunwayResponse builds the runway JSON response from precomputed reference data.
 // Matches the same JSON shape the frontend drawRunways() expects.
 func (h *Handler) buildRunwayResponse() interface{} {
-	homeData := h.refService.GetHomeRunwayData()
-	extensions := h.refService.GetHomeRunwayExtensions()
+	return runwayResponse(h.refService.GetHomeRunwayData(), h.refService.GetHomeRunwayExtensions())
+}
+
+// runwayResponse puts an airport's runways in the shape drawRunways() reads.
+func runwayResponse(homeData adsb.RunwayData, extensions map[string]map[string][]reference.RunwayExtensionPoint) interface{} {
 
 	type Point struct {
 		Latitude  float64 `json:"latitude"`

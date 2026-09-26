@@ -598,6 +598,23 @@
                                                     Approach, departure, takeoff, landing, runway in use and weather are
                                                     judged against this airport. Distances and range rings stay on the receiver.
                                                 </div>
+                                                <!-- Further airports: Orly and De Gaulle are 13 NM apart and both
+                                                     worth watching (docs-fr/05-decisions.md, Q40). -->
+                                                <span class="text-sm mt-2">Also follow</span>
+                                                <div class="grid gap-0.5 max-h-40 overflow-y-auto min-w-0">
+                                                    <template x-for="c in alsoChoices()" :key="'also-' + c.code">
+                                                        <label class="flex items-center gap-2 text-sm min-w-0 cursor-pointer">
+                                                            <input type="checkbox" :checked="alsoFollowed(c.code)" :disabled="busy"
+                                                                   @change="toggleAlso(c.code)">
+                                                            <span class="truncate" x-text="c.code + ' · ' + c.name + ' · ' + c.distance_nm + ' NM'"></span>
+                                                        </label>
+                                                    </template>
+                                                </div>
+                                                <div class="text-xs opacity-60 leading-snug">
+                                                    Each aircraft is judged against the airport whose runway axis it flies,
+                                                    else the nearest; its phase then shows that airport. Weather stays the
+                                                    reference airport's. Three at most.
+                                                </div>
                                             </div>
                                         </template>
 
@@ -1335,7 +1352,7 @@
                                             </template>
 
                                             <!-- Phase cell -->
-                                            <div class="p-1.5 text-center w-[70px] flex items-center justify-center">
+                                            <div class="p-1.5 text-center w-[70px] flex flex-col items-center justify-center">
                                                 <span x-show="aircraft.phase && aircraft.phase.current && aircraft.phase.current.length > 0"
                                                       x-text="$store.atc.getCurrentPhase(aircraft)"
                                                       class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center"
@@ -1351,6 +1368,8 @@
                                                           'bg-gray-500/20 text-gray-400 border border-gray-500/30': $store.atc.getCurrentPhase(aircraft) === 'NEW',
                                                           'bg-slate-500/15 text-slate-400 border border-slate-500/30': $store.atc.getCurrentPhase(aircraft) === 'UNK'
                                                       }"></span>
+                                                <span x-show="$store.atc.getPhaseAirport(aircraft)" x-text="$store.atc.getPhaseAirport(aircraft)"
+                                                      class="text-[8px] font-mono opacity-60 mt-0.5"></span>
                                                 <span x-show="!aircraft.phase || !aircraft.phase.current || aircraft.phase.current.length === 0"
                                                       x-text="'NEW'"
                                                       class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-gray-500/20 text-gray-400 border border-gray-500/30"></span>
@@ -1452,7 +1471,7 @@
                             <!-- Flight Strip at the top -->
                             <div class="flight-strip flight-strip-detail flex items-stretch rounded-md overflow-hidden border transition-all duration-200 mb-2">
                                 <!-- Phase cell -->
-                                <div class="px-2.5 py-2 text-center w-[70px] flex items-center justify-center">
+                                <div class="px-2.5 py-2 text-center w-[70px] flex flex-col items-center justify-center">
                                     <span x-show="$store.atc.selectedAircraft.phase && $store.atc.selectedAircraft.phase.current && $store.atc.selectedAircraft.phase.current.length > 0"
                                           x-text="$store.atc.getCurrentPhase($store.atc.selectedAircraft)"
                                           class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center"
@@ -1468,6 +1487,8 @@
                                               'bg-gray-500/20 text-gray-400 border border-gray-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'NEW',
                                               'bg-slate-500/15 text-slate-400 border border-slate-500/25': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'UNK'
                                           }"></span>
+                                    <span x-show="$store.atc.getPhaseAirport($store.atc.selectedAircraft)" x-text="$store.atc.getPhaseAirport($store.atc.selectedAircraft)"
+                                          class="text-[8px] font-mono opacity-60 mt-0.5"></span>
                                     <span x-show="!$store.atc.selectedAircraft.phase || !$store.atc.selectedAircraft.phase.current || $store.atc.selectedAircraft.phase.current.length === 0"
                                           x-text="'NEW'"
                                           class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-gray-500/20 text-gray-400 border border-gray-500/30"></span>
@@ -2427,14 +2448,14 @@
                         <!-- No data -->
                         <template x-if="!$store.atc.runwayInUse || $store.atc.runwayInUse.length === 0">
                             <div class="flex flex-col items-center justify-center min-w-[36px]">
-                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5">RWY</span>
+                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5" x-text="$store.atc.followedAirports.length > 1 ? $store.atc.stationAirportCode : 'RWY'">RWY</span>
                                 <span class="font-mono text-sm text-text/25 leading-none tracking-wider">---</span>
                             </div>
                         </template>
                         <!-- Parallel runways: co-primary display (e.g. "06L / 06R") -->
                         <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15 && $store.atc.areParallelRunways($store.atc.runwayInUse[0].runway_end, $store.atc.runwayInUse[1].runway_end)">
                             <div class="flex flex-col items-center justify-center">
-                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5">RWYS</span>
+                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5" x-text="$store.atc.followedAirports.length > 1 ? $store.atc.stationAirportCode : 'RWYS'">RWYS</span>
                                 <div class="flex items-baseline gap-1">
                                     <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
                                           x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[0].runway_end)"></span>
@@ -2448,7 +2469,7 @@
                         <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 0 && !($store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15 && $store.atc.areParallelRunways($store.atc.runwayInUse[0].runway_end, $store.atc.runwayInUse[1].runway_end))">
                             <div class="flex items-center space-x-2.5">
                                 <div class="flex flex-col items-center justify-center min-w-[36px]">
-                                    <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5">RWY</span>
+                                    <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5" x-text="$store.atc.followedAirports.length > 1 ? $store.atc.stationAirportCode : 'RWY'">RWY</span>
                                     <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
                                           x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[0].runway_end)"></span>
                                 </div>
@@ -2459,6 +2480,15 @@
                                               x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[1].runway_end)"></span>
                                     </div>
                                 </template>
+                            </div>
+                        </template>
+                        <!-- The runway in use of each airport followed besides the reference one (Q40) -->
+                        <template x-for="ap in $store.atc.otherAirports()" :key="'rwy-' + ap.code">
+                            <div class="flex flex-col items-center justify-center min-w-[36px] border-l border-border/20 pl-2.5">
+                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5" x-text="ap.code"></span>
+                                <span class="font-mono text-sm font-bold leading-none tracking-wider"
+                                      :class="ap.runway_in_use && ap.runway_in_use.length ? 'text-highlight' : 'text-text/25'"
+                                      x-text="ap.runway_in_use && ap.runway_in_use.length ? $store.atc.formatRunwayEnd(ap.runway_in_use[0].runway_end) : '---'"></span>
                             </div>
                         </template>
                     </div>

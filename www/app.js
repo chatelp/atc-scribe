@@ -283,6 +283,7 @@ document.addEventListener('alpine:init', () => {
         weatherFetchErrors: [],
         runwayData: null, // Store runway data
         runwayInUse: null, // Active runway scores from traffic analysis
+        followedAirports: [], // every airport followed, the reference one first, from /station (Q40)
         runwayInUseInterval: null, // 60s polling interval
         airportsData: null, // Airport reference data
         heliportsData: null, // Heliport reference data
@@ -637,6 +638,19 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        // The airport an aircraft's phase was judged against, shown only when
+        // several are followed: with one, it would repeat on every strip.
+        getPhaseAirport(aircraft) {
+            if (!aircraft || this.followedAirports.length < 2) return '';
+            const cur = aircraft.phase && aircraft.phase.current && aircraft.phase.current[0];
+            return (cur && cur.airport) || '';
+        },
+
+        // The airports followed besides the reference one, each with its runway in use.
+        otherAirports() {
+            return this.followedAirports.filter(a => !a.principal);
+        },
+
         // Helper function to safely get current phase
         getCurrentPhase(aircraft) {
             if (!aircraft) return 'NEW';
@@ -931,7 +945,9 @@ document.addEventListener('alpine:init', () => {
                     'UNK': 'bg-slate-500/15 text-slate-400 border border-slate-500/25'
                 };
                 const phaseClass = phaseClasses[currentPhase] || phaseClasses['NEW'];
-                phaseBadge = `<span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${phaseClass}">${currentPhase}</span>`;
+                const phaseAirport = this.getPhaseAirport(aircraft);
+                const airportTag = phaseAirport ? `<span class="ml-1 font-mono opacity-70">${phaseAirport}</span>` : '';
+                phaseBadge = `<span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${phaseClass}">${currentPhase}${airportTag}</span>`;
             }
 
             // Create airline and type display on same line
@@ -4570,7 +4586,8 @@ async initAircraftDataSource() {
             // Use centralized color and icon mapping
             const colorClass = this.getPhaseColorClass(data.phase);
             const iconClass = this.getPhaseIconClass(data.phase);
-            const displayText = `${data.flight || data.hex} → ${data.phase}`;
+            const displayText = `${data.flight || data.hex} → ${data.phase}` +
+                (data.airport && this.followedAirports.length > 1 ? ` ${data.airport}` : '');
 
             // Create the alert element
             const alertElement = document.createElement('div');
@@ -4781,9 +4798,14 @@ async initAircraftDataSource() {
                 this.stationFetchTAF = data.fetch_taf;
                 this.stationFetchNOTAMs = data.fetch_notams;
                 
+                // Every airport followed; its runways are drawn, not only the
+                // reference airport's.
+                this.followedAirports = Array.isArray(data.airports) ? data.airports : [];
+                const followedRunways = this.followedAirports.map(a => a.runways).filter(Boolean);
+
                 // Store runway data if available
-                if (data.runways) {
-                    this.runwayData = data.runways;
+                if (followedRunways.length > 0 || data.runways) {
+                    this.runwayData = followedRunways.length > 0 ? followedRunways : data.runways;
                     console.log('Runway data loaded:', this.runwayData);
 
                     // Draw runways on the map if mapManager is initialized
@@ -4919,6 +4941,7 @@ async initAircraftDataSource() {
                 if (!response.ok) return;
                 const data = await response.json();
                 this.runwayInUse = data.runway_in_use || null;
+                if (Array.isArray(data.airports)) this.followedAirports = data.airports;
             } catch (e) { /* silent */ }
         },
 
@@ -5745,7 +5768,7 @@ async initAircraftDataSource() {
 function serverSettings() {
     return {
         state: null,
-        draft: { log_level: 'info', db_retention_days: 7, reference_airport: '', matching: null },
+        draft: { log_level: 'info', db_retention_days: 7, reference_airport: '', also_airports: [], matching: null },
         newAccount: null, // { username, password } while the first account is being typed
         busy: false,
         error: '',
@@ -5764,6 +5787,7 @@ function serverSettings() {
                     log_level: this.state.settings.log_level,
                     db_retention_days: this.state.settings.db_retention_days,
                     reference_airport: this.state.settings.reference_airport,
+                    also_airports: (this.state.settings.also_airports || []).slice(),
                     // A deep copy: the sector sizes are edited in place by the inputs.
                     matching: this.state.settings.matching ? JSON.parse(JSON.stringify(this.state.settings.matching)) : null,
                 };
@@ -5803,6 +5827,8 @@ function serverSettings() {
                         log_level: this.draft.log_level,
                         db_retention_days: days,
                         reference_airport: this.draft.reference_airport,
+                        // The reference airport cannot also be a further one.
+                        also_airports: this.draft.also_airports.filter(c => c !== this.draft.reference_airport),
                         matching: this.draft.matching,
                     }),
                 });
@@ -5812,11 +5838,14 @@ function serverSettings() {
                     // A refused airport must not stay selected as if it were in force,
                     // nor a refused matching rule stay ticked.
                     this.draft.reference_airport = this.state.settings.reference_airport;
+                    this.draft.also_airports = (this.state.settings.also_airports || []).slice();
                     if (this.state.settings.matching) this.draft.matching = JSON.parse(JSON.stringify(this.state.settings.matching));
                     return;
                 }
-                const airportChanged = this.state.settings.reference_airport !== this.draft.reference_airport;
+                const followed = s => [s.reference_airport].concat(s.also_airports || []).join('+');
+                const airportChanged = followed(this.state.settings) !== followed(this.draft);
                 this.state.settings = await r.json();
+                this.draft.also_airports = (this.state.settings.also_airports || []).slice();
                 this.flash('Saved.', false);
                 if (airportChanged) {
                     // The map draws the reference airport's runway extensions from
@@ -5911,6 +5940,24 @@ function serverSettings() {
                 list.unshift({ code: ref.airport, name: ref.name || '', distance_nm: ref.distance_nm || 0 });
             }
             return list;
+        },
+
+        // Airports followed besides the reference one (Q40): each aircraft is
+        // judged against the one whose runway axis it flies, else the nearest.
+        alsoChoices() {
+            return this.airportChoices().filter(c => c.code !== this.draft.reference_airport);
+        },
+        alsoFollowed(code) {
+            return this.draft.also_airports.includes(code);
+        },
+        toggleAlso(code) {
+            const list = this.draft.also_airports.filter(c => c !== code);
+            if (list.length === this.draft.also_airports.length) {
+                if (list.length >= 3) { this.flash('Three further airports at most.', true); return; }
+                list.push(code);
+            }
+            this.draft.also_airports = list;
+            this.save();
         },
 
         flash(msg, bad) {
