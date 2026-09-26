@@ -3545,6 +3545,29 @@ service (après le réglage des micro-coupures d'`aero.mp3`, Q45).
 25/09). Pour un flux par canal, la fréquence suffit ; la liaison journalise chaque version. À
 reprendre si le flux mélangé reste en service.
 
+### D58 — Les indicatifs à lettres sont lus, et les règles d'association se règlent depuis le panneau *(26/09)*
+
+Décision du propriétaire, après la mesure de Q46 (+27 % d'avions justes, précision 73 -> 76 %) :
+*« on active les nouvelles règles — mais peut-être le mieux c'est d'avoir une section règles dans
+les réglages qui permette de les activer / varier »*.
+
+**Ce qui est en service** (commit `9437ecf`) : une section **« Callsign matching »** dans le
+panneau Server, à côté de la rétention et du niveau de journal, qui s'applique **à la transmission
+suivante, sans redémarrage**, et se garde dans `runtime-settings.json` comme les autres :
+
+| Réglage | Par défaut | Ce qui a été mesuré |
+|---|---|---|
+| Lettres dans le numéro de vol (« seven uniform echo » = 7UE) | **activé** | +27 % d'avions justes, précision 73 -> 76 % (Q46) |
+| Exploitant entendu approximativement (« welling » = Vueling), parmi ceux du ciel | **activé** | +1 % en nombre ; rattrape les indicatifs à moitié entendus |
+| Nombre de chiffres minimal | 3 (2 à 4) | à 2, le hasard égale la vérité (Q30) |
+| Un chiffre d'écart toléré | désactivé | 81 % de bruit (doc 19) |
+
+Chaque ligne du panneau porte son chiffre mesuré. Un réglage hors bornes est refusé avec le reste
+du changement ; un fichier de réglages antérieur garde ses valeurs et reçoit ces défauts.
+Vérifié sur une instance de test : la case décochée depuis la page arrive au serveur, se journalise
+(« Server settings changed from the panel ») et se relit au redémarrage. **Contribuable en amont** :
+les règles et le mécanisme sont génériques.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(ouverte, 23/09)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
@@ -3910,7 +3933,7 @@ les flux `flux_present` à l'adresse donnée. **Reste** : le premier essai réel
 flux.
 
 
-### Q46 — Les indicatifs à lettres échappent presque à l'association *(ouverte, 26/09 ; mesurée : +27 % d'avions justes)*
+### Q46 — Les indicatifs à lettres échappent presque à l'association *(26/09 — mesurée : +27 % d'avions justes ; **décidée, voir D58**)*
 
 Relevé par le propriétaire pendant le premier essai sur les flux séparés (123,875, Orly Approche) :
 *« j'ai eu un Uniform Echo que moi-même j'ai compris à l'oreille, l'avion est bien là, mais il n'a
@@ -3978,4 +4001,4 @@ transmission contenait un groupe d'au moins deux chiffres — ce qui cachait pr�
 indicatifs. La production, elle, envoie tout ; `-every` fait de même. Les mesures antérieures
 (Q30, doc 28…) sont peu touchées : +4 avions justes sur 236 le 24/09 avec les règles actuelles.
 
-**À décider par le propriétaire** : activer les deux règles en production.
+**Décidé le 26/09 (D58)** : les deux règles sont activées, et réglables depuis le panneau.
