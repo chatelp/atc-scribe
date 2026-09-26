@@ -4351,3 +4351,31 @@ qualité/distance »). Restent possibles :
 
 **Pour trancher** : rapprocher chaque transmission hachée de la distance de l'avion qui parle (à
 transcrire et associer, avec l'ADS-B de la même heure). Diaphonie de 126,425 : non concluant.
+
+### Q48 — Deux fréquences symétriques autour du centre de la clé s'entendent l'une l'autre *(ouverte, 26/09)*
+
+**Signalé par le propriétaire à l'écoute**, le 26/09 vers 20:30, sur 125,825 + 126,425 (centre choisi
+par la station : 126,125, le milieu) : « il y a de l'écho, les deux fréquences semblent recevoir la
+même chose ».
+
+**Mesuré** (flux séparés, simple auditeur, `whisper-lab/audio/2026-09-26-cdg-echo*`) :
+- centre 126,125 (les deux à ±0,3 MHz) : **6 transmissions sur 14** présentes sur les deux au même
+  instant, le même contenu transcrit deux fois ; la copie de 125,825 toujours la plus mauvaise
+  (fragments de 0,5 s contre 10 s, 3 à 4 dB de moins entre parole et souffle) ;
+- 24/09, mêmes fréquences, centre 125,39 (non symétriques) : 16 à 19 % de coïncidences, **autant
+  qu'avec 124,350** — le hasard de deux fréquences chargées ;
+- 26/09 20:34, **126,575 ajoutée** (secours muet) pour déplacer le centre à 126,200 :
+  - **2 coïncidences sur 22**, le niveau du hasard ;
+  - 126,575, miroir exact de 125,825, ne reçoit **rien**.
+
+**Lecture** : l'image I/Q de la clé RTL-SDR. La fréquence la plus forte (126,425) se reflète de
+l'autre côté du centre, sur 125,825 ; les signaux plus faibles de 125,825 ne laissent pas d'image
+au-dessus du squelch. **Contre-exemple** : pendant la séance de validation, 123,875 et 125,825
+étaient aussi symétriques (±0,975 autour de 124,85), sans aucune paire au texte semblable. L'effet
+dépendrait donc de l'écart au centre et de la force du signal. **Non prouvé** : un couplage des
+deux secteurs par le contrôle, défait par hasard à 20:33, reste possible ; la contre-épreuve est de
+revenir quelques minutes au centre symétrique.
+
+**Conséquence si c'est confirmé** : la règle de centre de la station (le milieu des fréquences)
+rend toujours miroirs les deux extrêmes d'une sélection. Un centre décalé, qui évite qu'un miroir
+tombe sur une fréquence choisie, serait à discuter avec le propriétaire et l'agent de la station.
