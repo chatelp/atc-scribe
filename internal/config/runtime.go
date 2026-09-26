@@ -51,15 +51,28 @@ type MatchingRules struct {
 	// OneDigitOff accepts a number one digit away from an aircraft's. Measured
 	// 81% noise; offered to try, off by default.
 	OneDigitOff bool `json:"one_digit_off"`
+
+	// An aircraft heard on the frequency in the last two minutes may be named
+	// by an abbreviation: its last letters ("sierra bravo"), its last two
+	// digits when no other aircraft just heard ends so, or its airline alone
+	// when it is the only one of that airline just heard. Measured on 24/09
+	// against another frequency's recent aircraft: +8 and +13 true matches,
+	// almost no chance; the airline alone +68, but ADS-B cannot tell whether
+	// it named the right aircraft, so it stays off until checked by ear.
+	ContextLetters bool `json:"context_letters"`
+	ContextDigits  bool `json:"context_digits"`
+	ContextNames   bool `json:"context_names"`
 }
 
 // DefaultMatchingRules are the rules in force until changed from the panel:
-// letters and approximate names on, decided by the owner on 26/09 after Q46.
+// letters, approximate names, and an aircraft just heard named by its last
+// letters or digits, decided by the owner on 26/09 after Q46.
 func DefaultMatchingRules(minDigits int) MatchingRules {
 	if minDigits <= 0 {
 		minDigits = 3
 	}
-	return MatchingRules{Letters: true, ApproxOperators: true, MinDigits: minDigits}
+	return MatchingRules{Letters: true, ApproxOperators: true, MinDigits: minDigits,
+		ContextLetters: true, ContextDigits: true}
 }
 
 func (m MatchingRules) validate() error {
@@ -263,6 +276,9 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		logger.Bool("match_letters", m.Letters),
 		logger.Bool("match_approx_operators", m.ApproxOperators),
 		logger.Int("match_min_digits", m.MinDigits),
-		logger.Bool("match_one_digit_off", m.OneDigitOff))
+		logger.Bool("match_one_digit_off", m.OneDigitOff),
+		logger.Bool("match_context_letters", m.ContextLetters),
+		logger.Bool("match_context_digits", m.ContextDigits),
+		logger.Bool("match_context_names", m.ContextNames))
 	return nil
 }

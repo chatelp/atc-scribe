@@ -629,6 +629,22 @@
                                                 <div class="text-xs opacity-60 leading-snug">
                                                     With 2 digits, chance matches about as often as the truth (measured); 3 is the default.
                                                 </div>
+                                                <div class="text-xs opacity-60 leading-snug">
+                                                    An aircraft heard on the frequency in the last two minutes, named again in short:
+                                                </div>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.context_letters" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">By its last letters</span>: "sierra bravo" for AFR23SB. Measured +8, no chance matches.</span>
+                                                </label>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.context_digits" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">By its last two digits</span>: "five four" for LBT554, when no other aircraft just heard ends so. Measured +13.</span>
+                                                </label>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.context_names" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">By its airline alone</span>, when it is the only one of that airline just heard. Measured +68,
+                                                        but ADS-B cannot tell whether the right aircraft was named: to be checked by ear first.</span>
+                                                </label>
                                                 <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
                                                     <input type="checkbox" x-model="draft.matching.one_digit_off" @change="save()" :disabled="busy" class="mt-0.5">
                                                     <span><span class="text-highlight">Accept one digit off</span>: measured 81% noise. For experiments only.</span>

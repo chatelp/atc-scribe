@@ -323,7 +323,10 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 		logger.Bool("match_letters", next.Matching.Letters),
 		logger.Bool("match_approx_operators", next.Matching.ApproxOperators),
 		logger.Int("match_min_digits", next.Matching.MinDigits),
-		logger.Bool("match_one_digit_off", next.Matching.OneDigitOff))
+		logger.Bool("match_one_digit_off", next.Matching.OneDigitOff),
+		logger.Bool("match_context_letters", next.Matching.ContextLetters),
+		logger.Bool("match_context_digits", next.Matching.ContextDigits),
+		logger.Bool("match_context_names", next.Matching.ContextNames))
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(h.runtime.Settings()); err != nil {
