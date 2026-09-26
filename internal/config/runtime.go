@@ -28,6 +28,45 @@ type RuntimeSettings struct {
 	// [station] airport_code and can be changed from the panel -- the airport a
 	// receiver sits on is not always the one worth watching.
 	ReferenceAirport string `json:"reference_airport"`
+
+	// Matching is how a transmission is tied to an aircraft. Absent from a file
+	// saved before it existed, which then means the defaults.
+	Matching *MatchingRules `json:"matching,omitempty"`
+}
+
+// MatchingRules are the association rules that can be changed from the panel.
+// Each was measured against a shuffled sky before being offered
+// (docs-fr/05-decisions.md, Q30 and Q46).
+type MatchingRules struct {
+	// Letters reads a spoken number followed by spelled letters as one flight
+	// part, "seven uniform echo" as 7UE: 59% of the callsigns over Paris have
+	// letters. Measured on 24/09: +27% true matches, precision 73% -> 76%.
+	Letters bool `json:"letters"`
+	// ApproxOperators accepts an airline name heard roughly ("welling" for
+	// Vueling), among the operators in the sky only.
+	ApproxOperators bool `json:"approx_operators"`
+	// MinDigits is the shortest spoken number that may stand for a flight
+	// number: 2 matched by chance about as often as by truth, 3 is the default.
+	MinDigits int `json:"min_digits"`
+	// OneDigitOff accepts a number one digit away from an aircraft's. Measured
+	// 81% noise; offered to try, off by default.
+	OneDigitOff bool `json:"one_digit_off"`
+}
+
+// DefaultMatchingRules are the rules in force until changed from the panel:
+// letters and approximate names on, decided by the owner on 26/09 after Q46.
+func DefaultMatchingRules(minDigits int) MatchingRules {
+	if minDigits <= 0 {
+		minDigits = 3
+	}
+	return MatchingRules{Letters: true, ApproxOperators: true, MinDigits: minDigits}
+}
+
+func (m MatchingRules) validate() error {
+	if m.MinDigits < 2 || m.MinDigits > 4 {
+		return fmt.Errorf("matching.min_digits must be 2, 3 or 4, got %d", m.MinDigits)
+	}
+	return nil
 }
 
 // ReferenceAirportHook validates and applies a change of reference airport. The
@@ -64,6 +103,8 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 		path: filepath.Join(filepath.Dir(configPath), RuntimeSettingsFile),
 		log:  log.Named("runtime-settings"),
 	}
+	defaults := DefaultMatchingRules(cfg.PostProcessing.MinDigits)
+	r.settings.Matching = &defaults
 
 	b, err := os.ReadFile(r.path)
 	if err != nil {
@@ -82,6 +123,14 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 	}
 	if a := normalizeAirport(saved.ReferenceAirport); a != "" {
 		r.settings.ReferenceAirport = a
+	}
+	if saved.Matching != nil {
+		if err := saved.Matching.validate(); err != nil {
+			r.log.Warn("Ignoring saved matching rules", logger.Error(err))
+		} else {
+			m := *saved.Matching
+			r.settings.Matching = &m
+		}
 	}
 	r.log.Info("Applied saved runtime settings",
 		logger.String("path", r.path),
@@ -118,7 +167,20 @@ func (r *Runtime) UseReferenceAirport(code string) {
 func (r *Runtime) Settings() RuntimeSettings {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return r.settings
+	s := r.settings
+	if s.Matching != nil {
+		m := *s.Matching
+		s.Matching = &m
+	}
+	return s
+}
+
+// Matching returns the association rules in force. It is read for every
+// transmission, so a change from the panel applies to the next one.
+func (r *Runtime) Matching() MatchingRules {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return *r.settings.Matching
 }
 
 // DBRetentionDays is read on every retention tick rather than captured once, so a
@@ -140,6 +202,13 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 	case "debug", "info", "warn", "error":
 	default:
 		return fmt.Errorf("log_level must be debug, info, warn or error, got %q", next.LogLevel)
+	}
+
+	if next.Matching == nil {
+		return fmt.Errorf("matching rules missing")
+	}
+	if err := next.Matching.validate(); err != nil {
+		return err
 	}
 
 	// The reference airport is checked with the rest, before anything is applied.
@@ -167,6 +236,8 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		hook.Apply(next.ReferenceAirport)
 	}
 
+	m := *next.Matching
+	next.Matching = &m
 	r.mu.Lock()
 	r.settings = next
 	r.mu.Unlock()
@@ -188,6 +259,10 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 	r.log.Info("Runtime settings changed",
 		logger.Int("db_retention_days", next.DBRetentionDays),
 		logger.String("log_level", next.LogLevel),
-		logger.String("reference_airport", next.ReferenceAirport))
+		logger.String("reference_airport", next.ReferenceAirport),
+		logger.Bool("match_letters", m.Letters),
+		logger.Bool("match_approx_operators", m.ApproxOperators),
+		logger.Int("match_min_digits", m.MinDigits),
+		logger.Bool("match_one_digit_off", m.OneDigitOff))
 	return nil
 }

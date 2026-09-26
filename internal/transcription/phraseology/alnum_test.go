@@ -82,3 +82,14 @@ func TestAHeadingBeforeTheCallsignDoesNotHideIt(t *testing.T) {
 		t.Errorf("want VLG7UE, got %+v (%v)", got, ok)
 	}
 }
+
+func TestWithRulesLeavesTheOriginalAlone(t *testing.T) {
+	m := &Matcher{telephony: map[string]string{}, MinDigits: 3}
+	c := m.WithRules(Rules{Letters: true, ApproxOperators: true, MinDigits: 4, OneDigitOff: true})
+	if !c.AlnumCallsigns || !c.FuzzyOperators || !c.FuzzyDigits || c.MinDigits != 4 {
+		t.Errorf("copy: %+v", c)
+	}
+	if m.AlnumCallsigns || m.FuzzyOperators || m.FuzzyDigits || m.MinDigits != 3 {
+		t.Errorf("the original matcher must not change: %+v", m)
+	}
+}

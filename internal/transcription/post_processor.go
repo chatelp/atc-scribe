@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yegors/co-atc/internal/storage/sqlite"
+	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
 )
@@ -32,6 +33,11 @@ type PostProcessingConfig struct {
 	MinScore             float64
 	MinDigits            int
 	FleetLastSeenMinutes int
+
+	// Rules, when set, gives the association rules in force for each
+	// transmission, so that a change from the settings panel applies to the
+	// next one. Nil keeps the matcher as MinDigits configured it.
+	Rules func() phraseology.Rules
 }
 
 // PostProcessingResult represents the structured result from the LLM

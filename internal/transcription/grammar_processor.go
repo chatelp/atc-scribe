@@ -246,8 +246,12 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 	if len(sky) > 0 {
 		ctx := p.recentlyHeard(record.FrequencyID, record.CreatedAt)
 
+		matcher := p.matcher
+		if p.config.Rules != nil {
+			matcher = p.matcher.WithRules(p.config.Rules())
+		}
 		try := func(res phraseology.Result, text string) (phraseology.Match, bool) {
-			m, ok := p.matcher.MatchWithContext(res, sky, ctx)
+			m, ok := matcher.MatchWithContext(res, sky, ctx)
 			if !ok {
 				return m, false
 			}
