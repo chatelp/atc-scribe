@@ -560,6 +560,13 @@ propre Terminal fait apparaître la demande.
 > l'enregistrement de contrôle, lancé par le Python du laboratoire
 > (`~/.pyenv/versions/3.12.3/bin/python3.12`). Non établi : de quel programme venait la demande.
 > La veille note désormais, en cas d'échec, le programme refusé et son parent.
+>
+> **La demande en attente nommait « node », selon le propriétaire.** Sur le Mac, les seuls `node`
+> en marche sont le serveur `desktop-commander` (un greffon de l'application Claude, lancé par
+> `npx`, démarré le 25/09 à 09:12 et 09:44, et le 26/09 à 09:00) — **pas dans la filiation du
+> programme refusé**, qui descend de `claude-code` 2.1.281 (démarré le 25/09 à 09:44, pas de mise à
+> jour la nuit). Cette demande-là n'explique donc pas directement la panne ; la piste de la
+> confidentialité reste la première, sans être établie. La veille tranchera à la prochaine panne.
 
 Relevé au passage, sans lien avec Q21 mais à corriger : le Mac porte **deux adresses
 sur 192.168.1.0/24**, `en0` Ethernet en `.28` et `en1` Wi-Fi en `.48`, et le cache ARP
