@@ -15,6 +15,10 @@ type Aircraft struct {
 	Hex        string
 	AltitudeFt float64 // barometric altitude, 0 if unknown
 	Phase      string  // "CRZ", "ARR", "DEP", "T/O", "TAX", "" if unknown
+
+	// Position, for a frequency's sector (sector.go).
+	Lat, Lon    float64
+	HasPosition bool
 }
 
 // Match is the outcome of trying to attach a transmission to an aircraft.

@@ -243,13 +243,28 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 	// Where the words that named the aircraft sit in the text displayed for the
 	// reading that named it -- the processed primary text, or the second reading.
 	var evidence [][2]int
+	matcher := p.matcher
+	if p.config.Rules != nil {
+		matcher = p.matcher.WithRules(p.config.Rules())
+	}
+	// Only the aircraft this frequency can be talking to. With fewer
+	// candidates, a flight part missing its last letter ("seven uniform" for
+	// 7UE) is worth accepting: measured on 24/09 inside the approach sector.
+	if p.config.SectorOf != nil {
+		if sector, ok := p.config.SectorOf(record.FrequencyID); ok {
+			before := len(sky)
+			sky = sector.Within(sky)
+			p.logger.Debug("Sky cut to the frequency's sector",
+				logger.String("frequency_id", record.FrequencyID),
+				logger.Int("aircraft", before), logger.Int("in_sector", len(sky)))
+			c := *matcher
+			c.PartialFlightScore = 0.6
+			matcher = &c
+		}
+	}
 	if len(sky) > 0 {
 		ctx := p.recentlyHeard(record.FrequencyID, record.CreatedAt)
 
-		matcher := p.matcher
-		if p.config.Rules != nil {
-			matcher = p.matcher.WithRules(p.config.Rules())
-		}
 		try := func(res phraseology.Result, text string) (phraseology.Match, bool) {
 			m, ok := matcher.MatchWithContext(res, sky, ctx)
 			if !ok {

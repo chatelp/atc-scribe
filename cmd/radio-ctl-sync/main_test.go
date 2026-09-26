@@ -121,3 +121,21 @@ func TestOnlyStreamsOnIcecastAreOpened(t *testing.T) {
 		t.Errorf("streams switched off at the station: nothing to open, got %v", w)
 	}
 }
+
+// The station's table gives each channel its airport and kind; control sectors
+// and ATIS get none.
+func TestChannelsGetTheirSectorFromTheStationTable(t *testing.T) {
+	cases := map[string][2]string{
+		"123875": {"LFPO", "approach"}, "124350": {"LFPG", "approach"}, "127750": {"LFPO", "departure"},
+		"118000": {"LFPZ", "tower"}, "121608": {"LFPG", "ground"}, "121842": {"LFPG", "ground"},
+		"124625": {"", ""}, "128225": {"", ""}, "121500": {"", ""},
+	}
+	for id, want := range cases {
+		if got := sectorTable[id]; got != want {
+			t.Errorf("%s: got %v, want %v", id, got, want)
+		}
+	}
+	if n := len(sectorTable); n < 35 || n > 45 {
+		t.Errorf("%d channels with a sector, expected about 40 of 68", n)
+	}
+}

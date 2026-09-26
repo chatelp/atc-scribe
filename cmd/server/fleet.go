@@ -47,6 +47,9 @@ func (f *adsbFleet) Fleet() []phraseology.Aircraft {
 		}
 		if target.ADSB != nil {
 			aircraft.AltitudeFt = target.ADSB.AltBaro.Float64()
+			if target.ADSB.Lat != nil && target.ADSB.Lon != nil {
+				aircraft.Lat, aircraft.Lon, aircraft.HasPosition = *target.ADSB.Lat, *target.ADSB.Lon, true
+			}
 		}
 		if target.Phase != nil && len(target.Phase.Current) > 0 {
 			aircraft.Phase = target.Phase.Current[0].Phase

@@ -277,7 +277,17 @@ type FrequencyConfig struct {
 	// disappear -- ffmpeg would retry it in a loop; co-atc then restarts it after
 	// reconnect_interval_secs instead.
 	FFmpegReconnect *bool `toml:"ffmpeg_reconnect"`
+
+	// SectorAirport and SectorKind say which aircraft this frequency can be
+	// talking to: those near that airport (ICAO code) within the radius and
+	// below the ceiling the settings give for its kind -- "approach",
+	// "departure", "tower" or "ground". Empty: the whole sky, as upstream.
+	SectorAirport string `toml:"sector_airport"`
+	SectorKind    string `toml:"sector_kind"`
 }
+
+// SectorKinds are the kinds of frequency a sector can be drawn for.
+var SectorKinds = map[string]bool{"approach": true, "departure": true, "tower": true, "ground": true}
 
 // ReconnectsInFFmpeg reports whether ffmpeg should reconnect by itself.
 func (f FrequencyConfig) ReconnectsInFFmpeg() bool {

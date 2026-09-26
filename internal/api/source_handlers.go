@@ -33,6 +33,8 @@ func (h *Handler) PutSource(w http.ResponseWriter, r *http.Request) {
 		TranscribeAudio bool    `json:"transcribe_audio"`
 		Language        string  `json:"language"`
 		FFmpegReconnect *bool   `json:"ffmpeg_reconnect"`
+		SectorAirport   string  `json:"sector_airport"`
+		SectorKind      string  `json:"sector_kind"`
 	}
 	dec := json.NewDecoder(io.LimitReader(r.Body, 4096))
 	dec.DisallowUnknownFields()
@@ -52,6 +54,8 @@ func (h *Handler) PutSource(w http.ResponseWriter, r *http.Request) {
 		TranscribeAudio: body.TranscribeAudio,
 		Language:        body.Language,
 		FFmpegReconnect: body.FFmpegReconnect,
+		SectorAirport:   body.SectorAirport,
+		SectorKind:      body.SectorKind,
 	})
 	switch {
 	case errors.Is(err, frequencies.ErrConfiguredSource):

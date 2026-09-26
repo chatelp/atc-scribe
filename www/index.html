@@ -646,6 +646,28 @@
                                                         but ADS-B cannot tell whether the right aircraft was named: to be checked by ear first.</span>
                                                 </label>
                                                 <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.sectors" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">Only aircraft in the frequency's sector</span>, for frequencies that name
+                                                        their airport and kind. Measured on the Roissy approach: chance matches halved, more true ones.</span>
+                                                </label>
+                                                <template x-if="draft.matching.sectors && draft.matching.sector">
+                                                    <div class="grid gap-1 pl-5">
+                                                        <template x-for="kind in ['approach', 'departure', 'tower', 'ground']" :key="kind">
+                                                            <div class="flex items-center justify-between gap-2 text-xs">
+                                                                <span class="capitalize" x-text="kind"></span>
+                                                                <span class="flex items-center gap-1">
+                                                                    <input type="number" min="1" max="250" x-model.number="draft.matching.sector[kind].radius_nm" @change="save()" :disabled="busy"
+                                                                           class="w-14 bg-background border border-border rounded px-1 py-0.5 text-right">
+                                                                    <span class="opacity-60">NM, below</span>
+                                                                    <input type="number" min="500" max="60000" step="500" x-model.number="draft.matching.sector[kind].max_alt_ft" @change="save()" :disabled="busy"
+                                                                           class="w-20 bg-background border border-border rounded px-1 py-0.5 text-right">
+                                                                    <span class="opacity-60">ft</span>
+                                                                </span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
                                                     <input type="checkbox" x-model="draft.matching.one_digit_off" @change="save()" :disabled="busy" class="mt-0.5">
                                                     <span><span class="text-highlight">Accept one digit off</span>: measured 81% noise. For experiments only.</span>
                                                 </label>

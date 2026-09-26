@@ -49,11 +49,25 @@ func validateSource(fc cfg.FrequencyConfig) error {
 	if fc.Language != "" && fc.Language != "en" && fc.Language != "fr" {
 		return fmt.Errorf("language %q: \"en\", \"fr\" or empty", fc.Language)
 	}
+	if fc.SectorKind != "" && !cfg.SectorKinds[fc.SectorKind] {
+		return fmt.Errorf("sector_kind %q: approach, departure, tower, ground or empty", fc.SectorKind)
+	}
+	if (fc.SectorKind == "") != (fc.SectorAirport == "") {
+		return fmt.Errorf("sector_airport and sector_kind go together")
+	}
+	if fc.SectorAirport != "" && !sectorAirport.MatchString(fc.SectorAirport) {
+		return fmt.Errorf("sector_airport %q: an ICAO code, four letters", fc.SectorAirport)
+	}
 	return nil
 }
 
+var sectorAirport = regexp.MustCompile(`^[A-Z]{4}$`)
+
+// sameDisplay also covers the sector: it is read at each match, so a change
+// needs no reconnection.
 func sameDisplay(a, b cfg.FrequencyConfig) bool {
-	return a.Name == b.Name && a.Airport == b.Airport && a.FrequencyMHz == b.FrequencyMHz && a.Order == b.Order
+	return a.Name == b.Name && a.Airport == b.Airport && a.FrequencyMHz == b.FrequencyMHz && a.Order == b.Order &&
+		a.SectorAirport == b.SectorAirport && a.SectorKind == b.SectorKind
 }
 
 // sameConnection reports that two versions of a source can share one
@@ -167,8 +181,26 @@ func (s *Service) announceSources() {
 	})
 }
 
+// SetSectors gives transcription the sector of each frequency, read for every
+// transmission. Called before Start.
+func (s *Service) SetSectors(sectorOf func(frequencyID string) (phraseology.Sector, bool)) {
+	s.transcriptionManager.SetSectors(sectorOf)
+}
+
 // SetMatchingRules gives transcription the association rules in force, read
 // for every transmission. Called before Start.
 func (s *Service) SetMatchingRules(rules func() phraseology.Rules) {
 	s.transcriptionManager.SetMatchingRules(rules)
+}
+
+// SectorOf returns the airport and kind of frequency id serves, empty when it
+// names none. Read for every transmission, so it follows sources added and
+// changed while the server runs.
+func (s *Service) SectorOf(id string) (airport, kind string) {
+	s.sourcesMu.RLock()
+	defer s.sourcesMu.RUnlock()
+	if fc, ok := s.frequenciesConfig[id]; ok {
+		return fc.SectorAirport, fc.SectorKind
+	}
+	return "", ""
 }
