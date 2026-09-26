@@ -61,6 +61,7 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 	}
 	matcher.MinDigits = minDigits
 	matcher.FuzzyDigits = fuzzy
+	matcher.AlnumCallsigns, matcher.FuzzyOperators = optAlnum, optFuzzyOperators
 
 	// Capture filenames carry station local time; ADS-B carries UTC.
 	toUTC := func(local string) (time.Time, bool) {
@@ -220,9 +221,10 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 					break
 				}
 			}
-			if !here {
+			if !here && !optEvery {
 				continue
 			}
+			candidate = true
 			if m, ok := accept(res, fleet, ctx); ok {
 				return m, t, true, true
 			}

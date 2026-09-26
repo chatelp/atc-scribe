@@ -67,6 +67,13 @@ type Matcher struct {
 	// single one is enough to carry it past. Over Paris, "Air France" corroborates
 	// almost anything.
 	FuzzyDigits bool
+
+	// AlnumCallsigns reads a spoken number followed by spelled letters as one
+	// flight part, "seven uniform echo" as 7UE, and FuzzyOperators accepts an
+	// airline name heard roughly, among the operators in the sky. Both off by
+	// default, pending measurement (alnum.go, docs-fr/05-decisions.md Q46).
+	AlnumCallsigns bool
+	FuzzyOperators bool
 }
 
 // NewMatcher builds the spoken-name index from OpenFlights' airlines.dat, which
@@ -215,6 +222,24 @@ func (m *Matcher) Match(r Result, fleet []Aircraft) (Match, bool) {
 // nothing and can only ever re-rank candidates that were already in the running.
 func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) (Match, bool) {
 	spokenOperators := m.operatorsIn(r.Raw)
+	toks := tokenize(r.Raw)
+	if m.FuzzyOperators {
+		present := map[string]bool{}
+		for _, ac := range fleet {
+			if prefix, _, _ := splitCallsign(ac.Callsign); prefix != "" {
+				present[prefix] = true
+			}
+		}
+		for code, words := range m.operatorsNear(toks, present) {
+			if len(spokenOperators[code]) == 0 {
+				spokenOperators[code] = words
+			}
+		}
+	}
+	var alnum []alnumGroup
+	if m.AlnumCallsigns {
+		alnum = alnumGroups(toks)
+	}
 
 	// If an operator is named and that operator is actually in the sky, only its
 	// aircraft are considered. This is not a contradiction of the rule that a
@@ -282,6 +307,14 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 			case m.FuzzyDigits && len(digits) >= 3 && len(v.Digits) == len(digits) && editDistance(v.Digits, digits) == 1:
 				if s := 0.5; s > score {
 					score, why, words = s, []string{"digits off by one"}, here
+				}
+			}
+		}
+
+		if letters != "" {
+			for _, g := range alnum {
+				if s, reason := alnumScore(g.text, digits+letters); s > score {
+					score, why, words = s, []string{reason}, [][2]int{g.word}
 				}
 			}
 		}
