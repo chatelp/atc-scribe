@@ -3597,7 +3597,13 @@ station-vers-atc-scribe-2026-09-26-secteurs-68-frequences.*`). Il identifie au p
 fréquences jusque-là inconnues (118.800 = Le Bourget Approche ; 125.933, 132.500, 132.783, 133.000,
 133.250, 135.033, 135.500 = Reims ; 118.883, 132.733 = Brest ; 135.550 = Paris TN), à confirmer à
 l'écoute. **Conflit sur 132.275** : catalogue « Paris Contrôle arrivée CDG », eAIP « Reims UAC
-KF » ; nos transcriptions, prises sur le mélange, ne tranchent pas.
+KF ». *Corrigé le 26/09 au soir* : nos transcriptions **tranchent** — elles ont été prises canal
+par canal la nuit du 15 au 16/09, et `24-identification-amas.md` en a tiré trois preuves
+indépendantes que ce qu'on reçoit sur 132,275 est **Paris Contrôle, arrivées de De Gaulle** :
+étagement de descente (médiane FL200), 14 transferts vers l'approche de De Gaulle (121,155), et
+un appel initial « hello Paris good evening ». L'eAIP pourrait réutiliser la fréquence pour un
+secteur de Reims éloigné ; c'est à vérifier dans GEN 3.4 côté station. (Écrit le matin sans
+relire le document 24 : l'affirmation « ne tranchent pas » était fausse.)
 
 **Les tailles**, par nature de fréquence, réglables au panneau :
 
