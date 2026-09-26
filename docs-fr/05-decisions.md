@@ -3665,6 +3665,33 @@ mesure ne montre pas de coût. Contribuable tel quel.
 **Pas encore vu en service** : la séance de validation tourne sur l'ancien binaire ; le
 prochain lancement le portera.
 
+### D61 — « France » seul désigne Air France *(26/09)*
+
+**Le cas, signalé par le propriétaire** : sur 124,350 à 17:00:29, « bonsoir France Quatre Nine
+Sierra Romeo pass the metro 100 pied air level 100 … Sierra Romeo », pas rattaché alors
+qu'AFR89SR est dans le ciel depuis 17:00:27. Rejoué avec le ciel exact de ce moment : les chiffres
+sont mal entendus (« quatre nine », 49 pour 89 ; la seconde lecture a bien « France 89 », mais
+séparé des lettres), les lettres sont justes (« Sierra Romeo », +0,3), et **« France » seul ne
+désignait aucune compagnie** — ni `airlines.dat` (AIRFRANS), ni nos deux tables. 0,3 reste sous le
+plancher de 0,6 ; avec le nom, 0,7, sans ambiguïté, depuis chacune des deux lectures.
+
+**Ce n'est pas un cas isolé** : sur la capture du 24/09, « France » sans « Air » apparaît 157 fois,
+contre 314 « Air France ». Au moins 11 de ces transmissions (11 avions) étaient déjà rattachées à
+un Air France par les chiffres ou les lettres seuls.
+
+**Mesuré** (capture du 24/09, règles en service, secteurs, attente de D60 ; contrôle par ciel
+mélangé ; `whisper-lab/resultats/station/2026-09-26-france-seul/`) :
+
+| | Avions justes | Hasard | Précision |
+|---|---|---|---|
+| sans | 372,4 | 68,6 | 84 % |
+| **« France » = AFR** | **386,8** | 70,2 | **85 %** |
+
+**+14 avions justes (+4 %)**, sur les quatre fréquences. « Bair France », forme vue aussi, n'apporte
+rien de plus. **Fait** : une ligne dans `assets/spoken-operators.csv`. « France Soleil » reste
+Transavia, la forme à deux mots étant cherchée d'abord. Au passage, la recherche des noms ne relit
+plus le second mot d'une forme à deux mots : « Air France » surlignait aussi « France » seul.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(ouverte, 23/09)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET

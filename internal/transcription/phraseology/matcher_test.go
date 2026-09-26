@@ -145,6 +145,26 @@ func TestCurrentTelephonyDisambiguates(t *testing.T) {
 	}
 }
 
+// "France" alone is Air France on Paris frequencies: heard on 26/09 on CDG
+// approach as "bonsoir France Quatre Nine Sierra Romeo" for AFR89SR, the digits
+// misheard, the letters right. Two words are looked up before one, so "France
+// Soleil" stays Transavia.
+func TestFranceAloneIsAirFrance(t *testing.T) {
+	m := newTestMatcher(t)
+	m.AlnumCallsigns = true
+	sky := []Aircraft{{Callsign: "AFR89SR", Hex: "39bb27", AltitudeFt: 2775},
+		{Callsign: "AFR35AJ", Hex: "3985a1"}, {Callsign: "EZY12SR", Hex: "400c1d"}}
+	got, ok := m.Match(Parse("bonsoir France Quatre Nine Sierra Romeo pass level one hundred Sierra Romeo"), sky)
+	if !ok || got.Callsign != "AFR89SR" {
+		t.Errorf("want AFR89SR, got %+v (%v)", got, ok)
+	}
+	got, ok = m.Match(Parse("france soleil one two three four"),
+		[]Aircraft{{Callsign: "AFR1234", Hex: "aaaaaa"}, {Callsign: "TVF1234", Hex: "bbbbbb"}})
+	if !ok || got.Callsign != "TVF1234" {
+		t.Errorf("France Soleil: want TVF1234, got %+v (%v)", got, ok)
+	}
+}
+
 func TestWithoutOverridesTheMatcherIsUnchanged(t *testing.T) {
 	// The file is optional. Without it, nothing fails and nothing is guessed:
 	// "france soleil" simply names no operator, as before the file existed.
