@@ -29,6 +29,9 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// Experimental matcher rules, set from flags (docs-fr/05-decisions.md, Q46).
+var optAlnum, optFuzzyOperators, optEvery bool
+
 func main() {
 	in := flag.String("in", "", "JSON array of objects holding transcripts")
 	db := flag.String("db", "", "co-atc daily SQLite database to measure against")
@@ -46,6 +49,9 @@ func main() {
 	strict := flag.Bool("strict", false, "refuse a match when a second aircraft scores nearly as well")
 	minScore := flag.Float64("min-score", 0, "refuse a match below this score")
 	fuzzy := flag.Bool("fuzzy", false, "accept a spoken number one digit off (measured 81% noise)")
+	flag.BoolVar(&optAlnum, "alnum", false, "read a number followed by spelled letters as one flight part, 7UE (Q46, to be measured)")
+	flag.BoolVar(&optFuzzyOperators, "fuzzy-operators", false, "accept an airline name heard roughly, among the operators in the sky (Q46, to be measured)")
+	flag.BoolVar(&optEvery, "every", false, "send every transmission to the matcher, as production does, not only those with a two-digit group")
 	from := flag.String("from", "", "with -db: only transmissions at or after this RFC3339 time")
 	to := flag.String("to", "", "with -db: only transmissions before this RFC3339 time")
 	union := flag.Bool("union", false, "with -capture: group passes by recording and accept a match from any of them — measures two models together, controls included")
@@ -189,6 +195,7 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 	}
 	matcher.MinDigits = minDigits
 	matcher.FuzzyDigits = fuzzy
+	matcher.AlnumCallsigns, matcher.FuzzyOperators = optAlnum, optFuzzyOperators
 
 	// Every ADS-B sighting, sorted, so each transmission can binary-search its
 	// own moment instead of re-querying 300 times over 300k rows.
@@ -347,7 +354,10 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 				hasCandidate = true
 			}
 		}
-		if !hasCandidate {
+		// Production sends every transmission to the matcher; this path used to
+		// skip those without a two-digit group, which hides callsigns with letters
+		// ("holding seven uniform echo") from any rule meant to find them.
+		if !hasCandidate && !optEvery {
 			continue
 		}
 		withCandidate++
