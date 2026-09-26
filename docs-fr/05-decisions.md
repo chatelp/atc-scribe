@@ -4286,7 +4286,7 @@ d'altitude) porté par la source — pour les flux séparés, `radio-ctl-sync` l
 `service` du catalogue de la station (« Approche De Gaulle », « Orly Approche », « croisière haute
 FL360-380 ») ; les positions dans le ciel que reçoit l'association ; et les réglages au panneau.
 
-### Q47 — 123,875 hache dans la sélection à quatre fréquences *(ouverte, 26/09)*
+### Q47 — 123,875 hache dans la sélection à quatre fréquences *(26/09 — **la position dans la bande n'est pas la cause : le hachage varie avec l'heure**, voir la contre-épreuve en fin de section)*
 
 **Signalé par le propriétaire à l'écoute**, pendant la séance de validation : « bcp de
 hachage/squelch sur Orly Approche, mais ça dépend de la transmission ». Le matin, 123,875 seule
@@ -4325,6 +4325,29 @@ hachage. Même seuil (SNR 10), même niveau de canal (×1,10) aux deux moments.
 - pourtant `aero.mp3` est haché à 17:50 : salves de 0,6 s en médiane, 54 % de moins d'1 s, contre
   4,4 s et 17 % à 16:46. **La cause est côté réception**, pas dans le mélange.
 
-**Reste** : la contre-épreuve. Le retour automatique de 18:45 remet 123,875 seule, recentrée ;
-enregistrement de 18:46 à 19:30, comparé à 17:01–17:21, avec les compteurs par canal de la
-station relevés à la minute. Et la diaphonie de 126,425 : les transcriptions ne tranchent pas.
+**Contre-épreuve, même soir** : le retour automatique de 18:45 remet 123,875 seule, recentrée
+(centre 123,4). Enregistrée de 18:46 à 19:30 : **28 %** de transmissions hachées, 11,7 coupures par
+minute de son, contre 66 % de 17:01 à 17:21. J'en ai d'abord conclu à un effet de la position
+dans la bande. **Les compteurs de la station, relevés à la minute** (lecture seule,
+`/home/pierre/mesure-flux/canaux-20260926-1726.txt`), le démentent. Sur 123,875 :
+
+| Période | Ouvertures / min | Battements / min |
+|---|---|---|
+| 4 fréquences, centre 124,85, 17:26–18:44 | 10,8 (de 0,9 à 23,6 selon la tranche de 10 min) | 1,47 (0,1 à 3,6) |
+| seule, centre 123,4, 18:46–19:36 | 10,1 (4,6 à 15,6) | 1,57 (0,4 à 2,1) |
+
+**Aucune différence mesurable entre les deux configurations ; une variation d'un facteur 10 à 30
+d'une tranche de 10 minutes à l'autre dans chacune.** Mes deux enregistrements de 17:01 et de 18:46
+comparaient des moments différents : 16:44–17:24 était une mauvaise période (2,7 battements par
+minute selon la station), et le midi (5 %) une période calme. Dans l'audio aussi, la contre-épreuve
+va de 8 % à 38 % de transmissions hachées selon la tranche, et les tranches chargées hachent le
+plus.
+
+**Conclusion provisoire** : le hachage dépend du moment, pas de la position de la fréquence dans
+la bande de la clé. C'est l'intuition première du propriétaire (« ça dépend de la transmission,
+qualité/distance »). Restent possibles :
+- des pilotes plus lointains ou plus bas aux heures chargées ;
+- un brouilleur intermittent.
+
+**Pour trancher** : rapprocher chaque transmission hachée de la distance de l'avion qui parle (à
+transcrire et associer, avec l'ADS-B de la même heure). Diaphonie de 126,425 : non concluant.
