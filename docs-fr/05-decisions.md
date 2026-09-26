@@ -4198,3 +4198,36 @@ réel) — **à confirmer sur un autre jour et un autre aéroport** (l'essai d'O
 d'altitude) porté par la source — pour les flux séparés, `radio-ctl-sync` le déduirait du champ
 `service` du catalogue de la station (« Approche De Gaulle », « Orly Approche », « croisière haute
 FL360-380 ») ; les positions dans le ciel que reçoit l'association ; et les réglages au panneau.
+
+### Q47 — 123,875 hache dans la sélection à quatre fréquences *(ouverte, 26/09)*
+
+**Signalé par le propriétaire à l'écoute**, pendant la séance de validation : « bcp de
+hachage/squelch sur Orly Approche, mais ça dépend de la transmission ». Le matin, 123,875 seule
+lui avait paru « vraiment bonne ».
+
+**Mesuré** sur les flux séparés, en simple auditeur (`whisper-lab/scripts/station/hachage.py` ;
+enregistrements `whisper-lab/audio/2026-09-26-*-hachage/`). Squelch fermé, RTLSDR-Airband sort
+un silence numérique ; une fermeture de moins de 0,3 s au milieu d'une transmission est un
+hachage. Même seuil (SNR 10), même niveau de canal (×1,10) aux deux moments.
+
+| Flux | Écart au centre de la clé | Transmissions hachées | Coupures / min de son | Ouvertures < 0,3 s |
+|---|---|---|---|---|
+| 123,875 seule, 13:32–14:17 (centre 123,4) | +0,475 MHz | 5 % (3/58) | 1,7 | 4 en 44 min |
+| 123,875, 17:01–17:21 (centre 124,85) | −0,975 MHz | **66 % (23/35)** | **42,7** | **101 en 20 min** |
+| 124,350, même moment | −0,500 MHz | 35 % (23/66) | 5,3 | 1 |
+| 124,625, même moment | −0,225 MHz | 0 % (0/13) | 0 | — |
+| 125,825, même moment | +0,975 MHz | 37 % (23/63) | 8,3 | 16 |
+
+- **C'est la radio, pas le numérique** : durées de coupure dispersées (10 à 290 ms), pas une
+  valeur fixe comme le saut de 125 ms du mélangeur (Q45, 25/09).
+- **Le contrôleur hache aussi** (émetteur au sol, fixe) : 2 transmissions sur 4 sur 123,875,
+  6 sur 9 sur 125,825, contre 0 sur 9 à midi. La distance des avions n'explique donc pas tout.
+  Effectifs petits (attribution par l'horodatage de co-atc, ±3 s).
+- **Les deux fréquences au bord de la bande hachent le plus**, mais pas à égalité : 123,875
+  cinq fois plus que 125,825. Hypothèse à vérifier côté station, **non mesurée** : l'image
+  repliée de 126,425 (Paris Contrôle, chargée) tombe à 123,865 quel que soit le centre
+  (126,425 − 2,56) ; à midi 126,425 était à 3 MHz du centre, très atténuée par le filtre du
+  tuner, maintenant à 1,6 MHz, juste hors de la bande passante.
+
+**Reste** : la contre-épreuve — même heure, 123,875 recentrée — et les niveaux de bruit par
+canal côté station. Ne pas basculer pendant une séance ; transmis à l'agent de la station.
