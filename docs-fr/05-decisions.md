@@ -3584,6 +3584,43 @@ Vérifié sur une instance de test : la case décochée depuis la page arrive au
 (« Server settings changed from the panel ») et se relit au redémarrage. **Contribuable en amont** :
 les règles et le mécanisme sont génériques.
 
+### D59 — Le ciel de chaque fréquence : le secteur *(26/09 — construit, désactivé jusqu'à la validation)*
+
+Suite de la piste 3 de Q46 (mesurée sur l'approche de Roissy : hasard divisé par deux, avions
+justes en plus). **Décisions du propriétaire, 26/09** : les tailles par défaut, et une copie dans
+notre dépôt du tableau des 68 fréquences fourni par l'agent de la station.
+
+**La source des secteurs.** L'agent de la station a dressé le tableau des 68 fréquences depuis
+l'eAIP (GEN 3.4 §3.4.5.4, ENR 2.1, AD 2.18 de LFPG, LFPO, LFPB, LFPV, LFPN ; AIRAC 03/09/2026) :
+61 lignes eAIP, 4 catalogue ou écoute, 1 supposée, 1 conflit (`whisper-lab/echanges-station/
+station-vers-atc-scribe-2026-09-26-secteurs-68-frequences.*`). Il identifie au passage onze
+fréquences jusque-là inconnues (118.800 = Le Bourget Approche ; 125.933, 132.500, 132.783, 133.000,
+133.250, 135.033, 135.500 = Reims ; 118.883, 132.733 = Brest ; 135.550 = Paris TN), à confirmer à
+l'écoute. **Conflit sur 132.275** : catalogue « Paris Contrôle arrivée CDG », eAIP « Reims UAC
+KF » ; nos transcriptions, prises sur le mélange, ne tranchent pas.
+
+**Les tailles**, par nature de fréquence, réglables au panneau :
+
+| Nature | Rayon autour de l'aéroport | Plafond | Fondement |
+|---|---|---|---|
+| approche, départ | 60 NM | 20 000 ft | mesuré le 24/09 (approche de Roissy) |
+| tour | 15 NM | 6 000 ft | à mesurer |
+| sol, prévol | 5 NM | 1 500 ft | à mesurer |
+| secteurs de contrôle | — | — | **pas de filtre** : l'eAIP ne publie que les limites de l'organisme, et elles trompent (124,625 rangée au contrôle supérieur, au-dessus du FL195, où les avions reconnus le 24/09 volaient à 15 700 ft en médiane) ; à apprendre des données |
+
+**Ce qui est construit** (commit `3fc52d6`, générique et contribuable, sauf la table) : une
+fréquence peut nommer son aéroport et sa nature (configuration, ou API des sources) ; avec le
+réglage « Only aircraft in the frequency's sector », l'association ne garde que les avions dans le
+rayon et sous le plafond, autour de la position de l'aéroport tirée des données de référence ; un
+avion sans position ni altitude est gardé ; dans un secteur, la partie vol amputée (« 7U ») est
+acceptée (0,6). `radio-ctl-sync` attribue aéroport et nature depuis la copie du tableau (40 des
+68 fréquences). **Vérifié sur le flux réel de 123,875 (Orly Approche)** : le ciel passe de 74 à
+29 avions, contre 32 comptés indépendamment sur l'ADS-B de la station.
+
+**Reste** : la séance de validation — co-atc sur des flux séparés choisis (les gros-porteurs, ou
+Orly Approche avec trois fréquences de Roissy), un autre jour, mesurée ensuite avec et sans
+secteur ; puis l'activation. Et apprendre des données les secteurs des fréquences de contrôle.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(ouverte, 23/09)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
