@@ -3761,10 +3761,23 @@ atterrissages ni des 14 décollages n'avait d'aéroport** :
   position d'un atterrissage date d'une minute, **5 à 7,5 NM** avant le seuil (AFR1655, AFR36KQ,
   AFR1855, IBE0579, DAH1108) — au-delà des 5 NM d'`airport_range_nm`.
 
-Corrigé (`33a62ac`) : un avion vu sur un axe de piste de son aéroport garde celui-ci jusqu'à
-`approach_max_distance_nm` (10 NM). Rejoué sur les mêmes données : AFR1655, IBE0579 et DASSAULT à De
-Gaulle, DAH1108 à Orly ; Saint-Cyr et Toussus restent sans aéroport. Vérification en direct en
-cours.
+Corrigé en deux temps :
+- `33a62ac` : un avion vu sur un axe de piste de son aéroport garde celui-ci jusqu'à
+  `approach_max_distance_nm` (10 NM) ;
+- `68532b4` : l'atterrissage est détecté une minute après la dernière position, quand
+  `aircraft.json` ne la donne plus. **Aucun** atterrissage ne pouvait donc être placé ; la dernière
+  position de la trajectoire, de moins de deux minutes, en tient lieu.
+
+**Vérifié en direct**, 31 min (18:41–19:12) : APP 12 De Gaulle / 10 Orly, ARR 24 / 23, DEP 18 / 3 ;
+**11 atterrissages d'avions de ligne avec leur aéroport** (8 De Gaulle : EJU42YG, AIC143, LBT508,
+AFR71FP, AFR1703, AFR647, LGL821P, CCA933 ; 3 Orly : 39de4f, TVF81YS, AFR94FM), chacun le plus
+proche de sa dernière position (4,1 à 7,6 NM). Aucune attribution fausse. Restent sans aéroport :
+- les avions légers de Saint-Cyr, Toussus et Le Bourget ;
+- 13 atterrissages sans aucune position ;
+- AFR71TY, dont la dernière position avait une heure.
+
+Les 7 décollages sont tous d'avions légers ou sans position. La station ne voit pas les avions de
+ligne au sol à Orly ni à De Gaulle.
 
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
