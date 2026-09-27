@@ -63,6 +63,7 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 	matcher.FuzzyDigits = fuzzy
 	matcher.AlnumCallsigns, matcher.FuzzyOperators = optAlnum, optFuzzyOperators
 	matcher.ContextLetters, matcher.ContextNames, matcher.ContextDigits = optCtxLetters, optCtxNames, optCtxDigits
+	matcher.PrefixDigits = optPrefix
 	matcher.PartialFlightScore = optPartial
 	inSector, err := loadSectors(optPositions, optSectors)
 	if err != nil {

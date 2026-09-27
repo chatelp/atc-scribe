@@ -69,6 +69,11 @@ type MatchingRules struct {
 	ContextDigits  bool `json:"context_digits"`
 	ContextNames   bool `json:"context_names"`
 
+	// PrefixDigits accepts the first two digits of a flight number when the
+	// transmission names the airline ("Air France Five One" for AFR511). Off
+	// until measured (docs-fr/30-association-regles-et-reglages.md).
+	PrefixDigits bool `json:"prefix_digits"`
+
 	// Sectors compares a transmission only with the aircraft its frequency can
 	// be talking to, for the frequencies that name an airport and a kind. The
 	// radii and ceilings were agreed with the owner on 26/09. Measured on 24/09
@@ -406,6 +411,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		logger.Bool("match_context_letters", m.ContextLetters),
 		logger.Bool("match_context_digits", m.ContextDigits),
 		logger.Bool("match_context_names", m.ContextNames),
+		logger.Bool("match_prefix_digits", m.PrefixDigits),
 		logger.Bool("match_sectors", m.Sectors))
 	return nil
 }

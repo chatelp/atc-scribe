@@ -87,6 +87,14 @@ type Matcher struct {
 	ContextNames   bool
 	ContextDigits  bool
 
+	// PrefixDigits accepts the first two digits of a flight number of three or
+	// more when the transmission names the aircraft's airline: "Air France Five
+	// One Air" for AFR511, the last digit lost (27/09, De Gaulle approach). It
+	// weighs 0.3, so it lands only with the airline named, and two aircraft of
+	// that airline starting alike make it ambiguous, hence refused. Off by
+	// default, pending measurement.
+	PrefixDigits bool
+
 	// PartialFlightScore is what a flight part missing its last letter weighs
 	// ("seven uniform" for 7UE). 0 means the default of 0.5, under the floor;
 	// worth raising only where the sky is cut to the frequency's sector.
@@ -326,6 +334,16 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 			case m.FuzzyDigits && len(digits) >= 3 && len(v.Digits) == len(digits) && editDistance(v.Digits, digits) == 1:
 				if s := 0.5; s > score {
 					score, why, words = s, []string{"digits off by one"}, here
+				}
+			}
+		}
+		if m.PrefixDigits && len(spokenOperators[prefix]) > 0 && len(digits) >= 3 {
+			for _, v := range r.Values {
+				if v.Role == RoleCallsign && len(v.Digits) == 2 && len(v.Digits) < m.MinDigits &&
+					strings.HasPrefix(digits, v.Digits) {
+					if s := 0.3; s > score {
+						score, why, words = s, []string{"first digits"}, [][2]int{{v.Word, v.End}}
+					}
 				}
 			}
 		}
