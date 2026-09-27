@@ -42,7 +42,7 @@ ne portent aucun indicatif (47 %).
 | 8 | Laisser le modèle deviner la langue | 16 à 28 % d'erreurs ; remplacé par la langue connue de chaque fréquence | ❌ (doc 13) |
 | 9 | Les réglages internes du modèle contre l'invention | aucun ne sépare l'invention de la bonne transcription | ❌ (D45) |
 | 9 bis | Ne donner au modèle que la parole | l'invention baisse avec la marge (presque divisée par deux à 1 s) ; les avions justes ne bougent pas au-delà du bruit, mais la fréquence faible 125,825 en perd à toutes les marges | ⏳ pas adopté en l'état (Q41) |
-| 9 ter | **L'aiguillage vers le modèle français** : aujourd'hui, la seconde lecture ne se déclenche que si le texte *anglais* contient un mot français repère (« bonjour », « niveau »…) | 27/09, 126,425 : le propriétaire entend « Air France 511 » dans des échanges en français ; forcé en anglais, le modèle **anglicise** (« Air France Five One Air we conceded report three zero »), aucun repère, pas de seconde lecture. La détection de langue de Whisper, avec notre modèle affiné sur l'ATC anglais, répond « anglais » sur ces mêmes passages | 🔲 aiguiller autrement : détection de langue par un modèle multilingue non affiné, ou mots repères plus larges, mesuré sur les passages français connus |
+| 9 ter | **L'aiguillage vers le modèle français** : aujourd'hui, la seconde lecture ne se déclenche que si le texte *anglais* contient un mot français repère (« bonjour », « niveau »…) | 27/09, 126,425 : le propriétaire entend « Air France 511 » dans des échanges en français ; forcé en anglais, le modèle **anglicise** (« Air France Five One Air we conceded report three zero »), aucun repère, pas de seconde lecture. La détection de langue de Whisper, avec notre modèle affiné sur l'ATC anglais, répond « anglais » sur ces mêmes passages | ⏳ **mesuré au banc le 27/09 (Q50)** : repères **ou** détection de langue par un Whisper multilingue non affiné → **+8 % d'avions justes à précision égale** ; « toujours le français » +10 % mais −2 points de précision. Coût : calcul doublé. À décider |
 
 ### B. Du texte à l'avion
 
@@ -80,9 +80,8 @@ ne portent aucun indicatif (47 %).
 
 ## Ce qui reste à tester, par ordre d'intérêt
 
-1. **L'aiguillage vers le modèle français** (9 ter) : du français « anglicisé » par le modèle anglais
-   n'ouvre pas la seconde lecture. À mesurer sur des passages français connus avant de changer la
-   porte.
+1. **L'aiguillage vers le modèle français** (9 ter, Q50) : mesuré au banc, +8 % à précision égale
+   en ajoutant la détection de langue. À décider, puis à confirmer sur un second banc.
 2. **Un quatrième essai d'entraînement, s'il vaut la peine** : repartir de l'essai 2 (le modèle
    entier), avec **beaucoup moins de clips de silence** pour qu'il ne se taise plus sur la parole
    faible, un apprentissage plus doux, puis le vocabulaire de Paris (vos indicatifs par synthèse

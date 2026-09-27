@@ -4535,3 +4535,45 @@ artefact de méthode.
 **Reste** : la comparaison aux mêmes heures qu'hier sur 123,875 seule (13:32-14:17 et 18:46-19:30,
 audio et compteurs de la station). Et demain matin, une séance comme celle du 27/09 sur 124,350 +
 126,425, co-atc compris, même heure, même méthode, même source ADS-B.
+
+### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — à décider)*
+
+**Le banc d'essai des modèles** (27/09) : les 665 transmissions de la séance du matin sur 124,350 +
+126,425 (09:17-11:17), retrouvées dans l'audio enregistré en continu et découpées comme co-atc les
+avait envoyées au modèle. Chacune passe une fois dans l'anglais de production, une fois dans le
+français de production, et une fois dans la détection de langue d'un Whisper multilingue non affiné
+(`whisper-large-v3-turbo`). Toute règle d'aiguillage se simule ensuite sans recalculer, et se juge
+par les avions justes contre cinq ciels mélangés (`cmd/phraseology -db -second`).
+Scripts : `whisper-lab/scripts/banc/` ; audio : `whisper-lab/audio/2026-09-27-banc-cdg-matin` (disque
+externe) ; résultats : `resultats/station/2026-09-27-hachage-distance/banc-aiguillage.txt`.
+
+**Le cas qui l'a déclenché** : AFR511, 27/09, en français selon le propriétaire. Forcé en anglais, le
+modèle a anglicisé, aucun mot repère n'est resté, et il n'y a pas eu de seconde lecture (doc 29,
+9 ter).
+
+| Aiguillage | Aiguillées | Rattachées | Hasard | Avions justes | Précision |
+|---|---|---|---|---|---|
+| anglais seul | 0 | 180 | 11,6 | 168,4 | 94 % |
+| **mots repères (production)** | 97 | 192 | 12,8 | 179,2 | 93 % |
+| *co-atc en direct (contrôle)* | *84* | *180* | *9,8* | *170,2* | *95 %* |
+| détection p(fr) ≥ 0,5 | 185 | 196 | 13,0 | 183,0 | 93 % |
+| **repères ou p(fr) ≥ 0,1** | 309 | 207 | 14,2 | **192,8** | **93 %** |
+| repères ou p(fr) ≥ 0,05 | 345 | 208 | 14,2 | 193,8 | 93 % |
+| toujours le français | 665 | 215 | 18,4 | 196,6 | 91 % |
+
+**Lecture** :
+- le banc rend la production à peu près (179 contre 170 en direct) ;
+- **les mots repères laissent passer du français** : ajouter la détection de langue (repères **ou**
+  p(fr) ≥ 0,1) donne **+14 avions justes (+8 %) à précision égale** ;
+- « toujours le français » gagne un peu plus (+17), mais perd 2 points de précision : le modèle
+  français invente sur l'anglais (hasard +5,6).
+
+**Coût**, temps médian par transmission : anglais 0,93 s, français 1,38 s, détection 0,61 s.
+- Mots repères : environ 1,1 s par transmission.
+- Repères ou détection ≥ 0,1 : 0,93 + 0,61 + 46 % × 1,38 ≈ 2,2 s, plus un troisième modèle en mémoire
+  (1,5 Go).
+- Toujours le français : 0,93 + 1,38 ≈ 2,3 s, sans troisième modèle.
+
+**Réserves** : une seule séance, deux approches de De Gaulle, un dimanche matin ; à confirmer sur une
+autre (la séance de De Gaulle de demain matin donnera un second banc). Le temps de calcul double :
+à vérifier aux heures chargées et avec quatre fréquences (doc 29, garder les deux modèles en mémoire).
