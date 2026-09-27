@@ -24,6 +24,7 @@ Run:
 from __future__ import annotations
 
 import asyncio
+import functools
 import io
 import json
 import logging
@@ -33,6 +34,7 @@ import threading
 import time
 import unicodedata
 import wave
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 import numpy as np
@@ -51,6 +53,7 @@ app = FastAPI(title="atc-scribe STT sidecar")
 _models: dict[str, object] = {}
 _vad = None
 _counters = {"second_opinion_ok": 0, "second_opinion_failed": 0,
+             "second_opinion_by_detector": 0, "detector_failed": 0,
              "transcribed": 0, "rejected_no_speech": 0, "audio_save_failed": 0,
              "archiving_stopped": 0}
 
@@ -222,10 +225,58 @@ def load(path: str):
 # concurrently, and two decodes at once would only share the same GPU anyway.
 _decode_lock = threading.Lock()
 
+# ...and on one thread. MLX keeps a stream per thread, and what it creates lazily
+# -- a model's weights, a cached filter bank -- belongs to the stream of the
+# thread that created it. asyncio.to_thread spreads calls over a pool, and with
+# the language detector loaded the sidecar aborted on its first request: "There
+# is no Stream(gpu, 1) in current thread". One thread for all model work is what
+# the bench did, and it never failed.
+_mlx_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mlx")
+
+
+async def on_mlx(fn, *args, **kwargs):
+    return await asyncio.get_running_loop().run_in_executor(
+        _mlx_thread, functools.partial(fn, *args, **kwargs))
+
 
 def decode(mlx_whisper, audio, **kwargs):
     with _decode_lock:
         return mlx_whisper.transcribe(audio, **kwargs)
+
+
+_detector = None
+
+
+def detector():
+    """The language-detection model, loaded once. Unlike the transcription
+    models it is held here: detection calls the model directly, not
+    mlx_whisper.transcribe."""
+    global _detector
+    if _detector is None:
+        t0 = time.time()
+        import mlx.core as mx
+        from mlx_whisper.load_models import load_model
+        model = load_model(os.path.expanduser(cfg.fr_detector)
+                           if cfg.fr_detector.startswith(("/", "~", "./")) else cfg.fr_detector)
+        # Loaded now rather than at the first detection, which would add the
+        # load to that transmission's wait. Called on the model thread (on_mlx).
+        mx.eval(model.parameters())
+        _detector = model
+        log.info("language detector loaded: %s (%.2fs)", cfg.fr_detector, time.time() - t0)
+    return _detector
+
+
+def french_probability(audio: np.ndarray) -> float:
+    """Whisper's language detection on the first 30 s: the probability that the
+    transmission is French. Costs one encoder pass -- about 0.6 s with
+    large-v3-turbo on this machine -- and no decoding."""
+    import mlx.core as mx
+    from mlx_whisper.audio import N_FRAMES, N_SAMPLES, log_mel_spectrogram, pad_or_trim
+    with _decode_lock:
+        model = detector()
+        mel = log_mel_spectrogram(mx.array(audio), n_mels=model.dims.n_mels, padding=N_SAMPLES)
+        _, probs = model.detect_language(pad_or_trim(mel, N_FRAMES, axis=-2).astype(mx.float16))
+    return float(probs.get("fr", 0.0))
 
 
 # --------------------------------------------------------------------------- routes
@@ -233,6 +284,8 @@ def decode(mlx_whisper, audio, **kwargs):
 @app.get("/health")
 def health():
     models = {"en": model_status(cfg.model_en), "fr": model_status(cfg.model_fr)}
+    if cfg.fr_detector:
+        models["detector"] = model_status(cfg.fr_detector)
     # degraded, not unhealthy: the primary model answers, so transcription works;
     # what is lost is the second opinion, and losing it quietly is the problem.
     degraded = [lang for lang, m in models.items()
@@ -248,6 +301,12 @@ def health():
         "second_opinion": cfg.second_opinion,
         "second_opinion_ok": _counters["second_opinion_ok"],
         "second_opinion_failed": _counters["second_opinion_failed"],
+        # How many second opinions the detector opened where no French word did,
+        # and at what threshold (Q50).
+        "fr_detector": cfg.fr_detector or None,
+        "fr_threshold": cfg.fr_threshold if cfg.fr_detector else None,
+        "second_opinion_by_detector": _counters["second_opinion_by_detector"],
+        "detector_failed": _counters["detector_failed"],
         # Q27 asked for this and nothing answered it: the voice gate's rejection
         # rate in production was logged only at Debug, so "is the night-time
         # parasite absent in daylight?" had no instrument.
@@ -353,7 +412,7 @@ async def transcribe(
     if prompt:
         kwargs["initial_prompt"] = prompt
 
-    result = await asyncio.to_thread(decode, mlx_whisper, audio, **kwargs)
+    result = await on_mlx(decode, mlx_whisper, audio, **kwargs)
     text = " ".join(result["text"].split())
     segments = [
         {"text": " ".join(s["text"].split()),
@@ -367,11 +426,26 @@ async def transcribe(
     # gate matters: asked on every transmission the French model also answers
     # where it has nothing to say, and invents callsigns on English audio.
     second = None
-    if (cfg.second_opinion and language == "en" and cfg.model_fr
-            and text and looks_french(text)):
+    gate, p_fr = "", None
+    if cfg.second_opinion and language == "en" and cfg.model_fr and text:
+        if looks_french(text):
+            gate = "words"
+        elif cfg.fr_detector:
+            # Only where no French word opened the gate: the detector costs an
+            # encoder pass, and a French word already says what it would.
+            try:
+                p_fr = await on_mlx(french_probability, audio)
+                if p_fr >= cfg.fr_threshold:
+                    gate = "detector"
+            except Exception as e:
+                # A detector that fails leaves the word gate, as before; counted
+                # so /health can say it is happening.
+                _counters["detector_failed"] += 1
+                log.warning("language detection failed (%d so far): %s", _counters["detector_failed"], e)
+    if gate:
         try:
             t1 = time.time()
-            r2 = await asyncio.to_thread(decode, mlx_whisper, audio,
+            r2 = await on_mlx(decode, mlx_whisper, audio,
                                          path_or_hf_repo=cfg.model_fr, language="fr")
             second = {
                 "text": " ".join(r2["text"].split()),
@@ -380,7 +454,10 @@ async def transcribe(
                 "elapsed": round(time.time() - t1, 3),
             }
             _counters["second_opinion_ok"] += 1
-            log.info("%s second opinion (fr) %r", x_frequency_id or "-", second["text"][:80])
+            if gate == "detector":
+                _counters["second_opinion_by_detector"] += 1
+            log.info("%s second opinion (fr, %s%s) %r", x_frequency_id or "-", gate,
+                     f" p_fr={p_fr:.2f}" if p_fr is not None else "", second["text"][:80])
         except Exception as e:
             # A failed second opinion is not a failed transcription: the primary
             # text stands and the caller is told nothing was added. But it is
@@ -400,6 +477,8 @@ async def transcribe(
         "texte": text,
         "texte_second": (second or {}).get("text", ""),
         "modele_second": (second or {}).get("model", ""),
+        "porte": gate,
+        "p_fr": p_fr,
     })
 
     elapsed = time.time() - started
@@ -412,6 +491,8 @@ async def transcribe(
         "second_text": (second or {}).get("text", ""),
         "second_language": (second or {}).get("language", ""),
         "second_model": (second or {}).get("model", ""),
+        "second_gate": gate if second else "",
+        "p_fr": None if p_fr is None else round(p_fr, 4),
         "duration": round(duration, 3),
         "speech_seconds": round(speech.seconds, 3),
         "speech_fraction": round(speech.fraction, 3),
@@ -468,10 +549,14 @@ def main() -> None:
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
     log.info("English model: %s", cfg.model_en)
     log.info("French model: %s", cfg.model_fr or "(none — French will be refused)")
+    if cfg.fr_detector:
+        log.info("Language detector: %s, second opinion above p(fr) %.2f", cfg.fr_detector, cfg.fr_threshold)
     if cfg.preload:
         load(cfg.model_en)
         if cfg.model_fr:
             load(cfg.model_fr)
+        if cfg.fr_detector and cfg.second_opinion and cfg.model_fr:
+            _mlx_thread.submit(detector).result()
     if cfg.exit_with_parent:
         watch_parent()
 

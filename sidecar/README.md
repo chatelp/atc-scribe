@@ -8,7 +8,8 @@ leaves the machine.
 python3 -m venv .venv && .venv/bin/pip install -r sidecar/requirements.txt
 .venv/bin/python sidecar/whisper_server.py \
     --model-en <mlx-model-or-hf-repo> \
-    [--model-fr <mlx-model-or-hf-repo>]
+    [--model-fr <mlx-model-or-hf-repo>] \
+    [--second-opinion [--fr-detector <multilingual-mlx-model> [--fr-threshold 0.1]]]
 ```
 
 `GET /health` reports which languages are served. `POST /transcribe` takes raw
@@ -52,3 +53,21 @@ stream. On isolated 3-second transmissions it measurably hurts: sevenfold more
 degeneration loops on French, decode time doubled, and the prompt text leaking
 into the transcript (`"Aircraft are at cruise level and use ICA-7, Yankee Papa…"`).
 See `docs-fr/10-mesure-amorces.md`.
+
+## Second opinion and its gate
+
+With `--second-opinion` and a French model, a transmission transcribed in English
+is read again by the French model when the English text carries a French word
+("bonjour", "niveau", "descendez"...). With `--fr-detector`, a multilingual
+Whisper not fine-tuned on English (e.g. `whisper-large-v3-turbo`) also opens it
+when its language detection gives French a probability of at least
+`--fr-threshold`: the English model turns much French into English, and then no
+French word is left to find. The detector only runs when no French word opened
+the gate. This is not the language routing the paragraph above refuses: the
+primary transcript still uses the language the caller asked for.
+
+The response says which gate opened (`second_gate`: `words` or `detector`) and
+the detector's probability (`p_fr`, when it ran); `/health` counts the second
+opinions the detector opened (`second_opinion_by_detector`) and its failures
+(`detector_failed`). All model work runs on one thread: MLX ties lazily created
+arrays to the thread that created them.

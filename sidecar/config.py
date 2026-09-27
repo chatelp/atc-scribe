@@ -40,6 +40,20 @@ class Config:
     # attributed to the wrong aircraft.
     second_opinion: bool = False
 
+    # Language detection for the second opinion (docs-fr/05-decisions.md, Q50).
+    # The word gate misses French that the English model turned into English:
+    # forced into English it anglicises -- "Air France Five One Air we conceded
+    # report three zero" -- and no French word survives. A multilingual Whisper
+    # that was not fine-tuned on English ATC (the ATC model's own detector says
+    # "English" on French) gives the probability of French, and above
+    # fr_threshold the French model reads the transmission too. Measured on 665
+    # transmissions: +8% true matches at equal precision with large-v3-turbo at
+    # 0.1, for about 0.6 s more per transmission that has no French word; the
+    # small and base models detect worse (+4% and +3%). Empty: the word gate
+    # alone, as before.
+    fr_detector: str = ""
+    fr_threshold: float = 0.1
+
     # Keep every transmission's audio, with a manifest line beside it. The whole
     # dossier rests on a single afternoon's capture: every model comparison, every
     # threshold, every control. A second corpus on different frequencies is what
@@ -88,6 +102,11 @@ def from_args(argv: list[str] | None = None) -> Config:
     p.add_argument("--log-level", default=d.log_level)
     p.add_argument("--second-opinion", dest="second", action="store_true",
                    help="on a transcript that looks French, transcribe again with the French model")
+    p.add_argument("--fr-detector", default=d.fr_detector, metavar="MODEL",
+                   help="multilingual MLX Whisper (path or HF repo) whose language detection also "
+                        "opens the second opinion; empty for the word gate alone")
+    p.add_argument("--fr-threshold", type=float, default=d.fr_threshold,
+                   help="probability of French above which the detector opens the second opinion (default 0.1)")
     p.add_argument("--save-audio", default=d.save_audio, metavar="DIR",
                    help="keep every transmission's audio and a manifest line, rejected ones included")
     p.add_argument("--save-audio-min-free-gb", type=float, default=d.save_audio_min_free_gb,
@@ -98,6 +117,7 @@ def from_args(argv: list[str] | None = None) -> Config:
     return Config(host=a.host, port=a.port, model_en=a.model_en, model_fr=a.model_fr,
                   preload=a.preload, vad_enabled=a.vad,
                   min_speech_seconds=a.min_speech_seconds, log_level=a.log_level,
-                  second_opinion=a.second, save_audio=a.save_audio,
+                  second_opinion=a.second, fr_detector=a.fr_detector,
+                  fr_threshold=a.fr_threshold, save_audio=a.save_audio,
                   save_audio_min_free_gb=a.save_audio_min_free_gb,
                   exit_with_parent=a.exit_with_parent)
