@@ -4286,7 +4286,7 @@ d'altitude) porté par la source — pour les flux séparés, `radio-ctl-sync` l
 `service` du catalogue de la station (« Approche De Gaulle », « Orly Approche », « croisière haute
 FL360-380 ») ; les positions dans le ciel que reçoit l'association ; et les réglages au panneau.
 
-### Q47 — 123,875 hache dans la sélection à quatre fréquences *(26/09 — **la position dans la bande n'est pas la cause : le hachage varie avec l'heure**, voir la contre-épreuve en fin de section)*
+### Q47 — Le hachage du squelch *(26-27/09 — **ni la position dans la bande, ni la distance de l'avion : la réception à la station** ; piste : le seuil de squelch)*
 
 **Signalé par le propriétaire à l'écoute**, pendant la séance de validation : « bcp de
 hachage/squelch sur Orly Approche, mais ça dépend de la transmission ». Le matin, 123,875 seule
@@ -4351,6 +4351,40 @@ qualité/distance »). Restent possibles :
 
 **Pour trancher** : rapprocher chaque transmission hachée de la distance de l'avion qui parle (à
 transcrire et associer, avec l'ADS-B de la même heure). Diaphonie de 126,425 : non concluant.
+
+**Fait le 27/09, de 09:17 à 11:17**, sur 124,350 + 126,425 (demande du propriétaire). co-atc
+transcrit et rattache pendant que les deux flux sont enregistrés en continu ; chaque segment de
+co-atc est retrouvé dans l'audio, avec ses fermetures de squelch de moins de 0,3 s, et, s'il est
+rattaché, la position ADS-B de l'avion (`whisper-lab/scripts/station/hachage-distance.py`, résultats
+dans `resultats/station/2026-09-27-hachage-distance/analyse.txt`).
+
+**Au passage** : co-atc date une transmission **à sa fin**, au moment où il la coupe après 0,6 s de
+silence (`internal/transcription/local.go`), pas à son début. Le recalage de l'audio sur les fins
+retrouve 85 à 91 % des segments. Il n'en retrouvait presque aucun sur les débuts.
+
+| Qui parle (classement de co-atc) | Segments | Hachés | Coupures / min de son |
+|---|---|---|---|
+| contrôleur (émetteur au sol, distance fixe) | 298 | **57 %** | 6,7 |
+| pilote | 134 | **68 %** | 7,3 |
+| inconnu | 233 | 58 % | 7,2 |
+
+Pilotes rattachés à un avion placé par l'ADS-B (41) : hachés à 86 % entre 10 et 30 NM, 44 % entre 30
+et 40, 75 % au-delà ; **aucune croissance avec la distance**, ni avec la marge d'horizon radio (74 %
+contre 78 %). Seule tendance, sur de petits effectifs : les avions bas hachent un peu plus (82 % sous
+6 000 ft, 62 % au-dessus).
+
+**Conclusion** : **le hachage ne tient pas à la distance de l'avion qui parle.** Le contrôleur, au
+sol, hache presque autant que les pilotes. C'est la réception à la station qui ferme le squelch par
+instants : le lien station–De Gaulle est faible (écart parole/souffle d'environ 11 dB le 26/09 au
+soir, contre 17 à 18 dB sur Orly), et un seuil de squelch de 10 dB laisse les creux de quelques dB
+fermer le canal.
+
+**Réserves** : un segment de co-atc peut contenir plusieurs messages (contrôleur et pilote), et le
+classement du locuteur est heuristique (Q39).
+
+**Piste suivante** : essayer un seuil de squelch plus bas (10 → 7) sur ces deux fréquences, par
+`/reglage`, en alternant avec 10 par blocs pour s'affranchir de l'heure. Mesurer les coupures, les
+ouvertures sur du bruit, et surtout les avions justes. Remettre le défaut ensuite.
 
 ### Q48 — De l'écho entre 125,825 et 126,425 : image de la clé ou fréquences couplées ? *(26/09 — **tranchée : fréquences couplées par le contrôle**)*
 
