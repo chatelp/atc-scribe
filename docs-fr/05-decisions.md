@@ -4452,8 +4452,8 @@ le Terminal (Q22), qui bascule la station et lance co-atc de 22:24 à 06:59
 
 | Heures | Trafic | 124,350 avec une jumelle sur 126,425 |
 |---|---|---|
-| 22 h – minuit | chargé (seulement 172 puis 341 transmissions par heure) | 10 % : fréquences séparées |
-| minuit – 5 h | presque rien (15 à 167 par heure, rattachements rares) | 61 à 100 % : **couplées** (Q48) |
+| 22 h – minuit | chargé (172 transmissions de 22:24 à 23 h, puis 341 de 23 h à minuit) | 10 % : fréquences séparées |
+| minuit – 5 h | faible (30 à 167 transmissions par heure, rattachements rares) | 61 à 100 % : **couplées** (Q48) |
 | 5 h – 7 h | arrivées du matin (277 puis 293 par heure) | 30 puis 15 % : séparées |
 
 **Mesure hors ligne** (règles en service, cinq ciels mélangés, les deux bases du 26 et du 27) :
