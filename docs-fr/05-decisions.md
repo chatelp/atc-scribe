@@ -4500,3 +4500,38 @@ le Terminal (Q22), qui bascule la station et lance co-atc de 22:24 à 06:59
 Par fréquence, avec secteur : 124,350 67,8 justes à 98 % ; 126,425 105,6 à 93 %. **Quatrième
 confirmation des secteurs** (D59) : hasard divisé par 2,5, +10 % d'avions justes, sur une nuit
 entière.
+
+### Q49 — L'antenne VHF réglée le 27/09 vers 11:45 : gain ou perte ? *(première comparaison, 27/09)*
+
+**Le réglage** (le propriétaire) : brins recalculés à 54,5 cm depuis le bout du support (115 cm
+de bout en bout, accord vers 124,5-126,5 MHz), contre 53,5 cm avant (environ 127 MHz). Les brins
+sont verticaux et alignés, et l'antenne est remontée de quelques centimètres sur la fenêtre.
+Manipulations de 11:20 à 11:50 environ, exclues des mesures.
+
+**Première comparaison, imparfaite** : 15 min après le réglage (11:53-12:08) sur 124,350 + 126,425,
+face aux 8 quarts d'heure de la séance du matin (09:17-11:17, mêmes fréquences, avant ;
+`whisper-lab/scripts/station/antenne-avant-apres.py`, `resultats/station/2026-09-27-antenne/`).
+
+| | 124,350 avant (min – médiane – max) | après | 126,425 avant | après |
+|---|---|---|---|---|
+| transmissions hachées | 30 – 52 – 62 % | **25 %** | 28 – 44 – 57 % | **25 %** |
+| coupures / min de son | 5,7 – 7,7 – 10,5 | **4,5** | 5,1 – 6,5 – 7,0 | **4,0** |
+| écart parole/souffle | 8,8 – 10,5 – 22,1 dB | 9,7 | 10,6 – 12,0 – 25,3 dB | **7,1** |
+
+Bruit du canal mesuré par la station, sur 10 min : 124,350 −39,8 dBFS à 11:22, −40,7 à 12:08 ;
+126,425 −40,6 puis −39,1. Aucun battement, ni avant ni après.
+
+**Lecture** : sur les deux fréquences, **moins de hachage qu'au meilleur quart d'heure du matin**.
+C'est encourageant, mais c'est un seul quart d'heure, à une autre heure. L'écart parole/souffle de
+126,425 va dans l'autre sens.
+
+**ADS-B** (le propriétaire craignait une gêne) : **aucune marche** sur la courbe continue de
+graphs1090 (10:10-12:06). Niveau médian −21,5 dBFS, bruit −26, signal le plus faible −31, tous
+stables ; portée maximale par minute inchangée (médiane 178 NM avant, 181 après). Une comparaison
+de la puissance par distance donnait 4 dB de moins sous 50 NM. Mais elle opposait la base de co-atc
+(avant) à un relevé direct d'`aircraft.json` (après) : la courbe continue la dément, c'est un
+artefact de méthode.
+
+**Reste** : la comparaison aux mêmes heures qu'hier sur 123,875 seule (13:32-14:17 et 18:46-19:30,
+audio et compteurs de la station). Et demain matin, une séance comme celle du 27/09 sur 124,350 +
+126,425, co-atc compris, même heure, même méthode, même source ADS-B.
