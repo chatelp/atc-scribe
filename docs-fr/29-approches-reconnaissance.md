@@ -1,7 +1,11 @@
-# Améliorer la reconnaissance : toutes les approches, où on en est
+# Améliorer la transcription : le modèle de langage et le son qui lui arrive
 
-*Document de référence, état au 26 septembre 2026, 16 h 30. Il se lit sans jargon ; chaque ligne
-renvoie au document qui détaille la mesure. À tenir à jour à chaque résultat.*
+*Document de référence, état au 27 septembre 2026. Il se lit sans jargon ; chaque ligne renvoie au
+document qui détaille la mesure. À tenir à jour à chaque résultat.*
+
+*Depuis le 27/09, ce document ne couvre plus que **le modèle, la chaîne de transcription et la
+réception**. Les règles qui relient ensuite le texte à un avion, avec leur réglage dans co-atc, sont
+dans **`30-association-regles-et-reglages.md`** (l'ancienne section B de ce tableau).*
 
 ## Ce qu'on cherche, et comment on juge
 
@@ -38,32 +42,19 @@ ne portent aucun indicatif (47 %).
 | 8 | Laisser le modèle deviner la langue | 16 à 28 % d'erreurs ; remplacé par la langue connue de chaque fréquence | ❌ (doc 13) |
 | 9 | Les réglages internes du modèle contre l'invention | aucun ne sépare l'invention de la bonne transcription | ❌ (D45) |
 | 9 bis | Ne donner au modèle que la parole | l'invention baisse avec la marge (presque divisée par deux à 1 s) ; les avions justes ne bougent pas au-delà du bruit, mais la fréquence faible 125,825 en perd à toutes les marges | ⏳ pas adopté en l'état (Q41) |
+| 9 ter | **L'aiguillage vers le modèle français** : aujourd'hui, la seconde lecture ne se déclenche que si le texte *anglais* contient un mot français repère (« bonjour », « niveau »…) | 27/09, 126,425 : le propriétaire entend « Air France 511 » dans des échanges en français ; forcé en anglais, le modèle **anglicise** (« Air France Five One Air we conceded report three zero »), aucun repère, pas de seconde lecture. La détection de langue de Whisper, avec notre modèle affiné sur l'ATC anglais, répond « anglais » sur ces mêmes passages | 🔲 aiguiller autrement : détection de langue par un modèle multilingue non affiné, ou mots repères plus larges, mesuré sur les passages français connus |
 
 ### B. Du texte à l'avion
 
-| | Approche | Ce qui a été mesuré | Verdict |
-|---|---|---|---|
-| 10 | Des règles de phraséologie à la place d'une IA en ligne | 66 % des transmissions livrent une valeur (niveau, cap, piste…) | ✅ (D14) |
-| 11 | Réglages de l'association : 3 chiffres, 60 s, refuser l'ambigu | fixés par balayage ; 72 % de précision | ✅ (doc 19) |
-| 12 | Corriger les mots avec un dictionnaire | gain nul | ❌ (doc 22) |
-| 13 | Compléter la liste des compagnies | 0 avion juste de plus | ❌ (Q23) |
-| 14 | Une table des indicatifs radio qui trompent (« France Soleil », « Bee Line »…) | mécanisme prouvé ; effet sur le résultat final **non mesuré** | ✅ (D47) |
-| 15 | Accepter un chiffre d'écart | 81 % de bruit | ❌ (doc 19) |
-| 16 | Accepter deux chiffres au lieu de trois | +28 % d'avions justes, mais la précision tombe de 72 à 52 % | ❌ (Q30) |
-| 17 | Lire correctement les mots accentués | corrigé ; aucun effet sur l'association | ✅ (Q38) |
-| 17 bis | **Lire les indicatifs à lettres** (« seven uniform echo » = 7UE ; « welling » = Vueling) — 59 % des indicatifs en ont | **+27 % d'avions justes** (240 -> 303 puis 306), précision 73 -> 76 %, sur les quatre fréquences | ✅ en service, réglable depuis le panneau (D58) |
-| 17 ter | **Le fil de l'échange** : un avion entendu il y a moins de 2 minutes, rappelé par ses dernières lettres ou ses deux derniers chiffres | +8 et +13 avions justes, presque sans hasard ; la compagnie seule +68 mais invérifiable à l'ADS-B | ✅ lettres et chiffres en service ; compagnie seule désactivée (D58) |
-| 17 quater | **Le secteur de chaque fréquence** : ne comparer qu'aux avions qu'elle peut avoir en ligne | hasard divisé par deux sur l'approche de Roissy ; avec le fil de l'échange, +20 % d'avions justes et précision 76 -> 84 % | ✅ validé le 26/09 sur Orly et De Gaulle (hasard ÷ 2,4, précision 91 -> 96 %), en service par défaut (D59) |
-| 17 quinquies | **Attendre l'avion** : une transmission sans avion est retentée une minute, le temps que l'ADS-B décode un avion qui vient d'entrer en portée (premier appel « Air Algerie 1214 » du 26/09) | **+29 avions justes (+8 %)** sans perte de précision ; les chiffres précédents lisaient déjà le ciel 60 s après la transmission | ✅ construit, en service au prochain lancement (D60) |
-| 17 sexies | **« France » seul = Air France** (« bonsoir France 89 Sierra Romeo ») : 157 fois sans « Air » le 24/09, contre 314 avec | **+14 avions justes (+4 %)**, précision 84 -> 85 % | ✅ en service au prochain lancement (D61) |
-| 18 | Une petite IA pour l'association | évaluée sur le papier le 23/09 ; protocole prêt, avec contrôle par ciel mélangé | 🔲 |
+→ **déplacé dans `30-association-regles-et-reglages.md`** (règles, réglages du panneau, mesures).
 
 ### C. La réception, à la station
 
 | | Approche | Ce qui a été mesuré | Verdict |
 |---|---|---|---|
-| 19 | **Recevoir chaque fréquence séparément au lieu du mélange** | **4 fois plus d'avions justes** (235 contre 60), précision égale — le gain le plus fort mesuré à ce jour | ⏳ co-atc prêt et essayé sur une station simulée (D57) ; la station doit d'abord régler les micro-coupures d'`aero.mp3` (Q45) |
-| 20 | Comprendre le hachage | c'est le squelch, sur **deux** fréquences faibles, par épisodes ; pas de coût mesurable sur l'association | ⏳ essai de réglage à faire (Q37, doc 28) |
+| 19 | **Recevoir chaque fréquence séparément au lieu du mélange** | **4 fois plus d'avions justes** (235 contre 60), précision égale — le gain le plus fort mesuré à ce jour | ✅ flux séparés en service à la station depuis le 26/09 ; co-atc les suit (D57) — séances du 26/09 et nuit du 26 au 27 ; reste le lancement de la production |
+| 20 | Comprendre le hachage | le squelch se ferme par instants au milieu des transmissions ; **la position de la fréquence dans la bande n'y est pour rien** (compteurs de la station, 26/09) ; il varie d'un facteur 10 d'un quart d'heure à l'autre ; **le contrôleur, au sol, hache presque autant que les pilotes** (27/09 : 56 % contre 63 % des transmissions) : la cause est à la réception, pas à la distance de l'avion | ⏳ séance du 27/09 en cours d'analyse (Q47) |
+| 20 bis | Deux fréquences qui reçoivent la même chose | le contrôle couple ses secteurs le soir et la nuit (approches de De Gaulle : 65 à 100 % des transmissions en double) : écho à l'écoute, transcriptions en double | ✅ compris (Q48) : n'écouter qu'une des deux |
 | 21 | Chasser le parasite de nuit | toujours là ; le bloc de la Freebox est innocenté | ⏳ coupable inconnu (Q44) |
 | 22 | Baisser le gain de la réception | ça écrête, mais baisser le gain n'est pas le remède | ❌ (D42, D43) |
 | 23 | Nettoyer le son par des filtres classiques | pas encore mesuré ; la station publie déjà un flux filtré | 🔲 (Q42) |
@@ -89,9 +80,9 @@ ne portent aucun indicatif (47 %).
 
 ## Ce qui reste à tester, par ordre d'intérêt
 
-1. **La réception séparée par fréquence, en permanence** (Q45) : le gain est déjà mesuré, et co-atc
-   sait suivre la station (D57). Reste à la station de régler les micro-coupures, puis l'essai
-   sur la vraie station.
+1. **L'aiguillage vers le modèle français** (9 ter) : du français « anglicisé » par le modèle anglais
+   n'ouvre pas la seconde lecture. À mesurer sur des passages français connus avant de changer la
+   porte.
 2. **Un quatrième essai d'entraînement, s'il vaut la peine** : repartir de l'essai 2 (le modèle
    entier), avec **beaucoup moins de clips de silence** pour qu'il ne se taise plus sur la parole
    faible, un apprentissage plus doux, puis le vocabulaire de Paris (vos indicatifs par synthèse
@@ -107,9 +98,8 @@ ne portent aucun indicatif (47 %).
 6. **Garder les deux modèles en mémoire** : l'attente derrière le modèle français fait perdre des
    transmissions aux heures chargées (6 le matin du 25/09).
 7. **Le nettoyage du son par filtres**, mesuré hors ligne avant tout réglage de la station (Q42).
-8. **Une petite IA pour l'association**, jugée avec le contrôle par ciel mélangé.
-9. **Le locuteur par la voix**.
-10. **Le modèle « turbo »**, plus rapide, jamais comparé sur l'ADS-B.
+8. **Le locuteur par la voix**.
+9. **Le modèle « turbo »**, plus rapide, jamais comparé sur l'ADS-B.
 
 ## Ce qu'on a appris en chemin
 
