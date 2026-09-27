@@ -4432,3 +4432,37 @@ règles en service, cinq ciels mélangés (`whisper-lab/resultats/station/2026-0
 Troisième confirmation des secteurs (D59), avec un gain plus faible : le hasard baisse de 28 %, et
 non d'un facteur 2,4. Les deux fréquences sont des approches de De Gaulle, dont le ciel est déjà
 concentré le soir. Avant les doublons, 125,825 donne 49 avions justes et 126,425 en donne 81.
+
+### Mesure — la nuit du 26 au 27/09 sur De Gaulle, toutes les règles du 26/09 en service
+
+**Choix du propriétaire** : une nuit sur De Gaulle, en flux séparés. Script `nuit.sh`, lancé dans
+le Terminal (Q22), qui bascule la station et lance co-atc de 22:24 à 06:59
+(`whisper-lab/resultats/station/2026-09-26-nuit-cdg/`, commit `b60f589`).
+
+**Conditions** :
+- 124,350 + 126,425, centre 125,3875 ; retour automatique à 07:00:40 vers 123,875 seule, sans
+  échec ;
+- De Gaulle aéroport principal, Orly suivi (D62) ; secteurs actifs (D59) ; attente d'une minute
+  (D60) ; « France » (D61) ;
+- deux coupures réseau : 23:04–23:06 et 04:33, sans perte des flux audio ; 9 lectures ADS-B en
+  échec.
+
+**Volume** : 1 484 transmissions (124,350 : 652 ; 126,425 : 832), **195 rattachées en direct**, dont
+5 en double. Trois régimes :
+
+| Heures | Trafic | 124,350 avec une jumelle sur 126,425 |
+|---|---|---|
+| 22 h – minuit | chargé (seulement 172 puis 341 transmissions par heure) | 10 % : fréquences séparées |
+| minuit – 5 h | presque rien (15 à 167 par heure, rattachements rares) | 61 à 100 % : **couplées** (Q48) |
+| 5 h – 7 h | arrivées du matin (277 puis 293 par heure) | 30 puis 15 % : séparées |
+
+**Mesure hors ligne** (règles en service, cinq ciels mélangés, les deux bases du 26 et du 27) :
+
+| | Rattachés | Hasard | Avions justes | Précision |
+|---|---|---|---|---|
+| sans secteur | 180 | 21,8 | 158,2 | 88 % |
+| **avec secteur** | 182 | **8,6** | **173,4** | **95 %** |
+
+Par fréquence, avec secteur : 124,350 67,8 justes à 98 % ; 126,425 105,6 à 93 %. **Quatrième
+confirmation des secteurs** (D59) : hasard divisé par 2,5, +10 % d'avions justes, sur une nuit
+entière.
