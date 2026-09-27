@@ -4541,9 +4541,15 @@ artefact de méthode.
 | coupures / min de son | 1,7 | 18,5 |
 | écart parole/souffle (médiane) | 18,2 dB | 22,8 dB |
 
-Compteurs de la station le 27/09, 13:30-14:20 : 20,6 ouvertures et 6,1 battements par minute, bruit
-−40,1 dBFS. Il n'y a pas de relevé le 26/09 à cette heure. Le soir du 26/09 (18:48-19:31), on
-comptait 9,9 ouvertures, 1,6 battement et −40,2 dBFS.
+Compteurs de la station (relevés par l'agent de la station) le 27/09, 13:30-14:19 :
+- 21,0 ouvertures et 6,7 battements par minute ;
+- squelch ouvert 23 % du temps, ouverture moyenne 0,66 s ;
+- bruit médian −40,1 dBFS.
+
+Il n'y a pas de relevé le 26/09 à cette heure. Le soir du 26/09 (18:48-19:31), on comptait :
+- 9,7 ouvertures et 1,5 battement par minute ;
+- 12 % ouvert, 0,80 s ;
+- −40,2 dBFS.
 
 **Lecture** : pas comparable. Le trafic a triplé : trois fois plus de transmissions, donc d'autres
 avions, d'autres distances, un autre mélange d'émetteurs. Le hachage monte, mais l'écart
