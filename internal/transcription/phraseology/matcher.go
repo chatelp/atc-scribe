@@ -91,8 +91,10 @@ type Matcher struct {
 	// more when the transmission names the aircraft's airline: "Air France Five
 	// One Air" for AFR511, the last digit lost (27/09, De Gaulle approach). It
 	// weighs 0.3, so it lands only with the airline named, and two aircraft of
-	// that airline starting alike make it ambiguous, hence refused. Off by
-	// default, pending measurement.
+	// that airline starting alike make it ambiguous, hence refused. The digits
+	// must follow the name. Measured on 27/09: +4.8 true on the 24/09 capture
+	// for 6.2 more by chance, +5.2 for 1.8 on the night and morning sessions --
+	// too thin to be on by default.
 	PrefixDigits bool
 
 	// PartialFlightScore is what a flight part missing its last letter weighs
@@ -340,7 +342,7 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 		if m.PrefixDigits && len(spokenOperators[prefix]) > 0 && len(digits) >= 3 {
 			for _, v := range r.Values {
 				if v.Role == RoleCallsign && len(v.Digits) == 2 && len(v.Digits) < m.MinDigits &&
-					strings.HasPrefix(digits, v.Digits) {
+					strings.HasPrefix(digits, v.Digits) && followsName(v.Word, spokenOperators[prefix]) {
 					if s := 0.3; s > score {
 						score, why, words = s, []string{"first digits"}, [][2]int{{v.Word, v.End}}
 					}
@@ -570,6 +572,19 @@ func spansOf(words [][2]int, at []Span) [][2]int {
 		}
 	}
 	return out
+}
+
+// followsName reports that a spoken number starts right after one of the
+// airline's names, "Air France | Five One": two digits anywhere else in the
+// transmission -- "cleared to route one two" -- are not a flight number.
+// Measured on 27/09: taken anywhere, about half of what the rule added was chance.
+func followsName(word int, names [][2]int) bool {
+	for _, n := range names {
+		if n[1] == word {
+			return true
+		}
+	}
+	return false
 }
 
 // splitCallsign breaks AFR1081 into ("AFR","1081",""), EZY36VJ into ("EZY","36","VJ").
