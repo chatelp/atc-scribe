@@ -35,6 +35,7 @@ var optCtxLetters, optCtxNames, optCtxDigits, optContextSwap, optPrefix bool
 var optPartial float64
 var optPositions, optSectors string
 var optAfter int
+var optSecond bool
 
 func main() {
 	in := flag.String("in", "", "JSON array of objects holding transcripts")
@@ -63,6 +64,7 @@ func main() {
 	flag.Float64Var(&optPartial, "partial", 0, "weight of a flight part missing its last letter (default 0.5)")
 	flag.StringVar(&optPositions, "positions", "", "ADS-B positions (heatmap.py output) for -sectors")
 	flag.StringVar(&optSectors, "sectors", "", "JSON: frequency -> {lat, lon, radius_nm, max_alt_ft}; the sky is cut to it")
+	flag.BoolVar(&optSecond, "second", false, "with -db: also try the French second reading, as production does (the first accepted wins)")
 	flag.IntVar(&optAfter, "after", -1, "seconds after a transmission to look for aircraft; -1 = -window. Production sees only what is known when it matches")
 	flag.BoolVar(&optContextSwap, "context-swap", false, "also rerun with each frequency given another frequency's recent aircraft: the chance level of the context rules")
 	from := flag.String("from", "", "with -db: only transmissions at or after this RFC3339 time")
@@ -182,9 +184,10 @@ func trunc(s string, n int) string {
 // ---------------------------------------------------------------- ADS-B measure
 
 type transmission struct {
-	at   time.Time
-	text string
-	freq string
+	at     time.Time
+	text   string
+	freq   string
+	second string // the French second reading, when there is one
 }
 
 // measureAgainstADSB is the only correctness measure in this project that needs
@@ -252,7 +255,7 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 	// A time window lets one recording be split by whatever changed during it --
 	// the listening group, a matcher setting -- and each slice measured on the
 	// same footing, with its own control.
-	q := `SELECT created_at, content, frequency_id FROM transcriptions WHERE content != ''`
+	q := `SELECT created_at, content, frequency_id, COALESCE(content_second, '') FROM transcriptions WHERE content != ''`
 	var args []any
 	if from != "" {
 		q += " AND created_at >= ?"
@@ -267,15 +270,18 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		return err
 	}
 	for rows.Next() {
-		var ts, txt, fq string
-		if err := rows.Scan(&ts, &txt, &fq); err != nil {
+		var ts, txt, fq, second string
+		if err := rows.Scan(&ts, &txt, &fq, &second); err != nil {
 			return err
 		}
 		t, err := time.Parse(time.RFC3339, ts)
 		if err != nil {
 			continue
 		}
-		txs = append(txs, transmission{t, txt, fq})
+		if !optSecond {
+			second = ""
+		}
+		txs = append(txs, transmission{t, txt, fq, second})
 	}
 	rows.Close()
 
@@ -390,6 +396,19 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		for _, v := range res.Values {
 			if v.Role == phraseology.RoleCallsign {
 				hasCandidate = true
+			}
+		}
+		// The second reading, tried when the first is not accepted -- production
+		// keeps the primary when both name an aircraft, so trying it second
+		// counts the same thing.
+		if tx.second != "" {
+			if m, ok := txMatcher.MatchWithContext(res, fleet, recent(tx.freq, tx.at)); !ok ||
+				(strict && m.Ambiguous) || m.Score < minScore {
+				res2 := phraseology.Parse(tx.second)
+				if m2, ok2 := txMatcher.MatchWithContext(res2, fleet, recent(tx.freq, tx.at)); ok2 &&
+					!(strict && m2.Ambiguous) && m2.Score >= minScore {
+					res, tx.text, hasCandidate = res2, "[fr] "+tx.second, true
+				}
 			}
 		}
 		// Production sends every transmission to the matcher; this path used to
