@@ -328,7 +328,18 @@ timeout_seconds = 60
 # more matches but precision falls to 66%, which means words put in the mouth of
 # the wrong aircraft.
 #
+# Add --fr-detector <multilingual MLX Whisper> to open the second opinion also on
+# transmissions with no French word whose probability of being French, as that
+# model's language detection sees it, reaches --fr-threshold (0.1). The English
+# model often turns French into English and leaves no French word to find.
+# Measured on 665 transmissions (Q50): with whisper-large-v3-turbo, +8% true
+# matches at equal precision, for about 0.6 s more per transmission; whisper-base
+# is nearly free and gains 3%. Give a local path: a hub id is fetched into the
+# Hugging Face cache, wherever that is.
+#
 # command = ["python3", "sidecar/whisper_server.py", "--preload", "--second-opinion"]
+# command = ["python3", "sidecar/whisper_server.py", "--preload", "--second-opinion",
+#            "--fr-detector", "/path/to/whisper-large-v3-turbo-mlx"]
 command = []
 startup_timeout_seconds = 60
 segment_silence_ms = 600      # silence that ends a transmission

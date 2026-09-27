@@ -4536,7 +4536,7 @@ artefact de méthode.
 audio et compteurs de la station). Et demain matin, une séance comme celle du 27/09 sur 124,350 +
 126,425, co-atc compris, même heure, même méthode, même source ADS-B.
 
-### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — à décider)*
+### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut, à valider demain)*
 
 **Le banc d'essai des modèles** (27/09) : les 665 transmissions de la séance du matin sur 124,350 +
 126,425 (09:17-11:17), retrouvées dans l'audio enregistré en continu et découpées comme co-atc les
@@ -4593,3 +4593,24 @@ moins que le turbo à 46 %. Au seuil de 0,1, les petits détecteurs ne sont d'ac
 sur 68 % (base) et 83 % (small) des transmissions. Le base est l'option presque gratuite ; le turbo
 reste le meilleur gain à précision égale. Rappel : 2 h de trafic sur deux fréquences demandaient
 14 min de calcul anglais. Avec le turbo, il en faudrait environ 28, soit un quart du temps réel.
+
+**Codé le 27/09 (choix du propriétaire : le turbo)**, dans le sidecar, désactivé par défaut :
+- `--fr-detector <modèle>` et `--fr-threshold` (0,1). La porte s'ouvre sur un mot repère, ou, s'il
+  n'y en a pas, sur p(fr) au seuil. La réponse dit laquelle (`second_gate`, `p_fr`), et `/health`
+  compte les ouvertures dues au détecteur ;
+- le turbo est donné par un chemin local, `whisper-lab/mlx-turbo` (disque externe). Un identifiant
+  Hugging Face le ferait retélécharger dans le cache interne ;
+- essayé sur un sidecar de test avec quatre transmissions du banc : trois françaises sans mot
+  repère ouvertes par le détecteur (p(fr) 0,99), une anglaise non (0,015), valeurs identiques au
+  banc ;
+- **au passage** : avec le détecteur chargé, le sidecar s'arrêtait net à la première requête (« There
+  is no Stream(gpu, 1) in current thread »). MLX lie ce qu'il crée paresseusement au fil qui le
+  crée, et `asyncio.to_thread` répartissait les appels sur plusieurs fils. Tout le travail des
+  modèles tourne désormais sur un seul fil.
+
+**Honnêteté sur le cas d'origine** : AFR511 (10:13:00) n'aurait pas été aiguillé. Le turbo lui donne
+p(fr) = 0,007 sur ce segment de 19 s, qui mêle plusieurs échanges. Le gain de +8 % vient d'autres
+transmissions.
+
+**Reste** : l'activer pour la séance de De Gaulle de demain matin, qui donnera aussi un second banc,
+puis décider de l'activer en production.
