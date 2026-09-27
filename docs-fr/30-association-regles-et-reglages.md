@@ -31,6 +31,7 @@ configuration, sous la clé `matching`.
 | By its airline alone | `context_names` | **désactivé** | même chose avec la compagnie seule, si un seul avion récent en est | +68 au-dessus du hasard, mais l'ADS-B ne peut pas dire si c'est le bon avion : à vérifier à l'oreille | D58 |
 | Only aircraft in the frequency's sector | `sectors` | activé (depuis le 26/09 au soir) | ne compare qu'aux avions que la fréquence peut avoir en ligne : dans un rayon autour de son aéroport, sous un plafond ; dans un secteur, un numéro de vol amputé de sa dernière lettre (« seven uniform » pour 7UE) est accepté | **quatre mesures** : hasard divisé par 2 à 2,5 (sauf deux approches de De Gaulle seules : −28 %), précision 76 → 84 %, 91 → 96 %, 88 → 91 %, 88 → 95 % | D59 |
 | (rayon, plafond par nature) | `sector.approach`, `.departure`, `.tower`, `.ground` → `radius_nm`, `max_alt_ft` | approche et départ 60 NM / 20 000 ft ; tour 15 / 6 000 ; sol 5 / 1 500 | taille du secteur selon la nature de la fréquence ; les fréquences de contrôle n'ont pas de secteur | approche mesurée le 24/09 ; tour et sol à mesurer | D59 |
+| First two digits, airline named | `prefix_digits` | **désactivé** | accepte les deux premiers chiffres d'un numéro de trois ou plus quand ils suivent immédiatement le nom de la compagnie, et qu'un seul avion de celle-ci commence ainsi (« Air France Five One » = AFR511) | capture du 24/09 : +4,8 avions justes pour +6,2 de hasard (85 → 84 %) ; nuit et matin du 27/09 : +5,2 pour +1,8 (94 % inchangée). Trop mince pour être activé par défaut | ci-dessous |
 | Accept one digit off | `one_digit_off` | désactivé | accepte un numéro à un chiffre près | 81 % de bruit | doc 19 |
 
 **Les aéroports suivis**, même panneau, section *Reference airport* :
@@ -102,7 +103,7 @@ sans ensuite) :
 
 | Piste | État |
 |---|---|
-| **Les deux premiers chiffres, compagnie nommée** : « Air France Five One Air » pour AFR511 (27/09) — accepter les deux premiers chiffres d'un numéro quand un seul avion de la compagnie nommée commence ainsi | 🔲 à coder derrière un réglage désactivé et mesurer (demandé le 27/09) |
+| **Les deux premiers chiffres, compagnie nommée** (AFR511, 27/09) | ✅ codé et mesuré le 27/09, **désactivé par défaut** (section 1). Prise n'importe où dans le texte, la règle ajoutait autant de hasard que d'avions justes (« cleared to route one two » pour AFR1241) ; collée au nom de la compagnie, elle gagne 1 à 2 % |
 | Le secteur des fréquences de contrôle, appris des données (où volent les avions rattachés) | 🔲 |
 | Une petite IA pour l'association, jugée avec le contrôle par ciel mélangé | 🔲 (évaluée sur le papier le 23/09) |
 | Dédoublonner une transmission reçue sur deux fréquences couplées | 🔲 constaté le 26/09 (Q48) ; seulement pour les comptes, pas pour l'affichage |

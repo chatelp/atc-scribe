@@ -182,6 +182,9 @@ func TestTheFirstTwoDigitsNeedTheAirlineAndNoTwin(t *testing.T) {
 	if _, ok := m.Match(Parse("five one air we conceded report three zero"), sky); ok {
 		t.Error("without the airline named, two digits must not be enough")
 	}
+	if _, ok := m.Match(Parse("Air France cleared to route five one"), sky); ok {
+		t.Error("two digits away from the airline's name are not its flight number")
+	}
 	twin := append(sky, Aircraft{Callsign: "AFR5162", Hex: "a4"})
 	if got, ok := m.Match(said, twin); ok && !got.Ambiguous {
 		t.Errorf("two Air France starting with 51: want ambiguous or nothing, got %+v", got)
