@@ -31,7 +31,7 @@ import (
 
 // Experimental matcher rules, set from flags (docs-fr/05-decisions.md, Q46).
 var optAlnum, optFuzzyOperators, optEvery bool
-var optCtxLetters, optCtxNames, optCtxDigits, optContextSwap bool
+var optCtxLetters, optCtxNames, optCtxDigits, optContextSwap, optPrefix bool
 var optPartial float64
 var optPositions, optSectors string
 var optAfter int
@@ -59,6 +59,7 @@ func main() {
 	flag.BoolVar(&optCtxLetters, "context-letters", false, "accept the last letters of an aircraft heard recently on the frequency (needs -context)")
 	flag.BoolVar(&optCtxNames, "context-names", false, "accept the airline alone when one aircraft of it was heard recently (needs -context)")
 	flag.BoolVar(&optCtxDigits, "context-digits", false, "accept the last two digits of an aircraft heard recently (needs -context)")
+	flag.BoolVar(&optPrefix, "prefix-digits", false, "accept the first two digits of a flight number when the airline is named")
 	flag.Float64Var(&optPartial, "partial", 0, "weight of a flight part missing its last letter (default 0.5)")
 	flag.StringVar(&optPositions, "positions", "", "ADS-B positions (heatmap.py output) for -sectors")
 	flag.StringVar(&optSectors, "sectors", "", "JSON: frequency -> {lat, lon, radius_nm, max_alt_ft}; the sky is cut to it")
@@ -209,6 +210,7 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 	matcher.FuzzyDigits = fuzzy
 	matcher.AlnumCallsigns, matcher.FuzzyOperators = optAlnum, optFuzzyOperators
 	matcher.ContextLetters, matcher.ContextNames, matcher.ContextDigits = optCtxLetters, optCtxNames, optCtxDigits
+	matcher.PrefixDigits = optPrefix
 	matcher.PartialFlightScore = optPartial
 	dbSectors, err := loadDBSectors(optSectors)
 	if err != nil {

@@ -350,7 +350,8 @@ func main() {
 		m := runtimeSettings.Matching()
 		return phraseology.Rules{Letters: m.Letters, ApproxOperators: m.ApproxOperators,
 			MinDigits: m.MinDigits, OneDigitOff: m.OneDigitOff,
-			ContextLetters: m.ContextLetters, ContextDigits: m.ContextDigits, ContextNames: m.ContextNames}
+			ContextLetters: m.ContextLetters, ContextDigits: m.ContextDigits, ContextNames: m.ContextNames,
+			PrefixDigits: m.PrefixDigits}
 	})
 
 	// Update templating service with frequencies service

@@ -131,6 +131,7 @@ type Rules struct {
 	ContextLetters  bool
 	ContextDigits   bool
 	ContextNames    bool
+	PrefixDigits    bool
 }
 
 // WithRules returns a copy of the matcher applying r. The copy shares the
@@ -139,6 +140,7 @@ func (m *Matcher) WithRules(r Rules) *Matcher {
 	c := *m
 	c.AlnumCallsigns, c.FuzzyOperators, c.FuzzyDigits = r.Letters, r.ApproxOperators, r.OneDigitOff
 	c.ContextLetters, c.ContextDigits, c.ContextNames = r.ContextLetters, r.ContextDigits, r.ContextNames
+	c.PrefixDigits = r.PrefixDigits
 	if r.MinDigits > 0 {
 		c.MinDigits = r.MinDigits
 	}

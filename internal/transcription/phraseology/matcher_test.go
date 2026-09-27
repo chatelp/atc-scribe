@@ -165,6 +165,29 @@ func TestFranceAloneIsAirFrance(t *testing.T) {
 	}
 }
 
+// Heard on 27/09 on De Gaulle approach: "Air France Five One Air" for AFR511,
+// the last digit lost. The first two digits carry it only with the airline
+// named, and only when no other aircraft of that airline starts alike.
+func TestTheFirstTwoDigitsNeedTheAirlineAndNoTwin(t *testing.T) {
+	m := newTestMatcher(t)
+	said := Parse("Air France Five One Air we conceded report three zero")
+	sky := []Aircraft{{Callsign: "AFR511", Hex: "a1"}, {Callsign: "AFR1081", Hex: "a2"}, {Callsign: "EZY51AB", Hex: "a3"}}
+	if _, ok := m.Match(said, sky); ok {
+		t.Fatal("off, as by default, nothing should be found")
+	}
+	m.PrefixDigits = true
+	if got, ok := m.Match(said, sky); !ok || got.Callsign != "AFR511" {
+		t.Errorf("want AFR511, got %+v (%v)", got, ok)
+	}
+	if _, ok := m.Match(Parse("five one air we conceded report three zero"), sky); ok {
+		t.Error("without the airline named, two digits must not be enough")
+	}
+	twin := append(sky, Aircraft{Callsign: "AFR5162", Hex: "a4"})
+	if got, ok := m.Match(said, twin); ok && !got.Ambiguous {
+		t.Errorf("two Air France starting with 51: want ambiguous or nothing, got %+v", got)
+	}
+}
+
 func TestWithoutOverridesTheMatcherIsUnchanged(t *testing.T) {
 	// The file is optional. Without it, nothing fails and nothing is guessed:
 	// "france soleil" simply names no operator, as before the file existed.
