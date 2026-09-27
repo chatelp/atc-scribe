@@ -4532,9 +4532,33 @@ de la puissance par distance donnait 4 dB de moins sous 50 NM. Mais elle opposai
 (avant) à un relevé direct d'`aircraft.json` (après) : la courbe continue la dément, c'est un
 artefact de méthode.
 
-**Reste** : la comparaison aux mêmes heures qu'hier sur 123,875 seule (13:32-14:17 et 18:46-19:30,
-audio et compteurs de la station). Et demain matin, une séance comme celle du 27/09 sur 124,350 +
-126,425, co-atc compris, même heure, même méthode, même source ADS-B.
+**Aux mêmes heures que le 26/09, sur 123,875 seule** (même centre 123,4, même seuil, même niveau) :
+
+| 123,875, 13:32-14:17 | 26/09 (avant) | 27/09 (après) |
+|---|---|---|
+| transmissions | 58 | **181** |
+| transmissions hachées | 5 % (3/58) | 49 % (89/181) |
+| coupures / min de son | 1,7 | 18,5 |
+| écart parole/souffle (médiane) | 18,2 dB | 22,8 dB |
+
+Compteurs de la station le 27/09, 13:30-14:20 : 20,6 ouvertures et 6,1 battements par minute, bruit
+−40,1 dBFS. Il n'y a pas de relevé le 26/09 à cette heure. Le soir du 26/09 (18:48-19:31), on
+comptait 9,9 ouvertures, 1,6 battement et −40,2 dBFS.
+
+**Lecture** : pas comparable. Le trafic a triplé : trois fois plus de transmissions, donc d'autres
+avions, d'autres distances, un autre mélange d'émetteurs. Le hachage monte, mais l'écart
+parole/souffle aussi, et le bruit du canal ne bouge pas. Le propriétaire conclut : « rien de
+significatif, peut-être une légère amélioration ».
+
+**Le soir (18:46-19:30) n'a pas été mesuré** : depuis 15:15, 118,150 était à l'antenne, une
+sélection faite à la main et sans durée. Le flux 123,875 n'existait plus, d'où 44 min de 404 et un
+enregistrement vide. Les compteurs ont relevé 118,150. L'enregistrement programmé ne vérifiait pas
+ce qui était à l'antenne. **Leçon : toute mesure programmée vérifie `/radio/etat` au départ**, et
+remet la fréquence si le pilotage est convenu, comme le font les `seance.sh`.
+
+**Reste** : la séance de demain matin (28/09, 09:15-11:15) sur 124,350 + 126,425, comme celle du
+27/09 : co-atc compris, même heure, même méthode, même source ADS-B. Elle reprend la main depuis
+118,150 et y revient seule. Réserve : lundi contre dimanche, le trafic diffère encore.
 
 ### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut, à valider demain)*
 
