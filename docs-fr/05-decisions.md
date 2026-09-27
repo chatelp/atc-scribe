@@ -4577,3 +4577,19 @@ modèle a anglicisé, aucun mot repère n'est resté, et il n'y a pas eu de seco
 **Réserves** : une seule séance, deux approches de De Gaulle, un dimanche matin ; à confirmer sur une
 autre (la séance de De Gaulle de demain matin donnera un second banc). Le temps de calcul double :
 à vérifier aux heures chargées et avec quatre fréquences (doc 29, garder les deux modèles en mémoire).
+
+**Des détecteurs plus petits** (même banc, demande du propriétaire ; `whisper-base` et `whisper-small`
+en MLX, 145 et 480 Mo, sur le disque externe) :
+
+| Détection | Temps médian | Aiguillées | Avions justes | Gain sur les repères | Précision | Calcul par transmission |
+|---|---|---|---|---|---|---|
+| — (repères seuls) | — | 97 (15 %) | 179,2 | — | 93 % | ~1,1 s |
+| base + repères, p(fr) ≥ 0,1 | 0,056 s | 147 (22 %) | 184,2 | +5,0 (+3 %) | 94 % | ~1,3 s |
+| small + repères, p(fr) ≥ 0,05 | 0,134 s | 263 (40 %) | 186,2 | +7,0 (+4 %) | 93 % | ~1,6 s |
+| turbo + repères, p(fr) ≥ 0,1 | 0,61 s | 309 (46 %) | 192,8 | +13,6 (+8 %) | 93 % | ~2,2 s |
+
+**Le détecteur compte, pas seulement la part aiguillée** : à 40 % d'aiguillage, le small gagne deux fois
+moins que le turbo à 46 %. Au seuil de 0,1, les petits détecteurs ne sont d'accord avec le turbo que
+sur 68 % (base) et 83 % (small) des transmissions. Le base est l'option presque gratuite ; le turbo
+reste le meilleur gain à précision égale. Rappel : 2 h de trafic sur deux fréquences demandaient
+14 min de calcul anglais. Avec le turbo, il en faudrait environ 28, soit un quart du temps réel.
