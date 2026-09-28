@@ -3879,6 +3879,29 @@ Les trois jours les plus récents restent, et le plus ancien est effacé au dém
 affiche et modifie la taille, et refuse 0,5 Go. Cinq tests (`cmd/server/retention_test.go`),
 dont une pause de dix jours qui n'efface plus rien.
 
+### D66 — Le sidecar mourait d'un débordement de pile ; son fil de calcul a 256 Mo et co-atc le relance *(28/09)*
+
+**Constaté** pendant la séance du canal ouvert, le 28/09 à 18:00:04 (signalé par Whisper-lab). Le
+sidecar de séance est mort sans trace Python. co-atc a continué sans lui : 550 « connection
+refused », plus aucune transcription pendant presque deux heures. Le rapport de plantage de macOS
+(`python3.12-2026-09-28-180005.ips`) donne la cause : **SIGBUS sur la page de garde de la pile** du
+fil qui fait tout le calcul des modèles (celui de Q50, qui corrigeait un autre plantage), en pleine
+récursion de MLX (`compile_dfs`), pendant une transcription anglaise.
+
+**Reproduit** : faire compiler par MLX un calcul de 100 000 étapes tue le processus (SIGBUS, code
+138) sur un fil Python ordinaire, dont la pile fait 16 Mo sur macOS. Pourquoi cette transcription-là
+a produit un graphe aussi profond n'est pas établi.
+
+**Deux corrections** :
+- **le fil de calcul du sidecar a une pile de 256 Mo**, réservée et non consommée. Le calcul de
+  300 000 étapes y passe (vérifié) ;
+- **co-atc relance un sidecar mort de lui-même** (`Sidecar.Supervise`), après 5 s, et renonce au-delà
+  de cinq relances en dix minutes, en le disant. Une panne permanente ne tourne pas en boucle. Deux
+  tests : la relance puis l'abandon, et aucun redémarrage après un arrêt voulu.
+
+La séance du canal ouvert reste exploitable pour la mesure du laboratoire : les enregistrements et
+l'ADS-B ont continué.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
