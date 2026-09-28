@@ -42,7 +42,7 @@ ne portent aucun indicatif (47 %).
 | 8 | Laisser le modèle deviner la langue | 16 à 28 % d'erreurs ; remplacé par la langue connue de chaque fréquence | ❌ (doc 13) |
 | 9 | Les réglages internes du modèle contre l'invention | aucun ne sépare l'invention de la bonne transcription | ❌ (D45) |
 | 9 bis | Ne donner au modèle que la parole | l'invention baisse avec la marge (presque divisée par deux à 1 s) ; les avions justes ne bougent pas au-delà du bruit, mais la fréquence faible 125,825 en perd à toutes les marges | ⏳ pas adopté en l'état (Q41) |
-| 9 ter | **L'aiguillage vers le modèle français** : aujourd'hui, la seconde lecture ne se déclenche que si le texte *anglais* contient un mot français repère (« bonjour », « niveau »…) | 27/09, 126,425 : le propriétaire entend « Air France 511 » dans des échanges en français ; forcé en anglais, le modèle **anglicise** (« Air France Five One Air we conceded report three zero »), aucun repère, pas de seconde lecture. La détection de langue de Whisper, avec notre modèle affiné sur l'ATC anglais, répond « anglais » sur ces mêmes passages | ⏳ **mesuré au banc le 27/09, confirmé le 28/09 sur le 24/09 (Q50)** : repères **ou** détection de langue par un Whisper multilingue non affiné → **+7 à +8 % d'avions justes, précision −0 à −1 point** ; « toujours le français » +10 à +11 % mais −2 points de précision. Coût moyen : calcul ×1,9 (la traîne du modèle français, jusqu'à 38 s quand il boucle). Un français plus rapide (distil, medium) perd le gain. À décider après la séance du 28/09 |
+| 9 ter | **L'aiguillage vers le modèle français** : aujourd'hui, la seconde lecture ne se déclenche que si le texte *anglais* contient un mot français repère (« bonjour », « niveau »…) | 27/09, 126,425 : le propriétaire entend « Air France 511 » dans des échanges en français ; forcé en anglais, le modèle **anglicise** (« Air France Five One Air we conceded report three zero »), aucun repère, pas de seconde lecture. La détection de langue de Whisper, avec notre modèle affiné sur l'ATC anglais, répond « anglais » sur ces mêmes passages | ✅ **en production depuis le 28/09 (D64, Q50)** : repères **ou** détection de langue (turbo, p(fr) ≥ 0,1) → **+7 à +8 % d'avions justes à précision égale**, sur trois bancs et en direct (+13,4 le 28/09). Français lu sans relance (coût ÷ 2) et **boucles coupées après le modèle** (sans relance, le français bouclait deux à trois fois plus ; avec la coupe, 4,2 et 2,5 % de textes qui bouclent, contre 9,8 et 4,8 % avec relance). Un français plus rapide (distil, medium) perd le gain |
 
 ### B. Du texte à l'avion
 
@@ -57,7 +57,14 @@ ne portent aucun indicatif (47 %).
 | 20 bis | Deux fréquences qui reçoivent la même chose | le contrôle couple ses secteurs le soir et la nuit (approches de De Gaulle : 65 à 100 % des transmissions en double) : écho à l'écoute, transcriptions en double | ✅ compris (Q48) : n'écouter qu'une des deux |
 | 21 | Chasser le parasite de nuit | toujours là ; le bloc de la Freebox est innocenté | ⏳ coupable inconnu (Q44) |
 | 22 | Baisser le gain de la réception | ça écrête, mais baisser le gain n'est pas le remède | ❌ (D42, D43) |
-| 23 | Nettoyer le son par des filtres classiques | pas encore mesuré ; la station publie déjà un flux filtré | 🔲 (Q42) |
+| 23 | Nettoyer le son par des filtres classiques | **le filtre voix de la station nuit à Whisper** (28/09, laboratoire) : passe-haut 300, passe-bas 2 800, compresseur et limiteur, rejoués à l'identique sur le Mac, sur le banc du 27/09, passe anglaise → 153,8 avions justes contre 166,5 (**−8 %**), textes vides 2,0 % contre 0,5 %, boucles 7,7 % contre 6,2 % | ❌ on garde le flux brut pour la reconnaissance (Q42) |
+| 23 bis | Combler les trous du squelch | les coupures font 7 % de l'audio. Les combler d'un souffle limité à la bande, au niveau du bruit de chaque transmission → 162,7 avions justes contre 166,5, dans le bruit de mesure ; boucles 6,2 → 5,4 %. Les retirer → 158,1. Nos trous ne font pas inventer le modèle, contrairement à une étude de 2026, où 30 % de l'audio était mis à zéro | ❌ aucun gain ; un canal sans squelch n'est plus prioritaire (28/09, laboratoire) |
+
+### C bis. D'autres modèles de reconnaissance
+
+| | Approche | Ce qui a été mesuré | Verdict |
+|---|---|---|---|
+| 23 ter | Kyutai STT (`stt-1b-en_fr`, MLX), bilingue par construction | sur 50 transmissions du 27/09 tirées au hasard : **43 textes vides**, 1 avec un mot de phraséologie ; le modèle anglais de production : 0 vide, 28 avec. Il lit bien la voix propre d'ATCOSIM, mais sur la radio d'UWB-ATCC il rend de l'hébreu ou rien | ❌ écarté (28/09, laboratoire) |
 
 ### D. Entraîner le modèle sur le bruit de la station (plan 27)
 
@@ -80,12 +87,9 @@ ne portent aucun indicatif (47 %).
 
 ## Ce qui reste à tester, par ordre d'intérêt
 
-1. **L'aiguillage vers le modèle français** (9 ter, Q50) : +8 % puis +7 % sur deux bancs en ajoutant
-   la détection de langue. À décider après la séance du 28/09, qui mesure la file d'attente en
-   direct.
-   - **Couper la traîne du modèle français** : ses lectures de plus de 10 s sont des boucles,
-     relancées jusqu'à six fois à des températures croissantes. Elles pèsent sur le coût moyen de
-     la seconde lecture. À mesurer au banc : sans relance, ou bornée en durée.
+1. ~~**L'aiguillage vers le modèle français**~~ : fait, en production depuis le 28/09 (9 ter), avec
+   la lecture sans relance et la coupe des boucles. La suite, mesurer et améliorer le texte
+   lui-même, est le plan du laboratoire (`whisper-lab/PLAN-LABO.md`, D63).
 2. **Un quatrième essai d'entraînement, s'il vaut la peine** : repartir de l'essai 2 (le modèle
    entier), avec **beaucoup moins de clips de silence** pour qu'il ne se taise plus sur la parole
    faible, un apprentissage plus doux, puis le vocabulaire de Paris (vos indicatifs par synthèse
