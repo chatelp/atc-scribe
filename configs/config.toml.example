@@ -337,6 +337,13 @@ timeout_seconds = 60
 # is nearly free and gains 3%. Give a local path: a hub id is fetched into the
 # Hugging Face cache, wherever that is.
 #
+# Add --fr-no-fallback to read French once at temperature 0: the temperature
+# fallback fires on the French model's loops, and removing it halves the mean
+# French read for the same matches (Q50).
+#
+# Add --save-audio <dir> to keep every transmission's audio with a daily manifest
+# (sidecar/README.md), on a disk with room: about 1-2 GB a day on two frequencies.
+#
 # command = ["python3", "sidecar/whisper_server.py", "--preload", "--second-opinion"]
 # command = ["python3", "sidecar/whisper_server.py", "--preload", "--second-opinion",
 #            "--fr-detector", "/path/to/whisper-large-v3-turbo-mlx"]

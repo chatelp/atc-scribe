@@ -54,6 +54,15 @@ class Config:
     fr_detector: str = ""
     fr_threshold: float = 0.1
 
+    # Read French once, at temperature 0, instead of mlx_whisper's fallback of up
+    # to six decodes at rising temperature (Q50). The fallback fires on the
+    # French model's loops, and those are what made the second opinion expensive:
+    # measured on two benches, the mean French decode falls from 3.83 to 1.77 s
+    # and from 2.73 to 1.41 s, reads over 10 s from 70 to 2 and 46 to 0, and the
+    # true matches stay within one aircraft (192.2 against 192.8, 202.0 against
+    # 202.8). Off: the fallback, as before.
+    fr_no_fallback: bool = False
+
     # Keep every transmission's audio, with a manifest line beside it. The whole
     # dossier rests on a single afternoon's capture: every model comparison, every
     # threshold, every control. A second corpus on different frequencies is what
@@ -107,6 +116,8 @@ def from_args(argv: list[str] | None = None) -> Config:
                         "opens the second opinion; empty for the word gate alone")
     p.add_argument("--fr-threshold", type=float, default=d.fr_threshold,
                    help="probability of French above which the detector opens the second opinion (default 0.1)")
+    p.add_argument("--fr-no-fallback", dest="fr_no_fallback", action="store_true",
+                   help="read French once at temperature 0, without the temperature fallback (Q50)")
     p.add_argument("--save-audio", default=d.save_audio, metavar="DIR",
                    help="keep every transmission's audio and a manifest line, rejected ones included")
     p.add_argument("--save-audio-min-free-gb", type=float, default=d.save_audio_min_free_gb,
@@ -118,6 +129,7 @@ def from_args(argv: list[str] | None = None) -> Config:
                   preload=a.preload, vad_enabled=a.vad,
                   min_speech_seconds=a.min_speech_seconds, log_level=a.log_level,
                   second_opinion=a.second, fr_detector=a.fr_detector,
-                  fr_threshold=a.fr_threshold, save_audio=a.save_audio,
+                  fr_threshold=a.fr_threshold, fr_no_fallback=a.fr_no_fallback,
+                  save_audio=a.save_audio,
                   save_audio_min_free_gb=a.save_audio_min_free_gb,
                   exit_with_parent=a.exit_with_parent)
