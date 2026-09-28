@@ -5768,7 +5768,7 @@ async initAircraftDataSource() {
 function serverSettings() {
     return {
         state: null,
-        draft: { log_level: 'info', db_retention_days: 7, reference_airport: '', also_airports: [], matching: null },
+        draft: { log_level: 'info', db_retention_gb: 20, reference_airport: '', also_airports: [], matching: null },
         newAccount: null, // { username, password } while the first account is being typed
         busy: false,
         error: '',
@@ -5785,7 +5785,7 @@ function serverSettings() {
                 this.state = await r.json();
                 this.draft = {
                     log_level: this.state.settings.log_level,
-                    db_retention_days: this.state.settings.db_retention_days,
+                    db_retention_gb: this.state.settings.db_retention_gb,
                     reference_airport: this.state.settings.reference_airport,
                     also_airports: (this.state.settings.also_airports || []).slice(),
                     // A deep copy: the sector sizes are edited in place by the inputs.
@@ -5801,18 +5801,28 @@ function serverSettings() {
         async save() {
             // Retention decides when data is deleted, so the panel says what it
             // is about to do rather than doing it silently.
-            const days = Number(this.draft.db_retention_days);
-            if (!Number.isFinite(days) || days < 1 || days > 365) {
-                this.flash('Retention must be between 1 and 365 days.', true);
+            const gb = Number(this.draft.db_retention_gb);
+            if (!Number.isFinite(gb) || gb < 1 || gb > 1000) {
+                this.flash('The size kept must be between 1 and 1000 GB.', true);
                 return;
             }
-            if (this.state && days < this.state.settings.db_retention_days) {
-                const kept = this.state.storage.daily_files || [];
-                const doomed = kept.length - days;
+            if (this.state && gb < this.state.settings.db_retention_gb) {
+                // What the server will do: newest first, today's kept whatever
+                // its size, and from the first day that does not fit, it and
+                // every older one deleted.
+                const files = this.state.storage.daily_files || [];
+                const cap = gb * 1024 * 1024 * 1024;
+                let total = files.filter(f => f.active).reduce((s, f) => s + f.bytes, 0);
+                let doomed = 0, over = false;
+                for (const f of files.filter(f => !f.active)) {
+                    if (!over && total + f.bytes <= cap) { total += f.bytes; continue; }
+                    over = true;
+                    doomed++;
+                }
                 if (doomed > 0 && !confirm(
-                    'Lowering retention to ' + days + ' days will delete ' + doomed +
+                    'Keeping ' + gb + ' GB will delete ' + doomed +
                     ' older database file(s) at the next hourly sweep. Continue?')) {
-                    this.draft.db_retention_days = this.state.settings.db_retention_days;
+                    this.draft.db_retention_gb = this.state.settings.db_retention_gb;
                     return;
                 }
             }
@@ -5825,7 +5835,7 @@ function serverSettings() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         log_level: this.draft.log_level,
-                        db_retention_days: days,
+                        db_retention_gb: gb,
                         reference_airport: this.draft.reference_airport,
                         // The reference airport cannot also be a further one.
                         also_airports: this.draft.also_airports.filter(c => c !== this.draft.reference_airport),

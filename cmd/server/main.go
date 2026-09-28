@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -33,8 +34,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-const defaultDBRetentionDays = 7
 
 // refAdapter wraps reference.Service to implement adsb.ReferenceService interface
 type refAdapter struct {
@@ -179,17 +178,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := cleanupOldDailyDatabases(dbDir, dbPath, cfg.Storage.DBRetentionDays, time.Now().UTC(), log); err != nil {
+	// Values that can be changed while the server runs, from the settings panel.
+	// Read before the first retention pass, so a size set from the panel is the
+	// one that pass obeys, not the configured default.
+	runtimeSettings := config.NewRuntime(cfg, *configPath, log)
+
+	if cfg.Storage.DBRetentionDays > 0 {
+		log.Warn("db_retention_days is no longer used: the daily databases are kept within db_retention_gb",
+			logger.Int("db_retention_days", cfg.Storage.DBRetentionDays),
+			logger.Float64("db_retention_gb", runtimeSettings.DBRetentionGB()))
+	}
+	if err := cleanupOldDailyDatabases(dbDir, dbPath, runtimeSettings.DBRetentionGB(), log); err != nil {
 		log.Warn("Failed to clean up old database files",
 			logger.Error(err),
 			logger.String("path", dbDir),
-			logger.Int("retention_days", cfg.Storage.DBRetentionDays))
+			logger.Float64("retention_gb", runtimeSettings.DBRetentionGB()))
 	}
 
 	log.Info("Using daily database", logger.String("path", dbPath))
-
-	// Values that can be changed while the server runs, from the settings panel.
-	runtimeSettings := config.NewRuntime(cfg, *configPath, log)
 
 	// Create SQLite storage with no retention settings
 	sqliteStorage, err := sqlite.NewAircraftStorage(
@@ -531,12 +537,12 @@ func runDatabaseRetentionCleanup(ctx context.Context, dbDir string, db *sqlite.D
 		// Read on every pass, not captured once: a retention changed from the
 		// settings panel takes effect on the next sweep rather than at the next
 		// restart.
-		keepDays := rt.DBRetentionDays()
-		if err := cleanupOldDailyDatabases(dbDir, db.Path(), keepDays, time.Now().UTC(), log); err != nil {
+		capGB := rt.DBRetentionGB()
+		if err := cleanupOldDailyDatabases(dbDir, db.Path(), capGB, log); err != nil {
 			log.Warn("Periodic database retention cleanup failed",
 				logger.Error(err),
 				logger.String("path", dbDir),
-				logger.Int("retention_days", keepDays))
+				logger.Float64("retention_gb", capGB))
 		}
 	}
 
@@ -568,61 +574,82 @@ func runDatabaseRetentionCleanup(ctx context.Context, dbDir string, db *sqlite.D
 	}
 }
 
-func cleanupOldDailyDatabases(dbDir, activeDBPath string, keepDays int, now time.Time, log *logger.Logger) error {
-	if keepDays <= 0 {
-		keepDays = defaultDBRetentionDays
+// cleanupOldDailyDatabases keeps the daily databases within capGB together
+// (28/09, D65). Newest first: the files that fit are kept, and from the first one
+// that does not, it and every older file are deleted -- never a newer day for an
+// older one. Today's file is never deleted, and counts. A file's -wal and -shm
+// count with it and go with it.
+func cleanupOldDailyDatabases(dbDir, activeDBPath string, capGB float64, log *logger.Logger) error {
+	if capGB <= 0 {
+		capGB = config.DefaultDBRetentionGB
 	}
+	capBytes := int64(capGB * (1 << 30))
 
 	entries, err := os.ReadDir(dbDir)
 	if err != nil {
 		return fmt.Errorf("read db directory: %w", err)
 	}
 
+	type daily struct {
+		path  string
+		date  time.Time
+		bytes int64
+	}
 	absActiveDBPath, _ := filepath.Abs(activeDBPath)
-	cutoffDate := now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -(keepDays - 1))
-
-	deletedCount := 0
+	var files []daily
+	var total int64
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
 		fileName := entry.Name()
-		if !strings.HasPrefix(fileName, "co-atc-") || !strings.HasSuffix(fileName, ".db") {
+		if entry.IsDir() || !strings.HasPrefix(fileName, "co-atc-") || !strings.HasSuffix(fileName, ".db") {
 			continue
 		}
-
-		dateStr := strings.TrimSuffix(strings.TrimPrefix(fileName, "co-atc-"), ".db")
-		fileDate, parseErr := time.Parse("2006-01-02", dateStr)
+		fileDate, parseErr := time.Parse("2006-01-02", strings.TrimSuffix(strings.TrimPrefix(fileName, "co-atc-"), ".db"))
 		if parseErr != nil {
 			continue
 		}
-
-		if !fileDate.Before(cutoffDate) {
+		path := filepath.Join(dbDir, fileName)
+		var size int64
+		for _, p := range []string{path, path + "-wal", path + "-shm"} {
+			if info, err := os.Stat(p); err == nil {
+				size += info.Size()
+			}
+		}
+		if abs, _ := filepath.Abs(path); abs == absActiveDBPath {
+			total += size // kept whatever its size
 			continue
 		}
+		files = append(files, daily{path, fileDate, size})
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].date.After(files[j].date) })
 
-		filePath := filepath.Join(dbDir, fileName)
-		absFilePath, _ := filepath.Abs(filePath)
-		if absFilePath == absActiveDBPath {
+	deleted, over := 0, false
+	var freed int64
+	for _, f := range files {
+		if !over && total+f.bytes <= capBytes {
+			total += f.bytes
 			continue
 		}
-
-		if removeErr := os.Remove(filePath); removeErr != nil {
-			return fmt.Errorf("remove old db '%s': %w", filePath, removeErr)
+		over = true
+		for _, p := range []string{f.path, f.path + "-wal", f.path + "-shm"} {
+			if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("remove old db '%s': %w", p, err)
+			}
 		}
-		deletedCount++
+		deleted++
+		freed += f.bytes
 		log.Info("Deleted old database file",
-			logger.String("path", filePath),
-			logger.String("file_date", fileDate.Format("2006-01-02")))
+			logger.String("path", f.path),
+			logger.String("file_date", f.date.Format("2006-01-02")),
+			logger.Int64("bytes", f.bytes))
 	}
 
-	if deletedCount > 0 {
+	if deleted > 0 {
 		log.Info("Database retention cleanup complete",
-			logger.Int("deleted_files", deletedCount),
-			logger.Int("retention_days", keepDays))
+			logger.Int("deleted_files", deleted),
+			logger.Int64("freed_bytes", freed),
+			logger.Int64("kept_bytes", total),
+			logger.Float64("retention_gb", capGB))
 	}
-
 	return nil
 }
 

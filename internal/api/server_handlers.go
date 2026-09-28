@@ -82,7 +82,7 @@ type StorageState struct {
 	ActiveDBBytes      int64       `json:"active_db_bytes"`
 	GrowthBytesPerHour int64       `json:"growth_bytes_per_hour"` // -1 while still measuring
 	Rotates            bool        `json:"rotates"`
-	RetentionDays      int         `json:"retention_days"`
+	RetentionGB        float64     `json:"retention_gb"`
 	DailyFiles         []DailyFile `json:"daily_files"`
 	TotalBytes         int64       `json:"total_bytes"`
 	DiskFreeBytes      int64       `json:"disk_free_bytes"`
@@ -162,9 +162,9 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 
 	dir := h.config.Storage.SQLiteBasePath
 	st.Storage = StorageState{
-		Dir:           dir,
-		ActiveDB:      h.db.Path(),
-		RetentionDays: h.runtime.DBRetentionDays(),
+		Dir:         dir,
+		ActiveDB:    h.db.Path(),
+		RetentionGB: h.runtime.DBRetentionGB(),
 		// True since the daily database began rotating at midnight. It used to be
 		// opened once at startup and never reopened, so a long-running server
 		// wrote one unbounded file that retention skipped as the active one. The
@@ -299,8 +299,8 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 	// client that only wants to change the log level does not silently set the
 	// retention to nothing.
 	current := h.runtime.Settings()
-	if next.DBRetentionDays == 0 {
-		next.DBRetentionDays = current.DBRetentionDays
+	if next.DBRetentionGB == 0 {
+		next.DBRetentionGB = current.DBRetentionGB
 	}
 	if next.LogLevel == "" {
 		next.LogLevel = current.LogLevel
@@ -330,7 +330,7 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	h.logger.Info("Server settings changed from the panel",
 		logger.String("by", by),
-		logger.Int("db_retention_days", next.DBRetentionDays),
+		logger.Float64("db_retention_gb", next.DBRetentionGB),
 		logger.String("log_level", next.LogLevel),
 		logger.String("reference_airport", next.ReferenceAirport),
 		logger.String("also_airports", strings.Join(next.AlsoAirports, ",")),

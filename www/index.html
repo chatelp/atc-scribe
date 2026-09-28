@@ -567,12 +567,14 @@
                                         </div>
                             
                                         <div class="flex items-center justify-between gap-2.5">
-                                            <span class="text-sm">Keep databases for</span>
+                                            <!-- A size, not a number of days (28/09): the oldest days go
+                                                 past it, today's never. -->
+                                            <span class="text-sm">Keep databases up to</span>
                                             <div class="flex items-center gap-2">
-                                                <input type="number" min="1" max="365"
-                                                       x-model.number="draft.db_retention_days" @change="save()"
+                                                <input type="number" min="1" max="1000" step="1"
+                                                       x-model.number="draft.db_retention_gb" @change="save()"
                                                        class="w-16 bg-background border border-border rounded px-2 py-0.5 text-sm text-right">
-                                                <span class="text-xs opacity-60">days</span>
+                                                <span class="text-xs opacity-60">GB</span>
                                             </div>
                                         </div>
                             
