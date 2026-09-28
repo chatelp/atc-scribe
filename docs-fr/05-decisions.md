@@ -3844,6 +3844,40 @@ décide. Elle se relance d'un double-clic sur `runs/production.command`. Quand e
 prend le GPU par à-coups, avec environ 8 Go de modèles en mémoire, et l'audio ne s'archive que
 pendant ce temps (`whisper-lab/PLANNING-MACHINE.md`).
 
+### D65 — Les bases se gardent par taille, 20 Go, et non plus 7 jours *(28/09)*
+
+**Proposé par le propriétaire**, quand la production est passée à la demande (D64).
+- Avec 7 jours, une relance après une semaine de pause effaçait d'un coup toutes les bases, même
+  légères, dont celles que l'archive audio du laboratoire référence.
+- Ce qui compte, c'est la place sur le disque, pas l'âge.
+
+**La règle** (`cleanupOldDailyDatabases`, au démarrage puis toutes les heures) :
+- les bases quotidiennes sont gardées ensemble **sous 20 Go**, en partant de la plus récente ;
+- dès qu'un jour ne tient plus, il est effacé, **avec tous les jours plus anciens**. On ne garde
+  jamais un jour ancien à la place d'un jour récent ;
+- la base du jour n'est jamais effacée, et elle compte dans les 20 Go ;
+- les fichiers `-wal` et `-shm` d'une base comptent avec elle, et partent avec elle ;
+- le premier passage lit la taille réglée depuis le panneau, et non la valeur par défaut. Avant,
+  le passage du démarrage obéissait au TOML même si le panneau disait autre chose.
+
+**Le chiffre** :
+- une journée complète en continu a pesé 1,8 Go le 24/09, et 2,6 Go au plus fort du trafic
+  (D32) ;
+- 20 Go font donc **8 à 11 journées en continu**, et des mois de production lancée pour les
+  écoutes ;
+- le disque interne a 44,6 Go libres.
+
+**Les réglages** :
+- `db_retention_gb` (TOML) et le panneau (« Keep databases up to … GB », de 1 à 1000)
+  remplacent `db_retention_days` ;
+- une ancienne valeur en jours est ignorée, et un avertissement le dit au démarrage ;
+- baisser la taille demande une confirmation, qui annonce combien de fichiers partiront.
+
+Mesuré sur une instance de test : quatre bases factices de 1, 1, 1 et 0,1 Go, une taille de 3 Go.
+Les trois jours les plus récents restent, et le plus ancien est effacé au démarrage. Le panneau
+affiche et modifie la taille, et refuse 0,5 Go. Cinq tests (`cmd/server/retention_test.go`),
+dont une pause de dix jours qui n'efface plus rien.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET

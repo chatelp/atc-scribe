@@ -20,8 +20,8 @@ import (
 // makes it worth reading. This file records only what was changed from the panel,
 // and the TOML stays the source of the defaults.
 type RuntimeSettings struct {
-	DBRetentionDays int    `json:"db_retention_days"`
-	LogLevel        string `json:"log_level"`
+	DBRetentionGB float64 `json:"db_retention_gb"`
+	LogLevel      string  `json:"log_level"`
 
 	// ReferenceAirport is the airport that approach, departure, takeoff and
 	// landing are judged against, and whose weather is fetched. It starts as
@@ -212,7 +212,7 @@ const RuntimeSettingsFile = "runtime-settings.json"
 func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 	r := &Runtime{
 		settings: RuntimeSettings{
-			DBRetentionDays:  cfg.Storage.DBRetentionDays,
+			DBRetentionGB:    cfg.Storage.DBRetentionGB,
 			LogLevel:         cfg.Logging.Level,
 			ReferenceAirport: normalizeAirport(cfg.Station.AirportCode),
 		},
@@ -231,8 +231,10 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 		r.log.Warn("Ignoring unreadable runtime settings", logger.String("path", r.path), logger.Error(err))
 		return r
 	}
-	if saved.DBRetentionDays > 0 {
-		r.settings.DBRetentionDays = saved.DBRetentionDays
+	// A file saved before 28/09 holds db_retention_days instead, which no
+	// longer exists: it is ignored and the configured size applies.
+	if saved.DBRetentionGB > 0 {
+		r.settings.DBRetentionGB = saved.DBRetentionGB
 	}
 	if saved.LogLevel != "" {
 		r.settings.LogLevel = saved.LogLevel
@@ -256,7 +258,7 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 	}
 	r.log.Info("Applied saved runtime settings",
 		logger.String("path", r.path),
-		logger.Int("db_retention_days", r.settings.DBRetentionDays),
+		logger.Float64("db_retention_gb", r.settings.DBRetentionGB),
 		logger.String("log_level", r.settings.LogLevel),
 		logger.String("reference_airport", r.settings.ReferenceAirport),
 		logger.String("also_airports", strings.Join(r.settings.AlsoAirports, ",")))
@@ -321,20 +323,20 @@ func (r *Runtime) Matching() MatchingRules {
 	return r.settings.Matching.clone()
 }
 
-// DBRetentionDays is read on every retention tick rather than captured once, so a
+// DBRetentionGB is read on every retention tick rather than captured once, so a
 // change from the panel takes effect on the next pass.
-func (r *Runtime) DBRetentionDays() int {
+func (r *Runtime) DBRetentionGB() float64 {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return r.settings.DBRetentionDays
+	return r.settings.DBRetentionGB
 }
 
 // Apply validates and applies a change, then persists it. Nothing is applied unless
 // every field validates: a half-applied settings change is harder to reason about
 // than a rejected one.
 func (r *Runtime) Apply(next RuntimeSettings) error {
-	if next.DBRetentionDays < 1 || next.DBRetentionDays > 365 {
-		return fmt.Errorf("db_retention_days must be between 1 and 365, got %d", next.DBRetentionDays)
+	if next.DBRetentionGB < 1 || next.DBRetentionGB > 1000 {
+		return fmt.Errorf("db_retention_gb must be between 1 and 1000, got %g", next.DBRetentionGB)
 	}
 	switch next.LogLevel {
 	case "debug", "info", "warn", "error":
@@ -400,7 +402,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 	}
 
 	r.log.Info("Runtime settings changed",
-		logger.Int("db_retention_days", next.DBRetentionDays),
+		logger.Float64("db_retention_gb", next.DBRetentionGB),
 		logger.String("log_level", next.LogLevel),
 		logger.String("reference_airport", next.ReferenceAirport),
 		logger.String("also_airports", strings.Join(next.AlsoAirports, ",")),

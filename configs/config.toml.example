@@ -119,8 +119,13 @@ type = "sqlite"
 # The actual filename will be generated as co-atc-YYYY-MM-DD.db
 sqlite_base_path = "data"
 
-# Number of daily SQLite DB files to keep (older co-atc-YYYY-MM-DD.db files are deleted)
-db_retention_days = 7
+# Size kept for the daily databases together, in GB (1 GB = 2^30 bytes). Past it
+# the oldest co-atc-YYYY-MM-DD.db files are deleted, today's never. A size rather
+# than a number of days: a server run on demand made "7 days" delete everything
+# after a week's pause. A full day of continuous running measured 1.8 GB (24/09),
+# 2.6 GB at the busiest rate (D32), so 20 GB is 8 to 11 such days, and months of a
+# server run on demand. Changeable from the settings panel.
+db_retention_gb = 20
 
 #######################################################
 # Station Location Configuration

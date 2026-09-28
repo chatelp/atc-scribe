@@ -123,10 +123,22 @@ type LoggingConfig struct {
 
 // StorageConfig contains data persistence configuration
 type StorageConfig struct {
-	Type            string `toml:"type"`              // Storage backend type (currently only "sqlite" is supported)
-	SQLiteBasePath  string `toml:"sqlite_base_path"`  // Base path for SQLite database files (actual filename will be generated as co-atc-YYYY-MM-DD.db)
-	DBRetentionDays int    `toml:"db_retention_days"` // Number of daily SQLite DB files to keep (older files are deleted)
+	Type           string `toml:"type"`             // Storage backend type (currently only "sqlite" is supported)
+	SQLiteBasePath string `toml:"sqlite_base_path"` // Base path for SQLite database files (actual filename will be generated as co-atc-YYYY-MM-DD.db)
+	// DBRetentionGB caps the daily databases together: past it the oldest is
+	// deleted, today's never. A size rather than a number of days (28/09): with a
+	// server run on demand, days said nothing about what a disk can hold, and a
+	// restart after a week's pause deleted every file at once.
+	DBRetentionGB float64 `toml:"db_retention_gb"`
+	// DBRetentionDays is no longer used; kept so an old configuration still
+	// loads, and says so at startup.
+	DBRetentionDays int `toml:"db_retention_days"`
 }
+
+// DefaultDBRetentionGB is the retention when none is configured: 8 to 11 full
+// days of a continuously running server (1.8 GB measured on 24/09, 2.6 GB a day
+// at the busiest rate, docs-fr D32), months of one run on demand.
+const DefaultDBRetentionGB = 20.0
 
 // StationConfig contains physical location configuration for the monitoring station
 type StationConfig struct {
@@ -567,8 +579,8 @@ func (c *Config) Validate() error {
 	if c.ADSB.FetchIntervalSecs <= 0 {
 		return fmt.Errorf("invalid fetch interval: %d", c.ADSB.FetchIntervalSecs)
 	}
-	if c.Storage.DBRetentionDays <= 0 {
-		c.Storage.DBRetentionDays = 7 // Default to 7 days
+	if c.Storage.DBRetentionGB <= 0 {
+		c.Storage.DBRetentionGB = DefaultDBRetentionGB
 	}
 
 	// Validate logging config

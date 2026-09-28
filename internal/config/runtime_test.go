@@ -17,7 +17,7 @@ func newRuntimeIn(t *testing.T, dir string) *Runtime {
 		t.Fatal(err)
 	}
 	cfg := &Config{}
-	cfg.Storage.DBRetentionDays = 7
+	cfg.Storage.DBRetentionGB = DefaultDBRetentionGB
 	cfg.Logging.Level = "info"
 	cfg.Station.AirportCode = "LFPZ"
 	return NewRuntime(cfg, filepath.Join(dir, "config.toml"), log)
@@ -160,7 +160,7 @@ func TestAnInvalidFieldBlocksTheAirportToo(t *testing.T) {
 
 	next := r.Settings()
 	next.ReferenceAirport = "LFPO"
-	next.DBRetentionDays = 0
+	next.DBRetentionGB = 0
 	if err := r.Apply(next); err == nil {
 		t.Fatal("a retention of 0 must be refused")
 	}
@@ -241,12 +241,46 @@ func TestAMatchingRuleOutOfRangeIsRefusedWhole(t *testing.T) {
 func TestAnOlderSettingsFileGetsTheDefaultRules(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, RuntimeSettingsFile),
-		[]byte(`{"db_retention_days": 30, "log_level": "warn"}`), 0o644); err != nil {
+		[]byte(`{"db_retention_gb": 30, "log_level": "warn"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	r := newRuntimeIn(t, dir)
-	if r.Settings().DBRetentionDays != 30 || !r.Matching().Letters {
+	if r.Settings().DBRetentionGB != 30 || !r.Matching().Letters {
 		t.Errorf("got %+v, matching %+v", r.Settings(), r.Matching())
+	}
+}
+
+// A file saved when retention was a number of days keeps its other settings,
+// and the retention falls back to the configured size: seven days never meant
+// any particular size, so it is not converted into one.
+func TestARetentionInDaysGivesWayToTheConfiguredSize(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, RuntimeSettingsFile),
+		[]byte(`{"db_retention_days": 7, "log_level": "warn", "reference_airport": "LFPO"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := newRuntimeIn(t, dir)
+	got := r.Settings()
+	if got.DBRetentionGB != DefaultDBRetentionGB || got.LogLevel != "warn" || got.ReferenceAirport != "LFPO" {
+		t.Errorf("got %+v", got)
+	}
+}
+
+// The size is bounded: nothing below 1 GB, which would delete yesterday on a busy
+// day, nor above 1000.
+func TestTheRetentionSizeIsBounded(t *testing.T) {
+	r := newRuntimeIn(t, t.TempDir())
+	for _, gb := range []float64{0.5, 1001} {
+		next := r.Settings()
+		next.DBRetentionGB = gb
+		if err := r.Apply(next); err == nil {
+			t.Errorf("a retention of %g GB must be refused", gb)
+		}
+	}
+	next := r.Settings()
+	next.DBRetentionGB = 12.5
+	if err := r.Apply(next); err != nil || r.DBRetentionGB() != 12.5 {
+		t.Errorf("12.5 GB: err %v, in force %g", err, r.DBRetentionGB())
 	}
 }
 
