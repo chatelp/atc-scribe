@@ -43,6 +43,7 @@ from fastapi.responses import JSONResponse
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from config import Config, from_args  # noqa: E402
+from loops import cut_loops  # noqa: E402
 
 WHISPER_RATE = 16000
 
@@ -54,6 +55,7 @@ _models: dict[str, object] = {}
 _vad = None
 _counters = {"second_opinion_ok": 0, "second_opinion_failed": 0,
              "second_opinion_by_detector": 0, "detector_failed": 0,
+             "second_opinion_loops_cut": 0,
              "transcribed": 0, "rejected_no_speech": 0, "audio_save_failed": 0,
              "archiving_stopped": 0}
 
@@ -336,6 +338,8 @@ def health():
         "fr_threshold": cfg.fr_threshold if cfg.fr_detector else None,
         "second_opinion_by_detector": _counters["second_opinion_by_detector"],
         "fr_no_fallback": cfg.fr_no_fallback,
+        "fr_cut_loops": cfg.fr_cut_loops,
+        "second_opinion_loops_cut": _counters["second_opinion_loops_cut"],
         "detector_failed": _counters["detector_failed"],
         # Q27 asked for this and nothing answered it: the voice gate's rejection
         # rate in production was logged only at Debug, so "is the night-time
@@ -479,8 +483,13 @@ async def transcribe(
             fr_kwargs = {"temperature": 0.0} if cfg.fr_no_fallback else {}
             r2 = await on_mlx(decode, mlx_whisper, audio,
                               path_or_hf_repo=cfg.model_fr, language="fr", **fr_kwargs)
+            raw_second = " ".join(r2["text"].split())
+            text_second = cut_loops(raw_second) if cfg.fr_cut_loops else raw_second
+            if text_second != raw_second:
+                _counters["second_opinion_loops_cut"] += 1
             second = {
-                "text": " ".join(r2["text"].split()),
+                "text": text_second,
+                "raw": raw_second,
                 "language": "fr",
                 "model": cfg.model_fr,
                 "elapsed": round(time.time() - t1, 3),
@@ -508,6 +517,9 @@ async def transcribe(
         "modele": model,
         "texte": text,
         "texte_second": (second or {}).get("text", ""),
+        # As the model read it, before any loop was cut, so the cut can be
+        # measured again (whisper-lab).
+        "texte_second_brut": (second or {}).get("raw", ""),
         "modele_second": (second or {}).get("model", ""),
         "porte": gate,
         "p_fr": None if p_fr is None else round(p_fr, 4),

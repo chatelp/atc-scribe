@@ -4896,6 +4896,34 @@ mlx_whisper à température croissante) :
   rapport à la production d'aujourd'hui (repères seuls, avec relances, 1,9 s) : 2,5 à 2,8 s par
   transmission, contre 3,0 à 3,8 s avec les relances.
 
+**Correction du 28/09 après-midi (Whisper-lab)** : « sans effet » ne valait que pour
+l'association. **Sans relance, le texte français boucle deux à trois fois plus** : la relance était
+précisément ce qui sortait le modèle de ses boucles. Je ne l'ai pas vu, parce que je ne jugeais que
+l'indicatif.
+
+La mesure : une jauge sans référence (`whisper-lab/scripts/labo/charabia.py`). Une boucle est un
+4-gramme répété plus de deux fois ; un texte est « trop long » au-delà de quatre mots par seconde
+de parole, plus quatre.
+
+| Français, repères ou p(fr) ≥ 0,1 | Boucles 27/09 | 28/09 | Trop longs 27/09 | 28/09 | Avions justes 27/09 | 28/09 |
+|---|---|---|---|---|---|---|
+| avec relance (production jusqu'au 28/09 midi) | 9,8 % | 4,8 % | 23,0 % | 17,9 % | 190,4 | 200,9 |
+| sans relance | 22,4 % | 12,0 % | 31,7 % | 23,5 % | 190,3 | 200,7 |
+| **sans relance + coupe des boucles** | **4,2 %** | **2,5 %** | **18,8 %** | **17,4 %** | 190,7 | 199,1 |
+
+Avions justes sur 20 ciels mélangés. Résultats : `whisper-lab/resultats/labo/2026-09-28-boucles/`.
+
+**La coupe** (`sidecar/loops.py`, option `--fr-cut-loops`, désactivée par défaut) coupe le texte
+français après le modèle, là où une suite de mots se répète bout à bout. Elle garde une
+occurrence et jette la suite. Un mot seul doit revenir quatre fois de suite, puisque « one one
+one » est un nombre légitime ; un groupe de deux à huit mots, trois fois.
+- **Le texte devient meilleur qu'avec la relance**, pour un calcul deux fois moindre.
+- Il y a deux rattachements de moins sur le banc du 28/09, au bord du bruit.
+- Le manifeste de l'archive garde le texte brut (`texte_second_brut`), pour remesurer.
+- Elle est identique, sur les 2 528 textes français des deux bancs, à la version du laboratoire.
+- **Elle n'est pas appliquée à l'anglais** : elle y coûte 1 à 4 avions justes pour un gain plus
+  faible (boucles 6,2 → 4,8 %).
+
 **Une limite du banc, trouvée en route** : il recoupe l'audio dans l'enregistrement continu, et ses
 coupes ne sont pas exactement celles de co-atc.
 - **Seuls 8 à 11 % de ses textes anglais sont identiques à ceux du direct.** Les niveaux restent
