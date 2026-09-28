@@ -3830,9 +3830,14 @@ Un indicatif faux affiché coûte la confiance dans l'outil.
   exactement sa ligne en base. C'est la matière première du laboratoire (D63) ;
 - toutes les règles d'association de la semaine, à leurs réglages par défaut (doc 30).
 
-**Le mot de passe** : co-atc demande une connexion (accès « account »), et `radio-ctl-sync` a
-besoin du compte. Le propriétaire tape le mot de passe dans la fenêtre Terminal au lancement ; il
-n'est écrit nulle part.
+**Le mot de passe** : la production était en accès « compte » (D51), et `radio-ctl-sync`, qui
+ajoute les fréquences par l'API, devait donc se connecter.
+- Au premier lancement, un mot de passe mal tapé l'a fait réessayer toutes les 10 s. Il a
+  consommé 5 des 8 essais que co-atc accorde par quart d'heure avant d'être coupé.
+- Le script vérifie désormais le mot de passe avant de le confier à la liaison, et le redemande
+  trois fois au plus.
+- Le jour même, **le propriétaire a passé la production en « cette machine uniquement »** : le
+  script ne demande plus rien quand l'accès est local.
 
 **Le GPU** est désormais pris en continu, par à-coups : c'est inscrit dans
 `whisper-lab/PLANNING-MACHINE.md`. Un entraînement long du laboratoire se décidera avec le
