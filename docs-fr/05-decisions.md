@@ -4501,7 +4501,7 @@ Par fréquence, avec secteur : 124,350 67,8 justes à 98 % ; 126,425 105,6 à 93
 confirmation des secteurs** (D59) : hasard divisé par 2,5, +10 % d'avions justes, sur une nuit
 entière.
 
-### Q49 — L'antenne VHF réglée le 27/09 vers 11:45 : gain ou perte ? *(première comparaison, 27/09)*
+### Q49 — L'antenne VHF réglée le 27/09 vers 11:45 : gain ou perte ? *(28/09 : légère amélioration à la même heure, ADS-B intacte)*
 
 **Le réglage** (le propriétaire) : brins recalculés à 54,5 cm depuis le bout du support (115 cm
 de bout en bout, accord vers 124,5-126,5 MHz), contre 53,5 cm avant (environ 127 MHz). Les brins
@@ -4562,9 +4562,47 @@ enregistrement vide. Les compteurs ont relevé 118,150. L'enregistrement program
 ce qui était à l'antenne. **Leçon : toute mesure programmée vérifie `/radio/etat` au départ**, et
 remet la fréquence si le pilotage est convenu, comme le font les `seance.sh`.
 
-**Reste** : la séance de demain matin (28/09, 09:15-11:15) sur 124,350 + 126,425, comme celle du
-27/09 : co-atc compris, même heure, même méthode, même source ADS-B. Elle reprend la main depuis
-118,150 et y revient seule. Réserve : lundi contre dimanche, le trafic diffère encore.
+**À la même heure, 28/09 contre 27/09** : 09:17-11:17, 124,350 + 126,425, même centre, même seuil,
+co-atc transcrivant pendant qu'on enregistre. Le 27/09 était un dimanche, avant le réglage ; le 28/09
+un lundi, après. Script : `whisper-lab/scripts/station/antenne-meme-heure.py`, résultats dans
+`resultats/station/2026-09-28-banc-cdg-matin/antenne.txt`.
+
+| Séance entière | 124,350 le 27/09 | le 28/09 | 126,425 le 27/09 | le 28/09 |
+|---|---|---|---|---|
+| transmissions | 639 | 725 | 548 | 442 |
+| transmissions hachées | 47 % | **38 %** | 42 % | **33 %** |
+| coupures / min de son | 7,9 | **6,6** | 6,3 | **4,9** |
+| écart parole/souffle (médiane) | 10,8 dB | 9,6 dB | 12,0 dB | **20,6 dB** |
+| quarts d'heure hachés (min – max) | 30 – 62 % | 29 – 49 % | 28 – 57 % | 17 – 43 % |
+
+**ADS-B**, même source les deux jours (la base de co-atc), 07:17-09:17 UTC :
+- **aucune différence de puissance reçue à distance égale** : de 0 à 20 NM, −15,2 puis −14,1 dBFS ;
+  au-delà, les écarts restent sous 0,4 dB ;
+- **le réglage de la VHF ne gêne pas l'ADS-B**. La portée maximale par minute baisse un peu
+  (médiane 178 NM, puis 165), mais il y a moins d'avions lointains ce lundi : 8 119 positions
+  entre 100 et 150 NM, contre 12 953. La puissance à distance égale, elle, ne bouge pas.
+
+**Compteurs de la station le 28/09** (09:18-11:15, relevés par l'agent de la station ; aucun relevé
+le 27/09 à cette heure) :
+- 124,350 : 10,7 ouvertures et 0,3 battement par minute, 52 % ouvert, ouvertures de 2,9 s en
+  moyenne, bruit −37,9 dBFS ;
+- 126,425 : 5,3 ouvertures et 0 battement par minute, 31 % ouvert, 3,5 s, bruit −42,6 dBFS.
+
+Presque aucun battement : le squelch est propre. Les 4,7 dB de bruit d'écart entre deux fréquences
+placées symétriquement autour du centre n'ont pas d'explication établie. Ces relevés servent de
+référence pour la suite.
+
+**Lecture** :
+- **le hachage baisse de 9 points sur les deux fréquences**. Le pire quart d'heure du 28/09
+  (49 %) reste sous la médiane du 27/09 sur 124,350 ;
+- l'écart parole/souffle monte nettement sur 126,425 (+8,6 dB) et baisse un peu sur 124,350
+  (−1,2 dB) ;
+- **cela confirme une légère amélioration**, sans pouvoir l'attribuer avec certitude au réglage :
+  un jour de semaine contre un dimanche, avec un autre trafic, et d'autres avions à d'autres
+  distances.
+
+**Reste** : la soirée du 28/09 sur 123,875 (18:46-19:30, contre le 26/09), qui complètera la
+comparaison sur une autre fréquence.
 
 ### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut ; confirmé sur un second jour le 28/09)*
 
