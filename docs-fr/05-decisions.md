@@ -3992,7 +3992,7 @@ explication probable, non vérifiée — le détecteur de voix manque une partie
 et la couper retire de vrais mots. **Pas adopté en l'état** : à reprendre avec un détecteur plus
 sensible pour le tri que pour l'acceptation, et à juger sur un autre jour.
 
-### Q42 — Nettoyer l'audio avant la reconnaissance, sans IA *(ouverte, 24/09)*
+### Q42 — Nettoyer l'audio avant la reconnaissance, sans IA *(24/09 — **le 28/09, le filtre voix de la station nuit à la reconnaissance : −8 % d'avions justes ; on garde le flux brut**, doc 29 ligne 23)*
 
 Question du propriétaire : *« il n'y a pas des techniques non IA pour améliorer fortement la
 qualité audio, supprimer les parasites, clarifier la voix en amont de la reconnaissance ? »*
