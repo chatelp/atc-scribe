@@ -3823,7 +3823,8 @@ Un indicatif faux affiché coûte la confiance dans l'outil.
   production du 25/09 transcrivait encore surtout le mélange (1 449 transmissions sur 1 621), qui
   vaut quatre fois moins d'avions justes (doc 28) ;
 - **la seconde lecture française** ouverte par un mot repère ou par le détecteur (turbo, 0,1), et
-  lue **sans relance de température** (`--fr-no-fallback`) ;
+  lue **sans relance de température** (`--fr-no-fallback`), ses boucles coupées après le modèle
+  (`--fr-cut-loops`, ajouté le 28/09 dans l'après-midi sur décision du propriétaire, Q50) ;
 - **l'audio de chaque transmission gardé** sur le disque externe
   (`whisper-corpus/sidecar-audio`, un manifeste par jour, arrêt sous 60 Go libres). co-atc envoie
   au sidecar la date de la transmission (`X-Created-At`), si bien que chaque clip retrouve
