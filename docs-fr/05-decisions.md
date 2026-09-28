@@ -4601,7 +4601,7 @@ Par fréquence, avec secteur : 124,350 67,8 justes à 98 % ; 126,425 105,6 à 93
 confirmation des secteurs** (D59) : hasard divisé par 2,5, +10 % d'avions justes, sur une nuit
 entière.
 
-### Q49 — L'antenne VHF réglée le 27/09 vers 11:45 : gain ou perte ? *(28/09 : légère amélioration à la même heure, ADS-B intacte)*
+### Q49 — L'antenne VHF réglée le 27/09 vers 11:45 : gain ou perte ? *(close le 28/09 : légère amélioration à la même heure, ADS-B intacte ; réglage gardé)*
 
 **Le réglage** (le propriétaire) : brins recalculés à 54,5 cm depuis le bout du support (115 cm
 de bout en bout, accord vers 124,5-126,5 MHz), contre 53,5 cm avant (environ 127 MHz). Les brins
@@ -4711,8 +4711,11 @@ réglage perso, même conteneur airband. Il reste deux changements possibles, et
 - le bloc CPL de la Freebox, remplacé le 24/09 à 16:15 ;
 - les flux séparés (`multiple_output_threads`), le 26/09 à 11:15, a priori côté sortie seulement.
 
-**Reste** : la soirée du 28/09 sur 123,875 (18:46-19:30, contre le 26/09), qui complètera la
-comparaison sur une autre fréquence.
+**Close le 28/09** sur la comparaison du matin. La soirée prévue sur 123,875 (18:46-19:30, contre le
+26/09) a été annulée, sur décision du propriétaire. Une seule soirée ne départagerait rien : le
+hachage varie d'un facteur 10 à 30 d'une tranche de dix minutes à l'autre, ce serait un lundi contre
+un samedi, et 123,875 est hors de la plage d'accord de l'antenne (124,5-126,5 MHz). **Le réglage est
+gardé.**
 
 ### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut ; confirmé sur trois bancs et en direct le 28/09)*
 
