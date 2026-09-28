@@ -3810,6 +3810,34 @@ et aucun enregistrement ne part dans le cloud. Seul l'agent du laboratoire y fai
 Ce qui manque le plus, c'est une mesure du charabia : le juge actuel, l'ADS-B, ne voit que
 l'indicatif.
 
+### D64 — co-atc en production : un flux par fréquence, la détection de langue, l'audio gardé *(28/09)*
+
+Le propriétaire a choisi la détection (Q50) plutôt que « toujours le français » : +7 à +8 %
+d'avions justes à précision égale, contre +10 à +12 % pour un à deux points de précision perdus.
+Un indicatif faux affiché coûte la confiance dans l'outil.
+
+**Ce qui tourne depuis le 28/09 à 14:40** (`configs/config.toml`, lancé par
+`runs/production.command` dans une fenêtre Terminal) :
+- **un flux par fréquence à l'antenne**, par `radio-ctl-sync`, qui lit l'état de la station sans
+  jamais la basculer. Le mélange `aero.mp3` reste écoutable, mais n'est plus transcrit : la
+  production du 25/09 transcrivait encore surtout le mélange (1 449 transmissions sur 1 621), qui
+  vaut quatre fois moins d'avions justes (doc 28) ;
+- **la seconde lecture française** ouverte par un mot repère ou par le détecteur (turbo, 0,1), et
+  lue **sans relance de température** (`--fr-no-fallback`) ;
+- **l'audio de chaque transmission gardé** sur le disque externe
+  (`whisper-corpus/sidecar-audio`, un manifeste par jour, arrêt sous 60 Go libres). co-atc envoie
+  au sidecar la date de la transmission (`X-Created-At`), si bien que chaque clip retrouve
+  exactement sa ligne en base. C'est la matière première du laboratoire (D63) ;
+- toutes les règles d'association de la semaine, à leurs réglages par défaut (doc 30).
+
+**Le mot de passe** : co-atc demande une connexion (accès « account »), et `radio-ctl-sync` a
+besoin du compte. Le propriétaire tape le mot de passe dans la fenêtre Terminal au lancement ; il
+n'est écrit nulle part.
+
+**Le GPU** est désormais pris en continu, par à-coups : c'est inscrit dans
+`whisper-lab/PLANNING-MACHINE.md`. Un entraînement long du laboratoire se décidera avec le
+propriétaire, production suspendue ou non.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
@@ -4832,5 +4860,6 @@ coupes ne sont pas exactement celles de co-atc.
   « toujours le français » (+10 à +12 %, un à deux points de précision en moins). Sans relance,
   « toujours le français » ne coûte guère plus que la détection (2,8 à 3,1 s par transmission
   contre 2,5 à 2,8 s), et épargne le troisième modèle ;
-- coder la lecture française sans relance dans le sidecar ;
-- puis l'activer en production, avec `--save-audio`.
+- ~~coder la lecture française sans relance dans le sidecar~~ : fait le 28/09 (`--fr-no-fallback`) ;
+- ~~l'activer en production, avec `--save-audio`~~ : **le propriétaire a choisi la détection. En
+  production depuis le 28/09 à 14:40**, voir D64.
