@@ -4700,6 +4700,16 @@ référence pour la suite.
   un jour de semaine contre un dimanche, avec un autre trafic, et d'autres avions à d'autres
   distances.
 
+**Une fausse piste écartée** : 126,425 battait environ 46 fois par minute le 24/09 (doc 28), et 0 le
+28/09. Ce n'est pas l'antenne. Elle ne battait déjà plus le 26/09 au soir, avant le réglage : 120
+ouvertures et 0 battement de 20:32 à 20:50, alors que 125,825 battait toujours, environ 15 fois par
+minute (compteurs de l'agent de la station).
+
+Aucun réglage de 126,425 n'a changé entre-temps : seuil 10, gain 40, ampfactor 1,3, pas de
+réglage perso, même conteneur airband. Il reste deux changements possibles, et aucun n'est mesuré :
+- le bloc CPL de la Freebox, remplacé le 24/09 à 16:15 ;
+- les flux séparés (`multiple_output_threads`), le 26/09 à 11:15, a priori côté sortie seulement.
+
 **Reste** : la soirée du 28/09 sur 123,875 (18:46-19:30, contre le 26/09), qui complètera la
 comparaison sur une autre fréquence.
 
