@@ -3779,6 +3779,31 @@ proche de sa dernière position (4,1 à 7,6 NM). Aucune attribution fausse. Rest
 Les 7 décollages sont tous d'avions légers ou sans position. La station ne voit pas les avions de
 ligne au sol à Orly ni à De Gaulle.
 
+### D63 — Un agent dédié à la reconnaissance et au laboratoire *(28/09)*
+
+**Le constat du propriétaire** : les règles d'association rattachent de plus en plus d'avions, mais
+le texte autour reste « quasi inexploitable ». L'anglais sort des mots d'aviation noyés dans du
+charabia ; le français rattache certains avions, entouré d'encore plus de charabia. La question
+de fond est d'améliorer la reconnaissance elle-même, sans que le propriétaire retranscrive des
+milliers d'heures.
+
+**Décision** : une session Claude dédiée devient responsable de cette question et du laboratoire
+(`whisper-lab/` : scripts, corpus, modèles, bancs, entraînement). Sa mission est dans
+`whisper-lab/MISSION-LABO.md`.
+
+**Le partage** :
+- **la session atc-scribe garde** co-atc et le sidecar, les règles d'association (doc 30), le
+  pilotage de l'écoute de la station (une seule session pilote), et ce dossier. Elle inscrit dans
+  le doc 29 les conclusions chiffrées que l'agent du laboratoire lui envoie ;
+- **l'agent du laboratoire** ne fait pas de commit dans ce dépôt. Il propose ses changements du
+  sidecar sous forme de diff mesuré ;
+- **le GPU du Mac est partagé** : tout calcul MLX de plus de 10 min s'inscrit dans
+  `whisper-lab/PLANNING-MACHINE.md`, et la session concernée est prévenue.
+
+**Son premier livrable** est un plan court, soumis au propriétaire avant tout entraînement long.
+Ce qui manque le plus, c'est une mesure du charabia : le juge actuel, l'ADS-B, ne voit que
+l'indicatif.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
