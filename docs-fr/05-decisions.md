@@ -4814,8 +4814,9 @@ mlx_whisper à température croissante) :
 
 - **Le gain est gardé**, à moins d'un avion près, pour un coût français divisé par deux. Le texte
   change sur un tiers des transmissions, sans effet sur l'association.
-- **Le calcul total par transmission, détection comprise, passe de ×1,9 à ×1,4-1,7** par rapport
-  aux repères seuls d'aujourd'hui : 2,5 à 2,8 s contre 1,6 à 1,9 s.
+- **Le calcul total par transmission, détection comprise, passe de ×1,6-1,9 à ×1,3-1,4** par
+  rapport à la production d'aujourd'hui (repères seuls, avec relances, 1,9 s) : 2,5 à 2,8 s par
+  transmission, contre 3,0 à 3,8 s avec les relances.
 
 **Une limite du banc, trouvée en route** : il recoupe l'audio dans l'enregistrement continu, et ses
 coupes ne sont pas exactement celles de co-atc.
