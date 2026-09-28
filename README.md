@@ -102,28 +102,63 @@ What does not work yet, and is known:
 
 ## How it works
 
+Two diagrams: from the radio to the text, then from the text to the aircraft.
+**●** marks a component written for atc-scribe, **○** an upstream Co-ATC component
+it adapts; unmarked boxes are third-party software, models, or the receiving station.
+
+```mermaid
+flowchart TD
+  station["Receiving station<br/>one audio stream per frequency<br/><i>RTLSDR-Airband · Icecast</i>"]
+  stationlink["● Station link<br/>follows the station's selection every 10 s<br/><i>radio-ctl-sync (Go)</i>"]
+  seg["● Segmenter<br/>a transmission ends after 0.6 s of silence<br/><i>co-atc local backend (Go) · ffmpeg</i>"]
+  subgraph sidecar["● Transcription sidecar · Python, FastAPI, mlx-whisper"]
+    direction LR
+    vad["Speech or noise?<br/><i>Silero VAD</i>"] --> en["English model<br/>first reading<br/><i>whisper-large-v3-atco2</i>"]
+    en --> gate["● French gate<br/>a French word, or p(fr) ≥ 0.1<br/><i>whisper-large-v3-turbo</i>"]
+    gate --> fr["French model<br/>second reading, no fallback<br/><i>whisper-large-v3-french</i>"]
+  end
+  db["○ Database and web interface<br/><i>SQLite · map + radio panel</i>"]
+  archive["● Audio archive<br/>every transmission, as received<br/><i>sidecar --save-audio</i>"]
+  station --> seg
+  stationlink --> seg
+  seg --> sidecar
+  sidecar --> db
+  sidecar --> archive
+  db --> matching["● Matching to aircraft, below"]
+
+  classDef core fill:#E3F2EF,stroke:#1F7A74,color:#0F4A46
+  classDef model fill:#F7E6F0,stroke:#A8336F,color:#6A1C45
+  classDef ext fill:#ECEFEC,stroke:#8C958F,color:#2E3631
+  class stationlink,seg,db,matching core
+  class vad,en,gate,fr model
+  class station,archive ext
 ```
-  VHF antenna ──► RTLSDR-Airband ──► Icecast ──┐
-                                               │
-  ADS-B antenna ──► readsb/tar1090 ────────┐   │
-                                           ▼   ▼
-                                     ┌───────────────┐
-                                     │    co-atc     │  Go, chi, SQLite
-                                     │               │
-                     squelch-split   │  ┌─────────┐  │
-                     audio ──────────┼─►│ sidecar │  │  Python, FastAPI
-                                     │  │ Silero  │  │
-                                     │  │ +Whisper│  │
-                     text ◄──────────┼──└─────────┘  │
-                                     │       │       │
-                                     │       ▼       │
-                                     │  ┌─────────┐  │
-                                     │  │ grammar │  │  Go, no model
-                                     │  └─────────┘  │
-                                     └───────┬───────┘
-                                             ▼
-                                  browser: map + radio panel
+
+```mermaid
+flowchart TD
+  txt["Transcribed text<br/>English first, then French"] --> grammar["● Grammar<br/>callsign, levels, headings<br/><i>phraseology (Go)</i>"]
+  sky["○ ADS-B sky<br/>aircraft in range of the station<br/><i>readsb · tar1090 → ADS-B service</i>"] --> sector["● Sector filter<br/>aircraft in the frequency's sector<br/><i>sector table per frequency</i>"]
+  grammar --> matcher["● Matcher<br/>digits, airline, letters, 2-minute memory<br/><i>OpenFlights airlines.dat</i>"]
+  sector --> matcher
+  matcher --> strict["● Refuse if ambiguous<br/>two close candidates: none"]
+  strict --> ok["● Aircraft attached<br/>shown, remembered 2 minutes"]
+  strict --> retry["● No aircraft yet<br/>retried for 60 s"]
+
+  classDef core fill:#E3F2EF,stroke:#1F7A74,color:#0F4A46
+  classDef ext fill:#ECEFEC,stroke:#8C958F,color:#2E3631
+  class grammar,sector,matcher,strict,ok,retry core
+  class txt,sky ext
 ```
+
+What each piece bought, as true callsign matches (attached to the right aircraft, minus
+what shuffled ADS-B skies give by chance), measured on this station:
+
+| Piece | Effect | Measured on |
+|---|---|---|
+| One stream per frequency instead of the mix | ×4 | 235 against 60, 24/09 capture |
+| The week's matching rules | 240 → 387 | the 24/09 reference capture |
+| Language detector at the French gate | +7 to +8 % at equal precision | three benches and a live session, 28/09 |
+| French read without temperature fallback | half the French decoding time, same matches | two benches, 28/09 |
 
 ### The sidecar
 
