@@ -9,12 +9,14 @@ python3 -m venv .venv && .venv/bin/pip install -r sidecar/requirements.txt
 .venv/bin/python sidecar/whisper_server.py \
     --model-en <mlx-model-or-hf-repo> \
     [--model-fr <mlx-model-or-hf-repo>] \
-    [--second-opinion [--fr-detector <multilingual-mlx-model> [--fr-threshold 0.1]]]
+    [--second-opinion [--fr-detector <multilingual-mlx-model> [--fr-threshold 0.1]] [--fr-no-fallback]] \
+    [--save-audio <dir> [--save-audio-min-free-gb 8]]
 ```
 
 `GET /health` reports which languages are served. `POST /transcribe` takes raw
 `s16le` PCM (or a WAV container) with `X-Sample-Rate`, `X-Channels`, `X-Language`
-and `X-Frequency-Id`, and returns the transcript plus `duration`,
+and `X-Frequency-Id` (and optionally `X-Created-At` / `X-Segment-At`, see the
+archive below), and returns the transcript plus `duration`,
 `speech_seconds`, `realtime_factor`, and `rejected` when nothing was transcribed.
 
 ## Two departures from the upstream design, both measured
@@ -71,3 +73,28 @@ the detector's probability (`p_fr`, when it ran); `/health` counts the second
 opinions the detector opened (`second_opinion_by_detector`) and its failures
 (`detector_failed`). All model work runs on one thread: MLX ties lazily created
 arrays to the thread that created them.
+
+`--fr-no-fallback` reads French once, at temperature 0, instead of mlx_whisper's
+fallback of up to six decodes at rising temperature. The fallback fires on the
+French model's loops: on two benches it made the mean French read 3.8 and 2.7 s,
+against 1.8 and 1.4 s without it, for the same matches within one aircraft.
+
+## The audio archive
+
+`--save-audio <dir>` keeps every transmission exactly as it arrived, before
+resampling, rejected ones included, as `<dir>/<YYYYMMDD>/<frequency>/t_*.wav`,
+with one manifest per day, `<dir>/<YYYYMMDD>/manifeste.jsonl`. A line holds:
+- the texts (`texte`, `texte_second`), the gate (`porte`) and `p_fr`;
+- `speech_seconds`, and `rejected` for a clip the voice gate dropped;
+- per decoded segment, `temperature`, `compression_ratio`, `avg_logprob` and
+  `no_speech_prob`, for both readings (`segments`, `segments_second`). A
+  temperature above 0 marks a segment the fallback re-read, which is how a loop
+  shows;
+- `recu_utc`, when the sidecar received it;
+- `created_at` and `segment_at_utc`, when the caller sends `X-Created-At` and
+  `X-Segment-At`. co-atc sends the date its database row will carry, so a clip
+  joins its transcription exactly. Under a queue, the sidecar sees a transmission
+  up to a minute after it ended.
+
+Archiving stops, and transcription goes on, when free space falls below
+`--save-audio-min-free-gb`.

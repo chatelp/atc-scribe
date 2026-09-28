@@ -195,7 +195,9 @@ def keep_audio(raw: bytes, rate: int, channels: int, record: dict) -> str:
             w.setframerate(rate)
             w.writeframes(raw)
         record["fichier"] = os.path.relpath(path, cfg.save_audio)
-        with open(os.path.join(cfg.save_audio, "manifeste.jsonl"), "a") as m:
+        # One manifest per day, beside that day's audio: a single file would
+        # grow without end, and a day is the unit the archive is used in.
+        with open(os.path.join(cfg.save_audio, day, "manifeste.jsonl"), "a") as m:
             m.write(json.dumps(record, ensure_ascii=False) + "\n")
         return path
     except Exception as e:
@@ -203,6 +205,33 @@ def keep_audio(raw: bytes, rate: int, channels: int, record: dict) -> str:
         _counters["audio_save_failed"] += 1
         log.warning("could not keep audio: %s", e)
         return ""
+
+
+def identity(frequency_id: str, received: float, segment_at: str, created_at: str) -> dict:
+    """The fields that tie a manifest line to its transcription in co-atc's
+    database. `created_at` is co-atc's own value for the row, sent with the
+    audio: under a queue the sidecar sees a transmission up to a minute after it
+    ended, so its own clock cannot be the join key."""
+    rec = {
+        "at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(received)),
+        "recu_utc": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(received)) + f".{int(received * 1000) % 1000:03d}Z",
+        "frequency_id": frequency_id,
+    }
+    if segment_at:
+        rec["segment_at_utc"] = segment_at
+    if created_at:
+        rec["created_at"] = created_at
+    return rec
+
+
+def decode_details(result: dict) -> list:
+    """Per-segment decoding figures for the archive. A segment decoded at a
+    temperature above 0 is one the fallback re-read, which is how a loop shows."""
+    out = []
+    for s in result.get("segments", []):
+        out.append({k: (round(s[k], 4) if isinstance(s.get(k), float) else s.get(k))
+                    for k in ("start", "end", "temperature", "compression_ratio", "avg_logprob", "no_speech_prob")})
+    return out
 
 
 def load(path: str):
@@ -306,6 +335,7 @@ def health():
         "fr_detector": cfg.fr_detector or None,
         "fr_threshold": cfg.fr_threshold if cfg.fr_detector else None,
         "second_opinion_by_detector": _counters["second_opinion_by_detector"],
+        "fr_no_fallback": cfg.fr_no_fallback,
         "detector_failed": _counters["detector_failed"],
         # Q27 asked for this and nothing answered it: the voice gate's rejection
         # rate in production was logged only at Debug, so "is the night-time
@@ -354,6 +384,8 @@ async def transcribe(
     x_channels: int = Header(default=1),
     x_language: str = Header(default="en"),
     x_frequency_id: str = Header(default=""),
+    x_segment_at: str = Header(default=""),
+    x_created_at: str = Header(default=""),
 ):
     """Transcribe raw PCM.
 
@@ -376,8 +408,7 @@ async def transcribe(
         if speech.seconds < cfg.min_speech_seconds:
             _counters["rejected_no_speech"] += 1
             keep_audio(raw, x_sample_rate, x_channels, {
-                "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "frequency_id": x_frequency_id,
+                **identity(x_frequency_id, started, x_segment_at, x_created_at),
                 "duree": round(duration, 3),
                 "speech_seconds": round(speech.seconds, 3),
                 "rejected": "no_speech",
@@ -445,13 +476,15 @@ async def transcribe(
     if gate:
         try:
             t1 = time.time()
+            fr_kwargs = {"temperature": 0.0} if cfg.fr_no_fallback else {}
             r2 = await on_mlx(decode, mlx_whisper, audio,
-                                         path_or_hf_repo=cfg.model_fr, language="fr")
+                              path_or_hf_repo=cfg.model_fr, language="fr", **fr_kwargs)
             second = {
                 "text": " ".join(r2["text"].split()),
                 "language": "fr",
                 "model": cfg.model_fr,
                 "elapsed": round(time.time() - t1, 3),
+                "details": decode_details(r2),
             }
             _counters["second_opinion_ok"] += 1
             if gate == "detector":
@@ -468,8 +501,7 @@ async def transcribe(
 
     _counters["transcribed"] += 1
     keep_audio(raw, x_sample_rate, x_channels, {
-        "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "frequency_id": x_frequency_id,
+        **identity(x_frequency_id, started, x_segment_at, x_created_at),
         "duree": round(duration, 3),
         "speech_seconds": round(speech.seconds, 3),
         "langue": language,
@@ -478,7 +510,9 @@ async def transcribe(
         "texte_second": (second or {}).get("text", ""),
         "modele_second": (second or {}).get("model", ""),
         "porte": gate,
-        "p_fr": p_fr,
+        "p_fr": None if p_fr is None else round(p_fr, 4),
+        "segments": decode_details(result),
+        "segments_second": (second or {}).get("details", []),
     })
 
     elapsed = time.time() - started
