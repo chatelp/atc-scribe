@@ -4566,7 +4566,7 @@ remet la fréquence si le pilotage est convenu, comme le font les `seance.sh`.
 27/09 : co-atc compris, même heure, même méthode, même source ADS-B. Elle reprend la main depuis
 118,150 et y revient seule. Réserve : lundi contre dimanche, le trafic diffère encore.
 
-### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut, à valider demain)*
+### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut ; confirmé sur un second jour le 28/09)*
 
 **Le banc d'essai des modèles** (27/09) : les 665 transmissions de la séance du matin sur 124,350 +
 126,425 (09:17-11:17), retrouvées dans l'audio enregistré en continu et découpées comme co-atc les
@@ -4642,5 +4642,74 @@ reste le meilleur gain à précision égale. Rappel : 2 h de trafic sur deux fr�
 p(fr) = 0,007 sur ce segment de 19 s, qui mêle plusieurs échanges. Le gain de +8 % vient d'autres
 transmissions.
 
-**Reste** : l'activer pour la séance de De Gaulle de demain matin, qui donnera aussi un second banc,
-puis décider de l'activer en production.
+**Second jour, la nuit du 27 au 28/09** : le banc du 24/09, un mercredi, sur quatre fréquences de
+Roissy.
+- **La source** : la capture de référence de toutes les règles d'association (doc 30), sans base de
+  co-atc. Ses 1 976 morceaux au texte anglais non vide ont été recoupés dans les enregistrements
+  (`scripts/banc/capture-banc.py`). Le modèle anglais redonne le texte de la capture.
+- **Le juge** : `cmd/phraseology -capture -union`, qui essaie l'anglais puis le français et garde le
+  premier accepté, comme co-atc. Il y a 20 ciels mélangés, parce qu'avec 5 le hasard varie de ±7
+  selon le tirage : l'anglais seul donne 386,8 ou 401,4, contre 390,7 et 394,7 avec 20
+  (`scripts/banc/evaluer-capture.py`).
+- **Résultats** : `resultats/station/2026-09-27-nuit-bancs/`.
+
+| Aiguillage (24/09) | Aiguillées | Rattachées | Hasard | Avions justes | Précision |
+|---|---|---|---|---|---|
+| anglais seul | 0 | 457 | 62,3 | 394,7 | 86 % |
+| **mots repères (production)** | 334 (17 %) | 485 | 68,5 | 416,5 | 86 % |
+| **repères ou p(fr) ≥ 0,1** | 1 036 (52 %) | 522 | 77,3 | **444,7** | **85 %** |
+| repères ou p(fr) ≥ 0,05 | 1 116 | 525 | 79,2 | 445,6 | 85 % |
+| p(fr) ≥ 0,5 seul | 673 | 509 | 74,5 | 434,5 | 85 % |
+| toujours le français | 1 976 | 553 | 89,1 | 464,0 | 84 % |
+
+**Le gain se confirme** :
+- la détection ajoute **+28 avions justes (+7 %) aux mots repères**, pour un point de précision ;
+- le 27/09, elle ajoutait +14 (+8 %) à précision égale ;
+- le gain se répartit sur les quatre fréquences : 124,350 +14, 126,425 +8, 125,825 +4, 124,625 +2.
+
+« Toujours le français » gagne encore plus (+48, +11 %), pour deux points de précision.
+
+**Le coût, corrigé** : l'estimation plus haut prenait des temps médians, et le modèle français a une
+longue traîne. Les transmissions où il boucle prennent de 10 à 38 s. En moyenne, ce que chaque
+règle ajoute à la lecture anglaise (1,30 s en moyenne le 27/09) :
+
+| Ajouté par transmission, en moyenne | 27/09 | 24/09 | Lectures françaises de plus de 10 s (27/09) |
+|---|---|---|---|
+| mots repères | 0,64 s | 0,41 s | 14 |
+| repères ou p(fr) ≥ 0,1 | **2,47 s** | **2,03 s** | 39 |
+| toujours le français | 3,83 s | 3,04 s | 70 |
+
+Avec la détection, le calcul passe donc de 1,9 à 3,8 s par transmission le 27/09, soit ×1,9.
+- Sur la séance du 27/09, 665 transmissions en 2 h, cela fait 42 min de calcul, **35 % du temps
+  réel**.
+- Au rythme du 24/09, 1 976 transmissions en 3 h 12 sur quatre fréquences, l'ordre de grandeur
+  est de 55 à 60 % du temps réel. La file d'attente aux heures chargées reste à mesurer : c'est ce
+  que donne la séance de ce matin.
+
+**Des modèles français plus rapides, même nuit, banc du 27/09** : convertis en MLX depuis les copies
+du disque externe (`whisper-lab/mlx-fr-distil-dec16`, `whisper-lab/mlx-fr-medium`).
+
+| Français (27/09) | Temps médian | Moyen | Repères | Repères ou p(fr) ≥ 0,1 | Toujours |
+|---|---|---|---|---|---|
+| production (bofenghuang large-v3) | 1,38 s | 3,83 s | 179,2 | **192,8** (93 %) | 196,6 (91 %) |
+| bofenghuang distil-dec16 | 0,83 s | 1,69 s | 177,0 | 182,8 (92 %) | 187,6 (91 %) |
+| pierreguillou whisper-medium-french* | 1,19 s | 3,11 s | 121,4 | 123,2 (93 %) | 122,8 (93 %) |
+
+\* Le medium s'est bloqué sur une transmission, entre la 550e et la 600e. Il est jugé sur les
+550 transmissions faites, avec l'anglais seul à 121,4 sur ce sous-ensemble : **il n'apporte
+rien**. Sur les mêmes 550 transmissions, la production donne 139,8 et le distil 132,8.
+
+**Lecture** :
+- **le distil est deux fois plus rapide en moyenne, mais perd plus de la moitié du gain de la
+  détection** (+14 au lieu de +24 sur l'anglais seul) ;
+- le français de production reste le bon modèle ;
+- la piste pour le coût est ailleurs : **couper la traîne**. Les lectures de plus de 10 s sont des
+  boucles, que mlx_whisper relance jusqu'à six fois à des températures croissantes. À essayer au
+  banc : la seconde lecture sans relance, ou bornée en durée.
+
+**Reste** :
+- la séance de ce matin (28/09, détection active) : la file d'attente en direct et un troisième
+  banc ;
+- puis décider entre la détection (+7 à +8 %, précision −0 à −1 point) et « toujours le français »
+  (+10 à +11 %, précision −2 points, un calcul ajouté plus lourd de moitié : 3,8 contre 2,5 s le 27/09) ;
+- puis l'activer en production.
