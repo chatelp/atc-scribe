@@ -254,6 +254,106 @@ func (s *Sidecar) spawn() error {
 	return nil
 }
 
+// Restarts allowed within restartWindow before Supervise gives up: a sidecar
+// that dies again and again has a cause that restarting will not fix, and a
+// crash loop would only bury it.
+const (
+	maxRestarts   = 5
+	restartWindow = 10 * time.Minute
+)
+
+// restartDelay is how long Supervise waits before restarting. A variable so
+// tests need not wait.
+var restartDelay = 5 * time.Second
+
+// Supervise restarts a sidecar we started when it dies on its own, and returns
+// at once; the watching is done in the background until ctx ends or Stop is
+// called.
+//
+// Measured on 28/09: the sidecar died of a native crash in MLX eight minutes into
+// a session, and co-atc went on for the rest of it -- 550 "connection refused",
+// no transcript -- because it only ever started its sidecar once. For a server
+// that runs unattended for hours, one crash must cost seconds, not the evening.
+// A sidecar that is not ours (no command) is left to whoever runs it.
+func (s *Sidecar) Supervise(ctx context.Context) {
+	if len(s.command) == 0 {
+		return
+	}
+	go func() {
+		var restarts []time.Time
+		for {
+			s.mu.Lock()
+			done := s.done
+			s.mu.Unlock()
+			if done == nil {
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-done:
+			}
+
+			s.mu.Lock()
+			stopped, waitErr := s.stopped, s.waitErr
+			s.mu.Unlock()
+			if stopped {
+				return
+			}
+			now := time.Now()
+			kept := restarts[:0]
+			for _, t := range restarts {
+				if now.Sub(t) < restartWindow {
+					kept = append(kept, t)
+				}
+			}
+			restarts = kept
+			if len(restarts) >= maxRestarts {
+				s.logger.Error("Local STT sidecar keeps dying, no longer restarting it: transcription is stopped",
+					logger.Int("restarts", len(restarts)),
+					logger.String("window", restartWindow.String()),
+					logger.String("last_output", s.output.String()))
+				return
+			}
+			s.logger.Error("Local STT sidecar died, restarting it",
+				logger.Error(waitErr),
+				logger.String("last_output", s.output.String()))
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(restartDelay):
+			}
+			s.mu.Lock()
+			stopped = s.stopped
+			s.mu.Unlock()
+			if stopped {
+				return
+			}
+			restarts = append(restarts, time.Now())
+			if err := s.spawn(); err != nil {
+				s.logger.Error("Could not restart the local STT sidecar", logger.Error(err))
+				return
+			}
+			deadline := time.Now().Add(s.timeout)
+			for time.Now().Before(deadline) {
+				if err := s.probe(ctx); err == nil {
+					s.logger.Info("Local STT sidecar restarted", logger.Int("restarts_in_window", len(restarts)))
+					break
+				}
+				if s.exited() != nil {
+					break // dead again: the loop above counts it
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(500 * time.Millisecond):
+				}
+			}
+		}
+	}()
+}
+
 // exited reports how the child ended, or nil while it is still running (or was
 // never ours to begin with).
 func (s *Sidecar) exited() error {

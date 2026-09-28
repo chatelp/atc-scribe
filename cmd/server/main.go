@@ -159,6 +159,9 @@ func main() {
 			fatalLog.Fatal("Local transcription sidecar unavailable", logger.Error(err))
 		}
 		sidecarCancel()
+		// A sidecar that dies later is restarted, instead of leaving the server
+		// transcribing nothing until someone notices (28/09).
+		sttSidecar.Supervise(signalCtx)
 		defer sttSidecar.Stop()
 	}
 	// Processor has been moved into the service

@@ -294,3 +294,72 @@ func TestAForeignSidecarIsFineWhenNoCommandIsSet(t *testing.T) {
 		t.Fatalf("an empty command means using someone else's sidecar on purpose: %v", err)
 	}
 }
+
+func countLines(t *testing.T, path string) int {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	return strings.Count(string(b), "\n")
+}
+
+// A sidecar that dies on its own is started again (28/09: one native crash in MLX
+// cost a whole evening's transcripts), and one that keeps dying is given up on
+// rather than restarted forever.
+func TestADeadSidecarIsRestartedThenGivenUp(t *testing.T) {
+	restartDelay = 20 * time.Millisecond
+	t.Cleanup(func() { restartDelay = 5 * time.Second })
+	srv := healthServer(t)
+	starts := filepath.Join(t.TempDir(), "starts")
+	s := NewSidecar(SidecarConfig{
+		ServerURL:             srv.URL,
+		Command:               []string{"sh", "-c", "echo up >> " + starts + "; sleep 0.2; exit 1"},
+		StartupTimeoutSeconds: 5,
+	}, testLogger(t))
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s.Supervise(ctx)
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) && countLines(t, starts) < 1+maxRestarts {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if n := countLines(t, starts); n != 1+maxRestarts {
+		t.Fatalf("started %d times, want the first start and %d restarts", n, maxRestarts)
+	}
+	time.Sleep(600 * time.Millisecond)
+	if n := countLines(t, starts); n != 1+maxRestarts {
+		t.Errorf("started %d times: it should have given up after %d restarts", n, maxRestarts)
+	}
+}
+
+// Stop is the operator's decision, not a crash: nothing is restarted after it.
+func TestStopEndsSupervision(t *testing.T) {
+	restartDelay = 20 * time.Millisecond
+	t.Cleanup(func() { restartDelay = 5 * time.Second })
+	srv := healthServer(t)
+	starts := filepath.Join(t.TempDir(), "starts")
+	s := NewSidecar(SidecarConfig{
+		ServerURL:             srv.URL,
+		Command:               []string{"sh", "-c", "echo up >> " + starts + "; sleep 60"},
+		StartupTimeoutSeconds: 5,
+	}, testLogger(t))
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	s.Supervise(context.Background())
+	// Start returns on the health answer, which here is not the child's: wait
+	// for the child itself to be up before stopping it.
+	for i := 0; i < 100 && countLines(t, starts) < 1; i++ {
+		time.Sleep(20 * time.Millisecond)
+	}
+	s.Stop()
+	time.Sleep(300 * time.Millisecond)
+	if n := countLines(t, starts); n != 1 {
+		t.Errorf("started %d times after Stop, want 1", n)
+	}
+}

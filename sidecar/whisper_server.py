@@ -262,7 +262,17 @@ _decode_lock = threading.Lock()
 # the language detector loaded the sidecar aborted on its first request: "There
 # is no Stream(gpu, 1) in current thread". One thread for all model work is what
 # the bench did, and it never failed.
+#
+# With a stack of its own, and a large one. On 28/09 the sidecar died of a bus error
+# on this thread's stack guard, deep in MLX's graph compilation (compile_dfs
+# recursing on itself): Python gives its threads 16 MiB on macOS, and one decode
+# needed more. 256 MiB is reserved, not used -- pages are only committed as the
+# stack grows -- and the size applies to this thread alone.
+_MLX_STACK = 256 * 1024 * 1024
+_default_stack = threading.stack_size(_MLX_STACK)
 _mlx_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mlx")
+_mlx_thread.submit(lambda: None).result()  # the thread is created now, with that stack
+threading.stack_size(_default_stack)
 
 
 async def on_mlx(fn, *args, **kwargs):
