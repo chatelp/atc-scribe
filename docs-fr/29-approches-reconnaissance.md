@@ -58,7 +58,7 @@ ne portent aucun indicatif (47 %).
 | 21 | Chasser le parasite de nuit | toujours là ; le bloc de la Freebox est innocenté | ⏳ coupable inconnu (Q44) |
 | 22 | Baisser le gain de la réception | ça écrête, mais baisser le gain n'est pas le remède | ❌ (D42, D43) |
 | 23 | Nettoyer le son par des filtres classiques | **le filtre voix de la station nuit à Whisper** (28/09, laboratoire) : passe-haut 300, passe-bas 2 800, compresseur et limiteur, rejoués à l'identique sur le Mac, sur le banc du 27/09, passe anglaise → 153,8 avions justes contre 166,5 (**−8 %**), textes vides 2,0 % contre 0,5 %, boucles 7,7 % contre 6,2 % | ❌ on garde le flux brut pour la reconnaissance (Q42) |
-| 23 bis | Combler les trous du squelch | les coupures font 7 % de l'audio. Comblées d'un souffle limité à la bande, au niveau du bruit de chaque transmission → 162,7 avions justes contre 166,5, dans le bruit de mesure ; boucles 6,2 → 5,4 %. Retirées → 158,1. **Les zéros eux-mêmes ne font pas inventer le modèle**, ce qui est plausible, puisque Whisper complète toujours son entrée de zéros jusqu'à 30 s. **L'effet principal d'un canal sans squelch n'est pas testé** : retrouver la voix faible des creux, que le squelch efface (le « one » de « five one one »). Il demande un vrai enregistrement, avec et sans squelch | ❌ aucun gain à combler les trous (28/09, laboratoire) ; 🔲 le canal sans squelch reste à mesurer |
+| 23 bis | Le squelch : combler ses trous, ou s'en passer | **Combler les trous** (7 % de l'audio) d'un souffle limité à la bande → 162,7 avions justes contre 166,5, dans le bruit ; les retirer → 158,1 : les zéros eux-mêmes ne font pas inventer le modèle. **Un vrai canal sans squelch** (28/09, 17:53-19:53) : 124,350 reçue deux fois à la fois, squelch 10 et squelch manuel à −120 dBFS ; 385 transmissions coupées aux mêmes instants, lues avec les réglages de production. Résultat : 139,3 avions justes avec squelch, 143,1 sans, précision 97 % des deux côtés ; transmission par transmission, 24 gagnées et 20 perdues (test du signe, p = 0,65) ; sur les 152 hachées, 10 gagnées et 13 perdues ; boucles un peu plus fréquentes sans squelch (anglais 5,2 → 6,5 %, français 1,0 → 2,3 %). Séance représentative : 39 % de transmissions hachées | ❌ **aucun gain mesurable, le canal sans squelch n'est pas retenu** (laboratoire). Réserve : une soirée, une fréquence ; un gain de quelques % n'est pas exclu |
 
 ### C bis. D'autres modèles de reconnaissance
 
@@ -109,6 +109,12 @@ ne portent aucun indicatif (47 %).
 9. **Le modèle « turbo »**, plus rapide, jamais comparé sur l'ADS-B.
 
 ## Ce qu'on a appris en chemin
+
+- **Compter les transmissions gagnées et perdues, pas seulement le total.** Une petite différence de
+  son fait changer d'avis le modèle sur une transmission rattachée sur trois (44 sur 385, canal
+  sans squelch, 28/09). Un écart de quelques avions sur un total ne dit rien tant qu'on n'a pas
+  compté les gagnées et les perdues, et fait un test du signe
+  (`whisper-lab/scripts/labo/paire-canal-ouvert.py`).
 
 - **Juger sur la vraie station.** L'imitation a flatté le premier mini-essai ; seule la station a
   montré qu'il perdait les indicatifs de Paris.
