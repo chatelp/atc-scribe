@@ -3839,9 +3839,10 @@ ajoute les fréquences par l'API, devait donc se connecter.
 - Le jour même, **le propriétaire a passé la production en « cette machine uniquement »** : le
   script ne demande plus rien quand l'accès est local.
 
-**Le GPU** est désormais pris en continu, par à-coups : c'est inscrit dans
-`whisper-lab/PLANNING-MACHINE.md`. Un entraînement long du laboratoire se décidera avec le
-propriétaire, production suspendue ou non.
+**Arrêtée le 28/09 à 14:53, à la demande du propriétaire** : la production ne tourne que quand il le
+décide. Elle se relance d'un double-clic sur `runs/production.command`. Quand elle tourne, elle
+prend le GPU par à-coups, avec environ 8 Go de modèles en mémoire, et l'audio ne s'archive que
+pendant ce temps (`whisper-lab/PLANNING-MACHINE.md`).
 
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
