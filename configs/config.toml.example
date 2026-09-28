@@ -344,7 +344,9 @@ timeout_seconds = 60
 #
 # Add --fr-no-fallback to read French once at temperature 0: the temperature
 # fallback fires on the French model's loops, and removing it halves the mean
-# French read for the same matches (Q50).
+# French read for the same matches (Q50). The fallback also broke those loops:
+# add --fr-cut-loops with it, which cuts them after the model and leaves fewer
+# than the fallback did.
 #
 # Add --save-audio <dir> to keep every transmission's audio with a daily manifest
 # (sidecar/README.md), on a disk with room: about 1-2 GB a day on two frequencies.

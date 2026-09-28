@@ -9,7 +9,7 @@ python3 -m venv .venv && .venv/bin/pip install -r sidecar/requirements.txt
 .venv/bin/python sidecar/whisper_server.py \
     --model-en <mlx-model-or-hf-repo> \
     [--model-fr <mlx-model-or-hf-repo>] \
-    [--second-opinion [--fr-detector <multilingual-mlx-model> [--fr-threshold 0.1]] [--fr-no-fallback]] \
+    [--second-opinion [--fr-detector <multilingual-mlx-model> [--fr-threshold 0.1]] [--fr-no-fallback [--fr-cut-loops]]] \
     [--save-audio <dir> [--save-audio-min-free-gb 8]]
 ```
 
@@ -77,7 +77,13 @@ arrays to the thread that created them.
 `--fr-no-fallback` reads French once, at temperature 0, instead of mlx_whisper's
 fallback of up to six decodes at rising temperature. The fallback fires on the
 French model's loops: on two benches it made the mean French read 3.8 and 2.7 s,
-against 1.8 and 1.4 s without it, for the same matches within one aircraft.
+against 1.8 and 1.4 s without it, for the same matches within one aircraft. But the
+fallback is also what broke those loops: without it, 22.4 and 12.0 % of French texts
+loop, against 9.8 and 4.8 %. `--fr-cut-loops` cuts them after the model, where a run
+of words repeats back to back (`loops.py`: a word four times in a row, a group of two
+to eight words three times), bringing them to 4.2 and 2.5 %. The manifest keeps the
+uncut text (`texte_second_brut`). Not applied to the English reading, where the cut
+cost true matches.
 
 ## The audio archive
 

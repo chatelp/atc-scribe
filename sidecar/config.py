@@ -63,6 +63,13 @@ class Config:
     # 202.8). Off: the fallback, as before.
     fr_no_fallback: bool = False
 
+    # Cut the loops out of the French second reading, after the model (loops.py).
+    # Read without fallback, the French model loops two to three times as often;
+    # cutting where a run of words repeats back to back brings the loops below
+    # what the fallback left (4.2 and 2.5 % of texts against 9.8 and 4.8 %), true
+    # matches within noise. The manifest keeps the uncut text. Off: as read.
+    fr_cut_loops: bool = False
+
     # Keep every transmission's audio, with a manifest line beside it. The whole
     # dossier rests on a single afternoon's capture: every model comparison, every
     # threshold, every control. A second corpus on different frequencies is what
@@ -118,6 +125,8 @@ def from_args(argv: list[str] | None = None) -> Config:
                    help="probability of French above which the detector opens the second opinion (default 0.1)")
     p.add_argument("--fr-no-fallback", dest="fr_no_fallback", action="store_true",
                    help="read French once at temperature 0, without the temperature fallback (Q50)")
+    p.add_argument("--fr-cut-loops", dest="fr_cut_loops", action="store_true",
+                   help="cut the loops out of the French second reading, after the model (Q50)")
     p.add_argument("--save-audio", default=d.save_audio, metavar="DIR",
                    help="keep every transmission's audio and a manifest line, rejected ones included")
     p.add_argument("--save-audio-min-free-gb", type=float, default=d.save_audio_min_free_gb,
@@ -130,6 +139,7 @@ def from_args(argv: list[str] | None = None) -> Config:
                   min_speech_seconds=a.min_speech_seconds, log_level=a.log_level,
                   second_opinion=a.second, fr_detector=a.fr_detector,
                   fr_threshold=a.fr_threshold, fr_no_fallback=a.fr_no_fallback,
+                  fr_cut_loops=a.fr_cut_loops,
                   save_audio=a.save_audio,
                   save_audio_min_free_gb=a.save_audio_min_free_gb,
                   exit_with_parent=a.exit_with_parent)
