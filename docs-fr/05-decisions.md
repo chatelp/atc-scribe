@@ -2975,7 +2975,8 @@ quoi les NOTAM de Saint-Cyr auraient été affichés comme ceux d'Orly.
 
 ### D50 — Les corpus du laboratoire sont rangés sous `audio/`, datés du prélèvement *(23/09)*
 
-Demandé par le propriétaire, *« si ça ne casse rien »*. `whisper-lab/` n'est pas sous git,
+Demandé par le propriétaire, *« si ça ne casse rien »*. `whisper-lab/` n'était pas sous git (il
+l'est depuis le 28/09 pour ses scripts et documents, voir D63),
 et ses dix dossiers audio portaient des noms d'usage (`corpus/`, `orly/`, `suites/`…) qui ne
 disaient ni la date ni ce qu'ils contenaient.
 
@@ -3799,6 +3800,11 @@ milliers d'heures.
   sidecar sous forme de diff mesuré ;
 - **le GPU du Mac est partagé** : tout calcul MLX de plus de 10 min s'inscrit dans
   `whisper-lab/PLANNING-MACHINE.md`, et la session concernée est prévenue.
+
+**Le laboratoire sous git** (28/09, avec l'accord du propriétaire) : le dépôt privé
+`chatelp/whisper-lab`. Il ne suit que `scripts/`, les `.md` de la racine et `.gitignore`, par une
+liste blanche. L'audio, les résultats, les journaux, les bases et les modèles restent hors de git,
+et aucun enregistrement ne part dans le cloud. Seul l'agent du laboratoire y fait des commits.
 
 **Son premier livrable** est un plan court, soumis au propriétaire avant tout entraînement long.
 Ce qui manque le plus, c'est une mesure du charabia : le juge actuel, l'ADS-B, ne voit que
