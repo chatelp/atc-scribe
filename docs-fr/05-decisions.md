@@ -4635,7 +4635,7 @@ référence pour la suite.
 **Reste** : la soirée du 28/09 sur 123,875 (18:46-19:30, contre le 26/09), qui complètera la
 comparaison sur une autre fréquence.
 
-### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut ; confirmé sur un second jour le 28/09)*
+### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut ; confirmé sur trois bancs et en direct le 28/09)*
 
 **Le banc d'essai des modèles** (27/09) : les 665 transmissions de la séance du matin sur 124,350 +
 126,425 (09:17-11:17), retrouvées dans l'audio enregistré en continu et découpées comme co-atc les
@@ -4776,9 +4776,60 @@ rien**. Sur les mêmes 550 transmissions, la production donne 139,8 et le distil
   boucles, que mlx_whisper relance jusqu'à six fois à des températures croissantes. À essayer au
   banc : la seconde lecture sans relance, ou bornée en durée.
 
+**En direct, le 28/09** (09:17-11:16, 124,350 + 126,425, détection active, seuil 0,1) :
+- **aiguillage** : 671 transmissions, dont 269 envoyées au français (40 %) : 93 par un mot repère et
+  176 par le détecteur. Aucun échec ;
+- **délai entre la fin d'une transmission et son texte** : médiane 6,5 s, contre 3,2 s le 27/09
+  avec les seuls repères ; 95 % sous 24 s, contre 22 s. Par tranche de 10 min, il monte avec le
+  trafic puis redescend : **aucune accumulation** sur deux fréquences ;
+- **ce que rapporte le détecteur**, mesuré dans la base du direct : on retire la lecture française
+  des transmissions qui n'avaient aucun mot repère (`banc-contre-direct.txt`).
+
+| En direct, 28/09 (671 transmissions) | Aiguillées | Avions justes | Précision |
+|---|---|---|---|
+| anglais seul | 0 | 195,0 | 93 % |
+| mots repères seuls | 93 | 200,2 | 92 % |
+| **repères ou détecteur (ce qui a tourné)** | 269 | **213,6** | **92 %** |
+
+**Le détecteur rapporte +13,4 avions justes (+6,7 %) en direct, à précision égale** : c'est le gain
+des bancs. Ce lundi, les mots repères seuls n'ajoutaient que +5 : les seules secondes lectures,
+sans cette décomposition, laissaient croire le contraire.
+
+**Troisième banc, 28/09** (599 transmissions sur 671 retrouvées dans l'audio) :
+- anglais seul : 176,6 ;
+- repères : 188,2 ;
+- **repères ou p(fr) ≥ 0,1 : 202,8 (+14,6, +8 %), précision 93 % inchangée** ;
+- toujours le français : 211,4 (+23,2, +12 %), précision 92 %.
+
+**Trois bancs et le direct disent la même chose : +7 à +8 %, à précision égale ou à un point près.**
+
+**La lecture française sans relance** (`temperature=0` : une seule lecture, sans les relances de
+mlx_whisper à température croissante) :
+
+| | 27/09 avec relances | sans | 28/09 avec relances | sans |
+|---|---|---|---|---|
+| français : temps moyen | 3,83 s | **1,77 s** | 2,73 s | **1,41 s** |
+| lectures de plus de 10 s | 70 | 2 | 46 | 0 |
+| repères ou p(fr) ≥ 0,1 : avions justes | 192,8 | 192,2 | 202,8 | 202,0 |
+
+- **Le gain est gardé**, à moins d'un avion près, pour un coût français divisé par deux. Le texte
+  change sur un tiers des transmissions, sans effet sur l'association.
+- **Le calcul total par transmission, détection comprise, passe de ×1,9 à ×1,4-1,7** par rapport
+  aux repères seuls d'aujourd'hui : 2,5 à 2,8 s contre 1,6 à 1,9 s.
+
+**Une limite du banc, trouvée en route** : il recoupe l'audio dans l'enregistrement continu, et ses
+coupes ne sont pas exactement celles de co-atc.
+- **Seuls 8 à 11 % de ses textes anglais sont identiques à ceux du direct.** Les niveaux restent
+  proches (anglais seul : 176,6 au banc, 173,8 en direct sur les mêmes 599 transmissions), mais
+  le banc flatte le direct de quelques avions.
+- **Le remède existe** : le sidecar sait garder l'audio exact qu'il a transcrit (`--save-audio`),
+  mais l'option n'était pas activée pendant les séances. À activer, sur le disque externe, pour
+  les prochains bancs.
+
 **Reste** :
-- la séance de ce matin (28/09, détection active) : la file d'attente en direct et un troisième
-  banc ;
-- puis décider entre la détection (+7 à +8 %, précision −0 à −1 point) et « toujours le français »
-  (+10 à +11 %, précision −2 points, un calcul ajouté plus lourd de moitié : 3,8 contre 2,5 s le 27/09) ;
-- puis l'activer en production.
+- choisir, avec le propriétaire, entre la détection (+7 à +8 %, précision égale à un point près) et
+  « toujours le français » (+10 à +12 %, un à deux points de précision en moins). Sans relance,
+  « toujours le français » ne coûte guère plus que la détection (2,8 à 3,1 s par transmission
+  contre 2,5 à 2,8 s), et épargne le troisième modèle ;
+- coder la lecture française sans relance dans le sidecar ;
+- puis l'activer en production, avec `--save-audio`.
