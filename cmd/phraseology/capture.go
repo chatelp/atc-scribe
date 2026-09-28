@@ -174,10 +174,13 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 	// are two chances to hit a callsign by accident, so the controls are given
 	// exactly the same two chances, at the same wrong moment.
 	type unit struct {
-		key   string // bucket: pass|freq, or union|freq
-		freq  string
-		at    time.Time
-		texts []string
+		key    string // bucket: pass|freq, or union|freq
+		freq   string
+		at     time.Time
+		texts  []string
+		passes []string // the pass of each text, for -json
+		id     string   // pass|freq|file, or freq|file under -union
+		debut  string
 	}
 	var units []unit
 
@@ -196,11 +199,12 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 			id := tx.Freq + "|" + tx.Fichier
 			if i, seen := index[id]; seen {
 				units[i].texts = append(units[i].texts, tx.Texte)
+				units[i].passes = append(units[i].passes, tx.Passe)
 				continue
 			}
 			index[id] = len(units)
 			units = append(units, unit{key: "union|" + tx.Freq, freq: tx.Freq, at: at,
-				texts: []string{tx.Texte}})
+				texts: []string{tx.Texte}, passes: []string{tx.Passe}, id: id, debut: tx.Debut})
 		}
 		sort.SliceStable(units, func(i, j int) bool { return units[i].at.Before(units[j].at) })
 	} else {
@@ -213,7 +217,8 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 				continue
 			}
 			units = append(units, unit{key: tx.Passe + "|" + tx.Freq, freq: tx.Freq, at: at,
-				texts: []string{tx.Texte}})
+				texts: []string{tx.Texte}, passes: []string{tx.Passe},
+				id: tx.Passe + "|" + tx.Freq + "|" + tx.Fichier, debut: tx.Debut})
 		}
 	}
 
@@ -246,7 +251,24 @@ func measureCapture(txPath, adsbPath, airlinesPath string, windowSec, minDigits,
 		b := get(real, u.key)
 		b.total++
 
-		m, text, candidate, matched := tryAll(u.texts, fleetAt(u.at, u.freq), recent("real|"+u.key, u.at))
+		fleet := fleetAt(u.at, u.freq)
+		m, text, candidate, matched := tryAll(u.texts, fleet, recent("real|"+u.key, u.at))
+		var rec *jsonRecord
+		if jsonOut != nil {
+			rec = &jsonRecord{ID: u.id, FrequencyID: u.freq, CreatedAt: u.debut,
+				Covered: len(fleet) > 0, Fleet: len(fleet), Readings: map[string]jsonReading{}}
+			for k, t := range u.texts {
+				name := u.passes[k]
+				if _, dup := rec.Readings[name]; dup {
+					name = fmt.Sprintf("%s#%d", name, k)
+				}
+				rec.Readings[name] = jsonReadingOf(matcher, t)
+				if matched && t == text && rec.Match == nil {
+					rec.Match = jsonMatchOf(m, name, "")
+				}
+			}
+			emitJSON(rec)
+		}
 		if !candidate {
 			continue
 		}

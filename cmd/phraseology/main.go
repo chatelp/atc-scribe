@@ -71,10 +71,26 @@ func main() {
 	to := flag.String("to", "", "with -db: only transmissions before this RFC3339 time")
 	union := flag.Bool("union", false, "with -capture: group passes by recording and accept a match from any of them — measures two models together, controls included")
 	contextSec := flag.Int("context", 0, "seconds of recent matches on the same frequency used to break ties; 0 = none")
+	jsonPath := flag.String("json", "", "with -db or -capture: write one JSON line per transmission of the real run -- its match, and each reading laid out on its tokens")
 	flag.Parse()
+
+	if *jsonPath != "" {
+		if *shuffle != 0 || *control != 0 {
+			fmt.Fprintln(os.Stderr, "-json describes the real run: drop -shuffle and -control")
+			os.Exit(1)
+		}
+		if err := openJSON(*jsonPath); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
 
 	if *capture != "" {
 		if err := measureCapture(*capture, *adsb, *airlines, *window, *minDigits, *seeds, *offset, *verbose, *strict, *minScore, *fuzzy, *contextSec, *union); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := closeJSON(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -83,6 +99,10 @@ func main() {
 
 	if *db != "" {
 		if err := measureAgainstADSB(*db, *airlines, *window, *control, *shuffle, *minDigits, *verbose, *fuzzy, *from, *to, *strict, *minScore, *contextSec); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := closeJSON(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -188,6 +208,8 @@ type transmission struct {
 	text   string
 	freq   string
 	second string // the French second reading, when there is one
+	id     int64
+	stored string // created_at as stored
 }
 
 // measureAgainstADSB is the only correctness measure in this project that needs
@@ -255,7 +277,7 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 	// A time window lets one recording be split by whatever changed during it --
 	// the listening group, a matcher setting -- and each slice measured on the
 	// same footing, with its own control.
-	q := `SELECT created_at, content, frequency_id, COALESCE(content_second, '') FROM transcriptions WHERE content != ''`
+	q := `SELECT id, created_at, content, frequency_id, COALESCE(content_second, '') FROM transcriptions WHERE content != ''`
 	var args []any
 	if from != "" {
 		q += " AND created_at >= ?"
@@ -270,8 +292,9 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		return err
 	}
 	for rows.Next() {
+		var id int64
 		var ts, txt, fq, second string
-		if err := rows.Scan(&ts, &txt, &fq, &second); err != nil {
+		if err := rows.Scan(&id, &ts, &txt, &fq, &second); err != nil {
 			return err
 		}
 		t, err := time.Parse(time.RFC3339, ts)
@@ -281,7 +304,7 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		if !optSecond {
 			second = ""
 		}
-		txs = append(txs, transmission{t, txt, fq, second})
+		txs = append(txs, transmission{t, txt, fq, second, id, ts})
 	}
 	rows.Close()
 
@@ -345,6 +368,14 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 	}
 
 	for _, tx := range txs {
+		rec := &jsonRecord{ID: tx.id, FrequencyID: tx.freq, CreatedAt: tx.stored,
+			Readings: map[string]jsonReading{}}
+		if jsonOut != nil {
+			rec.Readings["en"] = jsonReadingOf(matcher, tx.text)
+			if tx.second != "" {
+				rec.Readings["fr"] = jsonReadingOf(matcher, tx.second)
+			}
+		}
 		at := tx.at.Add(shift)
 		if shuffleSeed != 0 {
 			// Draw the moment from the sightings themselves, not from the clock:
@@ -361,9 +392,11 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		lo := sort.Search(len(sky), func(i int) bool { return !sky[i].at.Before(at.Add(-w)) })
 		hi := sort.Search(len(sky), func(i int) bool { return sky[i].at.After(at.Add(after)) })
 		if lo >= hi {
+			emitJSON(rec)
 			continue // no ADS-B coverage at this moment
 		}
 		covered++
+		rec.Covered = true
 
 		// The last sighting inside the window is the aircraft's state at that
 		// moment; its position is the last one known inside the window.
@@ -390,8 +423,10 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 			txMatcher = &c
 		}
 		fleetSizes = append(fleetSizes, len(fleet))
+		rec.Fleet = len(fleet)
 
 		res := phraseology.Parse(tx.text)
+		reading := "en"
 		hasCandidate := false
 		for _, v := range res.Values {
 			if v.Role == phraseology.RoleCallsign {
@@ -408,6 +443,7 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 				if m2, ok2 := txMatcher.MatchWithContext(res2, fleet, recent(tx.freq, tx.at)); ok2 &&
 					!(strict && m2.Ambiguous) && m2.Score >= minScore {
 					res, tx.text, hasCandidate = res2, "[fr] "+tx.second, true
+					reading = "fr"
 				}
 			}
 		}
@@ -415,12 +451,14 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		// skip those without a two-digit group, which hides callsigns with letters
 		// ("holding seven uniform echo") from any rule meant to find them.
 		if !hasCandidate && !optEvery {
+			emitJSON(rec)
 			continue
 		}
 		withCandidate++
 
 		m, ok := txMatcher.MatchWithContext(res, fleet, recent(tx.freq, tx.at))
 		if !ok {
+			emitJSON(rec)
 			if verbose {
 				fmt.Printf("  %s  —        %s\n", tx.at.Format("15:04:05"), trunc(tx.text, 80))
 			}
@@ -431,6 +469,8 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 		// now this path counted both as attached, so -strict, -min-score and
 		// -context were silently inert on -db.
 		if strict && m.Ambiguous {
+			rec.Match = jsonMatchOf(m, reading, "ambiguous")
+			emitJSON(rec)
 			refusedAmbiguous++
 			if verbose {
 				fmt.Printf("  %s  ~ambig   %.2f %-22s %s (with %s)\n", tx.at.Format("15:04:05"),
@@ -439,9 +479,13 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 			continue
 		}
 		if m.Score < minScore {
+			rec.Match = jsonMatchOf(m, reading, "min_score")
+			emitJSON(rec)
 			refusedScore++
 			continue
 		}
+		rec.Match = jsonMatchOf(m, reading, "")
+		emitJSON(rec)
 		matched++
 		if m.Ambiguous {
 			ambiguous++
