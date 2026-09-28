@@ -63,7 +63,8 @@ here improves on them.
 
 ## Status, honestly
 
-**Running in production on one station since September 2026**, and incomplete.
+**Running on one station since September 2026**, started when its owner listens, and
+incomplete. Figures as of 28 September 2026.
 
 What works, with the number that says so:
 
@@ -72,33 +73,55 @@ What works, with the number that says so:
   ADS-B arbitration: on 1 468 real transmissions it produced **94 true callsign
   matches against 62.6** for the English-only alternative, and won on all five
   frequencies.
-- **Callsign matching in production.** 138 matches on a day's traffic, against
-  **43.3 expected by chance** — 69 % above chance, 94.7 of them true. The control is
-  not a guess: control fleets are drawn from the sightings themselves and the
-  acceptance rule is applied identically to the real draw and to the eight shuffled
-  ones.
+- **One audio stream per frequency.** The station publishes each channel it listens
+  to on its own stream, and co-atc follows whatever is on air. Transcribed separately,
+  the same traffic gives **four times the true matches** of the mixed stream (235
+  against 60).
+- **Callsign matching.** On the reference capture (four Roissy frequencies, 24/09),
+  the matching rules went from 240 true matches at 73 % precision to **387 at 85 %**.
+  Live, on two De Gaulle approach frequencies for two hours (28/09): **213.6 true
+  matches out of 671 transmissions, 92 % precision**. The control is not a guess:
+  the same rules are run against the ADS-B sky of other moments, and what they match
+  there is subtracted as chance.
+- **A French second reading.** When a transmission holds a French word, or when a
+  multilingual Whisper gives French a probability of at least 0.1, the French model
+  reads it too, once, without temperature fallback. **+7 to +8 % true matches at
+  equal precision**, on three benches and live. Median delay from the end of a
+  transmission to its text: 6.5 s on two frequencies, with no backlog building up.
 - **A voice activity gate that is a correctness requirement, not an optimisation.**
   On four of this station's seven night-time channels, **up to 98 % of squelch
   openings carry no speech at all** — and a Whisper model fed silence does not return
   silence, it returns plausible sentences. Silero VAD in front of the model.
+- **An audio archive.** Every transmission is kept as received, with a daily manifest
+  that joins it to its database row: the raw material for improving recognition.
 - **Authentication**, because the fork made the server worth reaching from outside
-  the LAN. 13 tests.
-- **A daily database that actually rotates.** Upstream opens the daily SQLite file
-  once at startup and never reopens it, so a long-running server writes one
-  unbounded file that retention skips as the active one — measured here at
-  **1.49 GB in 4 h 15**, about 8.4 GB a day, six days to a full disk. Fixed, and
-  `GET /api/v1/server` reports which behaviour you are getting.
+  the LAN. 29 tests in `internal/auth`.
+- **A database that stays bounded.** Upstream opens the daily SQLite file once and
+  never reopens it (measured here at 1.49 GB in 4 h 15). It now rotates at midnight;
+  the per-second ADS-B rows no longer carry a JSON copy of themselves (**−73 %**,
+  9.8 → 2.6 GB a day); and the daily files are kept within a size, 20 GB by default,
+  instead of a number of days.
 
 What does not work yet, and is known:
 
-- **French.** The English branch is settled; the French one is not. A model
-  fine-tuned on air-traffic English will happily render French speech as confident,
-  well-formed, entirely invented English — a failure indistinguishable from success
-  for everything downstream. This is the open question of the project (`Q1`).
-- **Weather** still goes to Windy, and Windy returns 404 for the nearest airfield.
-- **`raw_data` is still stored**: 54 % of the database is a JSON copy of columns
-  that were already parsed out of it. Dropping it would roughly halve the growth,
-  and nothing reads it back.
+- **The transcript itself.** Matching works around it, but beyond callsigns and
+  numbers the text is mostly unusable. Most errors are invented words (59 % of the
+  English model's errors, 93 % of the French model's, on hand-annotated clips), and
+  the English model's gibberish is made of real air-traffic words in the wrong order:
+  only 6 % of its words fall outside the ATC vocabulary, yet 55 to 63 % of its
+  transcripts hold at least one. Three fine-tuning trials so far, none better than
+  production. Improving recognition itself, without transcribing thousands of hours
+  by hand, is now a workstream of its own.
+- **Reception.** On the weaker frequencies the squelch closes for a moment in the
+  middle of transmissions: 33 to 47 % of transmissions chopped on the De Gaulle
+  approaches. It comes from the reception at the station, not from the speaker's
+  distance nor from the software.
+- **Coupled sectors.** In the evening the controllers merge approach sectors, and the
+  same transmission then arrives on two frequencies: 65 to 76 % of them over most of
+  one evening measured. It is transcribed and counted twice.
+- **En-route sectors** get no sector filter: their limits are not published.
+- **Weather** still comes from Windy's private API, which has nothing for the nearest
+  airfield; a French source is still to be chosen.
 
 ## How it works
 
