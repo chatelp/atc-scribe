@@ -159,7 +159,8 @@ la pente, et ne dit jamais qu'un avion est « trop bas ».
 | Piste en service | `RunwayInUseTracker`, un par aéroport (D62), `airports[].runway_in_use` | ✅ servie |
 | Avions : position, altitude, niveau visé, QNH affiché | ADS-B par le websocket existant : `alt_baro`, `nav_altitude_mcp`, `nav_qnh`, `baro_rate` | ✅ 77 positionnés : `alt_baro` 77, `nav_altitude_mcp` 73, `nav_qnh` 73, `baro_rate` 75 |
 | QNH du jour | **à trancher** (V1) : le calage affiché par les avions bas, ou le METAR | 9 avions sur 10 sous 6 000 ft émettaient `nav_qnh`, entre 1 014 et 1 016 hPa |
-| Altitude et niveau de transition | **à relever** dans l'eAIP France, par aéroport (V2) | ❌ |
+| Pente de chaque piste | PAPI des cartes VAC | ✅ 3,0°, une à 3,4° à Orly ; les VAC donnent aussi l'altitude des terrains, 291 ft à Orly et 392 ft à De Gaulle, cohérente avec `runways.csv` |
+| Altitude et niveau de transition | **à relever** dans l'eAIP France, par aéroport (V2) : elle **n'est pas sur les VAC** | ❌ |
 | Niveau entendu | la grammaire (`phraseology`), rôles « altitude » et « niveau de vol » | ❌ **pas rattaché aux avions aujourd'hui** : les autorisations gardées par avion (`ClearanceData`) ne sont que décollage et atterrissage |
 
 Deux remarques sur les seuils :
@@ -177,7 +178,7 @@ Deux remarques sur les seuils :
 | Portée du cône | 20 NM | au-delà de l'approche (10 NM pour les phases, D62), en restant lisible |
 | Demi-ouverture en azimut | 20° | le double du PAR, pour attraper les avions en dernier virage |
 | Élévation maximale | 7° vers la piste, 15° en s'éloignant (V6) | celle du PAR pour les arrivées, environ 15 000 ft à 20 NM ; plus pour les départs, qui montent plus raide |
-| Pente de descente | 3°, par piste | la valeur usuelle ; à vérifier piste par piste dans l'eAIP |
+| Pente de descente | celle du PAPI de la piste, 3° à défaut | VAC du propriétaire (`~/Downloads/AD-2.LFPO.pdf`, `AD-2.LFPG.pdf`) : PAPI à 3,0° partout, sauf un à 3,4° à Orly — la 20, d'après la mise en page du texte extrait, à confirmer sur la carte |
 | Hauteur de franchissement du seuil | 50 ft | la valeur usuelle d'un ILS |
 | Tolérance d'élévation | ±0,7° | l'ordre de la pleine échelle d'un glide ILS |
 | Tolérance d'azimut | ±2,5° | l'ordre de la pleine échelle d'un localizer |
@@ -203,12 +204,16 @@ Deux remarques sur les seuils :
   le premier test JavaScript du dépôt.
 - **V5 — Où loger la vue.** Un onglet par aéroport à côté de la carte, ou un panneau qu'on ouvre
   sous la carte : à décider sur une maquette.
-- **V6 — Le plafond des départs.** Un avion au décollage monte souvent plus raide que 7°. Mesuré le
-  29/09 entre 15:32 et 15:35 (taux de montée rapporté à la vitesse sol, ADS-B) : **4 avions sur 9 en
-  montée sous 8 000 ft ont dépassé 7°**, jusqu'à 9,6°. Le cône du PAR, fait pour des arrivées,
-  perdrait donc des départs dans leurs premiers milles. **Proposition** : un avion qui s'éloigne de la piste a droit à 15°, avec le même
-  plafond absolu d'environ 15 000 ft ; l'étape 2 mesure combien de départs restent dans le cône
-  jusqu'à 10 NM avec 7° et avec 15°.
+- **V6 — Le plafond des départs.** Le cône teste l'angle sous lequel on voit l'avion **depuis le
+  bout de piste**. Mesuré le 29/09 de 15:38 à 15:44 (35 relevés ADS-B, De Gaulle face à l'est, chaque
+  avion rattaché à l'axe le plus proche) : **les 4 départs de De Gaulle ont tous dépassé 7°**, entre
+  9,2° et 13,5°, **sur leurs 4,5 à 6,4 premiers NM**. Ils rentrent ensuite dans le cône en se
+  stabilisant vers 4 000 à 5 000 ft. Avec 7°, la vue perdrait donc chaque décollage juste après la
+  piste, là où on veut le voir. Avec 15°, aucun des quatre n'en sort. En revanche, deux avions en
+  croisière vus au même moment, à FL180-200 et FL257 entre 13 et 20 NM, étaient sous 11,5° et 12,4° :
+  **15° seul les ferait entrer**, ce que le plafond absolu d'environ 15 000 ft empêche. **Proposition**
+  : 15° pour un avion qui s'éloigne de la piste, avec ce plafond absolu. Limites : 6 minutes, un seul
+  aéroport, un seul sens d'exploitation ; aucun départ d'Orly n'a été capté.
 
 ## Suivi de l'implémentation
 
