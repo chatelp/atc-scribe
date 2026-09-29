@@ -101,13 +101,27 @@ test('past the range, the half-width or the ceiling, an aircraft is out', () => 
 
 test('an aircraft crossing the axis far out is passing through, not flying the runway', () => {
     const f = orly();
-    // 15 NM past the 24 end, on the axis, low: aligned it is shown; crossing at
-    // 68 degrees, as De Gaulle's finals cross Orly's 02-20 axis, it is not.
-    const pos = at(f, f.lengthNM + 15, 1);
+    // 15 NM past the 24 end, near the axis, low: aligned it is shown; crossing
+    // at 68 degrees, as De Gaulle's finals cross Orly's 02-20 axis, it is not.
+    const pos = at(f, f.lengthNM + 15, 0.3);
     assert.ok(G.placeInFrame(f, Object.assign({}, pos, { altFt: 1400, track: 242 })));
     assert.equal(G.placeInFrame(f, Object.assign({}, pos, { altFt: 1400, track: 242 + 68 })), null);
     // Within 2 NM of the runway, turning onto final or away after take-off.
     assert.ok(G.placeInFrame(f, Object.assign(at(f, f.lengthNM + 1.5, 0.2), { altFt: 800, track: 242 + 80 })));
+});
+
+test('an aircraft flying beside the runway, never onto it, is not on it', () => {
+    const f = orly();
+    // Parallel to the axis, 1.25 NM to the side, 4 NM out, heading for the
+    // runway: it will pass abeam, as Le Bourget's departures pass De Gaulle.
+    assert.equal(G.placeInFrame(f, Object.assign(at(f, -4, 1.25), { altFt: 1800, track: f.bearing })), null);
+    // Converging on the axis at 20 degrees from 1.25 NM out, 8 NM out: an
+    // intercept, it joins the axis well before the runway.
+    assert.ok(G.placeInFrame(f, Object.assign(at(f, -8, 1.25), { altFt: 3000, track: f.bearing - 20 })));
+    // A departure that turned 15 degrees after take-off, 5 NM out: behind it,
+    // its track leads back to the runway end.
+    const turned = at(f, -5, -5 * Math.tan(15 * Math.PI / 180) * 0.9);
+    assert.ok(G.placeInFrame(f, Object.assign(turned, { altFt: 4500, track: f.bearing + 180 + 15 })));
 });
 
 test('on the ground, only the runway itself counts, not the taxiway beside it', () => {
@@ -124,13 +138,31 @@ test('between two parallel runways the nearest axis wins, and a close call keeps
     // On the 08R extended axis, 6 NM out: nearer 08R.
     const onR = Object.assign(at(r, -6, 0), { altFt: 2200, track: 82 });
     assert.equal(G.classify(frames, onR).frame, '08R-26L');
-    // Just off midway between the axes: the nearest axis, unless the aircraft
-    // was already in the other frame.
-    const pl = G.project(l, onR.lat, onR.lon);
-    const mid = Object.assign(at(r, -6, pl.c / 2 - 0.05), { altFt: 2200, track: 82 });
-    const fresh = G.classify(frames, mid);
-    const other = fresh.frame === '08R-26L' ? '08L-26R' : '08R-26L';
-    assert.equal(G.classify(frames, mid, {}, other).frame, other);
+    // Just off midway between the axes, 0.02 NM nearer 08L's: 08L, unless the
+    // aircraft was already in 08R's frame.
+    const cl = G.project(r, l.le.lat, l.le.lon).c;   // where 08L's axis lies in 08R's frame
+    const mid = Object.assign(at(r, -6, cl / 2 + Math.sign(cl) * 0.01), { altFt: 2200, track: 82 });
+    assert.equal(G.classify(frames, mid).frame, '08L-26R');
+    assert.equal(G.classify(frames, mid, {}, '08R-26L').frame, '08R-26L');
+});
+
+test('an aircraft established on one parallel does not stay in the other one\'s frame', () => {
+    const frames = G.buildFrames('LFPG', [CDG_08L_26R, CDG_08R_26L]);
+    const l = frames.find((f) => f.id === '08L-26R');
+    // On the 08L axis, 4 NM out, having crossed 08R's axis on the way.
+    const onL = Object.assign(at(l, -4, 0), { altFt: 1600, track: 85 });
+    assert.equal(G.classify(frames, onL, {}, '08R-26L').frame, '08L-26R');
+});
+
+test('a departure stays with the runway it took off from', () => {
+    const frames = G.buildFrames('LFPG', [CDG_08L_26R, CDG_08R_26L]);
+    const r = frames.find((f) => f.id === '08R-26L');
+    const l = frames.find((f) => f.id === '08L-26R');
+    // Climbing out of 08R past the 26L end, drifted most of the way to 08L's axis.
+    const cl = G.project(r, l.le.lat, l.le.lon).c;
+    const drifted = Object.assign(at(r, r.lengthNM + 5, cl * 0.7), { altFt: 4000, track: 85 });
+    assert.equal(G.classify(frames, drifted).frame, '08L-26R');
+    assert.equal(G.classify(frames, drifted, {}, '08R-26L').frame, '08R-26L');
 });
 
 test('QNH altitude and the transition level follow the pressure', () => {
