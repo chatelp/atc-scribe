@@ -3958,6 +3958,12 @@ rejetées dès que la 09 était active. Orly (06 et 07, 12° d'écart) n'est pas
 sur les coordonnées réelles, qui échouent sans la correction. Relu sur une instance de test
 corrigée : « 08R 60 % · 09L 35 % », les deux pistes d'atterrissage.
 
+**Complété le même soir, mesure à l'appui** (`tools/runway-check/validate.py`, quatre journées,
+629 approches à De Gaulle dont la piste est sûre) : les approches justes point par point passent de
+**0,8 %** (ancienne règle) à **92,2 %** (axe le plus proche), puis à **99,9 %** quand une piste
+parallèle dont le seuil est jusqu'à 1 NM au-delà des 10 NM peut concourir. Sans cette marge, le
+premier demi-mille de chaque finale de la 09L allait encore à la 09R. Orly : 90,2 % puis 99,5 %.
+
 **Contribuable** tel quel à l'amont : le défaut touche tout aéroport à pistes parallèles décalées.
 La production le prendra au prochain lancement, avec un binaire reconstruit.
 
@@ -4798,6 +4804,21 @@ réglage perso, même conteneur airband. Il reste deux changements possibles, et
 hachage varie d'un facteur 10 à 30 d'une tranche de dix minutes à l'autre, ce serait un lundi contre
 un samedi, et 123,875 est hors de la plage d'accord de l'antenne (124,5-126,5 MHz). **Le réglage est
 gardé.**
+
+### Q51 — Une source ADS-B externe en renfort de la station, quand elle perd un avion *(29/09 — ouverte)*
+
+Idée du propriétaire : *« on pourrait d'ailleurs basculer automatiquement vers une API quand on perd
+le signal local de la station. Mais comme une option dans co-atc »*. Mesuré le même jour : la
+station perd les avions en finale à 3,9 NM du seuil en médiane, vers 1 250 ft, et ne voit jamais
+un toucher à Orly ni à De Gaulle.
+
+**Ce qui existe** : co-atc lit déjà une source externe (OpenSky `/states/all`, ou ADS-B Exchange par
+RapidAPI, `source_type` dans `[adsb]`), mais **à la place** de la station, pas en complément. **Ce
+qu'il faudrait** : une source secondaire, interrogée seulement pour les avions que la station ne
+voit plus près d'un aéroport suivi, et marquée comme telle (la colonne `source_type` de la base
+distingue déjà `local` et `external`). À trancher : quelle source (gratuite, conditions
+d'utilisation, couverture au sol à Orly et De Gaulle), quel coût réseau, et comment l'afficher sans
+laisser croire que la station l'a reçu.
 
 ### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut ; confirmé sur trois bancs et en direct le 28/09)*
 

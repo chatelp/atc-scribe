@@ -66,6 +66,24 @@ func TestAnApproachGoesToTheNearestCentrelineNotTheNearestThreshold(t *testing.T
 	}
 }
 
+func TestAStaggeredParallelCompetesFromTheStartOfTheFinal(t *testing.T) {
+	rw := cdgRunways()
+	th := rw.RunwayThresholds["09L-27R"]["09L"]
+	op := rw.RunwayThresholds["09L-27R"]["27R"]
+	heading := CalculateBearing(th.Latitude, th.Longitude, op.Latitude, op.Longitude)
+	// 10.2 NM out on the 09L centreline: the 09L threshold is past 10 NM, the
+	// 09R one, 0.48 NM nearer, is not.
+	lat, lon := pointOnAxis(th.Latitude, th.Longitude, heading+180, 10.2)
+	if got := DetectRunwayApproach(lat, lon, heading, 3500, rw, choiceConfig()); got == nil || got.RunwayID != "09L-27R/09L" {
+		t.Errorf("start of the 09L final: got %+v, want 09L-27R/09L", got)
+	}
+	// Past 10 NM from every threshold, no approach at all.
+	lat, lon = pointOnAxis(th.Latitude, th.Longitude, heading+180, 10.8)
+	if got := DetectRunwayApproach(lat, lon, heading, 3500, rw, choiceConfig()); got != nil {
+		t.Errorf("10.8 NM out: got %+v, want no approach", got)
+	}
+}
+
 func TestADepartureGoesToTheNearestCentreline(t *testing.T) {
 	rw := cdgRunways()
 	// The receiver, west of CDG: departing aircraft fly away from it.
