@@ -48,3 +48,15 @@ func TestPlausibleValuesAreUntouched(t *testing.T) {
 		}
 	}
 }
+
+// A value with no plausible part is a number misheard: it keeps its digits and
+// loses the role it cannot have, as an impossible flight level already did.
+func TestAnImpossibleValueLosesItsRole(t *testing.T) {
+	for _, text := range []string{"QNH three", "speed six knots", "six knots"} {
+		for _, v := range Parse(text).Values {
+			if v.Role == RoleQNH || v.Role == RoleSpeed {
+				t.Errorf("%q: kept %s=%s", text, v.Role, v.Digits)
+			}
+		}
+	}
+}
