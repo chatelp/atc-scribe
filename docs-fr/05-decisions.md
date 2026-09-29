@@ -3932,6 +3932,11 @@ ou par extrémité de piste. Relevé dans l'eAIP pour les défauts : **altitude 
 à Orly et De Gaulle (cartes IAC, cycle du 03/09) ; **pente de 3°** pour leurs 13 ILS, hauteur au
 seuil de 50 à 57 ft ; la 20 d'Orly, sans ILS, a un PAPI à 3,4°.
 
+**Implémentation commencée le 29/09**, à la demande du propriétaire. Tranché avec lui : **seul
+l'écran principal bascule** (Radar, ou la vue PAR d'un des aéroports suivis dans les réglages), les
+panneaux restent ; le calcul se fait dans le navigateur. Premier incrément vu en direct à Orly et
+De Gaulle ; l'avancement étape par étape est tenu dans `31-vue-par.md`.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET

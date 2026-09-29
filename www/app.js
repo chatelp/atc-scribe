@@ -284,6 +284,11 @@ document.addEventListener('alpine:init', () => {
         runwayData: null, // Store runway data
         runwayInUse: null, // Active runway scores from traffic analysis
         followedAirports: [], // every airport followed, the reference one first, from /station (Q40)
+        // The main screen shows the radar map or the PAR view of one followed
+        // airport (docs-fr/31-vue-par.md); the choice is kept in this browser.
+        mainView: localStorage.getItem('mainView') === 'par' ? 'par' : 'map',
+        parAirport: localStorage.getItem('parAirport') || '',
+        parView: null,
         runwayInUseInterval: null, // 60s polling interval
         airportsData: null, // Airport reference data
         heliportsData: null, // Heliport reference data
@@ -4935,6 +4940,18 @@ async initAircraftDataSource() {
             return Number(abs).toFixed(decimals);
         },
 
+        setMainView(view, airport) {
+            this.mainView = view === 'par' ? 'par' : 'map';
+            if (airport) this.parAirport = airport;
+            try {
+                localStorage.setItem('mainView', this.mainView);
+                localStorage.setItem('parAirport', this.parAirport);
+            } catch (e) { /* the choice lasts for this page only */ }
+            if (!this.parView) return;
+            if (this.mainView === 'par') this.parView.show(this.parAirport);
+            else this.parView.hide();
+        },
+
         async fetchRunwayInUse() {
             try {
                 const response = await fetch(this.stationApiUrl);
@@ -5722,6 +5739,10 @@ async initAircraftDataSource() {
 
     // Now initialize the store's own logic
     Alpine.store('atc').init();
+
+    // The PAR view takes the map's place when chosen (docs-fr/31-vue-par.md)
+    Alpine.store('atc').parView = window.ParView.create(document.getElementById('par-view'), Alpine.store('atc'));
+    Alpine.store('atc').setMainView(Alpine.store('atc').mainView);
 
     // Watch for aircraft selection changes to clear pending requests and trails
     Alpine.effect(() => {
