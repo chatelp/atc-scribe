@@ -866,3 +866,55 @@ input[type=range].dual-range-max:focus {
 .ol-layer canvas {
     image-rendering: optimizeSpeed;
 }
+/* PAR view (docs-fr/31-vue-par.md): in the map's place, under the alerts bar */
+#par-view {
+    position: absolute;
+    inset: 0;
+    z-index: 9000;
+    overflow-y: auto;
+    padding: 76px 16px 24px;
+    background: #0a0a0a;
+}
+.par-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #e0e0e0;
+}
+.par-airport { color: #4CAF50; font-weight: bold; font-size: 15px; }
+.par-dim { color: #8a8a8a; font-weight: normal; }
+.par-sep { color: #555; }
+.par-message { padding: 24px; font-size: 13px; color: #8a8a8a; }
+.par-frame {
+    margin-bottom: 10px;
+    padding: 6px 0 2px;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: #141414;
+}
+.par-frame.par-in-use { border-color: rgba(76, 175, 80, 0.5); }
+.par-frame.par-collapsed { padding-bottom: 6px; }
+.par-frame-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px 2px;
+    font-size: 12px;
+    color: #e0e0e0;
+    cursor: pointer;
+    user-select: none;
+}
+.par-runway { font-weight: bold; }
+.par-badge {
+    padding: 0 6px;
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    border-radius: 3px;
+    background: rgba(76, 175, 80, 0.15);
+    color: #4CAF50;
+    font-size: 10px;
+}
+.par-svg { display: block; font-size: 11px; font-family: inherit; }
+.par-ac { cursor: pointer; }

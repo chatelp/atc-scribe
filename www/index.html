@@ -78,6 +78,10 @@
 
     <!-- 8) Aircraft motion smoothing layer (depends on manager) -->
     <script src="aircraft-animation.js"></script>
+
+    <!-- 9) PAR view: the sky in profile, runway by runway (docs-fr/31-vue-par.md) -->
+    <script src="par/par-geometry.js"></script>
+    <script src="par/par-view.js"></script>
 </head>
 <body class="bg-background text-text m-0 p-0 font-mono overflow-hidden h-screen flex flex-col" x-data>
     <div id="app-container" class="flex flex-col h-screen">
@@ -818,7 +822,25 @@
                         
                         <div id="map" class="h-full w-full bg-black"></div>
 
-                        <div x-data="{ open: false }" class="absolute bottom-4 right-4 z-[10001]">
+                        <!-- The main screen shows the radar map or the PAR view of one
+                             followed airport; the side panels stay as they are. -->
+                        <div id="par-view" x-show="$store.atc.mainView === 'par'" style="display: none"></div>
+                        <div class="absolute top-4 right-4 z-[10001] flex items-center gap-0.5 px-1 py-1 rounded border border-border bg-panel/85 backdrop-blur-sm text-xs shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+                            <button type="button" @click="$store.atc.setMainView('map')"
+                                    :class="$store.atc.mainView === 'map' ? 'bg-highlight/20 text-highlight' : 'text-text/70 hover:text-text'"
+                                    class="px-2 py-1 rounded uppercase tracking-wide cursor-pointer"
+                                    title="Radar map">Radar</button>
+                            <span class="pl-2 pr-1 text-text/40 uppercase tracking-wide"
+                                  title="Profile view of each runway, after the Precision Approach Radar scope">PAR</span>
+                            <template x-for="apt in $store.atc.followedAirports" :key="apt.code">
+                                <button type="button" @click="$store.atc.setMainView('par', apt.code)"
+                                        :class="$store.atc.mainView === 'par' && $store.atc.parAirport === apt.code ? 'bg-highlight/20 text-highlight' : 'text-text/70 hover:text-text'"
+                                        class="px-2 py-1 rounded cursor-pointer"
+                                        :title="apt.name" x-text="apt.code"></button>
+                            </template>
+                        </div>
+
+                        <div x-data="{ open: false }" x-show="$store.atc.mainView === 'map'" class="absolute bottom-4 right-4 z-[10001]">
                             <button @click="open = !open"
                                     @keydown.escape.window="open = false"
                                     type="button"

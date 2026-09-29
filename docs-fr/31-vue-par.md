@@ -1,8 +1,9 @@
 # 31 — La vue PAR : le ciel de profil, piste par piste
 
-> **État au 29/09 : proposition validée par le propriétaire (D67), rien n'est codé.** Tranché le
-> même jour : 15° côté départs (V6), altitude de transition relevée (V2), et tous les réglages
-> modifiables dans l'outil.
+> **État au 29/09 : implémentation commencée le jour même.** Proposition validée par le
+> propriétaire (D67) ; tranché le même jour : 15° côté départs (V6), altitude de transition relevée
+> (V2), réglages modifiables dans l'outil, calcul dans le navigateur (V4), bascule de l'écran
+> principal seul (V5). Où en est chaque étape : tableau de la dernière partie.
 > Ce document est à la fois la conception et le **suivi de l'implémentation** : le tableau de la
 > dernière partie se tient à jour à chaque étape, avec ce qui a été mesuré pour la valider.
 
@@ -226,12 +227,16 @@ des étiquettes (`localStorage`).
   les cônes de deux pistes non parallèles. **Proposition** : la règle de l'axe le plus proche vaut
   aussi pour elles, et un avion à égale distance de deux axes reste dans le cadre où il était, pour
   ne pas sauter d'une piste à l'autre à chaque mise à jour.
-- **V4 — Où calculer la géométrie.** **Recommandation** : dans le navigateur. Tout ce qu'il faut y
-  arrive déjà, sauf les champs de piste (étape 1) et le niveau entendu (étape 6), et la vue
-  n'influe sur rien d'autre. Le calcul vit dans un module pur, testé avec `node --test` — ce serait
-  le premier test JavaScript du dépôt.
-- **V5 — Où loger la vue.** Un onglet par aéroport à côté de la carte, ou un panneau qu'on ouvre
-  sous la carte : à décider sur une maquette.
+- **V4 — Où calculer la géométrie** — *tranchée le 29/09 : dans le navigateur*, comme recommandé.
+  Tout ce qu'il faut y arrive déjà. Le calcul vit dans un module pur, `www/par/par-geometry.js`, testé
+  avec `node --test 'www/par/*.test.js'` : ce sont les premiers tests JavaScript du dépôt.
+- **V5 — Où loger la vue** — *tranchée le 29/09 par le propriétaire* : *« il faut bien intégrer à
+  l'interface actuelle de CO-ATC »*, *« c'est l'écran principal uniquement (celui avec la vue radar)
+  qui bascule »*, *« il faut pouvoir switcher d'aéroport en fonction de ceux qui sont suivis dans les
+  settings »*. Une bascule en haut à droite de l'écran principal : **Radar**, puis un bouton par
+  aéroport suivi (le principal et les « Also follow »). Les panneaux de gauche et de droite ne
+  bougent pas ; la vue prend les filtres de la carte, et un clic sur un avion le sélectionne dans le
+  panneau de droite.
 - **V6 — Le plafond des départs** — *tranchée le 29/09 par le propriétaire : 15°*. Le cône teste l'angle sous lequel on voit l'avion **depuis le
   bout de piste**. Mesuré le 29/09 de 15:38 à 15:44 (35 relevés ADS-B, De Gaulle face à l'est, chaque
   avion rattaché à l'axe le plus proche) : **les 4 départs de De Gaulle ont tous dépassé 7°**, entre
@@ -250,17 +255,53 @@ ci-dessous au moment où elle est faite.
 
 | # | Étape | Vérification | État |
 |---|---|---|---|
-| 1 | **Pistes complètes servies** : altitude du seuil, seuil décalé, pente, pour chaque aéroport suivi | les 7 pistes d'Orly et De Gaulle servies avec des valeurs identiques à `runways.csv` ; test Go | 🔲 |
-| 2 | **Géométrie** : distance le long de l'axe, écart latéral, angle d'élévation, test du cône, piste la plus proche | tests `node --test` ; sur une heure de trajectoires de la base, les avions posés sur une piste (événements d'atterrissage du `RunwayInUseTracker`) sont sur cette piste à 5 NM du seuil dans au moins 98 % des cas ; part des départs gardés jusqu'à 10 NM avec 7° et 15° (V6) | 🔲 |
-| 3 | **Cadre d'une piste, sans avion** : axe gradué en niveaux et en pieds, transition, pente de 3° et tolérances, bande d'azimut | capture comparée au croquis ; FL70 placé selon le QNH | 🔲 |
-| 4 | **Avions en direct** : symbole, étiquette, flèche verticale, traîne, couleurs de phase, clic | un avion suivi 10 minutes sur la carte et dans la vue au même moment ; correction du QNH jugée au toucher : l'altitude corrigée des derniers points avant l'atterrissage tombe à ±100 ft de l'altitude du seuil sur une journée d'atterrissages | 🔲 |
-| 5 | **Pistes empilées** : piste en service en tête, repli, masquage, retournement quand le sens change | un changement de sens d'exploitation observé en direct ou rejoué | 🔲 |
-| 6 | **Niveau visé et niveau entendu** : `nav_altitude_mcp` affiché ; le dernier niveau lu par la grammaire rattaché à l'avion et servi | taux d'accord entendu / visé sur une séance, à comparer au J2 du doc 29 | 🔲 |
-| 7 | **Un onglet par aéroport**, bascule avec la carte | Orly et De Gaulle ouverts ensemble, un avion dans les deux cônes visible dans les deux | 🔲 |
+| 1 | **Pistes complètes servies** : altitude du seuil, seuil décalé, pente, pour chaque aéroport suivi | **déjà servies par `/api/v1/airports/{code}`** (`RunwayInfo` : altitude, cap vrai, seuil décalé des deux extrémités) ; vérifié sur les 3 pistes d'Orly, rien à coder côté Go. La pente et la hauteur au seuil par piste viendront des réglages (étape 8) | ✅ |
+| 2 | **Géométrie** : distance le long de l'axe, écart latéral, angle d'élévation, test du cône, piste la plus proche | 11 tests `node --test` ✅ ; **reste** : sur une heure de trajectoires de la base, les avions posés sur une piste sont sur cette piste à 5 NM du seuil dans au moins 98 % des cas, et la part des départs gardés jusqu'à 10 NM | 🟡 |
+| 3 | **Cadre d'une piste, sans avion** : axe gradué en niveaux et en pieds, transition, pente et tolérances, bande d'azimut | vu en direct le 29/09 à Orly et De Gaulle (journal) | ✅ |
+| 4 | **Avions en direct** : symbole, étiquette, flèche verticale, traîne, couleurs de phase, clic | vu en direct le 29/09 ; **reste** la mesure de la correction du QNH au toucher (±100 ft de l'altitude du seuil sur une journée d'atterrissages) | 🟡 |
+| 5 | **Pistes empilées** : piste en service en tête, repli, masquage, retournement quand le sens change | piste en service en tête et repli vus le 29/09 ; **reste** un changement de sens observé en direct ou rejoué | 🟡 |
+| 6 | **Niveau visé et niveau entendu** : `nav_altitude_mcp` affiché ; le dernier niveau lu par la grammaire rattaché à l'avion et servi | niveau visé affiché ✅ ; **reste** le niveau entendu (côté Go) et le taux d'accord entendu / visé, à comparer au J2 du doc 29 | 🟡 |
+| 7 | **Un onglet par aéroport**, bascule avec la carte | Orly et De Gaulle basculés le 29/09 ; **reste** un avion dans les deux cônes vu dans les deux | 🟡 |
 | 8 | **Les réglages** : défauts dans `config.toml`, section du panneau, `runtime-settings.json`, portées générale, par aéroport et par extrémité de piste | tests Go de validation des bornes et de l'héritage (piste → aéroport → général) ; une valeur changée au panneau redessine la vue sans redémarrer ; un réglage enregistré avant reste valide | 🔲 |
 
 États : 🔲 à faire · 🟡 en cours · ✅ fait.
 
 ### Journal
 
-*(vide — une entrée datée par étape, avec la mesure qui la valide)*
+**29/09 — premier incrément (étapes 1, 3 et 7, amorce de 2, 4, 5, 6).** Fichiers :
+`www/par/par-geometry.js` (géométrie pure) et ses 11 tests, `www/par/par-view.js` (rendu SVG, un
+cadre par piste, rafraîchi chaque seconde), la bascule dans `www/index.html`, `mainView` et
+`setMainView` dans le store de `www/app.js`, les styles dans `www/style.css`. Aucune ligne de Go.
+
+Vu en direct sur une instance de test (port 8012, sans audio ni transcription), de 16:36 à 16:40 :
+
+- **QNH estimé par l'ADS-B : 1 015 hPa sur 8 avions à Orly, autant qu'à De Gaulle ; le METAR d'Orly
+  dit Q1015.** La première source prévue (V1) tombe juste.
+- **Orly, 25 en service** (le compteur de pistes de co-atc, 100 %) : son cadre passe en tête. Trois
+  arrivées y descendent sur la pente de 3°, à 3 400, 2 300 et 1 200 ft. La dernière affiche déjà
+  2 000 ft sélectionnés : l'altitude de remise des gaz, que les équipages affichent une fois la
+  pente captée.
+- **De Gaulle, 09R en service** : une arrivée à gauche, deux départs à droite qui montent vers FL100
+  et FL110.
+- Des avions qui quittent Orly vers le nord sont rangés dans le cadre de la 02-20 : ils sont dans
+  son cône, et c'est son axe qui est le plus proche. C'est la règle voulue (géométrie seule).
+
+Quatre corrections faites en regardant :
+
+- le compteur de pistes nomme une extrémité « 07-25/25 » (paire, puis extrémité) : la comparaison
+  à « 25 » échouait, et la piste en service n'était pas trouvée ;
+- **l'altitude sélectionnée arrive par pas de 16 ou 32 ft** : 3 000 ft est émis 3 024. Arrondie à
+  la centaine à l'affichage ;
+- la barre d'alertes de co-atc, au-dessus de l'écran principal, masquait l'en-tête : la vue
+  commence sous elle, quelle que soit sa hauteur, et défile dessous ;
+- les étiquettes de niveau se chevauchaient en haut de l'axe : une étiquette trop proche de la
+  précédente est omise, la ligne reste.
+
+**Un choix à juger à l'œil par le propriétaire** : l'axe des altitudes est en racine carrée, pas
+linéaire. Les derniers milles et la montée initiale y ont de la place, et les niveaux jusqu'à FL150
+tiennent quand même dans 230 px. En contrepartie, la pente de 3° y est une courbe et non une droite,
+ce qui s'écarte de l'écran PAR.
+
+**À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
+co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la
+protection du réseau local de macOS. Lancé depuis Terminal, il y arrive.
