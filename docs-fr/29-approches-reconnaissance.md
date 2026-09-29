@@ -85,6 +85,17 @@ ne portent aucun indicatif (47 %).
 | 29 | Deviner à partir des mots | pas fiable, et aucune référence pour le vérifier ; une règle plus prudente n'a pas fait mieux | ⏳ gardé faute de mieux (Q39) |
 | 30 | Reconnaître le contrôleur à sa voix | pas encore essayé ; demande le son de chaque fréquence séparé | 🔲 |
 
+### F. Juger le texte lui-même, et pas seulement l'indicatif (laboratoire, D63)
+
+Juges de `whisper-lab/scripts/labo/juges.py`, sur la sortie `-json` de `cmd/phraseology`. Règle de
+production (détecteur, français sans relance, boucles coupées), bancs du 27 et du 28/09.
+
+| | Juge | Ce qui a été mesuré | Verdict |
+|---|---|---|---|
+| J2 | Les valeurs lues pour l'avion rattaché, confrontées à ce qu'il affiche en ADS-B, de 30 s avant à 150 s après : niveau ou altitude sélectionnés à 100 ft près (ou altitude baro à 300 ft), cap sélectionné à 5°, vitesse indiquée à 10 kt, squawk, QNH à 1 hPa. Le hasard : la même valeur confrontée aux autres avions à moins de 60 NM | **70 % des valeurs vérifiables justes le 27/09, contre 14 % par hasard** (74 sur 106 ; niveaux 84 %) ; **82 % contre 15 % le 28/09** (94 sur 114) | ✅ premier juge des chiffres au-delà de l'indicatif |
+| J2 bis | Des valeurs impossibles : un nombre suivi de son mot de rôle avalait l'indicatif dit juste avant (« KLM One Four Zero Five one eighty knots » → vitesse 1405180) | la grammaire garde désormais la partie plausible du nombre et rend le reste à la lecture des indicatifs (29/09) : **valeurs impossibles 16 → 6 % (27/09) et 13 → 4 % (28/09)**, plus de valeurs lues (131 → 140, 181 → 185) ; rattachements : 1 gagné, 0 perdu, 0 changé | ✅ en service au prochain lancement |
+| J3 | La part des mots que ni la grammaire ni un lexique de phraséologie et de politesse ne classent : un indicateur du charabia | anglais 16,5 et 17,4 %, français 28,0 et 28,9 % ; « ne donner que la parole » (Q41) n'y change rien (18,0 % contre 18,2 à 19,0 %) | ⏳ à étalonner sur les 60 clips annotés par le propriétaire |
+
 ## Ce qui reste à tester, par ordre d'intérêt
 
 1. ~~**L'aiguillage vers le modèle français**~~ : fait, en production depuis le 28/09 (9 ter), avec

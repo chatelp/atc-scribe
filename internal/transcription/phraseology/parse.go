@@ -167,6 +167,14 @@ func Parse(text string) Result {
 		if digits == "" {
 			continue
 		}
+		// A value read too far has swallowed what followed it -- "QNH one zero one
+		// three, one four zero five" -- so keep the longest plausible start, and
+		// leave the rest to be read again as a number of its own.
+		if !plausibleFor(role, digits) {
+			if d, e, ok := plausiblePrefix(role, toks, i+n, end); ok {
+				digits, end = d, e
+			}
+		}
 		if role == RoleFlightLevel && !plausibleFlightLevel(digits) {
 			role = RoleUnknown
 		}
@@ -455,19 +463,91 @@ func looseNumbers(toks []string, used []bool) []Value {
 		}
 		if end < len(toks) {
 			if role, ok := trailingRoles[toks[end]]; ok {
-				out = append(out, Value{Role: role, Digits: digits, Text: digits, Word: i, End: end})
+				// The role word follows the number, so the number may have
+				// swallowed the callsign spoken just before it: "KLM One Four Zero
+				// Five one eighty knots" read as a speed of 1405180 (27/09,
+				// whisper-lab). Keep the longest plausible end as the value, and
+				// read what comes before it as a number of its own.
+				start := i
+				if !plausibleFor(role, digits) {
+					if k, d, ok := plausibleSuffix(role, toks, i, end); ok {
+						if head, hend := readNumber(toks[:k], i); hend == k {
+							out = append(out, bareValue(head, i, k)...)
+						}
+						start, digits = k, d
+					}
+				}
+				out = append(out, Value{Role: role, Digits: digits, Text: digits, Word: start, End: end})
 				i = end
 				continue
 			}
 		}
-		if role, text := classifyBare(digits); role != RoleUnknown {
-			out = append(out, Value{Role: role, Digits: digits, Text: text, Word: i, End: end})
-		} else if len(digits) >= 2 && !strings.Contains(digits, ".") {
-			out = append(out, Value{Role: RoleCallsign, Digits: digits, Text: digits, Word: i, End: end})
-		}
+		out = append(out, bareValue(digits, i, end)...)
 		i = end - 1
 	}
 	return out
+}
+
+// bareValue is a number with no role word: a frequency when its value says so,
+// otherwise a callsign candidate of two digits or more.
+func bareValue(digits string, word, end int) []Value {
+	if role, text := classifyBare(digits); role != RoleUnknown {
+		return []Value{{Role: role, Digits: digits, Text: text, Word: word, End: end}}
+	}
+	if len(digits) >= 2 && !strings.Contains(digits, ".") {
+		return []Value{{Role: RoleCallsign, Digits: digits, Text: digits, Word: word, End: end}}
+	}
+	return nil
+}
+
+// plausibleFor says whether digits can be a value of this role at all. The
+// bounds are those of the phraseology, wide on purpose: they exist to catch a
+// number that swallowed its neighbours, not to judge a reading.
+func plausibleFor(role Role, digits string) bool {
+	if strings.Contains(digits, ".") {
+		return role == RoleFrequency || role == RoleUnknown
+	}
+	n, err := strconv.Atoi(digits)
+	if err != nil {
+		return false
+	}
+	switch role {
+	case RoleSpeed:
+		return n >= 40 && n <= 450
+	case RoleAltitude:
+		return n >= 100 && n <= 45000
+	case RoleHeading:
+		return len(digits) <= 3 && n >= 1 && n <= 360
+	case RoleQNH:
+		return (n >= 900 && n <= 1060) || (n >= 2700 && n <= 3150)
+	case RoleSquawk:
+		return len(digits) == 4 && !strings.ContainsAny(digits, "89")
+	case RoleFlightLevel:
+		return plausibleFlightLevel(digits)
+	}
+	return true
+}
+
+// plausiblePrefix is the longest start of the number read from toks[start:end]
+// that is plausible for the role, and where it ends.
+func plausiblePrefix(role Role, toks []string, start, end int) (string, int, bool) {
+	for e := end - 1; e > start; e-- {
+		if d, j := readNumber(toks[:e], start); j == e && d != "" && plausibleFor(role, d) {
+			return d, e, true
+		}
+	}
+	return "", 0, false
+}
+
+// plausibleSuffix is the longest end of the number read from toks[start:end]
+// that is plausible for the role, and where it starts.
+func plausibleSuffix(role Role, toks []string, start, end int) (int, string, bool) {
+	for k := start + 1; k < end; k++ {
+		if d, j := readNumber(toks[:end], k); j == end && d != "" && plausibleFor(role, d) {
+			return k, d, true
+		}
+	}
+	return 0, "", false
 }
 
 // classifyBare recognises numbers whose value alone gives them away, with no
