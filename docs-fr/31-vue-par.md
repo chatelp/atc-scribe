@@ -112,7 +112,21 @@ Un avion dans un cône apparaît dans le cadre de cette piste, **quelle que soit
 ce qui donne « plus loin que l'approche et le décollage ». Un avion dans les cônes de **deux pistes
 parallèles** va à celle dont l'axe est le plus proche. Les trois valeurs sont des réglages.
 
-Ce rattachement est **indépendant de l'attribution d'aéroport de D62** (axe à 0,5 NM, 10 NM, sous
+**Deux garde-fous, ajoutés le 29/09 après un cas réel** (AFR1855, en finale sur la 08R de De Gaulle,
+était affiché sur la 02-20 d'Orly : De Gaulle est à 13 NM au nord d'Orly, dans le prolongement de
+cet axe, et ses finales tombent dans le cône nord d'Orly) :
+
+- **un avion que co-atc rattache à un autre aéroport suivi n'est pas montré ici** : l'attribution
+  de D62, celle qui sert aux phases, fait foi ;
+- **un avion qui coupe l'axe à plus de 60° est de passage**, et n'est pas montré, sauf à moins de
+  2 NM de la piste, là où les avions virent en finale ou après le décollage. Les finales de De
+  Gaulle coupent l'axe 02-20 d'Orly à 68°. Ce garde-fou vaut aussi quand un seul aéroport est suivi.
+
+Un vrai PAR n'aurait pas vu AFR1855 : sa couverture s'arrête vers 9 NM, et c'est l'élargissement
+à 20 NM qui fait entrer ce trafic. Et un PAR montre des échos anonymes, alors que co-atc met un
+indicatif sur une piste, ce qui revient à dire « cet avion est pour cette piste ».
+
+Hors ces deux cas, ce rattachement est **indépendant de l'attribution d'aéroport de D62** (axe à 0,5 NM, 10 NM, sous
 5 000 ft) : celle-ci décide des phases ; le cône ne décide que de l'affichage. Un avion peut donc
 figurer dans l'onglet d'Orly et dans celui de De Gaulle s'il est dans leurs deux cônes.
 
@@ -200,6 +214,8 @@ portées :
 | Élévation maximale, avion qui s'approche | générale | 7° | celle du PAR ; environ 15 000 ft à 20 NM |
 | Élévation maximale, avion qui s'éloigne | générale | **15°** | **décidé le 29/09** (V6) : aucun des 4 départs mesurés ne la dépasse |
 | Plafond absolu | générale | 15 000 ft | garde dehors les avions en croisière que 15° laisserait entrer (V6) |
+| Angle de croisement maximal | générale | 60° | au-delà, l'avion coupe l'axe au lieu de le suivre ; les finales de De Gaulle coupent l'axe 02-20 d'Orly à 68° |
+| Rayon sans condition d'angle | générale | 2 NM | près de la piste, les avions virent en finale ou après le décollage |
 | Altitude de transition | par aéroport | 5 000 ft | eAIP, Orly et De Gaulle. Elle change d'un pays à l'autre (18 000 ft en Amérique du Nord) : l'exemple de configuration le dira |
 | Niveau de transition | par aéroport | automatique : le plus bas niveau à au moins 1 000 ft au-dessus de l'altitude de transition, avec le QNH du moment | règle de l'ENR 1.7 ; ou une valeur fixe, pour suivre ce qu'annonce l'ATIS |
 | Source du QNH | par aéroport | automatique : les avions bas, puis le METAR, puis aucun | V1 ; ou une valeur fixe |
@@ -395,6 +411,12 @@ propriétaire alimente FlightAware : **son compte « Personal » donne 10 $ d'us
 mois**, et la liste des arrivées d'un aéroport coûte 0,005 $ par tranche de 15 vols. Une journée
 de De Gaulle (environ 700 arrivées) coûte donc 0,23 $. Flightradar24 publie aussi la piste dans
 son API, mais **n'offre pas d'accès gratuit à ses contributeurs** (FAQ de l'API).
+
+**29/09, soir — un avion pour De Gaulle affiché sur une piste d'Orly.** Relevé par le propriétaire :
+AFR1855, en finale sur la 08R de De Gaulle à 1 350 ft, apparaissait dans le cadre 02-20 d'Orly,
+à 15,4 NM du bout 20, 1,1 NM de l'axe, 0,7° au-dessus de l'horizon. Il était dans le cône, mais il
+le traversait à 68°. Corrigé par les deux garde-fous décrits plus haut (« Le rattachement à une
+piste »), avec un test ; revu en direct, Orly n'affiche plus que son trafic.
 
 **À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
 co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la
