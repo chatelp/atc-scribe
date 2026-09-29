@@ -32,6 +32,10 @@
     const LEFT = 70;        // room for the level labels
     const RIGHT = 14;
     const TRAIL_SECONDS = 60;
+    // The runway tracker counts an end as in use from this share of the
+    // evidence (activeMinProbability in internal/adsb/runway_tracker.go): at
+    // Paris-CDG one runway lands and its neighbour takes off.
+    const IN_USE_MIN_PROBABILITY = 0.15;
     const STALE_SECONDS = 60;
 
     function esc(s) {
@@ -52,6 +56,93 @@
         return Math.round(ft / 100) * 100;
     }
 
+    // --- Help on hover, for someone who knows nothing of air traffic control ---
+
+    function helpAttr(title, body) {
+        return ` data-help-title="${esc(title)}" data-help="${esc(body)}"`;
+    }
+
+    // "09L" is flown at about 090 degrees; L, R and C tell parallel runways apart.
+    function aboutRunwayName(ident) {
+        const n = parseInt(ident, 10);
+        const side = { L: 'left', R: 'right', C: 'centre' }[ident.slice(-1)];
+        return `${ident} means about ${n === 0 ? 360 : n * 10}° on the compass` +
+            (side ? `, and ${ident.slice(-1)} the ${side}-hand one of parallel runways, as seen when landing` : '');
+    }
+
+    const HELP = {
+        view: () => helpAttr('PAR view',
+            'The sky seen from the side, runway by runway, the way a Precision Approach Radar shows controllers the aircraft coming down to land. ' +
+            'In each frame, height goes up the side and distance along the bottom; underneath, the same aircraft seen from above. ' +
+            'The buttons at the top right switch between the map and the airports followed in the settings.'),
+        inUse: (several) => helpAttr(several ? 'Runways in use' : 'Runway in use',
+            'Aircraft take off and land into the wind, so an airport uses its runways in one direction at a time, and a large one may land on one runway while taking off from the next. ' +
+            'co-atc works this out from the approaches, landings and take-offs it has seen in the last hour; the percentage is each runway\'s share of that evidence. ' +
+            'Frames with a runway in use come first.'),
+        qnh: (est) => helpAttr('QNH, the local air pressure', est
+            ? `An altimeter measures air pressure, not height. To read their height above sea level, crews set it to the local pressure, called the QNH. ` +
+              `co-atc takes the setting that ${est.count} aircraft flying low near the airport report, and uses it to place every aircraft at its true height. The weather report (METAR) gives the same figure.`
+            : 'An altimeter measures air pressure, not height; crews set it to the local pressure, the QNH, to read their height above sea level. ' +
+              'No aircraft flying low near the airport reports its setting right now, so heights are read on the standard pressure and may be a few hundred feet off.'),
+        ta: (ta) => helpAttr('Transition altitude',
+            `Up to ${ta} ft, heights are counted above sea level, on the local pressure. Climbing past it, crews switch their altimeter to the standard pressure (1013 hPa) and use flight levels, ` +
+            `so that everyone higher up shares one reference whatever the weather. ${ta} ft is the value published for Paris-Orly and Paris-Charles de Gaulle.`),
+        tl: (tl, ta) => helpAttr('Transition level',
+            `The lowest flight level in use, FL${pad3(tl)}: descending aircraft switch back to the local pressure as they pass it. ` +
+            `It is at least 1000 ft above the transition altitude (${ta} ft), so it moves with the air pressure. This one is worked out from today's QNH; the controllers announce the actual one.`),
+        layer: () => helpAttr('Transition layer',
+            'The band between the transition altitude and the transition level. Aircraft cross it while they change their altimeter setting; none is told to level off inside it.'),
+        runway: (a, b) => helpAttr(`Runway ${a} / ${b}`,
+            `A runway is named after its direction, at each end: ${aboutRunwayName(a)}. ` +
+            `Aircraft landing on ${a} arrive from the left and touch down at the ${a} end; aircraft taking off on ${a} climb out on the right, past the ${b} end. ` +
+            'When the airport turns its runways round, the frame turns round too.'),
+        fold: () => helpAttr('Fold', 'Click the bar to fold or unfold this runway.'),
+        count: () => helpAttr('Aircraft in this frame',
+            'The aircraft lined up with this runway, out to 20 NM, or on the runway itself, whatever they are doing. ' +
+            'An aircraft between two runways is shown with the nearest one. The map\'s filters apply here too.'),
+        scale: (ceil) => helpAttr('Height scale',
+            'Heights are stretched near the ground, so that the last miles of a landing and the first of a take-off have room while the levels higher up still fit. ' +
+            `Above ${ceil.toLocaleString('en')} ft, aircraft are not shown.`),
+        feet: () => helpAttr('Height in feet',
+            'Height above sea level, in feet, read on the local pressure (QNH). Used near the ground, below the transition altitude. 1000 ft is about 300 m.'),
+        fl: (fl) => helpAttr(`Flight level ${pad3(fl)}`,
+            `Higher up, heights are flight levels: hundreds of feet read on the standard pressure instead of the local one. ` +
+            `FL${pad3(fl)} is about ${(fl * 100).toLocaleString('en')} ft; the line is drawn where that level actually lies today.`),
+        glide: (e, strong) => helpAttr(`Glide path to runway ${e.ident}`,
+            `The line an aircraft follows down to land on ${e.ident}: a ${e.slopeDeg}° slope, about ${Math.round(G.FT_PER_NM * Math.tan(e.slopeDeg * Math.PI / 180))} ft lower for each nautical mile, ` +
+            `crossing the landing threshold ${e.thresholdCrossingFt} ft up. Instrument landing systems guide aircraft down it, and an arriving aircraft should ride on it.` +
+            (strong ? ' Green: this runway is in use.' : '')),
+        glideMargin: (tol) => helpAttr('Glide path margins',
+            `${tol}° either side of the glide path: about how far above or below it the pilots' instrument can still show them. Between these lines, an aircraft is well set up to land.`),
+        coneIn: (deg) => helpAttr('Edge of the coverage, inbound',
+            `An aircraft flying towards the runway is shown with it while it is below this line, ${deg}° above the horizon seen from the runway end, as on a real approach radar. ` +
+            'Higher, it is not yet lined up to land here.'),
+        coneOut: (deg, ceil) => helpAttr('Edge of the coverage, outbound',
+            `For aircraft flying away from the runway the limit is ${deg}°, since a take-off climbs much more steeply than a landing comes down. ` +
+            `Above ${ceil.toLocaleString('en')} ft no aircraft is shown.`),
+        runwayBar: (f) => helpAttr(`Runway ${f.le.ident}-${f.he.ident}`,
+            `${Math.round(f.lengthNM * 1852).toLocaleString('en')} m long, drawn at its height above sea level, ${Math.round(Math.min(f.le.elevFt, f.he.elevFt))} to ${Math.round(Math.max(f.le.elevFt, f.he.elevFt))} ft.`),
+        threshold: (e) => helpAttr(`Landing threshold ${e.ident}`, e.displacedFt > 0
+            ? `Where aircraft landing on ${e.ident} may first touch down: ${Math.round(e.displacedFt * 0.3048)} m in from the end of the runway, a "displaced threshold", usually to keep clear of obstacles or reduce noise. The glide path aims here.`
+            : `Where aircraft landing on ${e.ident} may first touch down, at the end of the runway. The glide path aims here.`),
+        end: (e) => helpAttr(`Runway end ${e.ident}`,
+            `${Math.round(e.elevFt)} ft above sea level. Aircraft landing on ${e.ident} fly towards ${pad3(e.landingBearing)}°.`),
+        distance: () => helpAttr('Distance',
+            'Nautical miles from the end of the runway; one nautical mile is 1852 m. On a 3° glide path, an arriving aircraft is about 1000 ft up 3 NM out.'),
+        azimuth: () => helpAttr('Seen from above',
+            'The same aircraft seen from above: how far each one is to the side of the runway\'s centre line, on the same distance scale. ' +
+            'Up is to the left of an arriving aircraft. An aircraft lined up sits on the line.'),
+        axis: (range) => helpAttr('Centre line', `The runway's centre line, extended ${range} NM out on each side.`),
+        azMargin: (tol) => helpAttr('Lined up',
+            `${tol}° either side of the centre line: about how far left or right of it the pilots' instrument can still show them. ` +
+            'Outside, an aircraft is dimmed in the upper band: near the runway, but not lined up with it.'),
+        coneSide: (deg, range) => helpAttr('Sides of the coverage',
+            `${deg}° either side of the centre line, out to ${range} NM. Outside, an aircraft is not shown with this runway.`),
+        track: () => helpAttr('Track of the selected aircraft',
+            'Where it has been: its recorded positions, as far back as the track length set in the settings, drawn along this runway. ' +
+            'Parts that lie outside this frame are left out.'),
+    };
+
     function phaseOf(a) {
         return (a.phase && a.phase.current && a.phase.current.length) ? a.phase.current[0].phase : 'UNK';
     }
@@ -62,11 +153,67 @@
         const trails = new Map();             // hex -> [{t, lat, lon, altBaro}]
         let timer = null;
         let airport = '';
+        let topRoom = 0;
 
         let collapsed = new Set();
         try { collapsed = new Set(JSON.parse(localStorage.getItem('parCollapsed') || '[]')); } catch (e) { /* none kept */ }
 
+        // One tooltip for the whole view, outside the part redrawn every second.
+        const tip = document.createElement('div');
+        tip.className = 'par-tip';
+        tip.style.display = 'none';
+        document.body.appendChild(tip);
+        let tipKey = null;
+        let tipTimer = null;
+        let tipX = 0;
+        let tipY = 0;
+
+        function placeTip() {
+            const pad = 14;
+            let left = tipX + pad;
+            let top = tipY + pad;
+            if (left + tip.offsetWidth > window.innerWidth - 8) left = tipX - pad - tip.offsetWidth;
+            if (top + tip.offsetHeight > window.innerHeight - 8) top = tipY - pad - tip.offsetHeight;
+            tip.style.left = Math.max(8, left) + 'px';
+            tip.style.top = Math.max(8, top) + 'px';
+        }
+
+        function hideTip() {
+            clearTimeout(tipTimer);
+            tipTimer = null;
+            tipKey = null;
+            tip.style.display = 'none';
+        }
+
+        // Aircraft have no help of their own: clicking one opens its panel.
+        container.addEventListener('mousemove', (ev) => {
+            tipX = ev.clientX;
+            tipY = ev.clientY;
+            const el = ev.target.closest('[data-help]');
+            if (!el || ev.target.closest('[data-hex]')) {
+                hideTip();
+                return;
+            }
+            const title = el.getAttribute('data-help-title') || '';
+            const body = el.getAttribute('data-help') || '';
+            const key = title + '\n' + body;
+            if (key === tipKey) {
+                if (tip.style.display !== 'none') placeTip();
+                return;
+            }
+            hideTip();
+            tipKey = key;
+            tipTimer = setTimeout(() => {
+                tip.innerHTML = `<div class="par-tip-title">${esc(title)}</div><div>${esc(body)}</div>`;
+                tip.style.display = 'block';
+                placeTip();
+            }, 250);
+        });
+        container.addEventListener('mouseleave', hideTip);
+        container.addEventListener('scroll', hideTip);
+
         container.addEventListener('click', (ev) => {
+            hideTip();
             const toggle = ev.target.closest('[data-par-toggle]');
             if (toggle) {
                 const key = toggle.getAttribute('data-par-toggle');
@@ -170,7 +317,8 @@
             const inUse = (apt.runway_in_use || [])
                 .map((r) => Object.assign({}, r, { end: endIdent(r) }))
                 .filter((r) => byIdent[r.end])
-                .map((r) => Object.assign(r, { bearing: byIdent[r.end].landingBearing }));
+                .map((r) => Object.assign(r, { bearing: byIdent[r.end].landingBearing }))
+                .filter((r) => r.probability >= IN_USE_MIN_PROBABILITY);
 
             const list = visibleAircraft();
             recordTrails(list);
@@ -192,47 +340,55 @@
                 placed.get(p.frame).push({ a, p, altFt });
             }
 
-            const inUseFrame = inUse.length ? frames.find((f) => f.le.ident === inUse[0].end || f.he.ident === inUse[0].end) : null;
-            const ordered = inUseFrame ? [inUseFrame, ...frames.filter((f) => f !== inUseFrame)] : frames;
+            // Frames carrying a runway in use come first, the most used first.
+            const usage = (f) => Math.max(0, ...inUse.filter((r) => r.end === f.le.ident || r.end === f.he.ident).map((r) => r.score));
+            const ordered = frames.map((f, i) => ({ f, i, use: usage(f) }))
+                .sort((p, q) => (q.use - p.use) || (p.i - q.i))
+                .map((o) => o.f);
 
             const width = Math.max(480, container.clientWidth - 34);
-            const top = inUse[0];
             const header = `
                 <div class="par-header">
-                    <span class="par-airport">${esc(apt.code)}</span>
-                    <span class="par-name">${esc(apt.name || '')}</span>
+                    <span class="par-airport"${HELP.view()}>${esc(apt.code)}</span>
+                    <span class="par-name"${HELP.view()}>${esc(apt.name || '')}</span>
                     <span class="par-sep">·</span>
-                    <span>Runway in use <b>${top ? esc(top.end) + ` <span class="par-dim">(${Math.round(top.probability * 100)}%)</span>` : '<span class="par-dim">unknown</span>'}</b></span>
+                    <span${HELP.inUse(inUse.length > 1)}>${inUse.length > 1 ? 'Runways' : 'Runway'} in use <b>${inUse.length
+                        ? inUse.map((r) => esc(r.end) + ` <span class="par-dim">${Math.round(r.probability * 100)}%</span>`).join(' · ')
+                        : '<span class="par-dim">unknown</span>'}</b></span>
                     <span class="par-sep">·</span>
-                    <span title="${est ? `Median of the QNH set by ${est.count} aircraft below ${opts.transitionAltitudeFt - 500} ft near the airport` : 'No aircraft near the airport sends its QNH setting: altitudes are pressure altitudes'}">
-                        QNH <b>${est ? Math.round(qnh) + ' hPa' : '—'}</b> <span class="par-dim">${est ? `(ADS-B, ${est.count} aircraft)` : '(standard)'}</span></span>
+                    <span${HELP.qnh(est)}>QNH <b>${est ? Math.round(qnh) + ' hPa' : '—'}</b> <span class="par-dim">${est ? `(ADS-B, ${est.count} aircraft)` : '(standard)'}</span></span>
                     <span class="par-sep">·</span>
-                    <span>TA <b>${opts.transitionAltitudeFt} ft</b></span>
+                    <span${HELP.ta(opts.transitionAltitudeFt)}>TA <b>${opts.transitionAltitudeFt} ft</b></span>
                     <span class="par-sep">·</span>
-                    <span title="Lowest flight level at least 1000 ft above the transition altitude with this QNH (AIP ENR 1.7). The controller gives the actual one.">TL <b>FL${pad3(tl / 1)}</b> <span class="par-dim">(computed)</span></span>
+                    <span${HELP.tl(tl, opts.transitionAltitudeFt)}>TL <b>FL${pad3(tl)}</b> <span class="par-dim">(computed)</span></span>
                 </div>`;
 
             const selected = store.selectedAircraft && store.selectedAircraft.hex;
             const body = ordered.map((f) => {
                 const key = `${apt.code} ${f.id}`;
-                const isInUse = f === inUseFrame;
+                const isInUse = usage(f) > 0;
                 const items = placed.get(f.id);
                 const A = arrivalEnd(f, inUse);
+                const a = f[A].ident;
+                const b = f[A === 'le' ? 'he' : 'le'].ident;
                 const head = `
                     <div class="par-frame-head" data-par-toggle="${esc(key)}">
-                        <i class="fas ${collapsed.has(key) ? 'fa-chevron-right' : 'fa-chevron-down'}"></i>
-                        <span class="par-runway">${esc(A === 'le' ? f.le.ident + ' → ' + f.he.ident : f.he.ident + ' → ' + f.le.ident)}</span>
-                        ${isInUse ? '<span class="par-badge">IN USE</span>' : ''}
-                        <span class="par-dim">${items.length} aircraft</span>
+                        <i class="fas ${collapsed.has(key) ? 'fa-chevron-right' : 'fa-chevron-down'}"${HELP.fold()}></i>
+                        <span class="par-runway"${HELP.runway(a, b)}>${esc(a + ' → ' + b)}</span>
+                        ${isInUse ? `<span class="par-badge"${HELP.inUse(inUse.length > 1)}>IN USE</span>` : ''}
+                        <span class="par-dim"${HELP.count()}>${items.length} aircraft</span>
                     </div>`;
                 if (collapsed.has(key)) return `<section class="par-frame par-collapsed">${head}</section>`;
                 return `<section class="par-frame${isInUse ? ' par-in-use' : ''}">${head}${frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse })}</section>`;
             }).join('');
 
-            // Start below the alerts bar, which the view scrolls under.
+            // Start below the alerts bar, which the view scrolls under. The bar
+            // grows and shrinks as alerts come and go: the room kept for it only
+            // grows, or the whole view would jump under the pointer.
             const bar = document.getElementById('alerts-bar');
             const barBottom = bar && bar.offsetParent ? bar.offsetTop + bar.offsetHeight : 60;
-            container.style.paddingTop = (barBottom + 12) + 'px';
+            topRoom = Math.max(topRoom, barBottom + 12);
+            container.style.paddingTop = topRoom + 'px';
             container.innerHTML = header + body;
         }
 
@@ -252,7 +408,6 @@
 
             // Display coordinate u: arrivals to A come from u < 0; the runway is [0, L].
             const u = (s) => (A === 'le' ? s : L - s);
-            const sOf = (uu) => (A === 'le' ? uu : L - uu);
             const x = (uu) => LEFT + (uu + R) / (L + 2 * R) * plotW;
             // Square-root altitude scale: the last miles and the climb-out get
             // room, and the flight levels up to the ceiling still fit.
@@ -267,59 +422,75 @@
             const flAlt = (fl) => G.qnhAltitude(fl * 100, qnh);
 
             const out = [];
+            const pts = (list) => list.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
             const line = (x1, y1, x2, y2, stroke, extra = '') =>
                 out.push(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${stroke}" ${extra}/>`);
             const text = (tx, ty, s, fill, extra = '') =>
                 out.push(`<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" fill="${fill}" ${extra}>${s}</text>`);
-            const poly = (pts, stroke, extra = '') => {
-                if (pts.length < 2) return;
-                out.push(`<polyline fill="none" stroke="${stroke}" points="${pts.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" ${extra}/>`);
+            const poly = (list, stroke, extra = '') => {
+                if (list.length < 2) return;
+                out.push(`<polyline fill="none" stroke="${stroke}" points="${pts(list)}" ${extra}/>`);
+            };
+            // Thin lines are hard to point at: each one that has something to say
+            // gets a wider invisible twin carrying its help.
+            const hitLine = (x1, y1, x2, y2, help) =>
+                out.push(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="transparent" stroke-width="10" pointer-events="stroke"${help}/>`);
+            const hitPoly = (list, help) => {
+                if (list.length < 2) return;
+                out.push(`<polyline fill="none" stroke="transparent" stroke-width="10" pointer-events="stroke" points="${pts(list)}"${help}/>`);
             };
 
-            // Transition layer, then the level grid: feet QNH below the
-            // transition altitude, flight levels from the transition level up.
+            // The level scale's column, then the transition layer.
+            out.push(`<rect x="0" y="${elevTop}" width="${LEFT}" height="${ELEV_H}" fill="transparent"${HELP.scale(ceil)}/>`);
             const ta = opts.transitionAltitudeFt;
-            out.push(`<rect x="${LEFT}" y="${y(flAlt(tl)).toFixed(1)}" width="${plotW}" height="${(y(ta) - y(flAlt(tl))).toFixed(1)}" fill="${C.transition}" fill-opacity="0.06"/>`);
-            // A label is left out when it would touch the one below it.
+            out.push(`<rect x="${LEFT}" y="${y(flAlt(tl)).toFixed(1)}" width="${plotW}" height="${(y(ta) - y(flAlt(tl))).toFixed(1)}" fill="${C.transition}" fill-opacity="0.06"${HELP.layer()}/>`);
+
+            // The level grid: feet QNH below the transition altitude, flight
+            // levels from the transition level up. A label is left out when it
+            // would touch the one below it.
             let lastLabelY = Infinity;
-            const levelLabel = (alt, s, fill, extra = '') => {
+            const levelLabel = (alt, s, fill, help, extra = '') => {
                 if (lastLabelY - y(alt) < 11) return;
                 lastLabelY = y(alt);
-                text(LEFT - 6, y(alt) + 3, s, fill, `text-anchor="end" ${extra}`);
+                text(LEFT - 6, y(alt) + 3, s, fill, `text-anchor="end" ${extra}${help}`);
             };
             for (let alt = 1000; alt < ta; alt += 1000) {
                 if (alt <= ground) continue;
                 line(LEFT, y(alt), LEFT + plotW, y(alt), C.grid);
-                levelLabel(alt, `${alt}`, C.label);
+                levelLabel(alt, `${alt}`, C.label, HELP.feet());
             }
             line(LEFT, y(ta), LEFT + plotW, y(ta), C.transition, 'stroke-opacity="0.5" stroke-dasharray="4 3"');
-            levelLabel(ta, `TA ${ta}`, C.transition, 'fill-opacity="0.8"');
+            hitLine(LEFT, y(ta), LEFT + plotW, y(ta), HELP.ta(ta));
+            levelLabel(ta, `TA ${ta}`, C.transition, HELP.ta(ta), 'fill-opacity="0.8"');
             for (let fl = tl; flAlt(fl) <= ceil + 1; fl += 10) {
                 const first = fl === tl;
                 line(LEFT, y(flAlt(fl)), LEFT + plotW, y(flAlt(fl)), first ? C.transition : C.grid,
                     first ? 'stroke-opacity="0.5" stroke-dasharray="4 3"' : '');
-                levelLabel(flAlt(fl), `FL${pad3(fl)}`, first ? C.transition : C.label, first ? 'fill-opacity="0.8"' : '');
+                if (first) hitLine(LEFT, y(flAlt(fl)), LEFT + plotW, y(flAlt(fl)), HELP.tl(tl, ta));
+                levelLabel(flAlt(fl), `FL${pad3(fl)}`, first ? C.transition : C.label,
+                    first ? HELP.tl(tl, ta) : HELP.fl(fl), first ? 'fill-opacity="0.8"' : '');
             }
 
             // The cones' upper edges: 7 degrees towards the runway on both sides,
             // and 15 for aircraft leaving it.
-            const coneEdge = (endKey, deg, extra) => {
+            const coneEdge = (endKey, deg, extra, help) => {
                 const e = f[endKey];
-                const pts = [];
+                const list = [];
                 for (let d = 0; d <= R + 0.01; d += 0.25) {
                     const alt = e.elevFt + d * G.FT_PER_NM * Math.tan(deg * Math.PI / 180);
                     if (alt > ceil) break;
                     const uu = endKey === A ? -d : L + d;
-                    pts.push([x(uu), y(alt)]);
+                    list.push([x(uu), y(alt)]);
                 }
-                poly(pts, C.cone, extra);
+                poly(list, C.cone, extra);
+                hitPoly(list, help);
             };
-            coneEdge(A, opts.elevApproachDeg, 'stroke-dasharray="2 4"');
-            coneEdge(B, opts.elevApproachDeg, 'stroke-dasharray="2 4"');
-            coneEdge(A, opts.elevDepartDeg, 'stroke-dasharray="1 6"');
-            coneEdge(B, opts.elevDepartDeg, 'stroke-dasharray="1 6"');
+            for (const endKey of [A, B]) {
+                coneEdge(endKey, opts.elevApproachDeg, 'stroke-dasharray="2 4"', HELP.coneIn(opts.elevApproachDeg));
+                coneEdge(endKey, opts.elevDepartDeg, 'stroke-dasharray="1 6"', HELP.coneOut(opts.elevDepartDeg, ceil));
+            }
 
-            // Glide paths, with their tolerance: the one of the end in use stands out.
+            // Glide paths, with their margins: the one of the end in use stands out.
             const glide = (endKey, strong) => {
                 const e = f[endKey];
                 const path = [], lo = [], hi = [];
@@ -336,9 +507,13 @@
                 const col = strong ? C.highlight : '#555';
                 poly(lo, col, 'stroke-opacity="0.25"');
                 poly(hi, col, 'stroke-opacity="0.25"');
+                hitPoly(lo, HELP.glideMargin(opts.elevToleranceDeg));
+                hitPoly(hi, HELP.glideMargin(opts.elevToleranceDeg));
                 poly(path, col, `stroke-width="${strong ? 1.5 : 1}" stroke-dasharray="6 4"`);
-                text(path[Math.min(path.length - 1, 16)][0], path[Math.min(path.length - 1, 16)][1] - 5,
-                    `${e.slopeDeg}°`, col, `text-anchor="middle" font-size="10"${strong ? '' : ' fill-opacity="0.7"'}`);
+                hitPoly(path, HELP.glide(e, strong));
+                const at = path[Math.min(path.length - 1, 16)];
+                text(at[0], at[1] - 5, `${e.slopeDeg}°`, col,
+                    `text-anchor="middle" font-size="10"${strong ? '' : ' fill-opacity="0.7"'}${HELP.glide(e, strong)}`);
             };
             glide(B, false);
             glide(A, isInUse);
@@ -346,42 +521,72 @@
             // Ground, runway, thresholds and the distance scale.
             const gy = y(ground);
             line(LEFT, gy, LEFT + plotW, gy, C.gridStrong);
-            out.push(`<rect x="${x(0).toFixed(1)}" y="${(gy - 3).toFixed(1)}" width="${(x(L) - x(0)).toFixed(1)}" height="5" fill="${C.runway}" rx="1"/>`);
+            out.push(`<rect x="${x(0).toFixed(1)}" y="${(gy - 3).toFixed(1)}" width="${(x(L) - x(0)).toFixed(1)}" height="5" fill="${C.runway}" rx="1"${HELP.runwayBar(f)}/>`);
             for (const endKey of ['le', 'he']) {
                 const e = f[endKey];
                 const tx = x(u(e.thresholdS));
                 line(tx, gy - 7, tx, gy + 4, C.text, 'stroke-width="1.5"');
+                hitLine(tx, gy - 7, tx, gy + 4, HELP.threshold(e));
                 const ex = x(u(endKey === 'le' ? 0 : L));
-                text(ex, gy + 15, esc(e.ident), C.text, `text-anchor="${endKey === A ? 'end' : 'start'}" font-weight="bold"`);
+                text(ex, gy + 15, esc(e.ident), C.text, `text-anchor="${endKey === A ? 'end' : 'start'}" font-weight="bold"${HELP.end(e)}`);
             }
             for (let d = 5; d <= R; d += 5) {
                 for (const uu of [-d, L + d]) {
                     line(x(uu), gy, x(uu), gy + 4, C.label);
-                    text(x(uu), gy + 15, `${d}`, C.label, 'text-anchor="middle" font-size="10"');
+                    text(x(uu), gy + 15, `${d}`, C.label, `text-anchor="middle" font-size="10"${HELP.distance()}`);
                 }
             }
-            text(x(-R) + 2, gy + 15, 'NM', C.label, 'font-size="10"');
+            text(x(-R) + 2, gy + 15, 'NM', C.label, `font-size="10"${HELP.distance()}`);
 
-            // Azimuth band: the axis, the approach tolerance and the cones' sides.
-            out.push(`<rect x="${LEFT}" y="${azTop}" width="${plotW}" height="${AZ_H}" fill="#111" stroke="${C.grid}"/>`);
+            // Azimuth band: the axis, the approach margins and the cones' sides.
+            out.push(`<rect x="${LEFT}" y="${azTop}" width="${plotW}" height="${AZ_H}" fill="#111" stroke="${C.grid}"${HELP.azimuth()}/>`);
             line(LEFT, azMid, LEFT + plotW, azMid, C.gridStrong);
-            out.push(`<rect x="${x(0).toFixed(1)}" y="${(azMid - 2).toFixed(1)}" width="${(x(L) - x(0)).toFixed(1)}" height="4" fill="${C.runway}" rx="1"/>`);
+            hitLine(LEFT, azMid, LEFT + plotW, azMid, HELP.axis(R));
+            out.push(`<rect x="${x(0).toFixed(1)}" y="${(azMid - 2).toFixed(1)}" width="${(x(L) - x(0)).toFixed(1)}" height="4" fill="${C.runway}" rx="1"${HELP.runwayBar(f)}/>`);
             for (const endKey of ['le', 'he']) {
                 // Both wedges are symmetric about the axis: the approach
-                // tolerance from the threshold, the cone's sides from the end.
+                // margin from the threshold, the cone's sides from the end.
                 const u0 = u(f[endKey].thresholdS);
                 const u1 = endKey === A ? -R : L + R;
                 const tol = Math.abs(u1 - u0) * Math.tan(opts.azToleranceDeg * Math.PI / 180);
                 const col = endKey === A && isInUse ? C.highlight : '#555';
-                line(x(u0), azMid, x(u1), yAz(tol), col, 'stroke-opacity="0.35"');
-                line(x(u0), azMid, x(u1), yAz(-tol), col, 'stroke-opacity="0.35"');
+                for (const side of [tol, -tol]) {
+                    line(x(u0), azMid, x(u1), yAz(side), col, 'stroke-opacity="0.35"');
+                    hitLine(x(u0), azMid, x(u1), yAz(side), HELP.azMargin(opts.azToleranceDeg));
+                }
                 const uEnd = endKey === A ? 0 : L;
-                line(x(uEnd), azMid, x(u1), yAz(azHalf), C.cone, 'stroke-dasharray="2 4"');
-                line(x(uEnd), azMid, x(u1), yAz(-azHalf), C.cone, 'stroke-dasharray="2 4"');
+                for (const side of [azHalf, -azHalf]) {
+                    line(x(uEnd), azMid, x(u1), yAz(side), C.cone, 'stroke-dasharray="2 4"');
+                    hitLine(x(uEnd), azMid, x(u1), yAz(side), HELP.coneSide(opts.halfWidthDeg, R));
+                }
             }
-            text(LEFT - 6, azMid + 3, 'AZ', C.label, 'text-anchor="end"');
+            text(LEFT - 6, azMid + 3, 'AZ', C.label, `text-anchor="end"${HELP.azimuth()}`);
 
-            // Trails first, aircraft over them.
+            // The selected aircraft's whole recorded track, in segments where
+            // it lies within the frame; then the short trails; aircraft on top.
+            const sel = items.find((it) => it.a.hex === selected);
+            const history = sel && store.selectedAircraft && store.selectedAircraft.hex === selected
+                ? (store.aircraftDetailsHistoryData || []) : [];
+            if (history.length) {
+                const segE = [[]], segA = [[]];
+                for (const pt of [...history].reverse()) {
+                    if (pt.lat == null || pt.lon == null || pt.altitude == null) continue;
+                    const pr = G.project(f, pt.lat, pt.lon);
+                    const uu = u(pr.s);
+                    if (uu < -R || uu > L + R) {
+                        if (segE[segE.length - 1].length) { segE.push([]); segA.push([]); }
+                        continue;
+                    }
+                    const alt = pt.altitude <= 0 ? ground : G.qnhAltitude(pt.altitude, qnh);
+                    segE[segE.length - 1].push([x(uu), y(alt)]);
+                    segA[segA.length - 1].push([x(uu), yAz(pr.c)]);
+                }
+                for (const seg of [...segE, ...segA]) {
+                    poly(seg, '#ffffff', 'stroke-opacity="0.75" stroke-width="1.5"');
+                    hitPoly(seg, HELP.track());
+                    for (const q of seg) out.push(`<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="1.4" fill="#ffffff" fill-opacity="0.75"/>`);
+                }
+            }
             for (const it of items) {
                 const tr = trails.get(it.a.hex) || [];
                 const pe = [], pa = [];
@@ -470,6 +675,7 @@
                 if (!timer) timer = setInterval(render, 1000);
             },
             hide() {
+                hideTip();
                 container.dataset.parActive = '0';
                 if (timer) clearInterval(timer);
                 timer = null;

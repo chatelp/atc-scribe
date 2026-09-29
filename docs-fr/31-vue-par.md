@@ -248,6 +248,27 @@ des étiquettes (`localStorage`).
   : 15° pour un avion qui s'éloigne de la piste, avec ce plafond absolu. Limites : 6 minutes, un seul
   aéroport, un seul sens d'exploitation ; aucun départ d'Orly n'a été capté.
 
+- **V7 — Un seul juge de la piste d'un avion** (demande du propriétaire, 29/09) : *« puisqu'on est
+  capable de relier les avions aux pistes, si on valide bien le matching, ça pourrait être une info
+  affichée dans la feuille détaillée d'un avion (parti ou arrivé sur telle piste) — évidemment ça
+  doit être cohérent partout »*. Aujourd'hui, deux calculs distincts répondent à deux questions
+  différentes :
+  - **« quelles pistes l'aéroport utilise-t-il ? »** : le serveur, qui compte les approches,
+    atterrissages et montées initiales de la dernière heure ; approche = à moins de 10 NM du seuil,
+    0,5 NM de l'axe, sous 5 000 ft ;
+  - **« qui est devant cette piste en ce moment ? »** : les cadres PAR, par la géométrie seule
+    (20 NM, ±20°), y compris des avions qui passent ou ne sont pas encore alignés.
+
+  Ils ne peuvent pas toujours concorder. **Proposition, à discuter** : le serveur devient le seul
+  juge. Pour chaque avion, il fixe la piste d'arrivée une fois l'avion établi en finale, et la piste
+  de départ une fois vu en montée dans l'axe, avec la même règle que la vue (l'axe le plus proche).
+  Il la garde pour le reste du vol et la sert avec l'avion. La feuille détaillée l'affiche. La vue
+  PAR s'en sert pour le cadre et pour distinguer un avion qui atterrit ou décolle d'un avion qui
+  passe. Les pistes en service se comptent en avions et non en mises à jour ADS-B. **Validation
+  avant tout affichage** : l'atterrissage donne une vérité terrain. Les derniers points en vol d'un
+  avion qui se pose survolent la piste qu'il a prise ; sur une journée de la base, on compte les
+  avions à qui la règle a donné cette piste-là.
+
 ## Suivi de l'implémentation
 
 Chaque étape se valide par ce qu'elle permet de **mesurer ou vérifier**, inscrit dans le journal
@@ -259,7 +280,7 @@ ci-dessous au moment où elle est faite.
 | 2 | **Géométrie** : distance le long de l'axe, écart latéral, angle d'élévation, test du cône, piste la plus proche | 11 tests `node --test` ✅ ; **reste** : sur une heure de trajectoires de la base, les avions posés sur une piste sont sur cette piste à 5 NM du seuil dans au moins 98 % des cas, et la part des départs gardés jusqu'à 10 NM | 🟡 |
 | 3 | **Cadre d'une piste, sans avion** : axe gradué en niveaux et en pieds, transition, pente et tolérances, bande d'azimut | vu en direct le 29/09 à Orly et De Gaulle (journal) | ✅ |
 | 4 | **Avions en direct** : symbole, étiquette, flèche verticale, traîne, couleurs de phase, clic | vu en direct le 29/09 ; **reste** la mesure de la correction du QNH au toucher (±100 ft de l'altitude du seuil sur une journée d'atterrissages) | 🟡 |
-| 5 | **Pistes empilées** : piste en service en tête, repli, masquage, retournement quand le sens change | piste en service en tête et repli vus le 29/09 ; **reste** un changement de sens observé en direct ou rejoué | 🟡 |
+| 5 | **Pistes empilées** : pistes en service en tête, repli, masquage, retournement quand le sens change | pistes en service en tête (plusieurs à De Gaulle) et repli vus le 29/09 ; **reste** un changement de sens observé en direct ou rejoué | 🟡 |
 | 6 | **Niveau visé et niveau entendu** : `nav_altitude_mcp` affiché ; le dernier niveau lu par la grammaire rattaché à l'avion et servi | niveau visé affiché ✅ ; **reste** le niveau entendu (côté Go) et le taux d'accord entendu / visé, à comparer au J2 du doc 29 | 🟡 |
 | 7 | **Un onglet par aéroport**, bascule avec la carte | Orly et De Gaulle basculés le 29/09 ; **reste** un avion dans les deux cônes vu dans les deux | 🟡 |
 | 8 | **Les réglages** : défauts dans `config.toml`, section du panneau, `runtime-settings.json`, portées générale, par aéroport et par extrémité de piste | tests Go de validation des bornes et de l'héritage (piste → aéroport → général) ; une valeur changée au panneau redessine la vue sans redémarrer ; un réglage enregistré avant reste valide | 🔲 |
@@ -301,6 +322,44 @@ Quatre corrections faites en regardant :
 linéaire. Les derniers milles et la montée initiale y ont de la place, et les niveaux jusqu'à FL150
 tiennent quand même dans 230 px. En contrepartie, la pente de 3° y est une courbe et non une droite,
 ce qui s'écarte de l'écran PAR.
+
+**29/09, fin d'après-midi — ce que le propriétaire a relevé, et ce qui en est sorti.**
+
+- **« Runway in use 09R (100 %) » alors que deux avions sont en approche sur la 09L.** Ce n'était
+  pas la vue, c'était la détection de co-atc, en amont. Parmi les pistes dont l'axe passe à moins de
+  0,5 NM de l'avion, elle retenait **celle dont le seuil est le plus proche**. À De Gaulle, les
+  seuils de chaque paire sont décalés : celui de la 09R est à 0,48 NM plus à l'ouest que celui de la
+  09L, à 383 m de côté. Mesuré sur la géométrie réelle, sans la correction : **les finales de la
+  09L comptaient pour la 09R, celles de la 08R pour la 08L, et les départs de la 09L comme de la 09R
+  pour la 08R.** Face à l'est, les deux pistes d'atterrissage étaient confondues avec les pistes de
+  décollage. Corrigé (D68) : l'axe le plus proche d'abord, le seuil ensuite. Quatre tests sur les
+  coordonnées de De Gaulle et d'Orly, qui échouent sans la correction.
+- **Les deux paires de De Gaulle, 08 et 09, n'étaient jamais actives ensemble** : co-atc reconnaît
+  les pistes parallèles à leur numéro, et 08 n'est pas 09, alors qu'elles sont à 1° l'une de
+  l'autre. Les approches sur la 08R étaient rejetées dès que la 09 était active. Elles sont
+  maintenant reconnues par leur cap, à 5° près ; Orly, dont les 06 et 07 sont à 12°, n'est pas
+  touché.
+- **L'en-tête ne nommait qu'une piste** : il nomme maintenant toutes celles que co-atc compte en
+  service (au moins 15 % des indices, son propre seuil), et chaque cadre concerné porte le badge.
+  Relu à 17:15 sur l'instance de test, corrigée et redémarrée : **« 08R 60 % · 09L 35 % »**, les
+  deux pistes d'atterrissage de De Gaulle face à l'est, et leurs deux cadres en tête.
+- **Reste un écart connu** : les décollages sont mal comptés par co-atc. La 09R n'est qu'à 6 % et la
+  08L n'apparaît pas, alors que la vue montre bien les départs. La détection de montée initiale
+  demande un décollage vu au sol, ou un avion à moins de 5 NM du point de référence de l'aéroport,
+  deux conditions que notre réception remplit rarement à De Gaulle. C'est la question V7.
+
+Ajouts demandés le même jour :
+
+- **L'aide au survol**, pour quelqu'un qui ne connaît pas le contrôle aérien : chaque élément de la
+  vue a son explication (QNH, niveaux, pente, cônes, seuils, azimut…), sauf les avions, qui ont
+  leur panneau. Les lignes fines ont une zone de survol élargie, invisible. 231 zones sur les
+  quatre pistes de De Gaulle.
+- **La trace de l'avion sélectionné** : toute sa trajectoire enregistrée, en blanc, dans les deux
+  bandes. Vue sur AFR61AX : l'arrivée par l'est au-dessus de FL100, le vent arrière le long de
+  l'aéroport, décalé sur le côté dans la bande d'azimut, le virage à 17 NM et 5 000 ft, puis la
+  descente sur la pente.
+- La barre d'alertes change de hauteur au gré des alertes, et **toute la vue sautait sous le
+  pointeur** : la place qui lui est réservée ne fait plus que grandir.
 
 **À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
 co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la

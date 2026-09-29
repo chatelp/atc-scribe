@@ -88,6 +88,10 @@ type RunwayInUseTracker struct {
 	// When one runway of a parallel pair is active, the other is automatically
 	// included in the active set (e.g. 06L active → 06R also active).
 	knownRunwayEnds []string
+
+	// The direction an aircraft flies on each known runway end, in degrees
+	// true: parallel runways need not share a number (see parallelHeadingDeg).
+	endHeadings map[string]float64
 }
 
 const (
@@ -97,6 +101,13 @@ const (
 
 	// Minimum interval between periodic score logs.
 	logThrottleInterval = 60 * time.Second
+
+	// Runway ends this close in heading are parallel even when their numbers
+	// differ: Paris-CDG's two pairs are 08L/08R and 09L/09R, 85 and 86 degrees
+	// true, flown in the same direction together. With the number alone, 09
+	// active kept rejecting every approach to 08R. Orly's 06 and 07, 12 degrees
+	// apart, stay separate.
+	parallelHeadingDeg = 5.0
 )
 
 // NewRunwayInUseTracker creates a tracker with the given scoring parameters.
@@ -319,12 +330,18 @@ func (rt *RunwayInUseTracker) SetRunwayData(runways RunwayData) {
 	defer rt.mu.Unlock()
 
 	var ends []string
+	headings := make(map[string]float64)
 	for pairKey, thresholds := range runways.RunwayThresholds {
-		for endID := range thresholds {
-			ends = append(ends, pairKey+"/"+endID)
+		for endID, t := range thresholds {
+			id := pairKey + "/" + endID
+			ends = append(ends, id)
+			if o, ok := thresholds[getOppositeThreshold(endID, pairKey)]; ok {
+				headings[id] = CalculateBearing(t.Latitude, t.Longitude, o.Latitude, o.Longitude)
+			}
 		}
 	}
 	rt.knownRunwayEnds = ends
+	rt.endHeadings = headings
 
 	if len(ends) > 0 {
 		rt.logger.Info("Runway data loaded for parallel detection",
@@ -375,7 +392,16 @@ func (rt *RunwayInUseTracker) expandActiveSetForParallels() {
 		}
 	}
 
-	// Add any known runway end whose base number matches an active base
+	// Headings of the active ends, for parallels whose numbers differ
+	var activeHeadings []float64
+	for activeID := range rt.activeSet {
+		if h, ok := rt.endHeadings[activeID]; ok {
+			activeHeadings = append(activeHeadings, h)
+		}
+	}
+
+	// Add any known runway end whose base number matches an active base, or
+	// that is flown in the same direction as an active end
 	for _, knownID := range rt.knownRunwayEnds {
 		if rt.activeSet[knownID] {
 			continue // already active
@@ -383,6 +409,15 @@ func (rt *RunwayInUseTracker) expandActiveSetForParallels() {
 		base := runwayBaseNumber(runwayEndIdent(knownID))
 		if base != "" && activeBases[base] {
 			rt.activeSet[knownID] = true
+			continue
+		}
+		if h, ok := rt.endHeadings[knownID]; ok {
+			for _, a := range activeHeadings {
+				if d := math.Abs(math.Mod(h-a+540, 360) - 180); d <= parallelHeadingDeg {
+					rt.activeSet[knownID] = true
+					break
+				}
+			}
 		}
 	}
 }
