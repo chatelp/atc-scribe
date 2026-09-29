@@ -99,6 +99,17 @@ test('past the range, the half-width or the ceiling, an aircraft is out', () => 
     assert.equal(G.placeInFrame(f, Object.assign(at(f, -20, 0), { altFt: 16000, track: 242 })), null);
 });
 
+test('an aircraft crossing the axis far out is passing through, not flying the runway', () => {
+    const f = orly();
+    // 15 NM past the 24 end, on the axis, low: aligned it is shown; crossing at
+    // 68 degrees, as De Gaulle's finals cross Orly's 02-20 axis, it is not.
+    const pos = at(f, f.lengthNM + 15, 1);
+    assert.ok(G.placeInFrame(f, Object.assign({}, pos, { altFt: 1400, track: 242 })));
+    assert.equal(G.placeInFrame(f, Object.assign({}, pos, { altFt: 1400, track: 242 + 68 })), null);
+    // Within 2 NM of the runway, turning onto final or away after take-off.
+    assert.ok(G.placeInFrame(f, Object.assign(at(f, f.lengthNM + 1.5, 0.2), { altFt: 800, track: 242 + 80 })));
+});
+
 test('on the ground, only the runway itself counts, not the taxiway beside it', () => {
     const f = orly();
     assert.equal(G.placeInFrame(f, Object.assign(at(f, 1, 0.01), { altFt: 283, onGround: true })).side, 'rwy');

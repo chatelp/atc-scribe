@@ -343,6 +343,14 @@
             const placed = new Map(frames.map((f) => [f.id, []]));
             for (const a of list) {
                 const t = a.adsb;
+                // co-atc ties each aircraft to one followed airport (D62): one it
+                // gives to another airport is not this one's, whatever its place
+                // in the cones -- De Gaulle's finals lie in Orly's northern one.
+                const ph = a.phase && a.phase.current && a.phase.current[0];
+                if (ph && ph.airport && ph.airport !== apt.code) {
+                    previousFrame.delete(a.hex);
+                    continue;
+                }
                 const onGround = !!a.on_ground;
                 if (typeof t.alt_baro !== 'number' && !onGround) continue;
                 const altFt = onGround ? null : G.qnhAltitude(t.alt_baro, qnh);

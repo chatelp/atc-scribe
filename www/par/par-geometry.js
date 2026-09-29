@@ -41,6 +41,13 @@
         thresholdCrossingFt: 50,
         elevToleranceDeg: 0.7,
         azToleranceDeg: 2.5,
+        // An aircraft crossing the axis at more than this angle is passing
+        // through the cone, not flying the runway: at 15 NM past Orly's 20 end
+        // lies the final of De Gaulle's 08R, flown at 68 degrees to Orly's axis
+        // (29/09, AFR1855). Close to the runway, where aircraft turn onto final
+        // or away after take-off, the angle does not count.
+        maxCrossingDeg: 60,
+        crossingFreeNM: 2,
         // Keep an aircraft in its frame unless another axis is this much nearer,
         // so one flying between two runways does not flicker from one to the other.
         hysteresisNM: 0.3,
@@ -206,6 +213,12 @@
         if (input.altFt > o.ceilingFt) return null;
 
         const outward = side === 'le' ? (frame.bearing + 180) % 360 : frame.bearing;
+        if (Number.isFinite(input.track) && dist > o.crossingFreeNM) {
+            // Along the axis either way is 0; square across it, 90.
+            const d = angleDiff(input.track, frame.bearing);
+            const crossing = Math.min(d, 180 - d);
+            if (crossing > o.maxCrossingDeg) return null;
+        }
         const movingAway = Number.isFinite(input.track) && angleDiff(input.track, outward) < 90;
         const limit = movingAway ? o.elevDepartDeg : o.elevApproachDeg;
         const elevation = deg(Math.atan2(input.altFt - end.elevFt, Math.max(dist, 0.1) * FT_PER_NM));
