@@ -48,9 +48,18 @@
         // or away after take-off, the angle does not count.
         maxCrossingDeg: 60,
         crossingFreeNM: 2,
+        // Extended along its track, an aircraft landing on a runway must pass
+        // this close to its end, and one that took off from it must have come
+        // from there. Business jets leaving Le Bourget fly parallel to De
+        // Gaulle's 08R final, 1.25 NM to the south, climbing: in its cone,
+        // never on its axis (29/09).
+        endToleranceNM: 0.5,
         // Keep an aircraft in its frame unless another axis is this much nearer,
-        // so one flying between two runways does not flicker from one to the other.
-        hysteresisNM: 0.3,
+        // so one flying between two runways does not flicker from one to the
+        // other. Well under the 0.21 NM between De Gaulle's parallels: at 0.3,
+        // an aircraft joining 09L from the south crossed 09R's axis first and
+        // stayed in its frame down to the runway (measured 29/09).
+        hysteresisNM: 0.05,
     });
 
     const rad = (d) => d * Math.PI / 180;
@@ -220,6 +229,20 @@
             if (crossing > o.maxCrossingDeg) return null;
         }
         const movingAway = Number.isFinite(input.track) && angleDiff(input.track, outward) < 90;
+        if (Number.isFinite(input.track) && dist > o.crossingFreeNM && Math.abs(c) > o.endToleranceNM) {
+            // Where its track meets the runway end: ahead of an arrival,
+            // behind a departure.
+            const delta = rad(input.track - frame.bearing);
+            const vs = Math.cos(delta);
+            const vc = Math.sin(delta);
+            if (Math.abs(vs) > 0.1) {
+                const t = dist / Math.abs(vs);
+                const atEnd = c + vc * t * (movingAway ? -1 : 1);
+                // Reaching the axis on the way counts: an intercept crosses it.
+                const crosses = Math.sign(atEnd) !== Math.sign(c);
+                if (!crosses && Math.abs(atEnd) > o.endToleranceNM) return null;
+            }
+        }
         const limit = movingAway ? o.elevDepartDeg : o.elevApproachDeg;
         const elevation = deg(Math.atan2(input.altFt - end.elevFt, Math.max(dist, 0.1) * FT_PER_NM));
         if (elevation > limit) return null;
@@ -236,7 +259,11 @@
     /**
      * The frame an aircraft belongs to: among those whose cone or runway holds
      * it, the one whose axis is nearest. previousFrameId keeps it where it was
-     * unless another axis is clearly nearer (hysteresisNM).
+     * unless another axis is clearly nearer (hysteresisNM) -- and keeps an
+     * aircraft flying away from the runway where it was as long as that frame
+     * holds it: a departure comes from the runway it took off from, and one
+     * climbing out of De Gaulle's 09R that drifts 100 m north is not a 09L
+     * departure.
      */
     function classify(frames, input, opts, previousFrameId) {
         const o = Object.assign({}, DEFAULTS, opts || {});
@@ -248,7 +275,7 @@
             if (f.id === previousFrameId) previous = p;
             if (!best || Math.abs(p.c) < Math.abs(best.c)) best = p;
         }
-        if (previous && Math.abs(previous.c) <= Math.abs(best.c) + o.hysteresisNM) return previous;
+        if (previous && (previous.movingAway || Math.abs(previous.c) <= Math.abs(best.c) + o.hysteresisNM)) return previous;
         return best;
     }
 

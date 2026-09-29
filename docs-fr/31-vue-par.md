@@ -216,6 +216,8 @@ portées :
 | Plafond absolu | générale | 15 000 ft | garde dehors les avions en croisière que 15° laisserait entrer (V6) |
 | Angle de croisement maximal | générale | 60° | au-delà, l'avion coupe l'axe au lieu de le suivre ; les finales de De Gaulle coupent l'axe 02-20 d'Orly à 68° |
 | Rayon sans condition d'angle | générale | 2 NM | près de la piste, les avions virent en finale ou après le décollage |
+| Tolérance au bout de piste | générale | 0,5 NM | prolongée le long de sa route, celle d'une arrivée doit rejoindre l'axe avant le bout de piste, celle d'un départ en venir ; 0,3 ou 1 NM donnent le même résultat (mesuré le 29/09) |
+| Hystérésis entre deux axes | générale | 0,05 NM | bien sous les 0,21 NM qui séparent les parallèles de De Gaulle ; un départ, lui, reste dans le cadre de sa piste tant qu'il y est |
 | Altitude de transition | par aéroport | 5 000 ft | eAIP, Orly et De Gaulle. Elle change d'un pays à l'autre (18 000 ft en Amérique du Nord) : l'exemple de configuration le dira |
 | Niveau de transition | par aéroport | automatique : le plus bas niveau à au moins 1 000 ft au-dessus de l'altitude de transition, avec le QNH du moment | règle de l'ENR 1.7 ; ou une valeur fixe, pour suivre ce qu'annonce l'ATIS |
 | Source du QNH | par aéroport | automatique : les avions bas, puis le METAR, puis aucun | V1 ; ou une valeur fixe |
@@ -417,6 +419,53 @@ AFR1855, en finale sur la 08R de De Gaulle à 1 350 ft, apparaissait dans le cad
 à 15,4 NM du bout 20, 1,1 NM de l'axe, 0,7° au-dessus de l'horizon. Il était dans le cône, mais il
 le traversait à 68°. Corrigé par les deux garde-fous décrits plus haut (« Le rattachement à une
 piste »), avec un test ; revu en direct, Orly n'affiche plus que son trafic.
+
+**29/09, soir — les réglages vérifiés sur 3 h 20 de trafic réel** (instance de test, 16:35-19:55,
+645 000 positions ; `tools/runway-check/par-replay.js` rejoue la base dans le code même de la vue).
+
+*Précision.*
+- **Les arrivées établies passent 60 ft sous la pente de 3° en médiane** (-0,1°), aux deux
+  aéroports. L'écart grandit avec la hauteur (Orly : -51 ft à 3-5 NM, -65 à 5-7, -81 à 7-10). C'est
+  l'erreur des altimètres par air chaud : environ 4 % de la hauteur à 26 °C, soit 53 ft à 4 NM, et
+  on mesure -51. La correction du QNH, les altitudes des seuils et les pentes sont donc justes, à
+  la température près. Sans la correction du QNH, l'écart passait à -100 ft.
+- **Le QNH estimé par l'ADS-B**, de 1014,4 à 1015,2 hPa sur la soirée, **concorde avec les METAR
+  d'Orly** (Q1014 et Q1015).
+- Les marges couvrent les approches normales : **99,8 à 100 % des points dans ±0,7°** en
+  élévation, **99,3 à 100 % dans ±2,5°** en azimut.
+
+*Deux défauts trouvés en mesurant, corrigés.*
+- **L'hystérésis de 0,3 NM dépassait l'écart des parallèles de De Gaulle (0,21 NM).** Un avion qui
+  rejoint la 09L par le sud croise d'abord l'axe de la 09R, prenait son cadre et y restait jusqu'à
+  la piste. D'où un azimut à 44,5 % seulement dans la marge entre 2 et 4 NM ; **97,6 % après**.
+  Ramenée à 0,05 NM. Un départ, lui, reste dans le cadre de sa piste tant qu'il y est : sans ça,
+  un avion qui monte de la 09R et dérive de 100 m au nord passait dans le cadre de la 09L.
+- **Les avions d'affaires qui décollent du Bourget** (5 NM au sud-ouest de De Gaulle, non suivi)
+  longent la finale de la 08R à 1,25 NM au sud, en montée : dans le cône, jamais sur l'axe, ils
+  étaient montrés comme des arrivées. Règle ajoutée : prolongée le long de sa route, celle d'une
+  arrivée doit rejoindre l'axe avant le bout de piste, celle d'un départ en venir (0,5 NM de
+  tolérance). Les quatre jets relevés (VLJ361Q, NJE322M, NJE5RT, IFA6555) sortent entièrement des
+  cadres ; les changements de cadre à Orly passent de 61 à 40.
+
+*Pertinence de chaque réglage*, en le faisant varier seul sur le même trafic :
+
+| Variante | Orly : points d'arrivée montrés, dès | Orly : avions montrés | De Gaulle : arrivées, dès | De Gaulle : départs montrés |
+|---|---|---|---|---|
+| **réglages retenus** | 65,2 %, dès 16,7 NM | 98 | 59,3 %, dès 17,5 NM | 54,5 % |
+| demi-ouverture 10° | 63,9 %, dès 16,2 NM | 96 | 58,7 % | 54,2 % (Orly : 60,7 % contre 65,1 %) |
+| demi-ouverture 30° | identique | 103 | identique | identique |
+| croisement 45° | 62,1 %, dès 15,9 NM | 96 | 57,8 % | 53,2 % |
+| croisement 75° | 66,2 % | **205** | 59,8 % | 55,7 % |
+| tolérance au bout de piste 0,3 ou 1 NM | identique | 98 à 101 | identique | identique |
+| portée 15 NM | dès 14,9 NM | 95 | dès 14,9 NM | identique |
+
+Les points d'arrivée non montrés (un tiers environ) sont les branches vent arrière et base, hors
+de l'axe : c'est voulu. Ce qui est montré est à 94 % du trafic d'arrivée ou de départ de la piste,
+le reste des avions attendus en approche. Les 15° des départs sont confirmés : avec les 7° d'un
+PAR, on ne verrait que 3,9 % des points de départ à Orly (65 % avec 15°) et 16,8 % à De Gaulle.
+
+**Ce qui n'est pas vérifié** : le niveau de transition calculé (FL060) contre celui de l'ATIS, que
+nous n'enregistrons pas.
 
 **À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
 co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la
