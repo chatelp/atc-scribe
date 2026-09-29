@@ -1,6 +1,8 @@
 # 31 — La vue PAR : le ciel de profil, piste par piste
 
-> **État au 29/09 : proposition validée par le propriétaire (D67), rien n'est codé.**
+> **État au 29/09 : proposition validée par le propriétaire (D67), rien n'est codé.** Tranché le
+> même jour : 15° côté départs (V6), altitude de transition relevée (V2), et tous les réglages
+> modifiables dans l'outil.
 > Ce document est à la fois la conception et le **suivi de l'implémentation** : le tableau de la
 > dernière partie se tient à jour à chaque étape, avec ce qui a été mesuré pour la valider.
 
@@ -159,9 +161,16 @@ la pente, et ne dit jamais qu'un avion est « trop bas ».
 | Piste en service | `RunwayInUseTracker`, un par aéroport (D62), `airports[].runway_in_use` | ✅ servie |
 | Avions : position, altitude, niveau visé, QNH affiché | ADS-B par le websocket existant : `alt_baro`, `nav_altitude_mcp`, `nav_qnh`, `baro_rate` | ✅ 77 positionnés : `alt_baro` 77, `nav_altitude_mcp` 73, `nav_qnh` 73, `baro_rate` 75 |
 | QNH du jour | **à trancher** (V1) : le calage affiché par les avions bas, ou le METAR | 9 avions sur 10 sous 6 000 ft émettaient `nav_qnh`, entre 1 014 et 1 016 hPa |
-| Pente de chaque piste | PAPI des cartes VAC | ✅ 3,0°, une à 3,4° à Orly ; les VAC donnent aussi l'altitude des terrains, 291 ft à Orly et 392 ft à De Gaulle, cohérente avec `runways.csv` |
-| Altitude et niveau de transition | **à relever** dans l'eAIP France, par aéroport (V2) : elle **n'est pas sur les VAC** | ❌ |
+| Pente et hauteur au seuil de chaque piste | eAIP : AD 2.19 (alignements de descente ILS) et AD 2.14 (PAPI) ; les VAC le montrent aussi | ✅ **3° pour les 13 ILS** d'Orly (5) et De Gaulle (8), hauteur au seuil de 50 à 57 ft ; la 20 d'Orly, sans ILS, a un **PAPI à 3,4°** (eAIP en vigueur, AD 2.14) |
+| Altitude des terrains | cartes VAC | ✅ 291 ft à Orly, 392 ft à De Gaulle, cohérentes avec `runways.csv` |
+| Altitude de transition | cartes d'approche aux instruments (IAC) de l'eAIP : l'ENR 1.7 dit qu'elle y est publiée, TMA par TMA ; **pas sur les VAC** | ✅ **5 000 ft à Orly et à De Gaulle** (IAC ILS 06 d'Orly, IAC ILS 08L de De Gaulle, cycle AIRAC du 03/09/2026) |
+| Niveau de transition | donné par le contrôle selon le QNH ; règle de l'ENR 1.7 : le plus bas niveau de vol à au moins 1 000 ft au-dessus de l'altitude de transition | calculé (voir les réglages) ; **à confronter à l'ATIS** |
 | Niveau entendu | la grammaire (`phraseology`), rôles « altitude » et « niveau de vol » | ❌ **pas rattaché aux avions aujourd'hui** : les autorisations gardées par avion (`ClearanceData`) ne sont que décollage et atterrissage |
+
+**Les cartes** : les VAC du propriétaire sont archivées dans `charts/vac/`, à la racine du dépôt mais
+hors git (`.gitignore`) — LFPB et LFPG du 11 JUN 2026, **LFPO du 10 JUL 2025**, plus ancienne, et
+LFPX. Les valeurs de ce document viennent de l'eAIP du cycle en vigueur (03/09/2026), qui fait foi ;
+les VAC ont servi à les recouper.
 
 Deux remarques sur les seuils :
 
@@ -171,18 +180,37 @@ Deux remarques sur les seuils :
 - les altitudes de seuil vont de 277 à 392 ft : les ignorer abaisserait toute la pente d'autant,
   soit plus d'un mille nautique sur une pente de 3°.
 
-## Réglages par défaut proposés
+## Les réglages : des valeurs par défaut, modifiables dans l'outil
 
-| Réglage | Défaut | Pourquoi |
-|---|---|---|
-| Portée du cône | 20 NM | au-delà de l'approche (10 NM pour les phases, D62), en restant lisible |
-| Demi-ouverture en azimut | 20° | le double du PAR, pour attraper les avions en dernier virage |
-| Élévation maximale | 7° vers la piste, 15° en s'éloignant (V6) | celle du PAR pour les arrivées, environ 15 000 ft à 20 NM ; plus pour les départs, qui montent plus raide |
-| Pente de descente | celle du PAPI de la piste, 3° à défaut | VAC du propriétaire (`~/Downloads/AD-2.LFPO.pdf`, `AD-2.LFPG.pdf`) : PAPI à 3,0° partout, sauf un à 3,4° à Orly — la 20, d'après la mise en page du texte extrait, à confirmer sur la carte |
-| Hauteur de franchissement du seuil | 50 ft | la valeur usuelle d'un ILS |
-| Tolérance d'élévation | ±0,7° | l'ordre de la pleine échelle d'un glide ILS |
-| Tolérance d'azimut | ±2,5° | l'ordre de la pleine échelle d'un localizer |
-| Traîne | 60 s | celle d'une lecture « d'où il vient » sans encombrer |
+Demande du propriétaire, 29/09 : *« il faudrait penser à des valeurs par défaut mais paramétrables
+dans l'outil »*. Chaque valeur ci-dessous a un défaut qui marche sans rien toucher, et se modifie au
+panneau de réglages, comme les règles d'association (doc 30) : défaut dans `config.toml`, valeur
+modifiée enregistrée dans `runtime-settings.json`, bornes vérifiées avant d'être appliquée. Trois
+portées :
+
+- **générale** : vaut pour tous les aéroports ;
+- **par aéroport** : un aéroport suivi peut avoir sa propre valeur, sinon il prend la générale ;
+- **par extrémité de piste** : même principe, sous l'aéroport.
+
+| Réglage | Portée | Défaut | D'où vient le défaut |
+|---|---|---|---|
+| Portée du cône | générale | 20 NM | au-delà de l'approche (10 NM pour les phases, D62), en restant lisible |
+| Demi-ouverture en azimut | générale | 20° | le double du PAR, pour attraper les avions en dernier virage |
+| Élévation maximale, avion qui s'approche | générale | 7° | celle du PAR ; environ 15 000 ft à 20 NM |
+| Élévation maximale, avion qui s'éloigne | générale | **15°** | **décidé le 29/09** (V6) : aucun des 4 départs mesurés ne la dépasse |
+| Plafond absolu | générale | 15 000 ft | garde dehors les avions en croisière que 15° laisserait entrer (V6) |
+| Altitude de transition | par aéroport | 5 000 ft | eAIP, Orly et De Gaulle. Elle change d'un pays à l'autre (18 000 ft en Amérique du Nord) : l'exemple de configuration le dira |
+| Niveau de transition | par aéroport | automatique : le plus bas niveau à au moins 1 000 ft au-dessus de l'altitude de transition, avec le QNH du moment | règle de l'ENR 1.7 ; ou une valeur fixe, pour suivre ce qu'annonce l'ATIS |
+| Source du QNH | par aéroport | automatique : les avions bas, puis le METAR, puis aucun | V1 ; ou une valeur fixe |
+| Pente de descente | par extrémité de piste | 3° | eAIP : 3° pour les 13 ILS d'Orly et De Gaulle. Notre configuration mettra 3,4° pour la 20 d'Orly (PAPI) |
+| Hauteur au seuil | par extrémité de piste | 50 ft | eAIP : de 50 à 57 ft sur ces 13 ILS |
+| Tolérance d'élévation | générale | ±0,7° | l'ordre de la pleine échelle d'un glide ILS |
+| Tolérance d'azimut | générale | ±2,5° | l'ordre de la pleine échelle d'un localizer |
+| Traîne | générale | 60 s | celle d'une lecture « d'où il vient » sans encombrer |
+
+Ce qui relève de la façon de regarder, et pas du ciel — l'onglet ouvert, les pistes repliées ou
+masquées — reste dans le navigateur de chacun, comme aujourd'hui le style de carte ou l'affichage
+des étiquettes (`localStorage`).
 
 ## Questions ouvertes
 
@@ -191,9 +219,9 @@ Deux remarques sur les seuils :
   équipages ont réellement affiché. Le METAR n'est chargé que pour l'aéroport principal (D62) et
   arrive brut (`interface{}`), à décoder. **Recommandation** : l'ADS-B d'abord, le METAR à défaut,
   et sinon l'altitude pression, en le disant sur l'axe.
-- **V2 — L'altitude et le niveau de transition** de chaque aéroport, à relever dans l'eAIP. Le
-  niveau de transition varie avec le QNH et c'est le contrôle qui le donne ; l'ATIS l'annonce. Un
-  réglage par aéroport suffit pour commencer.
+- **V2 — L'altitude et le niveau de transition** — *tranchée le 29/09* : 5 000 ft relevés dans
+  l'eAIP pour Orly et De Gaulle ; niveau de transition calculé par la règle de l'ENR 1.7, ou fixé au
+  panneau. Reste à confronter le calcul à ce qu'annonce l'ATIS.
 - **V3 — Les pistes sécantes.** Orly a 02-20 en travers de 06-24 et 07-25 : un avion peut être dans
   les cônes de deux pistes non parallèles. **Proposition** : la règle de l'axe le plus proche vaut
   aussi pour elles, et un avion à égale distance de deux axes reste dans le cadre où il était, pour
@@ -204,7 +232,7 @@ Deux remarques sur les seuils :
   le premier test JavaScript du dépôt.
 - **V5 — Où loger la vue.** Un onglet par aéroport à côté de la carte, ou un panneau qu'on ouvre
   sous la carte : à décider sur une maquette.
-- **V6 — Le plafond des départs.** Le cône teste l'angle sous lequel on voit l'avion **depuis le
+- **V6 — Le plafond des départs** — *tranchée le 29/09 par le propriétaire : 15°*. Le cône teste l'angle sous lequel on voit l'avion **depuis le
   bout de piste**. Mesuré le 29/09 de 15:38 à 15:44 (35 relevés ADS-B, De Gaulle face à l'est, chaque
   avion rattaché à l'axe le plus proche) : **les 4 départs de De Gaulle ont tous dépassé 7°**, entre
   9,2° et 13,5°, **sur leurs 4,5 à 6,4 premiers NM**. Ils rentrent ensuite dans le cône en se
@@ -228,7 +256,8 @@ ci-dessous au moment où elle est faite.
 | 4 | **Avions en direct** : symbole, étiquette, flèche verticale, traîne, couleurs de phase, clic | un avion suivi 10 minutes sur la carte et dans la vue au même moment ; correction du QNH jugée au toucher : l'altitude corrigée des derniers points avant l'atterrissage tombe à ±100 ft de l'altitude du seuil sur une journée d'atterrissages | 🔲 |
 | 5 | **Pistes empilées** : piste en service en tête, repli, masquage, retournement quand le sens change | un changement de sens d'exploitation observé en direct ou rejoué | 🔲 |
 | 6 | **Niveau visé et niveau entendu** : `nav_altitude_mcp` affiché ; le dernier niveau lu par la grammaire rattaché à l'avion et servi | taux d'accord entendu / visé sur une séance, à comparer au J2 du doc 29 | 🔲 |
-| 7 | **Un onglet par aéroport**, bascule avec la carte, réglages au panneau | Orly et De Gaulle ouverts ensemble, un avion dans les deux cônes visible dans les deux | 🔲 |
+| 7 | **Un onglet par aéroport**, bascule avec la carte | Orly et De Gaulle ouverts ensemble, un avion dans les deux cônes visible dans les deux | 🔲 |
+| 8 | **Les réglages** : défauts dans `config.toml`, section du panneau, `runtime-settings.json`, portées générale, par aéroport et par extrémité de piste | tests Go de validation des bornes et de l'héritage (piste → aéroport → général) ; une valeur changée au panneau redessine la vue sans redémarrer ; un réglage enregistré avant reste valide | 🔲 |
 
 États : 🔲 à faire · 🟡 en cours · ✅ fait.
 

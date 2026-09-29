@@ -85,3 +85,7 @@ __pycache__/
 
 # Accounts created by the first-run page. Password hashes, never published.
 configs/users.json
+
+# Aeronautical charts (SIA VAC and eAIP charts), kept next to the code for
+# reference. Never published: they are the SIA's, and they expire each cycle.
+/charts/

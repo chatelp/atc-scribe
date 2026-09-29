@@ -3926,6 +3926,12 @@ vus à plus de 7° depuis le bout de piste sur leurs 5 premiers NM environ (jusq
 plafond du cône côté départs passe donc à 15°, avec un plafond absolu vers 15 000 ft qui garde les
 avions en croisière dehors (V6).
 
+**Tranché le même jour par le propriétaire** : 15° pour un avion qui s'éloigne de la piste (V6) ;
+**tous les réglages de la vue ont un défaut et se modifient dans l'outil**, en général, par aéroport
+ou par extrémité de piste. Relevé dans l'eAIP pour les défauts : **altitude de transition 5 000 ft**
+à Orly et De Gaulle (cartes IAC, cycle du 03/09) ; **pente de 3°** pour leurs 13 ILS, hauteur au
+seuil de 50 à 57 ft ; la 20 d'Orly, sans ILS, a un PAPI à 3,4°.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
