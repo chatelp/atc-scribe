@@ -678,9 +678,16 @@ type RunwayData struct {
 // 09L one, 383 m to the side, well inside the 0.5 NM tolerance, so every
 // aircraft on the 09L final was counted for 09R -- and the runway in use read
 // "09R, 100%" while all the landings were on 09L.
+//
+// A runway whose threshold lies up to staggerMarginNM past the maximum distance
+// still competes, though it cannot make an approach on its own: otherwise, over
+// the first half mile of a 09L final, the 09L threshold is still beyond 10 NM
+// while the staggered 09R one is not, and 09R wins. Measured on four days of
+// CDG approaches, that was 7.8% of the points on final.
 func DetectRunwayApproach(lat, lon, heading, altitude float64, runways RunwayData, config config.FlightPhasesConfig) *RunwayApproachInfo {
 	var bestApproach *RunwayApproachInfo
-	minDistance := float64(config.ApproachMaxDistanceNM) + 1 // Start with distance beyond max
+	minDistance := float64(config.ApproachMaxDistanceNM) + staggerMarginNM + 1 // Start with distance beyond max
+	withinMax := false
 
 	// Check each runway threshold
 	for runwayPair, thresholds := range runways.RunwayThresholds {
@@ -690,7 +697,7 @@ func DetectRunwayApproach(lat, lon, heading, altitude float64, runways RunwayDat
 			distanceNM := MetersToNM(distanceMeters)
 
 			// Skip if too far from threshold
-			if distanceNM > float64(config.ApproachMaxDistanceNM) {
+			if distanceNM > float64(config.ApproachMaxDistanceNM)+staggerMarginNM {
 				continue
 			}
 
@@ -729,6 +736,9 @@ func DetectRunwayApproach(lat, lon, heading, altitude float64, runways RunwayDat
 
 			// Check if within centerline tolerance
 			if centerlineDistance <= config.ApproachCenterlineToleranceNM {
+				if distanceNM <= float64(config.ApproachMaxDistanceNM) {
+					withinMax = true
+				}
 				// A valid approach: keep it if its centreline is the nearest so far
 				if bestApproach == nil || closerRunway(centerlineDistance, distanceNM,
 					bestApproach.DistanceFromCenterline, minDistance) {
@@ -745,8 +755,15 @@ func DetectRunwayApproach(lat, lon, heading, altitude float64, runways RunwayDat
 		}
 	}
 
+	if !withinMax {
+		return nil
+	}
 	return bestApproach
 }
+
+// staggerMarginNM is how far past the approach distance a parallel runway's
+// threshold may lie and still compete. CDG's pairs are staggered by 0.48 NM.
+const staggerMarginNM = 1.0
 
 // closerRunway reports whether a runway at centreline distance c and threshold
 // distance d beats the best so far: the nearer centreline, then, between

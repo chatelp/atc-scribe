@@ -361,6 +361,41 @@ Ajouts demandés le même jour :
 - La barre d'alertes change de hauteur au gré des alertes, et **toute la vue sautait sous le
   pointeur** : la place qui lui est réservée ne fait plus que grandir.
 
+**29/09, soir — la validation de la piste d'un avion (V7), première mesure.** Script :
+`tools/runway-check/validate.py`, en lecture seule sur les bases quotidiennes. Quatre journées (23,
+24, 25 et 28/09) : **1 116 approches vues vers De Gaulle, 390 vers Orly.**
+
+- **Couverture.** On perd les avions en finale **à 3,9 NM du seuil en médiane, vers 1 250 ft**
+  (quartiles 3,1-4,3 NM à De Gaulle, 2,7-4,7 NM à Orly). Le toucher n'est jamais vu, comme le
+  prévoyait le propriétaire. Moins de 4 % des approches sont suivies sous 2 NM.
+- **La vérité prise faute de mieux** : l'axe que l'avion suit à son dernier point, quand ce point
+  est à moins de 4 NM du seuil (629 approches à De Gaulle, 194 à Orly). Elle ne laisse pas de
+  doute à ce stade : l'avion est à **4 m de son axe en médiane, 15 m au 95e centile**, et l'axe
+  parallèle voisin est à 276 m au moins.
+- **Point par point, comme le serveur** :
+
+  | Règle | De Gaulle | Orly |
+  |---|---|---|
+  | ancienne (seuil le plus proche) | **0,8 %** des points justes | 90,2 % |
+  | axe le plus proche (D68) | 92,2 % | 99,5 % |
+  | axe le plus proche, parallèles décalées admises jusqu'à 1 NM au-delà | **99,9 %** | 99,5 % |
+
+  Les 7,8 % manquants de la deuxième ligne sont un artefact : sur le premier demi-mille de chaque
+  finale de la 09L, son seuil est encore au-delà des 10 NM et celui de la 09R, décalé de 0,48 NM,
+  ne l'est plus. C'est ce qui donnait 6 % à la 09R en direct. Corrigé par la troisième ligne
+  (D68), avec son test.
+- **Stabilité, pour un juge par avion** : la piste lue à 8 NM (ou à 6 NM) est celle du dernier
+  point pour **628 approches sur 629 à De Gaulle et 193 sur 194 à Orly**. Les deux exceptions
+  (FPO4UD, 09L puis 09R ; VLG33CT, 07 puis 06) sont à regarder une par une.
+
+**Ce qui manque** : une vérité indépendante de notre réception, qui voie le toucher. **FlightAware
+AeroAPI la publie** : champs `actual_runway_on` et `actual_runway_off`, « piste d'arrivée réelle à
+destination, quand elle est connue » (spécification OpenAPI publique, lue le 29/09). Le
+propriétaire alimente FlightAware : **son compte « Personal » donne 10 $ d'usage gratuit par
+mois**, et la liste des arrivées d'un aéroport coûte 0,005 $ par tranche de 15 vols. Une journée
+de De Gaulle (environ 700 arrivées) coûte donc 0,23 $. Flightradar24 publie aussi la piste dans
+son API, mais **n'offre pas d'accès gratuit à ses contributeurs** (FAQ de l'API).
+
 **À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
 co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la
 protection du réseau local de macOS. Lancé depuis Terminal, il y arrive.
