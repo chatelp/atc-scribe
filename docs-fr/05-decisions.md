@@ -3902,6 +3902,28 @@ a produit un graphe aussi profond n'est pas établi.
 La séance du canal ouvert reste exploitable pour la mesure du laboratoire : les enregistrements et
 l'ADS-B ont continué.
 
+### D67 — Une vue PAR par piste, en plus de la carte *(29/09 — proposition validée, rien n'est codé)*
+
+**Demande du propriétaire** : une vue « horizon » par aéroport suivi, qui montre les avions de
+profil, en direct, qui se posent et décollent. Sur proposition, il retient les conventions de
+l'écran **PAR** (*Precision Approach Radar*), en restant lisible comme le reste de co-atc.
+
+**Ce qui est décidé** :
+- **un cadre par piste physique**, l'axe prolongé des deux côtés : les arrivées devant un seuil,
+  les départs derrière l'autre extrémité ; **toutes les pistes empilées**, celle en service en tête ;
+- **deux bandes par piste sur le même axe des distances** : l'élévation (altitude contre distance
+  au seuil, pente de 3° et tolérances) et, mince, l'azimut (écart à l'axe) ;
+- **le rattachement à une piste par la géométrie seule** : un cône à chaque extrémité, 20 NM, ±20°,
+  7° — plus loin que les phases d'approche et de départ, comme demandé ;
+- **le ciel gradué en niveaux de vol** au-dessus de la transition et en pieds QNH en dessous ;
+- **par avion, trois niveaux** : celui où il est (ADS-B, corrigé du QNH), celui qu'il vise
+  (altitude sélectionnée au pilote automatique) et le dernier niveau entendu dans une transmission
+  rattachée ; en désaccord, les deux sont montrés, sans jugement.
+
+**Conception, questions ouvertes (V1 à V6) et suivi de l'implémentation étape par étape** :
+`31-vue-par.md`. Une mesure faite en écrivant : 4 avions sur 9 en montée sous 8 000 ft dépassaient
+7° le 29/09 ; le plafond du cône côté départs est donc à revoir (V6).
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET

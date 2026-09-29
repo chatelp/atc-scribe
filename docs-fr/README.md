@@ -40,6 +40,7 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `28-gros-porteurs-par-canal.md` | les quatre canaux de `gros-porteurs` enregistrés séparément le 24/09 : deux sains, deux faibles qui battent et s'ouvrent sur du bruit (Q37, Q41) |
 | `29-approches-reconnaissance.md` | **référence** : améliorer la transcription — le modèle de langage, la chaîne et la réception : ce qui est mesuré, adopté, écarté, et ce qui reste à tester — sans jargon |
 | `30-association-regles-et-reglages.md` | **référence** : relier une transmission à un avion — chaque règle, son réglage dans co-atc (panneau, `runtime-settings.json`, `config.toml`), sa valeur par défaut, ce qu'elle rapporte |
+| `31-vue-par.md` | **conception et suivi** : la vue PAR, le ciel de profil piste par piste (D67) — décisions, sources des données, questions ouvertes, étapes d'implémentation et leur vérification |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
 
 > Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas
