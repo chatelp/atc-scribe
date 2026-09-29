@@ -140,35 +140,39 @@ def main():
                                    last_h=height, last_c=abs(c), margin=margin,
                                    pts_old=pts_old, pts_new=pts_new, pts_margin=pts_margin,
                                    at8=nearest_axis_at(ep, 8), at6=nearest_axis_at(ep, 6)))
-    q = lambda v, p: v[min(len(v) - 1, int(p * len(v)))]
+    def q(v, p):
+        return v[min(len(v) - 1, int(p * len(v)))] if v else float('nan')
+
+    labels = dict(old='old (nearest threshold)', new='nearest centreline', margin='nearest centreline, 1 NM stagger margin')
     for ap, lst in sorted(by_ap.items()):
-        print(f"\n== {ap} : {len(lst)} approches vues")
+        print(f"\n== {ap}: {len(lst)} approaches seen")
         ds = sorted(x['last_d'] for x in lst)
         hs = sorted(x['last_h'] for x in lst)
-        print(f"  A. dernier point vu en finale : à {q(ds, .5):.1f} NM du seuil (quartiles {q(ds, .25):.1f}-{q(ds, .75):.1f}), "
-              f"{q(hs, .5):.0f} ft au-dessus (quartiles {q(hs, .25):.0f}-{q(hs, .75):.0f})")
-        print('     vus jusqu\'à moins de 2 / 3 / 4 / 6 NM :', ' / '.join(str(sum(x['last_d'] <= lim for x in lst)) for lim in (2, 3, 4, 6)))
+        print(f"  A. last point seen on final: {q(ds, .5):.1f} NM from the threshold (quartiles {q(ds, .25):.1f}-{q(ds, .75):.1f}), "
+              f"{q(hs, .5):.0f} ft above it (quartiles {q(hs, .25):.0f}-{q(hs, .75):.0f})")
+        print('     followed below 2 / 3 / 4 / 6 NM:', ' / '.join(str(sum(x['last_d'] <= lim for x in lst)) for lim in (2, 3, 4, 6)))
         near = [x for x in lst if x['last_d'] <= 4]
         by_rw = defaultdict(int)
         for x in near:
             by_rw[x['truth']] += 1
-        print(f"     vérité exploitable (dernier point à moins de 4 NM) : {len(near)}, par piste {dict(sorted(by_rw.items()))}")
+        print(f"     usable truth (last point within 4 NM): {len(near)}, by runway {dict(sorted(by_rw.items()))}")
+        if not near:
+            continue
         cs = sorted(x['last_c'] * 1852 for x in near)
         ms = sorted(x['margin'] * 1852 for x in near if x['margin'] is not None)
-        print(f"     écart à l'axe au dernier point : médiane {q(cs, .5):.0f} m, 95e centile {q(cs, .95):.0f} m"
-              + (f" ; l'axe parallèle voisin est à {ms[0]:.0f} m au moins (médiane {q(ms, .5):.0f} m)" if ms else ''))
+        print(f"     offset from the centreline at the last point: median {q(cs, .5):.0f} m, 95th percentile {q(cs, .95):.0f} m"
+              + (f"; the neighbouring parallel is at least {ms[0]:.0f} m away (median {q(ms, .5):.0f} m)" if ms else ''))
         n_pts = sum(len(x['pts_old']) for x in near)
         for rule in ('old', 'new', 'margin'):
             ok = sum(sum(x['pts_' + rule]) for x in near)
             maj = sum(sum(x['pts_' + rule]) * 2 > len(x['pts_' + rule]) for x in near)
-            print(f"  B. règle {dict(old='ancienne', new='axe le plus proche', margin='axe + marge 1 NM')[rule]} point par point : {ok} sur {n_pts} points justes ({100 * ok / n_pts:.1f} %), "
-                  f"majorité juste pour {maj} approches sur {len(near)}")
+            print(f"  B. {labels[rule]}, point by point: {ok} of {n_pts} points right ({100 * ok / n_pts:.1f}%), "
+                  f"majority right for {maj} approaches of {len(near)}")
         for key, lab in (('at8', '8 NM'), ('at6', '6 NM')):
             got = [x for x in near if x[key]]
             ok = sum(x[key] == x['truth'] for x in got)
-            print(f"  C. axe le plus proche à {lab} = piste du dernier point : {ok} sur {len(got)}")
+            print(f"  C. nearest centreline at {lab} = runway at the last point: {ok} of {len(got)}")
             for x in [x for x in got if x[key] != x['truth']][:5]:
-                print(f"       {x['flight'] or x['hex']} : {x[key]} à {lab}, {x['truth']} au dernier point ({x['last_d']:.1f} NM)")
-
+                print(f"       {x['flight'] or x['hex']}: {x[key]} at {lab}, {x['truth']} at the last point ({x['last_d']:.1f} NM)")
 
 main()
