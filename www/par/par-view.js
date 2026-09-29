@@ -223,7 +223,21 @@
                 return;
             }
             const hit = ev.target.closest('[data-hex]');
-            if (hit) store.selectAircraftByHex(hit.getAttribute('data-hex'));
+            if (hit) {
+                store.selectAircraftByHex(hit.getAttribute('data-hex'));
+                return;
+            }
+            // A click beside the aircraft lets go of the selected one, as on the map.
+            if (store.selectedAircraft) {
+                store.selectedAircraft = null;
+                const m = store.mapManager;
+                if (m) {
+                    if (typeof m.removeProximityCircle === 'function') m.removeProximityCircle();
+                    if (typeof m.removeProximityHighlighting === 'function') m.removeProximityHighlighting();
+                    if (typeof m.applyFiltersAndRefreshView === 'function') m.applyFiltersAndRefreshView({ immediate: true });
+                }
+                render();
+            }
         });
 
         function runwaysFor(code) {
@@ -657,6 +671,9 @@
             const anchor = goingRight ? 'end' : 'start';
             return `<g class="par-ac" data-hex="${esc(a.hex)}" opacity="${opacity}">` +
                 `<title>${esc(title)}</title>` +
+                // A moving 10-pixel triangle is hard to click: a wider, invisible target.
+                `<circle cx="${px}" cy="${py}" r="11" fill="transparent"/>` +
+                `<circle cx="${px}" cy="${ay}" r="9" fill="transparent"/>` +
                 targetMark +
                 (sel ? `<circle cx="${px}" cy="${py}" r="9" fill="none" stroke="#fff" stroke-width="1.5"/>` : '') +
                 `<polygon points="${tri}" fill="${col}"/>` +
