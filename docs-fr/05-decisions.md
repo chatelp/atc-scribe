@@ -3921,8 +3921,10 @@ l'écran **PAR** (*Precision Approach Radar*), en restant lisible comme le reste
   rattachée ; en désaccord, les deux sont montrés, sans jugement.
 
 **Conception, questions ouvertes (V1 à V6) et suivi de l'implémentation étape par étape** :
-`31-vue-par.md`. Une mesure faite en écrivant : 4 avions sur 9 en montée sous 8 000 ft dépassaient
-7° le 29/09 ; le plafond du cône côté départs est donc à revoir (V6).
+`31-vue-par.md`. Une mesure faite en écrivant : les 4 départs de De Gaulle observés le 29/09 étaient
+vus à plus de 7° depuis le bout de piste sur leurs 5 premiers NM environ (jusqu'à 13,5°). Le
+plafond du cône côté départs passe donc à 15°, avec un plafond absolu vers 15 000 ft qui garde les
+avions en croisière dehors (V6).
 
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
