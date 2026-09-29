@@ -669,7 +669,15 @@ type RunwayData struct {
 	} `json:"runway_thresholds"`
 }
 
-// DetectRunwayApproach determines if aircraft is on approach to any runway
+// DetectRunwayApproach determines if aircraft is on approach to any runway.
+//
+// Among the runways whose centreline passes within tolerance, it picks the one
+// whose centreline is nearest, and only then the nearest threshold. The nearest
+// threshold alone gives parallel runways away whenever their thresholds are
+// staggered: at Paris-CDG the 09R threshold lies 0.48 NM further out than the
+// 09L one, 383 m to the side, well inside the 0.5 NM tolerance, so every
+// aircraft on the 09L final was counted for 09R -- and the runway in use read
+// "09R, 100%" while all the landings were on 09L.
 func DetectRunwayApproach(lat, lon, heading, altitude float64, runways RunwayData, config config.FlightPhasesConfig) *RunwayApproachInfo {
 	var bestApproach *RunwayApproachInfo
 	minDistance := float64(config.ApproachMaxDistanceNM) + 1 // Start with distance beyond max
@@ -721,8 +729,9 @@ func DetectRunwayApproach(lat, lon, heading, altitude float64, runways RunwayDat
 
 			// Check if within centerline tolerance
 			if centerlineDistance <= config.ApproachCenterlineToleranceNM {
-				// This is a valid approach - check if it's the closest
-				if distanceNM < minDistance {
+				// A valid approach: keep it if its centreline is the nearest so far
+				if bestApproach == nil || closerRunway(centerlineDistance, distanceNM,
+					bestApproach.DistanceFromCenterline, minDistance) {
 					minDistance = distanceNM
 					bestApproach = &RunwayApproachInfo{
 						RunwayID:               runwayPair + "/" + thresholdID,
@@ -737,6 +746,17 @@ func DetectRunwayApproach(lat, lon, heading, altitude float64, runways RunwayDat
 	}
 
 	return bestApproach
+}
+
+// closerRunway reports whether a runway at centreline distance c and threshold
+// distance d beats the best so far: the nearer centreline, then, between
+// centrelines within 10 m of each other, the nearer threshold.
+func closerRunway(c, d, bestC, bestD float64) bool {
+	const sameAxisNM = 10.0 / 1852
+	if math.Abs(c-bestC) > sameAxisNM {
+		return c < bestC
+	}
+	return d < bestD
 }
 
 // CalculateRunwayCenterlineDistance calculates distance from aircraft to runway centerline
@@ -798,13 +818,16 @@ func getOppositeThreshold(thresholdID, runwayPair string) string {
 	return parts[0]
 }
 
-// DetectRunwayDeparture determines if aircraft is departing from any runway
+// DetectRunwayDeparture determines if aircraft is departing from any runway.
+// Like approaches, the nearest centreline wins, then the nearest threshold: the
+// nearest threshold alone gave departures from 09R at Paris-CDG to 09L.
 // Unlike approach detection, departure detection is more lenient:
 // - Aircraft don't need to be on centerline (they deviate quickly after takeoff)
 // - We check if aircraft is moving away from the airport/runways
 // - Distance tolerance is larger since aircraft spread out after departure
 func DetectRunwayDeparture(lat, lon, heading float64, runways RunwayData, stationLat, stationLon float64, config config.FlightPhasesConfig) *RunwayDepartureInfo {
 	var bestDeparture *RunwayDepartureInfo
+	var bestCenterline float64
 	minDistance := float64(config.ApproachMaxDistanceNM) + 1 // Start with distance beyond max
 
 	// Check each runway threshold
@@ -853,9 +876,14 @@ func DetectRunwayDeparture(lat, lon, heading float64, runways RunwayData, statio
 				// Aircraft is moving away if heading is roughly opposite to station bearing
 				// Allow 90 degrees tolerance (aircraft can be moving perpendicular and still be departing)
 				if awayHeadingDiff >= 90 {
-					// This is a valid departure - check if it's the closest
-					if distanceNM < minDistance {
+					// A valid departure: keep it if its centreline is the nearest so far
+					centerlineDistance := CalculateRunwayCenterlineDistance(lat, lon,
+						RunwayThreshold{ID: thresholdID, Latitude: threshold.Latitude, Longitude: threshold.Longitude},
+						runwayHeading)
+					if bestDeparture == nil || closerRunway(centerlineDistance, distanceNM,
+						bestCenterline, minDistance) {
 						minDistance = distanceNM
+						bestCenterline = centerlineDistance
 						bestDeparture = &RunwayDepartureInfo{
 							RunwayID:              runwayPair + "/" + thresholdID,
 							DistanceFromThreshold: distanceNM,

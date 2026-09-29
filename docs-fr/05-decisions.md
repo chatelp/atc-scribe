@@ -3937,6 +3937,30 @@ l'écran principal bascule** (Radar, ou la vue PAR d'un des aéroports suivis da
 panneaux restent ; le calcul se fait dans le navigateur. Premier incrément vu en direct à Orly et
 De Gaulle ; l'avancement étape par étape est tenu dans `31-vue-par.md`.
 
+### D68 — La piste d'un avion : l'axe le plus proche, pas le seuil le plus proche *(29/09)*
+
+**Constaté par le propriétaire** dans la vue PAR : « Runway in use 09R (100 %) » à De Gaulle, alors
+que deux avions étaient en approche sur la 09L. La cause est dans la détection amont
+(`DetectRunwayApproach`, `DetectRunwayDeparture`, `internal/adsb/atc_utils.go`) : parmi les pistes
+dont l'axe passe à moins de 0,5 NM, elle retenait celle dont **le seuil** est le plus proche. À De
+Gaulle, les seuils de chaque paire sont décalés (09R à 0,48 NM plus à l'ouest que 09L, à 383 m de
+côté).
+
+**Mesuré sur la géométrie réelle, avant correction** : les finales de la 09L comptaient pour la 09R,
+celles de la 08R pour la 08L, les départs de la 09L et de la 09R pour la 08R. **Face à l'est, les
+deux pistes d'atterrissage de De Gaulle étaient confondues avec les pistes de décollage**, pour la
+piste en service comme pour le filtre qui rejette les approches vers une piste inactive.
+
+**Corrigé** : l'axe le plus proche d'abord, le seuil ensuite. Et les pistes parallèles sont
+reconnues **par leur cap, à 5° près**, plus seulement par leur numéro : les paires 08 et 09 de De
+Gaulle, à 1° l'une de l'autre, ne s'activaient jamais ensemble, et les approches sur la 08R étaient
+rejetées dès que la 09 était active. Orly (06 et 07, 12° d'écart) n'est pas touché. Quatre tests
+sur les coordonnées réelles, qui échouent sans la correction. Relu sur une instance de test
+corrigée : « 08R 60 % · 09L 35 % », les deux pistes d'atterrissage.
+
+**Contribuable** tel quel à l'amont : le défaut touche tout aéroport à pistes parallèles décalées.
+La production le prendra au prochain lancement, avec un binaire reconstruit.
+
 ### Q40 — Plusieurs aéroports de référence, pas un seul *(23/09 — **tranchée et construite le 26/09, voir D62**)*
 
 Question du propriétaire : *« est-ce qu'on peut avoir deux aéroports rattachés ? Orly ET
