@@ -74,9 +74,14 @@ func TestSpeed(t *testing.T) {
 }
 
 func TestHeadingIsPaddedToThreeDigits(t *testing.T) {
-	v, ok := find(Parse("air france eight zero two foxtrot proceed with descend heading zero zero"), RoleHeading)
-	if !ok || v.Text != "000" {
-		t.Errorf("got %q (found=%v), want 000", v.Text, ok)
+	v, ok := find(Parse("air france eight zero two foxtrot proceed with heading nine zero"), RoleHeading)
+	if !ok || v.Text != "090" {
+		t.Errorf("got %q (found=%v), want 090", v.Text, ok)
+	}
+	// Heading zero does not exist -- north is 360 -- so "heading zero zero" is a
+	// number misheard, not a heading (29/09; it was read as "000" before).
+	if v, ok := find(Parse("air france eight zero two foxtrot proceed with descend heading zero zero"), RoleHeading); ok {
+		t.Errorf("heading zero read as a heading: %q", v.Text)
 	}
 }
 

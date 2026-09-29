@@ -175,7 +175,10 @@ func Parse(text string) Result {
 				digits, end = d, e
 			}
 		}
-		if role == RoleFlightLevel && !plausibleFlightLevel(digits) {
+		// A value with no plausible part at all -- "QNH three", "speed six" -- is a
+		// number misheard, not a value: it is kept, without a role it cannot have.
+		// (Flight levels were already treated so.)
+		if !plausibleFor(role, digits) {
 			role = RoleUnknown
 		}
 		v := Value{Role: role, Digits: digits, Word: i, End: end}
@@ -477,6 +480,9 @@ func looseNumbers(toks []string, used []bool) []Value {
 						start, digits = k, d
 					}
 				}
+				if !plausibleFor(role, digits) {
+					role = RoleUnknown
+				}
 				out = append(out, Value{Role: role, Digits: digits, Text: digits, Word: start, End: end})
 				i = end
 				continue
@@ -504,8 +510,10 @@ func bareValue(digits string, word, end int) []Value {
 // bounds are those of the phraseology, wide on purpose: they exist to catch a
 // number that swallowed its neighbours, not to judge a reading.
 func plausibleFor(role Role, digits string) bool {
-	if strings.Contains(digits, ".") {
-		return role == RoleFrequency || role == RoleUnknown
+	switch role {
+	case RoleSpeed, RoleAltitude, RoleHeading, RoleQNH, RoleSquawk, RoleFlightLevel:
+	default:
+		return true // a runway ("27l"), a frequency, a callsign: not bounded here
 	}
 	n, err := strconv.Atoi(digits)
 	if err != nil {
