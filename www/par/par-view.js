@@ -77,7 +77,7 @@
             'The buttons at the top right switch between the map and the airports followed in the settings.'),
         inUse: (several) => helpAttr(several ? 'Runways in use' : 'Runway in use',
             'Aircraft take off and land into the wind, so an airport uses its runways in one direction at a time, and a large one may land on one runway while taking off from the next. ' +
-            'co-atc works this out from the approaches, landings and take-offs it has seen in the last hour; the percentage is each runway\'s share of that evidence. ' +
+            'co-atc works this out from the aircraft it has seen approach, land and take off in the last hour, each aircraft counted once, recent ones weighing more; the percentage is each runway\'s share. ' +
             'Frames with a runway in use come first.'),
         qnh: (est) => helpAttr('QNH, the local air pressure', est
             ? `An altimeter measures air pressure, not height. To read their height above sea level, crews set it to the local pressure, called the QNH. ` +
@@ -98,8 +98,9 @@
             'When the airport turns its runways round, the frame turns round too.'),
         fold: () => helpAttr('Fold', 'Click the bar to fold or unfold this runway.'),
         count: () => helpAttr('Aircraft in this frame',
-            'The aircraft lined up with this runway, out to 20 NM, or on the runway itself, whatever they are doing. ' +
-            'An aircraft between two runways is shown with the nearest one. The map\'s filters apply here too.'),
+            'The aircraft lined up with this runway, out to 20 NM, or on the runway itself. ' +
+            'A filled symbol is an aircraft co-atc judges to be landing on this runway or to have taken off from it (the same runway as in its details panel); ' +
+            'a hollow one is in the coverage without that. Others go with the nearest runway. The map\'s filters apply here too.'),
         scale: (ceil) => helpAttr('Height scale',
             'Heights are stretched near the ground, so that the last miles of a landing and the first of a take-off have room while the levels higher up still fit. ' +
             `Above ${ceil.toLocaleString('en')} ft, aircraft are not shown.`),
@@ -351,12 +352,36 @@
                     previousFrame.delete(a.hex);
                     continue;
                 }
+                // The server's runway judge (D69) has the last word: an aircraft it
+                // puts on another airport's runway is not this one's.
+                const rw = a.runway || {};
+                const arrival = rw.arrival && rw.arrival.airport === apt.code ? rw.arrival.runway : null;
+                const departure = rw.departure && rw.departure.airport === apt.code ? rw.departure.runway : null;
+                if (!arrival && !departure && (rw.arrival || rw.departure)) {
+                    previousFrame.delete(a.hex);
+                    continue;
+                }
                 const onGround = !!a.on_ground;
                 if (typeof t.alt_baro !== 'number' && !onGround) continue;
                 const altFt = onGround ? null : G.qnhAltitude(t.alt_baro, qnh);
-                const p = G.classify(frames, {
-                    lat: t.lat, lon: t.lon, altFt, track: t.track, onGround,
-                }, opts, previousFrame.get(a.hex));
+                const input = { lat: t.lat, lon: t.lon, altFt, track: t.track, onGround };
+                let p = G.classify(frames, input, opts, previousFrame.get(a.hex));
+                // An aircraft judged on a runway goes to that runway's frame while
+                // its cone holds it, even as it crosses the neighbouring axis on
+                // its way in: arriving on the approach side, departing past the
+                // far end.
+                const judged = (ident, departing) => {
+                    const f = ident && frames.find((q) => q.le.ident === ident || q.he.ident === ident);
+                    if (!f) return null;
+                    const key = f.le.ident === ident ? 'le' : 'he';
+                    const q = G.placeInFrame(f, input, opts);
+                    if (!q) return null;
+                    const ok = departing
+                        ? q.side === (key === 'le' ? 'he' : 'le') && q.movingAway
+                        : (q.side === key && !q.movingAway) || q.side === 'rwy';
+                    return ok ? Object.assign(q, { judged: departing ? 'departure' : 'arrival', runway: ident }) : null;
+                };
+                p = judged(arrival, false) || judged(departure, true) || p;
                 if (!p) { previousFrame.delete(a.hex); continue; }
                 previousFrame.set(a.hex, p.frame);
                 placed.get(p.frame).push({ a, p, altFt });
@@ -650,6 +675,9 @@
             // Which way it moves along the display axis.
             const rightward = f.bearing + (A === 'le' ? 0 : 180);
             const goingRight = Number.isFinite(t.track) ? G.angleDiff(t.track, rightward) < 90 : true;
+            // Filled: judged landing on or taking off from this runway; hollow:
+            // in its coverage, not judged on it.
+            const fillAttr = p.judged ? `fill="${col}"` : `fill="#0a0a0a" stroke="${col}" stroke-width="1.5"`;
             const tri = goingRight
                 ? `${px + 6},${py} ${px - 4},${py - 4} ${px - 4},${py + 4}`
                 : `${px - 6},${py} ${px + 4},${py - 4} ${px + 4},${py + 4}`;
@@ -676,7 +704,8 @@
                 }
             }
 
-            const title = `${callsign} · ${phaseOf(a)} · ${level}${rate}${target}` +
+            const role = p.judged === 'arrival' ? ` · landing on ${p.runway}` : p.judged === 'departure' ? ` · took off from ${p.runway}` : ' · not judged on this runway';
+            const title = `${callsign} · ${phaseOf(a)} · ${level}${rate}${target}${role}` +
                 (p.side === 'rwy' ? ' · on the runway' : ` · ${p.dist.toFixed(1)} NM from ${esc(f[p.side].ident)}, ${p.elevationDeg.toFixed(1)}° up, ${Math.abs(p.azimuthDeg).toFixed(1)}° off the axis`);
             const labelX = goingRight ? px - 8 : px + 8;
             const anchor = goingRight ? 'end' : 'start';
@@ -687,7 +716,7 @@
                 `<circle cx="${px}" cy="${ay}" r="9" fill="transparent"/>` +
                 targetMark +
                 (sel ? `<circle cx="${px}" cy="${py}" r="9" fill="none" stroke="#fff" stroke-width="1.5"/>` : '') +
-                `<polygon points="${tri}" fill="${col}"/>` +
+                `<polygon points="${tri}" ${fillAttr}/>` +
                 `<text x="${labelX}" y="${py - 7}" fill="${col}" text-anchor="${anchor}" font-weight="bold">${esc(callsign)}</text>` +
                 `<text x="${labelX}" y="${py + 13}" fill="${C.text}" text-anchor="${anchor}" font-size="10">${esc(level + rate + target)}</text>` +
                 (sel ? `<circle cx="${px}" cy="${ay}" r="7" fill="none" stroke="#fff" stroke-width="1.5"/>` : '') +

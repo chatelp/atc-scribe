@@ -154,6 +154,10 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 		delta["phase"] = current.Phase
 	}
 
+	if !aircraftRunwaysEqual(previous.Runway, current.Runway) {
+		delta["runway"] = current.Runway
+	}
+
 	// Compare distance
 	if (previous.Distance == nil) != (current.Distance == nil) ||
 		(previous.Distance != nil && current.Distance != nil && *previous.Distance != *current.Distance) {

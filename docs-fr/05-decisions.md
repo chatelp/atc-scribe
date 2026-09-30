@@ -4810,6 +4810,32 @@ hachage varie d'un facteur 10 à 30 d'une tranche de dix minutes à l'autre, ce 
 un samedi, et 123,875 est hors de la plage d'accord de l'antenne (124,5-126,5 MHz). **Le réglage est
 gardé.**
 
+### D69 — Un seul juge de la piste d'un avion : le serveur *(30/09 — décidé et construit le même jour ; reste à vérifier en direct, doc 31)*
+
+**Demande du propriétaire** (29/09) : afficher dans la feuille détaillée la piste d'arrivée ou de
+départ d'un avion, *« évidemment ça doit être cohérent partout (entre les PAR, la feuille détaillée,
+le résumé des pistes actives en haut des PAR etc.) »* ; décidé le 30/09 (*« oui, construis-la »*),
+une fois la règle validée contre FlightAware (D68).
+
+**La règle**, mesurée avant d'être codée, contre la piste réelle de FlightAware sur six journées :
+un avion est **établi** sur une piste quand il est à moins de **185 m** de son axe prolongé, à moins
+de **8 NM** du seuil, route alignée à **15°** près. La piste d'arrivée est **la dernière sur laquelle
+il s'est établi** : un changement tardif, comme FPO4UD passé de la 09L à la 09R, est suivi. Résultat :
+**1 504 arrivées justes sur 1 505 à De Gaulle (99,93 %), 449 sur 449 à Orly** ; 18 arrivées de De
+Gaulle sur 1 523 ne sont jamais établies et n'ont pas de piste, plutôt qu'une fausse. 185 m reste sous
+la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1 500 sur 1 502 ; 278 m,
+20° et 10 NM, 1 510 sur 1 511.
+
+**Ce qui en découle** :
+- le serveur sert la piste avec l'avion, et la garde pour le reste du vol ;
+- la feuille détaillée l'affiche ;
+- la vue PAR range l'avion dans le cadre de sa piste et distingue celui qui atterrit ou décolle de
+  celui qui passe ;
+- les pistes en service se comptent **en avions**, et non plus en mises à jour ADS-B.
+
+La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
+validée contre `actual_runway_off`.
+
 ### Q51 — Une source ADS-B externe en renfort de la station, quand elle perd un avion *(29/09 — ouverte)*
 
 Idée du propriétaire : *« on pourrait d'ailleurs basculer automatiquement vers une API quand on perd
