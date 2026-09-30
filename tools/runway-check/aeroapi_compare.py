@@ -54,13 +54,18 @@ class AeroAPI:
             self.stamps = [t for t in self.stamps if now - t < 61]
 
     def arrivals(self, airport, start, end):
+        return self.flights(airport, 'arrivals', start, end)
+
+    def flights(self, airport, kind, start, end):
+        """Arrivals or departures at an airport between start and end, cached."""
         os.makedirs(CACHE, exist_ok=True)
-        tag = f"{airport}_{start:%Y%m%dT%H%M}_{end:%Y%m%dT%H%M}.json"
+        tag = (f"{airport}_{start:%Y%m%dT%H%M}_{end:%Y%m%dT%H%M}.json" if kind == 'arrivals'
+               else f"{airport}_{kind}_{start:%Y%m%dT%H%M}_{end:%Y%m%dT%H%M}.json")
         path = os.path.join(CACHE, tag)
         if os.path.exists(path):
             return json.load(open(path))
         flights = []
-        url = (f'{BASE}/airports/{airport}/flights/arrivals?'
+        url = (f'{BASE}/airports/{airport}/flights/{kind}?'
                + urllib.parse.urlencode({'start': start.strftime('%Y-%m-%dT%H:%M:%SZ'),
                                          'end': end.strftime('%Y-%m-%dT%H:%M:%SZ'), 'max_pages': 1}))
         while url:
@@ -77,10 +82,13 @@ class AeroAPI:
                 raise
             self.pages += 1
             self.stamps.append(time.time())
-            flights += d.get('arrivals') or []
+            flights += d.get(kind) or []
             nxt = (d.get('links') or {}).get('next')
             url = (BASE + nxt) if nxt else None
-        json.dump(flights, open(path, 'w'))
+        # A window still open, or just closed, is not kept: flights are still
+        # landing and FlightAware still filling in runways.
+        if end < datetime.now(timezone.utc) - timedelta(minutes=30):
+            json.dump(flights, open(path, 'w'))
         return flights
 
 
