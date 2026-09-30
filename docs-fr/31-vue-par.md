@@ -467,6 +467,36 @@ PAR, on ne verrait que 3,9 % des points de départ à Orly (65 % avec 15°) et 1
 **Ce qui n'est pas vérifié** : le niveau de transition calculé (FL060) contre celui de l'ATIS, que
 nous n'enregistrons pas.
 
+**30/09, matin — une nuit entière.** L'instance de test a tourné 16 h 27, **sans une erreur** dans son
+journal, 360 Mo de mémoire ; la base a changé de fichier à minuit (608 Mo pour le 29, 405 Mo pour le
+30 à 9:52). Rejouées, les deux journées confirment la soirée (plus de 570 arrivées) :
+
+| | 29/09 Orly | 29/09 De Gaulle | 30/09 Orly | 30/09 De Gaulle |
+|---|---|---|---|---|
+| Arrivées suivies | 110 | 211 | 55 | 201 |
+| Écart médian sous la pente | -59 ft | -55 ft | -46 ft | -35 ft |
+| Dans ±0,7° / ±2,5° | 100 / 99,9 % | 99,8 / 99,7 % | 100 / 100 % | 99,8 / 98,8 % |
+| Arrivées montrées dès | 16,2 NM | 16,7 NM | 16,9 NM | 16,9 NM |
+| Départs montrés (7° à la place de 15°) | 74,9 % (9,3 %) | 52,5 % (17,6 %) | 55,2 % (1,0 %) | 51,9 % (14,6 %) |
+| Trafic étranger à la piste | 0,0 % | 0,0 % | 0,0 % | 0,0 % |
+
+**L'écart sous la pente suit la température** : les METAR d'Orly donnaient 26-27 °C le 29 au soir et
+21-22 °C le 30 au matin, et l'écart passe de -55/-59 à -35/-46 ft. C'est l'erreur des altimètres
+par air chaud, pas un défaut du modèle.
+
+**Pistes en service la nuit** : De Gaulle a posé à égalité sur la 08R et la 09L (50 % chacune), puis
+sur la 09R la nuit vers 23:42 ; Orly est resté sur la 25 (fermé de 23:30 à 6:00). Pas de changement
+de sens : l'étape 5 reste à observer.
+
+**Corrigé** : avec deux pistes à égalité, la « première » a changé 18 fois dans la nuit, et les
+cadres, rangés par score, échangeaient leur place à l'écran. Les cadres en service viennent
+maintenant en tête dans l'ordre de leurs noms.
+
+**Les changements de cadre** (environ un par avion) sont presque tous des arrivées qui rejoignent
+leur axe par le côté et traversent d'abord celui de la piste parallèle voisine : 235 entre 08L et
+08R, 184 entre 09L et 09R sur les deux jours. C'est la géométrie. Le juge unique de V7, qui fixerait
+la piste d'un avion une fois établi en finale, les ferait disparaître.
+
 **À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
 co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la
 protection du réseau local de macOS. Lancé depuis Terminal, il y arrive.
