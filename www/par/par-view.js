@@ -362,10 +362,13 @@
                 placed.get(p.frame).push({ a, p, altFt });
             }
 
-            // Frames carrying a runway in use come first, the most used first.
+            // Frames carrying a runway in use come first, in the order of the
+            // runway names, not of their scores: at De Gaulle 08R and 09L land
+            // half the traffic each, the first of them changed 18 times in a
+            // night, and the two frames kept swapping places on the screen.
             const usage = (f) => Math.max(0, ...inUse.filter((r) => r.end === f.le.ident || r.end === f.he.ident).map((r) => r.score));
-            const ordered = frames.map((f, i) => ({ f, i, use: usage(f) }))
-                .sort((p, q) => (q.use - p.use) || (p.i - q.i))
+            const ordered = frames.map((f) => ({ f, use: usage(f) > 0 }))
+                .sort((p, q) => (q.use - p.use) || p.f.id.localeCompare(q.f.id))
                 .map((o) => o.f);
 
             const width = Math.max(480, container.clientWidth - 34);
