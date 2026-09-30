@@ -266,7 +266,7 @@ des étiquettes (`localStorage`).
   : 15° pour un avion qui s'éloigne de la piste, avec ce plafond absolu. Limites : 6 minutes, un seul
   aéroport, un seul sens d'exploitation ; aucun départ d'Orly n'a été capté.
 
-- **V7 — Un seul juge de la piste d'un avion** (demande du propriétaire, 29/09) : *« puisqu'on est
+- **V7 — Un seul juge de la piste d'un avion** — *tranchée le 30/09 (D69) : le serveur, avec la règle « établi sur l'axe », validée contre FlightAware* (demande du propriétaire, 29/09) : *« puisqu'on est
   capable de relier les avions aux pistes, si on valide bien le matching, ça pourrait être une info
   affichée dans la feuille détaillée d'un avion (parti ou arrivé sur telle piste) — évidemment ça
   doit être cohérent partout »*. Aujourd'hui, deux calculs distincts répondent à deux questions
@@ -302,6 +302,7 @@ ci-dessous au moment où elle est faite.
 | 6 | **Niveau visé et niveau entendu** : `nav_altitude_mcp` affiché ; le dernier niveau lu par la grammaire rattaché à l'avion et servi | niveau visé affiché ✅ ; **reste** le niveau entendu (côté Go) et le taux d'accord entendu / visé, à comparer au J2 du doc 29 | 🟡 |
 | 7 | **Un onglet par aéroport**, bascule avec la carte | Orly et De Gaulle basculés le 29/09 ; **reste** un avion dans les deux cônes vu dans les deux | 🟡 |
 | 8 | **Les réglages** : défauts dans `config.toml`, section du panneau, `runtime-settings.json`, portées générale, par aéroport et par extrémité de piste | tests Go de validation des bornes et de l'héritage (piste → aéroport → général) ; une valeur changée au panneau redessine la vue sans redémarrer ; un réglage enregistré avant reste valide | 🔲 |
+| 9 | **La piste de chaque avion, jugée par le serveur** (D69) : servie avec l'avion, affichée dans la feuille détaillée, utilisée par la vue PAR ; pistes en service comptées en avions | règle mesurée contre FlightAware avant d'être codée (99,93 % à De Gaulle, 100 % à Orly) ✅ ; 8 tests Go sur les coordonnées réelles ✅ ; **reste** la vérification en direct | 🟡 |
 
 États : 🔲 à faire · 🟡 en cours · ✅ fait.
 
@@ -554,6 +555,34 @@ dernier point, à 2,2 NM, disait 06 : près d'Orly, les axes de la 06 et de la 0
 **Conclusion** : la règle de l'axe le plus proche est validée contre une source indépendante qui
 voit le toucher, et la lecture dès 8 NM suffit pour un juge unique par avion (V7), à 99,5 % et
 100 %. L'ancienne règle se trompait à De Gaulle pour 96,5 % des points.
+
+**30/09, soir — le juge des pistes (D69), construit.**
+
+- **Serveur** : `internal/adsb/runway_judge.go`, un fichier à part, contribuable. À chaque position
+  reçue, le juge regarde si l'avion est établi sur un axe d'un aéroport suivi (185 m, 8 NM, 15°,
+  sous le plafond d'approche). La piste d'arrivée est la dernière sur laquelle il s'est établi ;
+  la piste de départ est jugée sur la montée initiale dans l'axe, au-delà du bout de piste.
+  - Une remontée juste après une approche est une remise des gaz, pas un départ.
+  - Un départ jugé plus de 20 minutes après une arrivée ouvre un nouveau vol et efface l'arrivée.
+  - Le verdict est servi avec l'avion (champ `runway`), sur tous les chemins : REST, websocket et
+    différences en direct.
+- **Pistes en service comptées en avions** : chaque avion garde un indice par type (approche,
+  atterrissage, montée), sur la dernière piste où il a été vu. Avant, un avion en longue finale
+  pesait cent fois un avion vu brièvement.
+- **Feuille détaillée** : une ligne « Runway », par exemple « Arriving 09L (LFPG) », « Landed on
+  09L (LFPG) » ou « Departed 08L (LFPG) ».
+- **Vue PAR** : un avion jugé sur une piste va dans le cadre de cette piste, même pendant qu'il
+  traverse l'axe voisin pour rejoindre le sien. Son symbole est **plein** ; un avion présent dans le
+  cône sans être jugé sur la piste a un symbole **creux**. Un avion jugé sur un autre aéroport n'est
+  pas montré.
+- **Corrigé au passage** : les phases envoyées en direct par websocket perdaient leur aéroport,
+  dont la vue a besoin pour écarter le trafic des autres aéroports.
+- **Tests** : 8 tests Go du juge, sur les coordonnées réelles de De Gaulle (arrivée, interception
+  qui traverse la 09R, changement tardif de FPO4UD, départ, remise des gaz, rotation, avion qui
+  n'est pas en finale, décompte en avions). Un test m'a d'ailleurs repris : un point à 300 m au sud
+  de la 09L est à 83 m de l'axe de la 09R, et le juge l'y met à raison.
+- **Reste à vérifier en direct** : une instance de test, la feuille détaillée et les symboles de la
+  vue sur du trafic réel.
 
 **À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
 co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la

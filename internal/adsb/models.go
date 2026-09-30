@@ -261,6 +261,7 @@ type Aircraft struct {
 	Future             []Position          `json:"future,omitempty"`              // Predicted future positions
 	Hindcast           []Position          `json:"hindcast,omitempty"`            // Predicted positions before first ADS-B contact
 	Phase              *PhaseData          `json:"phase,omitempty"`               // Phase information with current and history
+	Runway             *AircraftRunways    `json:"runway,omitempty"`              // Runways it landed or took off on, per the runway judge (D69)
 	Clearances         []ClearanceData     `json:"clearances,omitempty"`          // Recent clearances for this aircraft
 	Voice              *VoiceData          `json:"voice,omitempty"`               // What the radio has said about this aircraft
 	IsSimulated        bool                `json:"is_simulated"`                  // Whether this is a simulated aircraft

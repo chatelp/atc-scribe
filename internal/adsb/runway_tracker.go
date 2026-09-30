@@ -134,17 +134,37 @@ func NewRunwayInUseTracker(
 }
 
 // RecordEvent records evidence of runway usage and recomputes scores.
+//
+// The runway in use is counted in aircraft, not in position reports: each
+// aircraft keeps one event per type, on the last runway it was seen using, and
+// a report only refreshes it. Counted per report, an aircraft on a long final
+// weighed a hundred times one seen briefly, and the one or two reports an
+// intercepting aircraft spends nearer the parallel runway's axis were counted
+// for that runway (docs-fr/05-decisions.md, D69).
 func (rt *RunwayInUseTracker) RecordEvent(runwayID string, eventType RunwayEventType, hex string) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 
 	now := time.Now().UTC()
-	rt.events = append(rt.events, RunwayEvent{
-		RunwayEnd: runwayID,
-		Type:      eventType,
-		Hex:       hex,
-		Timestamp: now,
-	})
+	replaced := false
+	if hex != "" {
+		for i := range rt.events {
+			if rt.events[i].Hex == hex && rt.events[i].Type == eventType {
+				rt.events[i].RunwayEnd = runwayID
+				rt.events[i].Timestamp = now
+				replaced = true
+				break
+			}
+		}
+	}
+	if !replaced {
+		rt.events = append(rt.events, RunwayEvent{
+			RunwayEnd: runwayID,
+			Type:      eventType,
+			Hex:       hex,
+			Timestamp: now,
+		})
+	}
 
 	rt.logger.Debug("Runway event recorded",
 		logger.String("runway", runwayID),

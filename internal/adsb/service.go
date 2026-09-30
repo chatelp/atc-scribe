@@ -228,6 +228,7 @@ type Service struct {
 	wsServer           WebSocketServer           // WebSocket server for broadcasting events
 	signalLostTimeout  time.Duration             // Time after which aircraft is marked as signal_lost
 	ref                *phaseRef                 // Airport phases are judged against; see PhaseReference
+	runwayJudge        *RunwayJudge              // The one judge of each aircraft's runway (D69)
 	flightPhasesConfig config.FlightPhasesConfig // Flight phases configuration
 	changeDetector     *ChangeDetector           // Tracks aircraft changes
 	broadcastChan      chan []AircraftChange     // Channel for broadcasting changes
@@ -297,6 +298,8 @@ func NewService(
 		},
 	}
 	SetConfig(predictionConfig)
+
+	service.runwayJudge = NewRunwayJudge()
 
 	// Initialize trajectory tracker for phase detection
 	if flightPhasesConfig.Enabled {
@@ -669,6 +672,15 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 			snap := TrajectorySnapshotFromADSB(a.ADSB, a.OnGround, time.Now().UTC())
 			s.trajectoryTracker.Ingest(a.Hex, snap)
 		}
+		if a.ADSB != nil {
+			if lat, lon, ok := a.ADSB.Position(); ok && a.ADSB.Track != nil {
+				s.runwayJudge.Observe(a.Hex, s.ref.all(), RunwayObservation{
+					Lat: lat, Lon: lon, TrackDeg: *a.ADSB.Track, AltFt: a.ADSB.AltBaro.Float64(),
+					BaroRateFPM: a.ADSB.BaroRate, OnGround: a.OnGround,
+					MaxApproachFt: float64(s.flightPhasesConfig.ApproachMaxAltitudeFt), At: time.Now().UTC(),
+				})
+			}
+		}
 
 		if found {
 			// Use pre-fetched takeoff and landing times
@@ -731,13 +743,14 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 				phaseMap[hex] = *phase
 			}
 		}
-		// Override with immediate phase changes
+		// Override with immediate phase changes. The airport goes with the phase:
+		// the PAR view reads it to keep another airport's traffic off its runways.
 		for _, change := range immediatePhaseChanges {
-			phaseMap[change.Hex] = PhaseChange{Phase: change.Phase, Timestamp: change.Timestamp}
+			phaseMap[change.Hex] = PhaseChange{Phase: change.Phase, Timestamp: change.Timestamp, Airport: change.Airport}
 		}
 		// Override with newly detected phase changes
 		for _, change := range newPhaseChanges {
-			phaseMap[change.Hex] = PhaseChange{Phase: change.Phase, Timestamp: change.Timestamp}
+			phaseMap[change.Hex] = PhaseChange{Phase: change.Phase, Timestamp: change.Timestamp, Airport: change.Airport}
 		}
 		for _, a := range newAircraft {
 			if phase, ok := phaseMap[a.Hex]; ok {
@@ -801,7 +814,13 @@ func (s *Service) updateSimulationFields(aircraft []*Aircraft) {
 
 func (s *Service) enrichWithATCDerivedData(aircraft []*Aircraft) {
 	for _, a := range aircraft {
-		if a == nil || a.ADSB == nil {
+		if a == nil {
+			continue
+		}
+		// Every path that sends aircraft out passes here, so the runway goes
+		// wherever the aircraft goes.
+		a.Runway = s.runwayJudge.Get(a.Hex)
+		if a.ADSB == nil {
 			continue
 		}
 		a.ADSB.ATCDerived = computeATCDerivedMetrics(a.ADSB, a.Distance)

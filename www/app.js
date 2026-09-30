@@ -1188,6 +1188,19 @@ document.addEventListener('alpine:init', () => {
             const aircraftOperator = bsdbData.registered_owners || '-';
             const derived = this.getATCDerivedMetrics(aircraft);
 
+            // Runways, as the server's runway judge has them (D69): the same verdict
+            // the PAR view and the runway-in-use summary use.
+            const runwayText = (() => {
+                const r = aircraft.runway || {};
+                const parts = [];
+                if (r.departure) parts.push(`Departed ${r.departure.runway} (${r.departure.airport})`);
+                if (r.arrival) {
+                    const landed = aircraft.on_ground || (aircraft.date_landed && new Date(aircraft.date_landed) >= new Date(r.arrival.since));
+                    parts.push(`${landed ? 'Landed on' : 'Arriving'} ${r.arrival.runway} (${r.arrival.airport})`);
+                }
+                return parts.length ? parts.join(' · ') : '-';
+            })();
+
             const fields = [
                 ['Basic Info', [
                     ['Callsign', aircraft.flight?.trim() || '-'],
@@ -1205,6 +1218,7 @@ document.addEventListener('alpine:init', () => {
                 ['Status', [
                     ['On Ground', aircraft.on_ground ? 'Yes' : 'No'],
                     ['Phase', this.getCurrentPhase(aircraft)],
+                    ['Runway', runwayText],
                     ['Takeoff Time', takeoffTimeText, takeoffSeconds],
                     ['Landing Time', landingTimeText, landingSeconds]
                 ]],
@@ -4076,6 +4090,8 @@ async initAircraftDataSource() {
             if (delta.status !== undefined && aircraft.status !== delta.status) aircraft.status = delta.status;
             if (delta.on_ground !== undefined && aircraft.on_ground !== delta.on_ground) aircraft.on_ground = delta.on_ground;
             if (delta.phase !== undefined && aircraft.phase !== delta.phase) aircraft.phase = delta.phase;
+            // The runway judge's verdict (D69); null when it forgets the aircraft
+            if (delta.runway !== undefined) aircraft.runway = delta.runway;
             if (delta.distance !== undefined && aircraft.distance !== delta.distance) aircraft.distance = delta.distance;
 
             // Apply BSDB (BaseStation.sqb enrichment) data if provided
