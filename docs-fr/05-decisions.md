@@ -4820,6 +4820,11 @@ distingue déjà `local` et `external`). À trancher : quelle source (gratuite, 
 d'utilisation, couverture au sol à Orly et De Gaulle), quel coût réseau, et comment l'afficher sans
 laisser croire que la station l'a reçu.
 
+**30/09** : testé à l'instant T, **seul OpenSky voit le sol** (11 avions sur 11 dans la zone d'Orly,
+2 sur 5 à De Gaulle ; adsb.lol et adsb.fi aucun). Le propriétaire a créé un compte OpenSky, et
+**a demandé à l'agent de la station d'ajouter un conteneur d'envoi vers OpenSky**, à côté de
+`piaware` et `fr24`, sans toucher à l'existant (demande transmise le 30/09, en attente).
+
 ### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut ; confirmé sur trois bancs et en direct le 28/09)*
 
 **Le banc d'essai des modèles** (27/09) : les 665 transmissions de la séance du matin sur 124,350 +

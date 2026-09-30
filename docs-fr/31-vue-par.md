@@ -497,6 +497,26 @@ leur axe par le côté et traversent d'abord celui de la piste parallèle voisin
 08R, 184 entre 09L et 09R sur les deux jours. C'est la géométrie. Le juge unique de V7, qui fixerait
 la piste d'un avion une fois établi en finale, les ferait disparaître.
 
+**30/09 — OpenSky Network comme vérité indépendante (V7) : ce qu'on a appris.** Le propriétaire a
+créé un compte gratuit ; les identifiants de l'API sont dans `~/.config/atc-scribe/opensky.json`,
+hors du dépôt, et n'ont jamais été affichés. Script : `tools/runway-check/opensky_compare.py`
+(cache des réponses dans `~/.cache/atc-scribe/opensky/`, hors du dépôt : ce sont les données
+d'OpenSky, seuls des décomptes sont publiés).
+
+- **Ça marche pour un vol ancien** : la trajectoire d'un Istanbul–De Gaulle du 28/09 revient en
+  590 points, **les derniers au seuil de la 09L**, bien plus bas que la station ne le suit.
+- **Le coût dépend de l'âge des données** (documentation de l'API, vérifié) : 4 crédits pour moins
+  de 24 h, 30 pour un ou deux jours, 60 × N au-delà. Relevé : 180 crédits pour le vol du 28/09,
+  sur 4 000 par jour.
+- **Mais OpenSky traite les journées avec retard** : le 30/09 à 10 h, la liste des arrivées à De
+  Gaulle du 29/09 était vide, et la trajectoire d'un vol vu la veille à 15:08 UTC introuvable ;
+  même une trajectoire « en direct » d'un avion en approche est revenue introuvable (le service est
+  dit expérimental). En pratique, on ne peut vérifier qu'une vingtaine d'avions par jour.
+- **Demande transmise à l'agent de la station** (décision du propriétaire, 30/09) : ajouter un
+  conteneur d'envoi vers OpenSky, à côté de `piaware` et `fr24`, sans toucher à l'existant. Le
+  quota passerait à 8 000 crédits par jour. FlightAware AeroAPI, qui donne la piste directement,
+  reste la voie la plus rapide.
+
 **À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
 co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la
 protection du réseau local de macOS. Lancé depuis Terminal, il y arrive.
