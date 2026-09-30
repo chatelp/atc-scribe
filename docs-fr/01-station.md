@@ -33,13 +33,17 @@ problème, un flux IQ brut à 16 Mbit/s non.
 | **VHF aéro 118-137 MHz** | index `1`, série `vhf` | RTLSDR-Airband **ou** SDR++ à distance, jamais les deux |
 
 > ⚠️ **La chaîne ADS-B ne doit jamais être touchée.** Elle alimente FlightAware et
-> Flightradar24 en continu et participe à la multilatération avec 161 récepteurs
-> voisins. Une erreur de position y injecte des microsecondes d'erreur chez tous les
-> autres.
+> Flightradar24 en continu, **et OpenSky Network depuis le 30/09** (service `opensky`,
+> ajouté par l'agent de la station avec l'accord du propriétaire, MLAT comprise, position
+> masquée ; les neuf services existants n'ont pas été redémarrés — compte rendu dans
+> `station/echanges/station-vers-atc-scribe-2026-09-30-opensky.md`), et participe à la
+> multilatération avec 161 récepteurs voisins. Une erreur de position y injecte des
+> microsecondes d'erreur chez tous les autres.
 
 ## Ce que la station expose déjà
 
-Onze services Docker dans `/opt/adsb/docker-compose.yml`, neuf en permanence.
+Onze services Docker dans `/opt/adsb/docker-compose.yml`, neuf en permanence ; **douze et dix
+depuis le 30/09**, avec `opensky`.
 Les noms d'hôte `*.lan` sont résolus par un Pi-hole en 192.168.1.2 — **depuis le M4 ils
 fonctionnent ; depuis un conteneur ou une machine tierce, utiliser l'IP.**
 
