@@ -298,11 +298,11 @@ ci-dessous au moment où elle est faite.
 | 2 | **Géométrie** : distance le long de l'axe, écart latéral, angle d'élévation, test du cône, piste la plus proche | 11 tests `node --test` ✅ ; **reste** : sur une heure de trajectoires de la base, les avions posés sur une piste sont sur cette piste à 5 NM du seuil dans au moins 98 % des cas, et la part des départs gardés jusqu'à 10 NM | 🟡 |
 | 3 | **Cadre d'une piste, sans avion** : axe gradué en niveaux et en pieds, transition, pente et tolérances, bande d'azimut | vu en direct le 29/09 à Orly et De Gaulle (journal) | ✅ |
 | 4 | **Avions en direct** : symbole, étiquette, flèche verticale, traîne, couleurs de phase, clic | vu en direct le 29/09 ; **reste** la mesure de la correction du QNH au toucher (±100 ft de l'altitude du seuil sur une journée d'atterrissages) | 🟡 |
-| 5 | **Pistes empilées** : pistes en service en tête, repli, masquage, retournement quand le sens change | pistes en service en tête (plusieurs à De Gaulle) et repli vus le 29/09 ; **reste** un changement de sens observé en direct ou rejoué | 🟡 |
+| 5 | **Pistes empilées** : pistes en service en tête, repli, masquage, retournement quand le sens change | pistes en service en tête (plusieurs à De Gaulle) et repli vus le 29/09 ; **retournement vu en direct le 30/09 au soir**, De Gaulle passé face à l'ouest : « 08R → 26L » est devenu « 26L → 08R » | ✅ |
 | 6 | **Niveau visé et niveau entendu** : `nav_altitude_mcp` affiché ; le dernier niveau lu par la grammaire rattaché à l'avion et servi | niveau visé affiché ✅ ; **reste** le niveau entendu (côté Go) et le taux d'accord entendu / visé, à comparer au J2 du doc 29 | 🟡 |
 | 7 | **Un onglet par aéroport**, bascule avec la carte | Orly et De Gaulle basculés le 29/09 ; **reste** un avion dans les deux cônes vu dans les deux | 🟡 |
 | 8 | **Les réglages** : défauts dans `config.toml`, section du panneau, `runtime-settings.json`, portées générale, par aéroport et par extrémité de piste | tests Go de validation des bornes et de l'héritage (piste → aéroport → général) ; une valeur changée au panneau redessine la vue sans redémarrer ; un réglage enregistré avant reste valide | 🔲 |
-| 9 | **La piste de chaque avion, jugée par le serveur** (D69) : servie avec l'avion, affichée dans la feuille détaillée, utilisée par la vue PAR ; pistes en service comptées en avions | règle mesurée contre FlightAware avant d'être codée (99,93 % à De Gaulle, 100 % à Orly) ✅ ; 8 tests Go sur les coordonnées réelles ✅ ; **reste** la vérification en direct | 🟡 |
+| 9 | **La piste de chaque avion, jugée par le serveur** (D69) : servie avec l'avion, affichée dans la feuille détaillée, utilisée par la vue PAR ; pistes en service comptées en avions | règle mesurée contre FlightAware avant d'être codée (99,93 % à De Gaulle, 100 % à Orly) ✅ ; 8 tests Go ✅ ; vu en direct le 30/09 au soir ✅ ; **reste** les verdicts de la nuit comparés à FlightAware, départs compris | 🟡 |
 
 États : 🔲 à faire · 🟡 en cours · ✅ fait.
 
@@ -584,6 +584,26 @@ voit le toucher, et la lecture dès 8 NM suffit pour un juge unique par avion (V
 - **Reste à vérifier en direct** : une instance de test, la feuille détaillée et les symboles de la
   vue sur du trafic réel.
 
-**À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
+**30/09, 21:10-21:30 — le juge vu en direct**, sur une instance de test relancée depuis
+`runs/par-test/`. Le redémarrage du Mac à 20:52 (installation de macOS 27.0.1) avait vidé `/tmp`,
+et avec lui l'instance précédente et ses bases du 29 et du 30/09 ; leurs résultats sont consignés
+plus haut, mais on ne peut plus les rejouer.
+
+- **Feuille détaillée** : « Runway: Arriving 25 (LFPO) » pour TAP438T, en approche sur Orly.
+- **Un départ de la 20 d'Orly** (TVF37LC), vérifié sur sa trajectoire : sur l'axe à 4-13 m, de 1,4 à
+  5,3 NM au-delà du bout 02, cap 198, en montée de 2 200 à 4 700 ft.
+- **Vue PAR, De Gaulle face à l'ouest** :
+  - pleins : AFR99ZC « landing on 26L », AFR22CT « took off from 26R », AFR69DF « took off from
+    27L » ; c'est la répartition de De Gaulle face à l'ouest, atterrissages sur les pistes
+    extérieures et décollages sur les intérieures ;
+  - creux : KQA114, dans le cône sans être établi.
+- **En-tête** : « Runways in use 27R 50 % · 26L 50 % ».
+- **Le cadre s'est retourné** avec le changement de sens (étape 5).
+- **Les verdicts de la nuit** sont enregistrés par `tools/runway-check/judge_log.py` dans
+  `runs/par-test/verdicts.jsonl`, pour être comparés à FlightAware au matin, départs compris
+  (`actual_runway_off`).
+
+**À savoir pour lancer une instance de test** : la mettre sous `runs/` (ignoré par git), jamais dans
+`/tmp`, que macOS vide à chaque redémarrage. Lancé depuis la session de l'agent, le binaire
 co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la
 protection du réseau local de macOS. Lancé depuis Terminal, il y arrive.
