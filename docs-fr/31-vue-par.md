@@ -517,6 +517,44 @@ d'OpenSky, seuls des décomptes sont publiés).
   quota passerait à 8 000 crédits par jour. FlightAware AeroAPI, qui donne la piste directement,
   reste la voie la plus rapide.
 
+**30/09 — la validation indépendante (V7) : FlightAware confirme la règle.** Clé AeroAPI du
+propriétaire dans `~/.config/atc-scribe/aeroapi.key`, hors du dépôt, jamais affichée ; réponses en
+cache dans `~/.cache/atc-scribe/aeroapi/`, hors du dépôt (licence Personal : usage personnel, seuls
+des décomptes sont publiés). Script : `tools/runway-check/aeroapi_compare.py`. Coût : 196 pages,
+**0,98 $**. FlightAware donne `actual_runway_on`, la piste d'atterrissage réelle, pour chaque vol :
+il voit le toucher, pas nous.
+
+Six journées (23, 24, 25, 28, 29 et 30/09), approches suivies à moins de 6 NM du seuil. L'appariement
+se fait par indicatif et par heure. La station entend l'**indicatif radio** (AFR16MC), et
+FlightAware range le vol sous son numéro (AFR1234), avec l'indicatif radio en `atc_ident` : faute de
+ce champ, 60 % des vols manquaient au premier passage. Retrouvés : **1 501 sur 1 566 à De Gaulle,
+446 sur 453 à Orly.**
+
+| | De Gaulle | Orly |
+|---|---|---|
+| Axe le plus proche au dernier point vu = piste réelle | **1 495 sur 1 501 (99,6 %)** | **445 sur 446 (99,8 %)** |
+| Axe le plus proche dès 8 NM = piste réelle | 1 493 sur 1 501 (99,5 %) | 446 sur 446 (100 %) |
+| Points de finale justes, ancienne règle (seuil le plus proche) | **3,5 %** | 95,1 % |
+| Points de finale justes, règle de D68 | **99,5 %** | 100,0 % |
+
+Les huit désaccords restants à De Gaulle, à regarder un par un :
+- **Un vrai changement de piste tardif**, que FlightAware confirme : FPO4UD, sur l'axe de la 09L à
+  8 NM, posé sur la 09R. Le dernier point de la station le donnait déjà sur la 09R.
+- **Des désaccords qui ressemblent à des erreurs de FlightAware**, dont la piste est donnée « quand
+  elle est connue » :
+  - CPA261 un autre jour : co-atc dit 08L, FlightAware dit 27L, soit le sens opposé ;
+  - HVN19 et SAS73C : co-atc les voit sur la 09R à 3,5 et 4,7 NM, FlightAware dit 08R, de l'autre
+    paire, à 1,6 NM de là.
+- **Quatre cas entre les deux pistes d'une même paire, à trancher** : AFR41WP, CPA261, MAU14 et
+  AFR39PA.
+
+À Orly, le seul désaccord (VLG33CT) donne raison à la lecture à 8 NM : 07, comme FlightAware. Le
+dernier point, à 2,2 NM, disait 06 : près d'Orly, les axes de la 06 et de la 07 se rapprochent.
+
+**Conclusion** : la règle de l'axe le plus proche est validée contre une source indépendante qui
+voit le toucher, et la lecture dès 8 NM suffit pour un juge unique par avion (V7), à 99,5 % et
+100 %. L'ancienne règle se trompait à De Gaulle pour 96,5 % des points.
+
 **À savoir pour lancer une instance de test** : lancé depuis la session de l'agent, le binaire
 co-atc n'atteint pas la station (« no route to host »), alors que `curl` y arrive. C'est la
 protection du réseau local de macOS. Lancé depuis Terminal, il y arrive.

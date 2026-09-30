@@ -3964,6 +3964,11 @@ corrigée : « 08R 60 % · 09L 35 % », les deux pistes d'atterrissage.
 parallèle dont le seuil est jusqu'à 1 NM au-delà des 10 NM peut concourir. Sans cette marge, le
 premier demi-mille de chaque finale de la 09L allait encore à la 09R. Orly : 90,2 % puis 99,5 %.
 
+**Validé le 30/09 contre FlightAware** (AeroAPI, piste d'atterrissage réelle, compte du
+propriétaire ; `tools/runway-check/aeroapi_compare.py`, doc 31) : sur six journées, la piste donnée
+par l'axe le plus proche est la bonne pour **1 495 arrivées sur 1 501 à De Gaulle (99,6 %)** et
+445 sur 446 à Orly ; point par point en finale, 99,5 % contre **3,5 %** pour l'ancienne règle.
+
 **Contribuable** tel quel à l'amont : le défaut touche tout aéroport à pistes parallèles décalées.
 La production le prendra au prochain lancement, avec un binaire reconstruit.
 
