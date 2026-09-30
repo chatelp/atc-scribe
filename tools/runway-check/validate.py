@@ -175,4 +175,5 @@ def main():
             for x in [x for x in got if x[key] != x['truth']][:5]:
                 print(f"       {x['flight'] or x['hex']}: {x[key]} at {lab}, {x['truth']} at the last point ({x['last_d']:.1f} NM)")
 
-main()
+if __name__ == '__main__':
+    main()
