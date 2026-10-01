@@ -4858,7 +4858,11 @@ laisser croire que la station l'a reçu.
 station, avec l'accord direct du propriétaire : service `opensky` démarré seul, MLAT comprise
 (choix du propriétaire, position masquée), 1,7 % d'un cœur et 14 Mo ; les neuf services
 existants n'ont pas redémarré. Le quota d'API doit passer de 4 000 à 8 000 crédits par jour :
-à relever en début de journée, le statut étant recalculé toutes les deux heures.
+à relever en début de journée, le statut étant recalculé toutes les deux heures. **Relevé le 01/10 à
+02:10** : 3 999 crédits restants, toujours le palier standard. OpenSky réserve les 8 000 aux
+récepteurs actifs **au moins 30 % du mois** (documentation de l'API) ; la station n'alimente que
+depuis le 30/09 à 10:20, il faut donc compter une dizaine de jours. À relever de nouveau vers le
+10/10.
 
 ### Q50 — L'aiguillage vers le modèle français, mesuré au banc *(27/09 — codé, désactivé par défaut ; confirmé sur trois bancs et en direct le 28/09)*
 
