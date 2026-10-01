@@ -4836,6 +4836,35 @@ la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1
 La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
 validée contre `actual_runway_off`.
 
+### D70 — co-atc joignable par le réseau local, connexion obligatoire *(01/10)*
+
+**Besoin du propriétaire** : en voyage, il passera par un VPN vers le réseau de la maison, et
+voudra ouvrir co-atc comme les autres outils (*« si co-atc est dispo uniquement via localhost je
+ne pourrais pas y accéder correctement avec mon VPN »*). co-atc n'écoutait que sur le Mac
+(`host = "127.0.0.1"`), en accès « local », sans mot de passe (D51).
+
+**Choix du propriétaire**, sur trois options proposées (réseau avec mot de passe rangé, réseau
+avec mot de passe tapé, tunnel SSH sans rien ouvrir) : **le réseau, avec le mot de passe rangé.**
+
+- `configs/config.toml` : `host = "0.0.0.0"`. co-atc refuse alors de lui-même l'accès « local »
+  sans mot de passe : il le réserve à un serveur qui n'écoute que sur la boucle locale. Il
+  **demande la connexion à tout client, le Mac compris**, et refuserait de démarrer sans compte.
+- `configs/users.json` : accès « compte ». Le compte existant et son empreinte Argon2id sont
+  inchangés.
+- **Le mot de passe est rangé** dans `~/.config/atc-scribe/coatc-password` (mode 600, hors du
+  dépôt), par `runs/ranger-mot-de-passe.command`, qui le demande sans l'afficher. Le script de
+  production le lit, le vérifie auprès de co-atc, puis le passe à la liaison avec la station
+  par l'environnement. Sans fichier ou s'il est refusé, il le demande dans Terminal, comme
+  avant. La production et les scripts de nuit démarrent ainsi sans personne au clavier.
+- **Vérifié** sur l'instance de test, ouverte de la même façon : sans connexion, les données
+  sont refusées (401, « authentication required »), depuis l'adresse réseau comme depuis le Mac ;
+  la page d'accueil et l'état de connexion répondent.
+- Le pare-feu du Mac est désactivé : rien à autoriser. Le sidecar de transcription reste sur la
+  boucle locale (127.0.0.1:8178).
+- Sauvegardes d'avant : `runs/config.toml.avant-d70`, `runs/users.json.avant-d70`.
+- D5 tient : le service reste sur le réseau local, que le VPN prolonge ; rien n'est ouvert vers
+  internet.
+
 ### Q51 — Une source ADS-B externe en renfort de la station, quand elle perd un avion *(29/09 — ouverte)*
 
 Idée du propriétaire : *« on pourrait d'ailleurs basculer automatiquement vers une API quand on perd
