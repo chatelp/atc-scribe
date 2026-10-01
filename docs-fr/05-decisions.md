@@ -4810,7 +4810,7 @@ hachage varie d'un facteur 10 à 30 d'une tranche de dix minutes à l'autre, ce 
 un samedi, et 123,875 est hors de la plage d'accord de l'antenne (124,5-126,5 MHz). **Le réglage est
 gardé.**
 
-### D69 — Un seul juge de la piste d'un avion : le serveur *(30/09 — décidé et construit le même jour ; reste à vérifier en direct, doc 31)*
+### D69 — Un seul juge de la piste d'un avion : le serveur *(30/09 — décidé et construit le même jour ; **validé en direct la nuit suivante : 368 verdicts sur 368 conformes à FlightAware, arrivées et départs**, doc 31)*
 
 **Demande du propriétaire** (29/09) : afficher dans la feuille détaillée la piste d'arrivée ou de
 départ d'un avion, *« évidemment ça doit être cohérent partout (entre les PAR, la feuille détaillée,

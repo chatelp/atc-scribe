@@ -302,7 +302,7 @@ ci-dessous au moment où elle est faite.
 | 6 | **Niveau visé et niveau entendu** : `nav_altitude_mcp` affiché ; le dernier niveau lu par la grammaire rattaché à l'avion et servi | niveau visé affiché ✅ ; **reste** le niveau entendu (côté Go) et le taux d'accord entendu / visé, à comparer au J2 du doc 29 | 🟡 |
 | 7 | **Un onglet par aéroport**, bascule avec la carte | Orly et De Gaulle basculés le 29/09 ; **reste** un avion dans les deux cônes vu dans les deux | 🟡 |
 | 8 | **Les réglages** : défauts dans `config.toml`, section du panneau, `runtime-settings.json`, portées générale, par aéroport et par extrémité de piste | tests Go de validation des bornes et de l'héritage (piste → aéroport → général) ; une valeur changée au panneau redessine la vue sans redémarrer ; un réglage enregistré avant reste valide | 🔲 |
-| 9 | **La piste de chaque avion, jugée par le serveur** (D69) : servie avec l'avion, affichée dans la feuille détaillée, utilisée par la vue PAR ; pistes en service comptées en avions | règle mesurée contre FlightAware avant d'être codée (99,93 % à De Gaulle, 100 % à Orly) ✅ ; 8 tests Go ✅ ; vu en direct le 30/09 au soir ✅ ; **reste** les verdicts de la nuit comparés à FlightAware, départs compris | 🟡 |
+| 9 | **La piste de chaque avion, jugée par le serveur** (D69) : servie avec l'avion, affichée dans la feuille détaillée, utilisée par la vue PAR ; pistes en service comptées en avions | règle mesurée contre FlightAware avant d'être codée ✅ ; 8 tests Go ✅ ; vu en direct le 30/09 ✅ ; **verdicts de la nuit du 30/09 : 368 sur 368 conformes à FlightAware, arrivées et départs** ✅ | ✅ |
 
 États : 🔲 à faire · 🟡 en cours · ✅ fait.
 
@@ -602,6 +602,26 @@ plus haut, mais on ne peut plus les rejouer.
 - **Les verdicts de la nuit** sont enregistrés par `tools/runway-check/judge_log.py` dans
   `runs/par-test/verdicts.jsonl`, pour être comparés à FlightAware au matin, départs compris
   (`actual_runway_off`).
+
+**01/10, matin — le juge validé en direct, sur une nuit, contre FlightAware.** Verdicts
+enregistrés de 21:10 à 07:29 par `judge_log.py` (445 verdicts) et comparés par
+`tools/runway-check/judge_vs_aeroapi.py` à la piste réelle d'atterrissage (`actual_runway_on`)
+et de décollage (`actual_runway_off`). Coût : 73 pages, 0,36 $.
+
+| | Verdicts | Retrouvés chez FlightAware | Concordants |
+|---|---|---|---|
+| Arrivées De Gaulle | 170 | 162 | **162 sur 162** |
+| Arrivées Orly | 53 | 52 | **52 sur 52** |
+| Départs De Gaulle | 125 | 117 | **117 sur 117** |
+| Départs Orly | 38 | 37 | **37 sur 37** |
+
+**368 verdicts sur 368 justes.** C'est le code du serveur lui-même qui est vérifié ici, départs compris,
+là où la mesure du 30/09 vérifiait la règle hors ligne, sur les seules arrivées. De Gaulle était face
+à l'ouest toute la nuit.
+
+**Couverture** : 222 avions sont passés en approche (phase APP) avant d'avoir un verdict. **Trois
+seulement n'en ont jamais eu** (NJE089B et DAL224 à De Gaulle, TVF62SF à Orly) ; les autres ont été
+jugés une fois établis sur l'axe.
 
 **À savoir pour lancer une instance de test** : la mettre sous `runs/` (ignoré par git), jamais dans
 `/tmp`, que macOS vide à chaque redémarrage. Lancé depuis la session de l'agent, le binaire

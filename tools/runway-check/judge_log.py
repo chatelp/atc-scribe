@@ -11,7 +11,7 @@ import argparse
 import json
 import time
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
     failures = 0
     with open(a.out, 'a') as out:
         while datetime.now() < stop:
-            t = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+            t = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
             try:
                 d = json.load(urllib.request.urlopen(a.base + '/api/v1/aircraft', timeout=15))
                 failures = 0
