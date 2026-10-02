@@ -10,6 +10,18 @@ Données : `whisper-lab/audio/2026-09-24-gros-porteurs-par-canal/` (16 fichiers,
 dans `CORPUS.md`). Analyse : `whisper-lab/scripts/station/par-canal-analyse.py`, résultat dans
 `resultats/station/2026-09-24-par-canal.json`.
 
+> **Révisé le 02/10 : 126,425 ne bat plus.** Relevés de la station, une mesure toutes les 15 s,
+> signal moins bruit tiré des statistiques d'airband, une heure par paire. 126,425 (avec 124,350,
+> 14:45-15:47) : 0,2 battement/min, bruit −44,4 dBFS, le plus bas mesuré, 38 échantillons sur 124
+> ouverts à 30 dB et plus. 125,825 (avec 124,350, 13:34-14:34) reste mauvaise : 3,7 battements/min,
+> bruit −38,9 dBFS, 83 ouvertures sur 105 entre 10 et 15 dB, juste au-dessus du squelch. La
+> station relevait déjà 0 battement sur 126,425 le 26/09 et le 28/09 : les 8 919 du 24/09 ne se
+> sont pas reproduits. Côté transcription, même heure : 126,425 donne 260 transmissions dont 25 %
+> avec un avion reconnu, contre 95 et 18 % pour 125,825 l'heure précédente ; 124,350 donne 33 à
+> 40 %. Ces taux ne sont pas appariés (trafics et heures différents). **124,350 + 126,425 est la
+> meilleure paire des trois mesurées le 02/10** ; 124,625 n'avait rien émis en 4 min. Ce qui suit
+> reste la mesure du 24/09.
+
 ## En bref
 
 **Deux canaux sont sains, deux ne le sont pas, et ce sont les mêmes pour les deux défauts.**
