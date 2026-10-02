@@ -5279,11 +5279,19 @@ async initAircraftDataSource() {
                 const data = await response.json();
                 const next = (data && data.frequencies) || [];
                 const kept = new Set(next.map(f => String(f.id)));
+                const before = new Set(this.audioFrequencies.map(f => String(f.id)));
                 this.audioFrequencies.forEach(f => {
                     if (!kept.has(String(f.id)) && audioClient) audioClient.cleanupFrequency(String(f.id));
                 });
                 this.audioFrequencies = next;
                 this.prepareAllFrequencies();
+                // Once the radios are started, a frequency that arrives later is
+                // connected like those there at the start. Prepared alone it has
+                // no source: unmuting its tile played an empty element, silently
+                // (02/10, after the station switched channels).
+                if (this.radiosStarted) {
+                    next.filter(f => !before.has(String(f.id))).forEach(f => this.connectToFrequency(f));
+                }
             } catch (e) {
                 console.error('Failed to refresh frequencies:', e);
             }
