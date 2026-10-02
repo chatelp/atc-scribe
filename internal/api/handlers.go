@@ -1540,7 +1540,10 @@ func (h *Handler) StreamAudio(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "audio/wav")
 	w.Header().Set("Cache-Control", "no-cache, no-store")
 	w.Header().Set("Transfer-Encoding", "chunked")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// No "Access-Control-Allow-Origin: *" here: the CORS middleware has already
+	// named the page's origin and allowed credentials, which is what a stream
+	// fetched with its session cookie from another port needs -- a browser
+	// refuses "*" on a request that carries credentials.
 	w.Header().Set("Connection", "keep-alive")                // Add keep-alive
 	w.Header().Set("Keep-Alive", "timeout=86400, max=604800") // Add keep-alive timeout
 
