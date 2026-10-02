@@ -4865,6 +4865,21 @@ avec mot de passe tapé, tunnel SSH sans rien ouvrir) : **le réseau, avec le mo
 - D5 tient : le service reste sur le réseau local, que le VPN prolonge ; rien n'est ouvert vers
   internet.
 
+**Conséquence constatée le 02/10 : plus de son dans la page, les transcriptions arrivant.** co-atc
+répartit les flux audio sur ses ports annexes (8001 à 8004) ; le lecteur de la page les demandait
+en mode `anonymous`, qui n'envoie pas le cookie de session vers une autre origine, et la réponse du
+flux portait `Access-Control-Allow-Origin: *`, que le navigateur refuse avec un cookie. Tant que
+l'accès « local » dispensait la boucle locale de connexion, rien ne se voyait ; avec la connexion
+obligatoire, chaque flux recevait un 401 que le journal ne note pas. Corrigé : lecteur en
+`use-credentials`, flux sans `*` (l'origine exacte et `Allow-Credentials` viennent déjà du
+middleware CORS). Le cookie reste `SameSite=Strict` : seule une page du même hôte l'envoie.
+Second défaut trouvé au passage, sans lien avec D70 : une fréquence arrivée après « Start
+Monitoring » (bascule de la station) était préparée sans source, et cliquer sa tuile ne jouait
+rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'essai avec compte
+(`runs/son-test/`, ports 8020, 8023, 8024 ; le 8021 est pris par un service système) : flux des
+ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
+sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
+
 ### Q51 — Une source ADS-B externe en renfort de la station, quand elle perd un avion *(29/09 — ouverte)*
 
 Idée du propriétaire : *« on pourrait d'ailleurs basculer automatiquement vers une API quand on perd

@@ -67,7 +67,11 @@ class AudioClient {
         this.initAudioContext();
 
         const audioElement = document.createElement('audio');
-        audioElement.crossOrigin = 'anonymous';
+        // Streams are spread over the server's additional ports, a different
+        // origin from the page: "anonymous" sends no cookie there, and with
+        // sign-in required every stream was refused while the transcriptions,
+        // on the page's own port, kept arriving (02/10).
+        audioElement.crossOrigin = 'use-credentials';
         audioElement.preload = 'metadata';
         audioElement.playsInline = true;
 
