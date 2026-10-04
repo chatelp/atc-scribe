@@ -19,17 +19,17 @@ class AudioClient {
         this.audioDataArrays = {};
         this.visualizationFrameIds = {};
         this.sourceNodes = {};
+        this.gainNodes = {};
         this.userSetVolumes = {};
         this.lastSignificantAudioTime = {};
         this.secondsSinceLastAudio = {};
 
-        this.mutedVolume = 0.01;
         this.defaultVolume = 1.0;
         this.visualizationTargetFps = 30;
-        this.significantAudioThresholdUnmuted = 0.10;
-        this.significantAudioThresholdMuted = 0.02;
-        this.visualizerMultiplierUnmuted = 150;
-        this.visualizerMultiplierMutedFactor = 5;
+        // The analyser sits before the mute gain, so it sees the same signal
+        // whether a frequency is muted or not: one threshold, one multiplier.
+        this.significantAudioThreshold = 0.10;
+        this.visualizerMultiplier = 150;
     }
 
     /**
@@ -130,9 +130,7 @@ class AudioClient {
         const audioElement = audioInfo.element;
         const intendedSrc = audioInfo.intendedSrc;
 
-        audioElement.volume = this.store.unmutedFrequencies.has(frequencyId)
-            ? (this.userSetVolumes[frequencyId] || this.defaultVolume)
-            : this.mutedVolume;
+        this._applyMute(frequencyId);
 
         if (audioElement.currentSrc !== intendedSrc) {
             audioElement.src = intendedSrc;
@@ -204,8 +202,10 @@ class AudioClient {
 
         this._safeDisconnectNode(this.sourceNodes[frequencyId]);
         this._safeDisconnectNode(this.audioAnalysers[frequencyId]);
+        this._safeDisconnectNode(this.gainNodes[frequencyId]);
         delete this.sourceNodes[frequencyId];
         delete this.audioAnalysers[frequencyId];
+        delete this.gainNodes[frequencyId];
 
         try {
             const sourceNode = this.audioContext.createMediaElementSource(audioElement);
@@ -218,14 +218,44 @@ class AudioClient {
 
             this.audioDataArrays[frequencyId] = new Uint8Array(analyserNode.frequencyBinCount);
 
+            const gainNode = this.audioContext.createGain();
+            this.gainNodes[frequencyId] = gainNode;
+
             sourceNode.connect(analyserNode);
-            analyserNode.connect(this.audioContext.destination);
+            analyserNode.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            this._applyMute(frequencyId);
         } catch (e) {
             console.error(`Error setting up visualization for ${frequencyId}:`, e);
             this._safeDisconnectNode(this.sourceNodes[frequencyId]);
             this._safeDisconnectNode(this.audioAnalysers[frequencyId]);
+            this._safeDisconnectNode(this.gainNodes[frequencyId]);
             delete this.sourceNodes[frequencyId];
             delete this.audioAnalysers[frequencyId];
+            delete this.gainNodes[frequencyId];
+        }
+    }
+
+    /**
+     * Silence or restore a frequency's output.
+     *
+     * The mute is a gain after the analyser: the level bar keeps the whole
+     * signal and the output is silent. Upstream lowered the element's volume
+     * to 0.01 instead, so that the bar still had something to show, which left
+     * a muted channel audible at -40 dB under the others (04/10). Without Web
+     * Audio there is no gain node, and the element itself goes to 0.
+     * @param {string} frequencyId
+     */
+    _applyMute(frequencyId) {
+        const unmuted = this.store.unmutedFrequencies.has(frequencyId);
+        const gainNode = this.gainNodes[frequencyId];
+        if (gainNode) {
+            gainNode.gain.value = unmuted ? 1 : 0;
+        }
+        const audioElement = this.audioElements[frequencyId]?.element;
+        if (audioElement) {
+            const volume = this.userSetVolumes[frequencyId] || this.defaultVolume;
+            audioElement.volume = (gainNode || unmuted) ? volume : 0;
         }
     }
 
@@ -274,20 +304,14 @@ class AudioClient {
             const audioLevel = totalPoints > 0 ? (totalSum / totalPoints) / 255 : 0;
 
             const isUnmuted = this.store.unmutedFrequencies.has(frequencyId);
-            const significantAudioThreshold = isUnmuted
-                ? this.significantAudioThresholdUnmuted
-                : this.significantAudioThresholdMuted;
-            const visualizerMultiplier = isUnmuted
-                ? this.visualizerMultiplierUnmuted
-                : (this.visualizerMultiplierUnmuted * this.visualizerMultiplierMutedFactor);
 
-            if (audioLevel >= significantAudioThreshold) {
+            if (audioLevel >= this.significantAudioThreshold) {
                 this.lastSignificantAudioTime[frequencyId] = Date.now();
             } else if (!this.lastSignificantAudioTime[frequencyId]) {
                 this.lastSignificantAudioTime[frequencyId] = Date.now();
             }
 
-            const widthPercentage = Math.min(100, audioLevel * visualizerMultiplier);
+            const widthPercentage = Math.min(100, audioLevel * this.visualizerMultiplier);
             
             const barElement = document.getElementById(`vis-bar-${frequencyId}`);
             if (barElement) {
@@ -350,13 +374,11 @@ class AudioClient {
         const isCurrentlyUnmuted = this.store.unmutedFrequencies.has(frequencyId);
 
         if (isCurrentlyUnmuted) {
-            this.userSetVolumes[frequencyId] = audioElement.volume > this.mutedVolume ? audioElement.volume : this.defaultVolume;
-            audioElement.volume = this.mutedVolume;
             this.store.unmutedFrequencies.delete(frequencyId);
         } else {
-            audioElement.volume = this.userSetVolumes[frequencyId] || this.defaultVolume;
             this.store.unmutedFrequencies.add(frequencyId);
         }
+        this._applyMute(frequencyId);
 
         if (audioElement.paused && this.store.unmutedFrequencies.has(frequencyId) && this.store.radiosStarted) {
             setTimeout(() => {
@@ -380,9 +402,11 @@ class AudioClient {
 
         this._safeDisconnectNode(this.audioAnalysers[frequencyId]);
         this._safeDisconnectNode(this.sourceNodes[frequencyId]);
+        this._safeDisconnectNode(this.gainNodes[frequencyId]);
 
         delete this.audioAnalysers[frequencyId];
         delete this.sourceNodes[frequencyId];
+        delete this.gainNodes[frequencyId];
 
         if (this.audioDataArrays[frequencyId]) {
             delete this.audioDataArrays[frequencyId];
