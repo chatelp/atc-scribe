@@ -108,6 +108,25 @@
                         </button>
                         
                         <div class="p-4 h-full overflow-y-auto overflow-x-hidden bg-panel">
+                            <!-- Who is signed in, and the way out: there was none. First in the
+                                 panel, not with Access at its bottom, so that it is found. Shown
+                                 only when sign-in is required. -->
+                            <div x-data="{ user: null, busy: false }"
+                                 x-init="fetch('/api/v1/auth/status', { credentials: 'same-origin' })
+                                     .then(r => r.ok ? r.json() : null)
+                                     .then(s => { if (s && s.enabled && s.authenticated && s.user) user = s.user; })
+                                     .catch(() => {})"
+                                 x-show="user"
+                                 class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                <span class="opacity-80">Signed in as <span class="text-highlight" x-text="user"></span></span>
+                                <button :disabled="busy"
+                                        @click="busy = true; fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' })
+                                            .finally(() => location.reload())"
+                                        class="shrink-0 px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
+                                    <i class="fas fa-right-from-bracket mr-1"></i>Sign out
+                                </button>
+                            </div>
+
                             <!-- Display Settings -->
                             <section class="mb-5">
                                 <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Display</h3>
