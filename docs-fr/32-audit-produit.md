@@ -296,8 +296,10 @@ programmation d'écoute par plage horaire (E2).
    récepteur puisse utiliser le dépôt public, ou les retirer. Mon avis : garder les sources
    ADS-B (c'est 720 lignes et c'est ce qui rend le dépôt utile à d'autres), retirer SRT.
 3. **La langue de l'interface** : anglais (`lang="en"`, dépôt public) ou français pour lui.
-   Mon avis : l'interface reste en anglais, mais les aides au survol et les clairances en clair
-   (3.5, 3.7) existent dans les deux langues, la sienne d'abord.
+   **Tranché le 10/10 : l'interface reste en anglais à ce stade.** Exception : l'interprétation
+   logique d'une communication (clairances en clair, 3.5) suit la langue de la communication,
+   donc en français quand la transmission est en français. Une version en/fr de l'interface
+   viendra dans un second temps ; d'ici là, pas de chaîne traduite à la volée ni de mélange.
 4. **Le fond de carte par défaut** : Carto sombre (déjà en cache par le service worker) ou OSM.
 5. **L'ordre** : les paliers 0, 1 et 2 d'abord (≈ 5 j, l'interface s'allège et ses deux
    griefs disparaissent), puis le palier 3 (ce qu'atc-scribe sait et ne montre pas). C'est
