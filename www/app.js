@@ -1295,69 +1295,28 @@ document.addEventListener('alpine:init', () => {
             return `${before}<span class="border-b border-red-400">${match}</span>${after}`;
         },
 
-        // Cycle to next aircraft in the filtered list
-        cycleToNextAircraft() {
+        // Select the next (step 1) or previous (step -1) aircraft of the filtered
+        // list, wrapping around. With none selected, or the selected one filtered
+        // out, start from the first (next) or the last (previous).
+        cycleAircraft(step) {
             const filtered = this.filteredAircraft;
             if (filtered.length === 0) return;
-            
-            if (!this.selectedAircraft) {
-                // Select first aircraft
-                this.selectedAircraft = filtered[0];
-                if (this.mapManager) {
-                    this.mapManager.updateVisualState(filtered[0].hex, true);
-                    this.mapManager.centerOnAircraft(filtered[0]);
-                }
-                return;
-            }
-            
-            // Find current aircraft index
-            const currentIndex = filtered.findIndex(aircraft => aircraft.hex === this.selectedAircraft.hex);
-            if (currentIndex === -1) {
-                // Current aircraft not in filtered list, select first
-                this.selectedAircraft = filtered[0];
-            } else {
-                // Select next aircraft (wrap around to beginning)
-                const nextIndex = (currentIndex + 1) % filtered.length;
-                this.selectedAircraft = filtered[nextIndex];
-            }
-            
-            if (this.mapManager) {
-                this.mapManager.updateVisualState(this.selectedAircraft.hex, true);
-                this.mapManager.centerOnAircraft(this.selectedAircraft);
-            }
-        },
 
-        // Cycle to previous aircraft in the filtered list
-        cycleToPreviousAircraft() {
-            const filtered = this.filteredAircraft;
-            if (filtered.length === 0) return;
-            
-            if (!this.selectedAircraft) {
-                // Select last aircraft
-                this.selectedAircraft = filtered[filtered.length - 1];
-                if (this.mapManager) {
-                    this.mapManager.updateVisualState(filtered[filtered.length - 1].hex, true);
-                    this.mapManager.centerOnAircraft(filtered[filtered.length - 1]);
-                }
-                return;
-            }
-            
-            // Find current aircraft index
-            const currentIndex = filtered.findIndex(aircraft => aircraft.hex === this.selectedAircraft.hex);
-            if (currentIndex === -1) {
-                // Current aircraft not in filtered list, select last
-                this.selectedAircraft = filtered[filtered.length - 1];
-            } else {
-                // Select previous aircraft (wrap around to end)
-                const prevIndex = currentIndex === 0 ? filtered.length - 1 : currentIndex - 1;
-                this.selectedAircraft = filtered[prevIndex];
-            }
-            
+            const currentIndex = this.selectedAircraft
+                ? filtered.findIndex(aircraft => aircraft.hex === this.selectedAircraft.hex)
+                : -1;
+            const index = currentIndex === -1
+                ? (step > 0 ? 0 : filtered.length - 1)
+                : (currentIndex + step + filtered.length) % filtered.length;
+            this.selectedAircraft = filtered[index];
+
             if (this.mapManager) {
                 this.mapManager.updateVisualState(this.selectedAircraft.hex, true);
                 this.mapManager.centerOnAircraft(this.selectedAircraft);
             }
         },
+        cycleToNextAircraft() { this.cycleAircraft(1); },
+        cycleToPreviousAircraft() { this.cycleAircraft(-1); },
 
         // Properties for Aircraft Details Panel (moved from x-data in HTML)
         aircraftDetailsShowHistoryView: false,
@@ -2248,82 +2207,33 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        toggleAirports() {
+        // A map layer whose visibility and opacity are settings: save them, then
+        // apply the one that changed. settingKey names it in this.settings.
+        applyLayerVisibility(layerId, settingKey) {
             this.saveSettings();
             if (this.mapManager) {
-                this.mapManager.toggleLayerVisibility('airports', this.settings.showAirports);
+                this.mapManager.toggleLayerVisibility(layerId, this.settings[settingKey]);
             }
         },
 
-        toggleHeliports() {
-            this.saveSettings();
-            if (this.mapManager) {
-                this.mapManager.toggleLayerVisibility('heliports', this.settings.showHeliports);
-            }
-        },
-
-        toggleNavaids() {
-            this.saveSettings();
-            if (this.mapManager) {
-                this.mapManager.toggleLayerVisibility('navaids', this.settings.showNavaids);
-            }
-        },
-
-        toggleAllRunways() {
-            this.saveSettings();
-            if (this.mapManager) {
-                this.mapManager.toggleLayerVisibility('allRunways', this.settings.showAllRunways);
-            }
-        },
-
-        toggleAirspaceBoundaries() {
-            this.saveSettings();
-            if (this.mapManager) {
-                this.mapManager.toggleLayerVisibility('airspace-polygons', this.settings.showAirspaceBoundaries);
-            }
-        },
-
-        setAirspaceOpacity() {
+        applyLayerOpacity(layerId, settingKey) {
             this.saveSettings();
             if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
-                this.mapManager.setLayerOpacity('airspace-polygons', this.settings.airspaceOpacity);
+                this.mapManager.setLayerOpacity(layerId, this.settings[settingKey]);
             }
         },
 
-        setRingsOpacity() {
-            this.saveSettings();
-            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
-                this.mapManager.setLayerOpacity('rangeRings', this.settings.ringsOpacity);
-            }
-        },
-
-        setAirportsOpacity() {
-            this.saveSettings();
-            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
-                this.mapManager.setLayerOpacity('airports', this.settings.airportsOpacity);
-            }
-        },
-
-        setHeliportsOpacity() {
-            this.saveSettings();
-            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
-                this.mapManager.setLayerOpacity('heliports', this.settings.heliportsOpacity);
-            }
-        },
-
-        setNavaidsOpacity() {
-            this.saveSettings();
-            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
-                this.mapManager.setLayerOpacity('navaids', this.settings.navaidsOpacity);
-            }
-        },
-
-        setAllRunwaysOpacity() {
-            this.saveSettings();
-            if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
-                this.mapManager.setLayerOpacity('allRunways', this.settings.allRunwaysOpacity);
-            }
-        },
+        toggleAirports() { this.applyLayerVisibility('airports', 'showAirports'); },
+        toggleHeliports() { this.applyLayerVisibility('heliports', 'showHeliports'); },
+        toggleNavaids() { this.applyLayerVisibility('navaids', 'showNavaids'); },
+        toggleAllRunways() { this.applyLayerVisibility('allRunways', 'showAllRunways'); },
+        toggleAirspaceBoundaries() { this.applyLayerVisibility('airspace-polygons', 'showAirspaceBoundaries'); },
+        setAirspaceOpacity() { this.applyLayerOpacity('airspace-polygons', 'airspaceOpacity'); },
+        setRingsOpacity() { this.applyLayerOpacity('rangeRings', 'ringsOpacity'); },
+        setAirportsOpacity() { this.applyLayerOpacity('airports', 'airportsOpacity'); },
+        setHeliportsOpacity() { this.applyLayerOpacity('heliports', 'heliportsOpacity'); },
+        setNavaidsOpacity() { this.applyLayerOpacity('navaids', 'navaidsOpacity'); },
+        setAllRunwaysOpacity() { this.applyLayerOpacity('allRunways', 'allRunwaysOpacity'); },
 
         applyMapDisplaySettings() {
             if (!this.mapManager) return;
@@ -4519,98 +4429,32 @@ async initAircraftDataSource() {
             return this.metar.trend[0];
         },
         
-        // Toggle METAR details visibility
-        toggleMetarDetails() {
-            // Initialize if undefined
-            if (this.metarDetailsVisible === undefined) {
-                this.metarDetailsVisible = false;
-            }
-            
-            // Toggle the state
-            this.metarDetailsVisible = !this.metarDetailsVisible;
-            
-            // Close other popups
-            this.tafDetailsVisible = false;
-            this.notamDetailsVisible = false;
-            
-            // Position the popup correctly if it's being opened
-            if (this.metarDetailsVisible) {
-                setTimeout(() => {
-                    const metarElement = document.querySelector('[data-metar-button]');
-                    const metarPopup = document.querySelector('[data-metar-popup]');
-                    
-                    if (metarElement && metarPopup) {
-                        const rect = metarElement.getBoundingClientRect();
-                        metarPopup.style.left = `${rect.left + (rect.width / 2)}px`;
-                        metarPopup.style.bottom = `${window.innerHeight - rect.top + 8}px`;
-                        metarPopup.style.transform = 'translateX(-50%)';
-                        metarPopup.style.transition = 'none';
-                    }
-                }, 0);
-            }
-        },
-        
-        // Toggle TAF details visibility
-        toggleTAFDetails() {
-            // Initialize if undefined
-            if (this.tafDetailsVisible === undefined) {
-                this.tafDetailsVisible = false;
-            }
-            
-            // Toggle the state
-            this.tafDetailsVisible = !this.tafDetailsVisible;
-            
-            // Close other popups
-            this.metarDetailsVisible = false;
-            this.notamDetailsVisible = false;
-            
-            // Position the popup correctly if it's being opened
-            if (this.tafDetailsVisible) {
-                setTimeout(() => {
-                    const tafElement = document.querySelector('[data-taf-button]');
-                    const tafPopup = document.querySelector('[data-taf-popup]');
-                    
-                    if (tafElement && tafPopup) {
-                        const rect = tafElement.getBoundingClientRect();
-                        tafPopup.style.left = `${rect.left + (rect.width / 2)}px`;
-                        tafPopup.style.bottom = `${window.innerHeight - rect.top + 8}px`;
-                        tafPopup.style.transform = 'translateX(-50%)';
-                        tafPopup.style.transition = 'none';
-                    }
-                }, 0);
-            }
-        },
-        
-        // Toggle NOTAM details visibility
-        toggleNOTAMDetails() {
-            // Initialize if undefined
-            if (this.notamDetailsVisible === undefined) {
-                this.notamDetailsVisible = false;
-            }
-            
-            // Toggle the state
-            this.notamDetailsVisible = !this.notamDetailsVisible;
-            
-            // Close other popups
+        // The METAR, TAF and NOTAM popups (kind: 'metar', 'taf', 'notam'): one open
+        // at a time, placed above the button that opens it.
+        toggleWeatherDetails(kind) {
+            const open = !this[`${kind}DetailsVisible`];
             this.metarDetailsVisible = false;
             this.tafDetailsVisible = false;
-            
-            // Position the popup correctly if it's being opened
-            if (this.notamDetailsVisible) {
-                setTimeout(() => {
-                    const notamElement = document.querySelector('[data-notam-button]');
-                    const notamPopup = document.querySelector('[data-notam-popup]');
-                    
-                    if (notamElement && notamPopup) {
-                        const rect = notamElement.getBoundingClientRect();
-                        notamPopup.style.left = `${rect.left + (rect.width / 2)}px`;
-                        notamPopup.style.bottom = `${window.innerHeight - rect.top + 8}px`;
-                        notamPopup.style.transform = 'translateX(-50%)';
-                        notamPopup.style.transition = 'none';
-                    }
-                }, 0);
-            }
+            this.notamDetailsVisible = false;
+            this[`${kind}DetailsVisible`] = open;
+            if (!open) return;
+
+            setTimeout(() => {
+                const button = document.querySelector(`[data-${kind}-button]`);
+                const popup = document.querySelector(`[data-${kind}-popup]`);
+
+                if (button && popup) {
+                    const rect = button.getBoundingClientRect();
+                    popup.style.left = `${rect.left + (rect.width / 2)}px`;
+                    popup.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+                    popup.style.transform = 'translateX(-50%)';
+                    popup.style.transition = 'none';
+                }
+            }, 0);
         },
+        toggleMetarDetails() { this.toggleWeatherDetails('metar'); },
+        toggleTAFDetails() { this.toggleWeatherDetails('taf'); },
+        toggleNOTAMDetails() { this.toggleWeatherDetails('notam'); },
         
         async fetchAudioFrequencies() {
             try {
