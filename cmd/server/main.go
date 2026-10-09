@@ -23,7 +23,6 @@ import (
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
-	"github.com/yegors/co-atc/internal/templating"
 	"github.com/yegors/co-atc/internal/transcription"
 	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"github.com/yegors/co-atc/internal/weather"
@@ -143,26 +142,22 @@ func main() {
 	// server starts, serves the map and the audio, and transcribes nothing --
 	// one error line per transmission and no transcript, which is a worse
 	// failure than not starting at all.
-	var sttSidecar *transcription.Sidecar
-	if cfg.Transcription.Backend == transcription.BackendLocal {
-		sttSidecar = transcription.NewSidecar(transcription.SidecarConfig{
-			ServerURL:             cfg.Transcription.Local.ServerURL,
-			Command:               cfg.Transcription.Local.Command,
-			StartupTimeoutSeconds: cfg.Transcription.Local.StartupTimeoutSeconds,
-		}, log)
-		sidecarCtx, sidecarCancel := context.WithTimeout(signalCtx, 5*time.Minute)
-		if err := sttSidecar.Start(sidecarCtx); err != nil {
-			sidecarCancel()
-			fatalLog := log.WithOptions(zap.AddStacktrace(zapcore.PanicLevel))
-			fatalLog.Fatal("Local transcription sidecar unavailable", logger.Error(err))
-		}
+	sttSidecar := transcription.NewSidecar(transcription.SidecarConfig{
+		ServerURL:             cfg.Transcription.Local.ServerURL,
+		Command:               cfg.Transcription.Local.Command,
+		StartupTimeoutSeconds: cfg.Transcription.Local.StartupTimeoutSeconds,
+	}, log)
+	sidecarCtx, sidecarCancel := context.WithTimeout(signalCtx, 5*time.Minute)
+	if err := sttSidecar.Start(sidecarCtx); err != nil {
 		sidecarCancel()
-		// A sidecar that dies later is restarted, instead of leaving the server
-		// transcribing nothing until someone notices (28/09).
-		sttSidecar.Supervise(signalCtx)
-		defer sttSidecar.Stop()
+		fatalLog := log.WithOptions(zap.AddStacktrace(zapcore.PanicLevel))
+		fatalLog.Fatal("Local transcription sidecar unavailable", logger.Error(err))
 	}
-	// Processor has been moved into the service
+	sidecarCancel()
+	// A sidecar that dies later is restarted, instead of leaving the server
+	// transcribing nothing until someone notices (28/09).
+	sttSidecar.Supervise(signalCtx)
+	defer sttSidecar.Stop()
 
 	// Create SQLite storage
 	var adsbStorage adsb.Storage
@@ -281,7 +276,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create weather service first (needed for templating)
+	// Create weather service
 	weatherConfigConverted := weather.ConfigWeatherConfig{
 		RefreshIntervalMinutes: cfg.Weather.RefreshIntervalMinutes,
 		APIBaseURL:             cfg.Weather.APIBaseURL,
@@ -310,19 +305,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// The post-processor's prompt template, rendered with live airspace data.
-	// Only post_processing.backend = "openai" reads it.
-	templateService := templating.NewService(adsbService, weatherService, cfg, log)
-
 	// Create frequencies service.
 	// The fleet adapter is what lets a spoken callsign be attached to a real
-	// target; with post_processing.backend = "openai" it is simply never read.
+	// target.
 	fleet := &adsbFleet{service: adsbService, lastSeenMinutes: cfg.PostProcessing.FleetLastSeenMinutes}
 
 	// What the radio has said about each aircraft, carried on the aircraft itself
 	// so the map can show which targets the controller is actually talking to.
 	adsbService.SetVoiceIndex(newVoiceIndex(context.Background(), transcriptionStorage, 5*time.Second, log))
-	frequenciesService := frequencies.NewService(cfg, log, wsServer, transcriptionStorage, sqliteStorage, clearanceStorage, templateService, fleet)
+	frequenciesService := frequencies.NewService(cfg, log, wsServer, transcriptionStorage, clearanceStorage, fleet)
 	// Each frequency's sector: its airport and kind, the sizes from the settings
 	// panel, the airport's position from the reference data. Off unless the
 	// panel says so, and for a frequency that names no airport.
@@ -434,9 +425,7 @@ func main() {
 	log.Info("Frequencies service stopped.")
 
 	// After the frequencies service: nothing will ask it to transcribe again.
-	if sttSidecar != nil {
-		sttSidecar.Stop()
-	}
+	sttSidecar.Stop()
 
 	// Stop any active transcription processors
 	// This will be handled by the frequencies service when we integrate the transcription service

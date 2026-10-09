@@ -268,61 +268,32 @@ transcribe_audio = true
 
 #######################################################
 # Audio Transcription Configuration
-# - This will eat up your API credits, so please be careful.
 #######################################################
 [transcription]
-# Transcription engine: "openai" or "local".
-# "local" posts whole transmissions to the sidecar in sidecar/, which runs a
-# Whisper model on this machine: no API key, and no audio leaving the host.
-# It implements the contract upstream documented in docs/LOCAL-STT.md.
-# Settings for it are in [transcription.local], at the end of this section.
-backend = "openai"
+# Transcription is local: whole transmissions are posted to the sidecar in
+# sidecar/, which runs a Whisper model on this machine -- no API key, and no
+# audio leaving the host. It implements the contract upstream documented in
+# docs/LOCAL-STT.md. Settings for it are in [transcription.local], at the end
+# of this section. ("openai", upstream's realtime backend, was removed.)
+backend = "local"
 
-# OpenAI API settings, used when backend = "openai"
-openai_api_key = ""              # Replace with your actual API key
-model = "gpt-4o-transcribe"      # OpenAI model to use for transcription
-language = "en"                  # Primary language for transcription (e.g., "en" for English)
+# Expected language when a frequency does not give its own (see
+# [[frequencies.sources]] language).
+language = "en"
 
-# Audio processing settings
-noise_reduction = "near_field"   # Noise reduction mode: "near_field", "far_field", or "none"
-chunk_ms = 500                   # Size of audio chunks for processing in milliseconds
-buffer_size_kb = 32              # Audio buffer size in kilobytes
-
-# FFmpeg conversion settings (required for audio format conversion)
+# How each stream is decoded into the PCM that is played and transcribed.
 ffmpeg_path = "ffmpeg"           # Path to FFmpeg executable
-ffmpeg_sample_rate = 24000       # Audio sample rate in Hz (24000 Hz required by OpenAI)
-ffmpeg_channels = 1              # Number of audio channels (1 = mono, required by OpenAI)
+ffmpeg_sample_rate = 24000       # Audio sample rate in Hz
+ffmpeg_channels = 1              # Number of audio channels (1 = mono)
 ffmpeg_format = "s16le"          # Audio format (signed 16-bit little-endian PCM, raw format)
-
-# Connection management settings
-reconnect_interval_sec = 5       # Seconds to wait before reconnecting after failure
-max_retries = 3                  # Maximum number of connection retry attempts
-
-# Voice activity detection (VAD) settings
-turn_detection_type = "server_vad" # Method for detecting speech turns
-prefix_padding_ms = 1000          # Milliseconds of audio to include before detected speech
-silence_duration_ms = 500        # Milliseconds of silence to consider end of speech
-vad_threshold = 0.3              # Threshold for voice activity detection (0.0-1.0)
-
-# API retry settings for handling transient errors
-retry_max_attempts = 5           # Maximum number of API call retry attempts
-retry_initial_backoff_ms = 500   # Initial backoff time in milliseconds
-retry_max_backoff_ms = 10000     # Maximum backoff time in milliseconds
-
-# HTTP timeout for OpenAI API requests in seconds
-timeout_seconds = 60
-
-# Path to the transcription prompt file
-prompt_path = "prompts/transcription_prompt.txt"
 
 # Optional directory for transcription log files (append-only logs)
 # If set, transcriptions will be written to log files organized by date and frequency:
-#   - raw/{date}_{frequency_id}.log       - Raw transcriptions from Whisper
-#   - processed/{date}_{frequency_id}.log - Post-processed transcriptions (if enabled)
+#   raw/{date}_{frequency_id}.log - transcriptions as the sidecar returned them
 # Leave empty to disable file logging
 log_dir = "data/transcriptions"
 
-# Local speech-to-text, used when backend = "local".
+# Local speech-to-text.
 #
 # This sub-table MUST stay at the end of [transcription]: everything written
 # after a sub-table header belongs to the sub-table, so a key placed below it
@@ -430,19 +401,14 @@ attempt_window_minutes = 15    # ...within this window
 enabled = true
 
 # Which implementation assigns a speaker, a callsign and any clearance to a
-# stored transcription.
-#   "openai" - the GPT-4o pass below; needs transcription.openai_api_key
-#   "local"  - a closed-vocabulary grammar for ICAO phraseology, matched against
-#              the aircraft the ADS-B receiver can currently see. No key.
-# The two write the same columns and the same clearances table, so the map and
-# the web UI behave identically either way.
-backend = "openai"
+# stored transcription: a closed-vocabulary grammar for ICAO phraseology,
+# matched against the aircraft the ADS-B receiver can currently see. No key.
+# ("openai", upstream's GPT-4o pass, was removed.)
+backend = "local"
 
-# The four settings below apply to backend = "local" only.
-#
-# They are measured rather than chosen. Against 1468 recorded transmissions and
-# the receiver's own ADS-B history, with eight shuffled control fleets, this is
-# the best operating point of the sweep:
+# The four settings below are measured rather than chosen. Against 1468
+# recorded transmissions and the receiver's own ADS-B history, with eight
+# shuffled control fleets, this is the best operating point of the sweep:
 #
 #   min_digits  fleet window  matches  above chance  true matches
 #          3          30s       131        70%           91.1
@@ -458,23 +424,11 @@ min_score = 0.0             # extra floor on top of the matcher's own 0.6; 0 = n
 min_digits = 3              # shortest spoken number that may be a flight number
 fleet_last_seen_minutes = 1 # how stale an ADS-B target may be and still be a candidate
 
-# OpenAI model to use for post-processing
-model = "gpt-4o"
-
 # How often to run the post-processing (in seconds)
 interval_seconds = 10
 
 # Maximum number of transcriptions to process in each batch
 batch_size = 20
-
-# Number of previous processed transcriptions to include for context
-context_transcriptions = 3
-
-# HTTP timeout for OpenAI API requests in seconds
-timeout_seconds = 120
-
-# Path to the system prompt file
-system_prompt_path = "prompts/post_processing_prompt.txt"
 
 #######################################################
 # Flight Phase Detection Configuration

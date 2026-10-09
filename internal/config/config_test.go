@@ -78,3 +78,58 @@ func TestTheExampleConfigurationStarts(t *testing.T) {
 	atRepoRoot(t)
 	loadAndValidate(t, filepath.Join("configs", "config.toml.example"))
 }
+
+// legacyWithBackend writes the frozen legacy configuration with the backend of
+// one section ("transcription" or "post_processing") changed to line.
+func legacyWithBackend(t *testing.T, section, line string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("internal", "config", "testdata", "legacy-full.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	start := strings.Index(text, "\n["+section+"]\n")
+	at := strings.Index(text[start:], "\nbackend = \"local\"\n")
+	if start < 0 || at < 0 {
+		t.Fatalf("fixture has no backend in [%s]", section)
+	}
+	at += start + 1
+	text = text[:at] + line + text[at+len(`backend = "local"`):]
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// The OpenAI backend is gone. A configuration that still asks for it must stop
+// the server with the reason, not start it transcribing nothing.
+func TestTheRemovedOpenAIBackendIsRefusedWithItsReason(t *testing.T) {
+	atRepoRoot(t)
+	for _, section := range []string{"transcription", "post_processing"} {
+		t.Run(section, func(t *testing.T) {
+			cfg, err := Load(legacyWithBackend(t, section, `backend = "openai"`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = cfg.Validate()
+			want := section + `.backend = "openai": the OpenAI backend was removed, use "local"`
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("got %v, want %q", err, want)
+			}
+		})
+	}
+}
+
+// An empty backend used to mean OpenAI. There is now one backend, so empty
+// means local.
+func TestAnEmptyBackendMeansLocal(t *testing.T) {
+	atRepoRoot(t)
+	for _, section := range []string{"transcription", "post_processing"} {
+		cfg := loadAndValidate(t, legacyWithBackend(t, section, "# no backend"))
+		if cfg.Transcription.Backend != BackendLocal || cfg.PostProcessing.Backend != BackendLocal {
+			t.Errorf("[%s] without backend: got %q and %q, want %q", section,
+				cfg.Transcription.Backend, cfg.PostProcessing.Backend, BackendLocal)
+		}
+	}
+}
