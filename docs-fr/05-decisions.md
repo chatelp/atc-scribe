@@ -4897,8 +4897,12 @@ de l'amont, pensée pour un autre usage, et ses défauts sortent à l'usage quot
 (UX, serveur Go, code de l'interface), consolidée dans `docs-fr/32-audit-produit.md`, puis une
 liste unique classée par gain / effort / risque que le propriétaire arbitre. Contraintes :
 la production reste utilisable à chaque étape ; le contribuable reste identifiable ; l'UX se juge
-sur l'usage réel d'une seule personne, Mac et téléphone par Tailscale. Reste à obtenir du
-propriétaire sa propre liste d'irritants (les trois questions du doc 32).
+sur l'usage réel d'une seule personne, Mac et téléphone par Tailscale. Le propriétaire a donné
+son jugement (interface lourde, déplacements lents, réglages mal faits, alertes inutiles,
+disposition à garder) ; les trois rapports sont consolidés dans le doc 32 en six paliers,
+≈ 18 jours. **Premier arbitrage (10/10) : le chat « AI Advisory » (assistant vocal OpenAI,
+4 500 lignes, inutilisable sans clé) est retiré.** Quatre arbitrages restent : sources ADS-B
+hors tar1090 et SRT, langue de l'interface, fond de carte par défaut, ordre des paliers.
 
 ### Q51 — Une source ADS-B externe en renfort de la station, quand elle perd un avion *(29/09 — ouverte)*
 
