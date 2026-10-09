@@ -2,8 +2,11 @@ package frequencies
 
 import (
 	"os"
+	"sync"
 	"testing"
 	"time"
+
+	cfg "github.com/yegors/co-atc/internal/config"
 )
 
 // skipDefect marks a test that shows a defect found while writing these tests.
@@ -73,4 +76,30 @@ func TestAListenerWhoComesBackHearsLiveAudio(t *testing.T) {
 	if n := bytesWithin(again, 100*time.Millisecond); n > 16000 {
 		t.Errorf("back after 1.5 s, the listener got %d bytes (%.1f s of audio) at once: it starts that far behind live", n, float64(n)/32000)
 	}
+}
+
+// buildStreamInfo advances streamPortIndex, and GetAllFrequencies and
+// GetFrequencyByID call it holding only sourcesMu's read lock: two requests
+// for the list at once write the index together. The race detector says so;
+// without -race this test passes.
+func TestTheFrequencyListCanBeReadConcurrently(t *testing.T) {
+	skipDefect(t, "buildStreamInfo writes streamPortIndex under a read lock: concurrent GetAllFrequencies race (run with -race)")
+	c := toneConfig()
+	c.Server.AdditionalPorts = []int{8001, 8002}
+	c.Frequencies.Sources = []cfg.FrequencyConfig{{ID: "a", Name: "A", URL: tone}, {ID: "b", Name: "B", URL: tone}}
+	s := NewService(c, quietLog(t), nil, nil, nil, nil, nil, nil)
+	t.Cleanup(s.Stop)
+
+	var wg sync.WaitGroup
+	for g := 0; g < 4; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 50; i++ {
+				s.GetAllFrequencies()
+				s.GetFrequencyByID("a")
+			}
+		}()
+	}
+	wg.Wait()
 }
