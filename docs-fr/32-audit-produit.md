@@ -380,6 +380,47 @@ programmation d'écoute par plage horaire (E2).
 Le détail de chaque arbitrage, tel qu'il a été instruit, est dans les sections précédentes et
 dans D71 (`05-decisions.md`).
 
+### Retour de la vague 1 (10/10)
+
+Intégrée dans `local` le 10/10 après relecture et vérification sur le Mac (branche d'essai
+`integration/vague1`). Ensemble : **+3 983 / −10 342 lignes** ; Go hors tests 35 077 → 27 498,
+interface (JS + HTML) 13 036 → 10 881. Rapports : `docs-fr/fiches-cloud/{A,B,C}-rapport.md`.
+
+- **Conflits de sens** entre C (écrit avant A) et A : trois tests de C appelaient des fonctions
+  retirées par A ; adaptés. Un test de C utilisait `t.Chdir` (Go 1.24, le module déclare 1.23) :
+  réécrit avec `os.Chdir`, il a révélé **un défaut propre au Mac** — la rétention ne reconnaissait
+  la base du jour que par son nom ; à travers un lien symbolique (`/var` → `/private/var`), elle
+  la prenait pour ancienne et la supprimait au-delà du plafond. Corrigé : reconnue aussi par
+  identité de fichier (`os.SameFile`). En production les chemins sont relatifs : pas d'incident.
+- **Vérifié sur le Mac** : ta configuration réelle se charge et se valide ; l'instance d'essai
+  (faux sidecar `runs/son-test/fake-sidecar.py`, sans GPU) démarre sans aucune ligne chat,
+  simulation ni prompt ; dans le navigateur à 1 440 × 900 : fond `ign-dark` choisi seul (et une
+  préférence pointant un fond retiré y retombe), plan des aéroports (891 Ko, 35 s d'Overpass ;
+  88 pistes, 1 818 taxiways, 289 aires, 71 terminaux, 117 hélistations) lisible à z13 et z15,
+  lien VAC de la PAR au cycle AIRAC du 01/10 (PDF du SIA en 200), son, coupure, réglages,
+  déconnexion.
+- **Tuiles IGN** : le serveur refuse environ une tuile sur vingt (400 « layer unknown »), par
+  périodes qui peuvent tenir une même tuile plusieurs secondes ; sous le filtre sombre, un trou
+  noir. Réessai ajouté (7 essais espacés de 0,5 à 16 s, ~30 s). Pas une limite de requêtes
+  simultanées (25 requêtes parallèles toutes servies).
+- **Défauts de C** : n°3 (l'auditeur qui revient repartait jusqu'à 87 s derrière le direct) et
+  n°4 (course sur le compteur de ports) **corrigés** ; vérifiés par leurs tests (échec sur
+  l'ancien code) et, pour le n°3, sur l'instance d'essai (retour après 5 s et 40 s : débit du
+  direct). **N°1 et n°2 à arbitrer** (changent ce qui est stocké) :
+  - n°1 : une colonne vide (`tas`, position…) empêche la contrainte d'unicité de reconnaître une
+    position répétée ; **mesuré sur la base du 04/10 : 923 816 doublons exacts sur 2 328 654
+    positions (40 %)**. Corriger réduirait les bases d'environ 40 %, mais change ce que lisent la
+    PAR, le juge des pistes, `cmd/phraseology` et le laboratoire (un état répété n'est plus
+    réécrit chaque seconde) ;
+  - n°2 : les transcriptions sont datées en heure locale avec décalage, les positions en UTC ;
+    les comparaisons de texte se trompent d'une à deux heures et la nuit du changement d'heure
+    (25/10) trie à l'envers. Corriger change le format lu par les scripts du laboratoire :
+    à coordonner avec Whisper-lab.
+- **À juger à l'œil par le propriétaire** : le filtre d'assombrissement
+  (`style.css`, `.basemap-dark .atc-basemap`) et les couleurs du plan
+  (`AIRPORT_LAYOUT_COLORS`, en tête de `openlayers-map-manager.js`).
+- Binaire de production reconstruit ; l'ancien est gardé (`runs/co-atc.avant-vague1`).
+
 ## État
 
 - 09/10 : cadre posé ; trois études menées en parallèle (Sonnet), rapports dans
