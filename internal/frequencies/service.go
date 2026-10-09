@@ -364,24 +364,6 @@ func (sp *StreamProcessor) IsClientConnected(clientID string) bool {
 	return false
 }
 
-// RemoveClient removes a client from the stream processor.
-func (sp *StreamProcessor) RemoveClient(clientID string) {
-	sp.clientsMu.Lock()
-	defer sp.clientsMu.Unlock()
-
-	if reader, exists := sp.clients[clientID]; exists {
-		sp.logger.Info("Removing client", String("clientID", clientID))
-		reader.Close()
-		delete(sp.clients, clientID)
-		delete(sp.clientLastActive, clientID)
-
-		// Log the current client count
-		sp.logger.Info("Client removed",
-			String("clientID", clientID),
-			Int("remaining_clients", len(sp.clients)))
-	}
-}
-
 // GetClientCount returns the number of connected clients.
 func (sp *StreamProcessor) GetClientCount() int {
 	sp.clientsMu.RLock()
@@ -395,14 +377,6 @@ type NonClosingReader struct {
 	io.ReadCloser
 	processor *StreamProcessor
 	clientID  string
-}
-
-// NewNonClosingReader creates a new NonClosingReader.
-func NewNonClosingReader(r io.ReadCloser) *NonClosingReader {
-	return &NonClosingReader{
-		ReadCloser: r,
-		// processor and clientID will be set by the StreamProcessor.AddClient method
-	}
 }
 
 // Read reads data and updates the last activity time

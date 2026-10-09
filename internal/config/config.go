@@ -395,12 +395,6 @@ func Load(path string) (*Config, error) {
 	return &config, nil
 }
 
-// LoadWithFallback loads the configuration by checking multiple locations in order of preference
-func LoadWithFallback(preferredPath string) (*Config, error) {
-	config, _, err := LoadWithFallbackAndPath(preferredPath)
-	return config, err
-}
-
 // LoadWithFallbackAndPath loads configuration and returns the resolved config file path.
 func LoadWithFallbackAndPath(preferredPath string) (*Config, string, error) {
 	// List of paths to check in order of preference

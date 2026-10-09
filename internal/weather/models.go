@@ -49,13 +49,6 @@ type FetchResult struct {
 	Err  error
 }
 
-// IsExpired checks if the cached data has expired
-func (wc *WeatherCache) IsExpired() bool {
-	wc.mu.RLock()
-	defer wc.mu.RUnlock()
-	return time.Now().After(wc.ExpiresAt)
-}
-
 // Get returns the cached weather data (thread-safe)
 func (wc *WeatherCache) Get() *WeatherData {
 	wc.mu.RLock()
@@ -75,20 +68,6 @@ func (wc *WeatherCache) Set(data *WeatherData, expiryDuration time.Duration) {
 func NewWeatherCache() *WeatherCache {
 	return &WeatherCache{
 		Data: nil, // Start with no data instead of empty data
-	}
-}
-
-// DefaultWeatherConfig returns the default weather configuration
-func DefaultWeatherConfig() WeatherConfig {
-	return WeatherConfig{
-		RefreshIntervalMinutes: 10,
-		APIBaseURL:             "https://node.windy.com/airports",
-		RequestTimeoutSeconds:  10,
-		MaxRetries:             2,
-		FetchMETAR:             true,
-		FetchTAF:               true,
-		FetchNOTAMs:            true,
-		CacheExpiryMinutes:     15,
 	}
 }
 

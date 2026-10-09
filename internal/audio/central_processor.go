@@ -470,13 +470,3 @@ func (p *CentralAudioProcessor) GetStatus() (string, time.Time, error) {
 
 	return "running", p.lastActivity, nil
 }
-
-// GetContentType returns the content type of the audio stream
-func (p *CentralAudioProcessor) GetContentType() string {
-	return p.contentType
-}
-
-// GetFormat returns the format of the audio stream
-func (p *CentralAudioProcessor) GetFormat() string {
-	return p.format
-}
