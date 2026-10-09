@@ -265,7 +265,11 @@ programmation d'écoute par plage horaire (E2).
 ### Ce que le propriétaire doit trancher
 
 1. **Retirer le code du chat ATC et de la simulation** (1.3, et la part JS de 1.1) : −4 500
-   lignes ; rien ne tourne dessus ici. Mon avis : oui.
+   lignes ; rien ne tourne dessus ici. **Tranché le 10/10 : on retire.** Le chat est
+   l'assistant vocal « AI Advisory » (voix et ciel envoyés à l'API temps réel d'OpenAI, en
+   anglais, facturé à la minute), pas les transcriptions par fréquence, qui restent. Un
+   assistant *local*, en français, lisant nos données, est une question à ouvrir plus tard,
+   et ne partirait pas de ce code.
 2. **Les sources ADS-B autres que tar1090, et SRT** (1.4) : les garder pour qu'un autre
    récepteur puisse utiliser le dépôt public, ou les retirer. Mon avis : garder les sources
    ADS-B (c'est 720 lignes et c'est ce qui rend le dépôt utile à d'autres), retirer SRT.
