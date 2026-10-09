@@ -37,7 +37,15 @@ func TestTheActiveFileIsRecognisedHoweverItsPathIsSpelled(t *testing.T) {
 	}
 	daily(t, dir, "co-atc-2026-09-28.db", 2*gib)
 	daily(t, dir, "co-atc-2026-09-27.db", gib/100)
-	t.Chdir(parent)
+	// os.Chdir rather than t.Chdir: the module still declares Go 1.23.
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(parent); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
 
 	for _, active := range []string{
 		"data/co-atc-2026-09-28.db",

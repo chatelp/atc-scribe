@@ -533,7 +533,22 @@ func cleanupOldDailyDatabases(dbDir, activeDBPath string, capGB float64, log *lo
 		date  time.Time
 		bytes int64
 	}
+	// The same file can be spelled two ways: relative and absolute, or through a
+	// symbolic link (/var is one on macOS, to /private/var). Compared by name
+	// only, today's file passed for an old one there, and went when over the
+	// cap. It is now recognised by name or by identity.
 	absActiveDBPath, _ := filepath.Abs(activeDBPath)
+	activeInfo, _ := os.Stat(activeDBPath)
+	isActive := func(path string) bool {
+		if abs, _ := filepath.Abs(path); abs == absActiveDBPath {
+			return true
+		}
+		if activeInfo == nil {
+			return false
+		}
+		info, err := os.Stat(path)
+		return err == nil && os.SameFile(info, activeInfo)
+	}
 	var files []daily
 	var total int64
 	for _, entry := range entries {
@@ -552,7 +567,7 @@ func cleanupOldDailyDatabases(dbDir, activeDBPath string, capGB float64, log *lo
 				size += info.Size()
 			}
 		}
-		if abs, _ := filepath.Abs(path); abs == absActiveDBPath {
+		if isActive(path) {
 			total += size // kept whatever its size
 			continue
 		}

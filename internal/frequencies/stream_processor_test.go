@@ -78,9 +78,9 @@ func readSome(t *testing.T, r io.Reader, n int) {
 	}
 }
 
-// A browser asking twice with its id gets the reader it has; removed, it is
-// gone and its reader ends.
-func TestAClientIsAddedOnceAndRemoved(t *testing.T) {
+// A browser asking twice with its id gets the reader it has. (Removal by id
+// went with RemoveClient, which nothing called: clients leave by the sweep.)
+func TestAClientIsAddedOnce(t *testing.T) {
 	sp := newToneProcessor(t)
 	a := sp.AddClient("page-1")
 	if again := sp.AddClient("page-1"); again != a {
@@ -90,15 +90,6 @@ func TestAClientIsAddedOnceAndRemoved(t *testing.T) {
 		t.Fatalf("%d clients, connected %v", n, sp.IsClientConnected("page-1"))
 	}
 	readSome(t, a, 44+320) // the WAV header, then audio
-
-	sp.RemoveClient("page-1")
-	if n := sp.GetClientCount(); n != 0 || sp.IsClientConnected("page-1") {
-		t.Errorf("after RemoveClient: %d clients, connected %v", n, sp.IsClientConnected("page-1"))
-	}
-	if _, err := a.Read(make([]byte, 64)); !errors.Is(err, io.EOF) {
-		t.Errorf("a removed client's reader: %v, want EOF", err)
-	}
-	sp.RemoveClient("never-added") // nothing to do, no panic
 }
 
 // The sweep removes a client silent for more than 30 s and one whose reader
@@ -182,7 +173,7 @@ func newToneService(t *testing.T) *Service {
 	}
 	c := toneConfig()
 	c.Frequencies.Sources = []cfg.FrequencyConfig{{ID: "125825", Name: "Tone", URL: tone, FFmpegInputOptions: toneOptions}}
-	s := NewService(c, quietLog(t), nil, nil, nil, nil, nil, nil)
+	s := NewService(c, quietLog(t), nil, nil, nil, nil)
 	t.Cleanup(s.Stop)
 	return s
 }
@@ -234,7 +225,7 @@ func TestTheFrequencyListCarriesOrderStatusAndPorts(t *testing.T) {
 		{ID: "b", Name: "Second", URL: tone, Order: 2},
 		{ID: "a", Name: "First", URL: tone, Order: 1},
 	}
-	s := NewService(c, log, nil, nil, nil, nil, nil, nil)
+	s := NewService(c, log, nil, nil, nil, nil)
 	t.Cleanup(s.Stop)
 
 	s.broadcastFrequencyStatus("b", "failed", "404 Not Found")
