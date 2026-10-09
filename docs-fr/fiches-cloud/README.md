@@ -18,7 +18,7 @@ seule.*
 | Fiche | Vague | Prompt à coller | Branche | Parallèle avec |
 |---|---|---|---|---|
 | [A — retraits côté serveur](A-retraits-serveur.md) | 1 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/A-retraits-serveur.md, et exécute la fiche A en entier.` | `cloud/a-retraits-serveur` | B, C |
-| [B — retraits côté interface](B-retraits-interface.md) | 1 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/B-retraits-interface.md, et exécute la fiche B en entier.` | `cloud/b-retraits-interface` | A, C |
+| [B — retraits côté interface, et la carte réparée](B-retraits-interface.md) | 1 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/B-retraits-interface.md, et exécute la fiche B en entier.` | `cloud/b-retraits-interface` | A, C |
 | [C — tests de ce qui tourne sans filet](C-tests.md) | 1 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/C-tests.md, et exécute la fiche C en entier.` | `cloud/c-tests` | A, B |
 
 La vague 2 (configuration réduite, découpage de `main()` et de `handlers.go`, tests de l'API)
