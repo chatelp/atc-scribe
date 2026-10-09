@@ -166,7 +166,8 @@ navaids_csv_path = "assets/navaids.csv"
 
 #######################################################
 # Radio Frequencies Configuration
-# - You can use HTTP streams (like LiveATC) or local SRT streams (https://github.com/rtl-airband/RTLSDR-Airband/pull/523).
+# - A source is anything FFmpeg can read: an HTTP stream (Icecast, LiveATC...), SRT (FFmpeg built
+#   with libsrt), raw PCM over UDP from an SDR program, a receiver on the sound card. See the last examples.
 # - LiveATC says not to steal these streams, so keep that in mind.
 #######################################################
 [frequencies]
@@ -229,15 +230,41 @@ url = "https://s1-bos.liveatc.net/cyyz8"
 order = 5                        # Fifth in display order
 transcribe_audio = false         # Not transcribing this frequency
 
-# Local VHF Stream (RTLSDR-Airband + SRT server)
+# Local VHF stream over SRT (RTLSDR-Airband + SRT server), read by FFmpeg itself:
+# needs an FFmpeg built with libsrt (Homebrew's is).
 [[frequencies.sources]]
-id = "cyyz_lcl"                  
-airport = "CYYZ"                
-name = "Local"         
-frequency_mhz = 133.7         
+id = "cyyz_lcl"
+airport = "CYYZ"
+name = "Local"
+frequency_mhz = 133.7
 url = "srt://192.168.1.166:42069"
-order = 6                      
-transcribe_audio = true     
+order = 6
+transcribe_audio = true
+
+# Raw PCM over UDP, as GQRX, SDR++ or rtl_fm send it: FFmpeg has to be told
+# the format, rate and channels before it reads the input.
+#[[frequencies.sources]]
+#id = "sdr_udp"
+#name = "SDR++ network sink"
+#frequency_mhz = 118.7
+#url = "udp://127.0.0.1:7355"
+#ffmpeg_input_options = ["-f", "s16le", "-ar", "48000", "-ac", "1"]
+#order = 7
+#transcribe_audio = true
+
+# A receiver plugged into the sound card: the capture device is the input.
+# macOS: "-f", "avfoundation" and url = ":0" (list devices with
+#   ffmpeg -f avfoundation -list_devices true -i "").
+# Linux: "-f", "alsa" and url = "hw:1", or "-f", "pulse" and url = "default".
+# Windows: "-f", "dshow" and url = "audio=Line In".
+#[[frequencies.sources]]
+#id = "scanner"
+#name = "Scanner line-in"
+#frequency_mhz = 118.7
+#url = ":0"
+#ffmpeg_input_options = ["-f", "avfoundation"]
+#order = 8
+#transcribe_audio = true
 
 #######################################################
 # Audio Transcription Configuration
