@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yegors/co-atc/internal/audio"
@@ -185,6 +186,9 @@ func (sp *StreamProcessor) removeInactiveClients() {
 			delete(sp.clients, clientID)
 		}
 		delete(sp.clientLastActive, clientID)
+		// The shared reader goes too: left behind, it kept its position, and
+		// every write woke it for nothing.
+		sp.audioProcessor.RemoveReader(clientID)
 	}
 
 	if len(inactiveClients) > 0 {
@@ -295,6 +299,12 @@ func (sp *StreamProcessor) AddClient(clientID string) *ClientStreamReader {
 	}
 
 	sp.logger.Info("Adding new client (or replacing closed one)", String("clientID", clientID))
+
+	// A page keeps one client id for its life. Asking again after its stream
+	// ended, it was handed its old shared reader back, still at the position it
+	// stopped at: up to the whole buffer behind live (87 s at 24 kHz; 2 s
+	// measured after a 1.5 s gap). A new client starts at live.
+	sp.audioProcessor.RemoveReader(clientID)
 
 	// Create a reader from the audio processor
 	audioReader, err := sp.audioProcessor.CreateReader(clientID)
@@ -448,8 +458,8 @@ type Service struct {
 	streamsMu            sync.RWMutex
 	ctx                  context.Context
 	cancel               context.CancelFunc
-	streamPortIndex      int   // For round-robin port selection
-	allServerPorts       []int // Combined list of primary and additional ports
+	streamPortIndex      atomic.Uint64 // round-robin port selection; atomic: the list is built under a read lock
+	allServerPorts       []int         // Combined list of primary and additional ports
 	transcriptionManager *transcription.TranscriptionManager
 	wsServer             *websocket.Server               // WebSocket server for broadcasting status updates
 	connectionStatus     map[string]connectionStatusInfo // Track connection status per frequency
@@ -554,7 +564,6 @@ func NewService(
 		streamsMu:            sync.RWMutex{},
 		ctx:                  ctx,
 		cancel:               cancel,
-		streamPortIndex:      0,
 		allServerPorts:       allPorts,
 		transcriptionManager: transcriptionManager,
 		wsServer:             wsServer,
@@ -1053,8 +1062,8 @@ func (s *Service) GetFrequencyByID(id string) (*Frequency, bool) {
 // The port is selected via round-robin from all available server ports.
 func (s *Service) buildStreamInfo(frequencyID string) (string, int) {
 	// Get the next port via round-robin
-	port := s.allServerPorts[s.streamPortIndex]
-	s.streamPortIndex = (s.streamPortIndex + 1) % len(s.allServerPorts)
+	i := s.streamPortIndex.Add(1) - 1
+	port := s.allServerPorts[i%uint64(len(s.allServerPorts))]
 
 	// Return relative URL path so the browser uses the correct hostname
 	return fmt.Sprintf("/api/v1/stream/%s", frequencyID), port

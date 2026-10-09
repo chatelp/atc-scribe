@@ -61,8 +61,6 @@ func bytesWithin(r interface{ Read([]byte) (int, error) }, d time.Duration) int 
 // the live rate; the same id back after 1.5 s gets 64 KB at once, 2.0 s of
 // audio -- the time away, plus what the first reader had not yet read.
 func TestAListenerWhoComesBackHearsLiveAudio(t *testing.T) {
-	skipDefect(t, "a client id that comes back gets its old MultiReader position, not live audio: "+
-		"NonClosingReader.Close never removes the reader AddClient created")
 	sp := newToneProcessor(t)
 	first := sp.AddClient("page-1")
 	readSome(t, first, 44+3200)
@@ -83,7 +81,6 @@ func TestAListenerWhoComesBackHearsLiveAudio(t *testing.T) {
 // for the list at once write the index together. The race detector says so;
 // without -race this test passes.
 func TestTheFrequencyListCanBeReadConcurrently(t *testing.T) {
-	skipDefect(t, "buildStreamInfo writes streamPortIndex under a read lock: concurrent GetAllFrequencies race (run with -race)")
 	c := toneConfig()
 	c.Server.AdditionalPorts = []int{8001, 8002}
 	c.Frequencies.Sources = []cfg.FrequencyConfig{{ID: "a", Name: "A", URL: tone}, {ID: "b", Name: "B", URL: tone}}
