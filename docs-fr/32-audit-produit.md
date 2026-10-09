@@ -302,15 +302,16 @@ pas de mesure de charge réelle ni de fluidité sur trafic vivant.
 ### La liste unique, classée
 
 Classement par gain pour l'usage quotidien, puis effort, puis risque pour la production.
-Efforts en heures (h) ou jours (j), estimés par les rapports ou par moi.
+Efforts en heures (h) ou jours (j), estimés par les rapports ou par moi. **État au 10/10**
+indiqué en fin de ligne quand il a bougé ; chaque ligne se fait sous les sept garde-fous.
 
 **0. Corrections — avant tout chantier (≈ 1 j)**
 
 | # | Quoi | Effort | Risque |
 |---|---|---|---|
 | 0.1 | **WebSocket** : échéance d'écriture, ping/pong, verrou relâché pendant l'écriture ; le test du gel devient test de non-régression | 4 h | moyen-faible |
-| 0.2 | Fond de carte par défaut utilisable en France (Carto sombre ou OSM) ; retirer les trois fonds FAA | 1 h | nul |
-| 0.3 | Deux messages de journal en `debug` (−51 %) ; fuite de contexte signalée par `go vet` ; `go mod tidy` | 1,5 h | nul |
+| 0.2 | Fond de carte par défaut utilisable en France ; retirer les trois fonds FAA. *Préférence du propriétaire (10/10) : le sombre, et surtout des fonds **aéronautiques**, plans d'aéroport et pistes bien visibles ; étude en cours (`runs/audit-2026-10-09/fonds-de-carte.md`), la ligne sera précisée à son retour* | 1 h + ? | nul |
+| 0.3 | Deux messages de journal en `debug` (−51 %) ; ~~fuite de contexte signalée par `go vet`~~ ; ~~`go mod tidy`~~ — *fuite et tidy faits le 10/10 (`0bf7f6b`, `e9c336b`), `go vet` propre sur tout le dépôt* | 1 h | nul |
 | 0.4 | Deux index SQLite redondants, après `EXPLAIN QUERY PLAN` (−14,8 % de base) | 1 h | faible |
 | 0.5 | Bouton **Se déconnecter** (aucun aujourd'hui) | 0,5 h | nul |
 | 0.6 | `atc_chat.enabled = false` | fait | — |
@@ -321,8 +322,8 @@ Efforts en heures (h) ou jours (j), estimés par les rapports ou par moi.
 |---|---|---|---|
 | 1.1 | Interface : chat IA, simulation, fonctions mortes, couches américaines, clones (étapes 1 à 5 du plan `frontend-code.md`, −2 355 lignes) ; volets Debug, Station, Simulated | 9 h | faible |
 | 1.2 | Serveur : 81 fonctions mortes, chemin OpenAI (D3 le dit déjà retiré, −1 990 lignes) | 10 h | nul-faible |
-| 1.3 | Serveur : chat ATC et gabarits (−3 250 lignes) — **décision du propriétaire** | 8 h | faible-moyen |
-| 1.4 | Serveur : sources ADS-B hors tar1090, SRT, simulation (−1 300 lignes, −9 paquets tiers) — **décision** : généralité du dépôt public | 7 h | faible |
+| 1.3 | Serveur : chat ATC et gabarits (−3 250 lignes) — *tranché le 10/10 : on retire* | 8 h | faible-moyen |
+| 1.4 | Serveur : simulation (−375 lignes) — *tranché le 10/10 (D71) : les sources ADS-B hors tar1090 sont **gardées** (réutilisable) ; le lecteur SRT est **retiré** (fait, `e9c336b`, −208 lignes, −9 modules), remplacé par les options d'entrée ffmpeg (`1858fc6`)* | 2 h | faible |
 | 1.5 | Accueil : plus d'écran bloquant ; un bandeau « reprendre l'écoute » au premier clic (le seul geste que le navigateur exige) | 2 h | nul |
 | 1.6 | **Relance automatique** de la production après redémarrage du Mac (`launchd`) | 4 h | faible |
 
@@ -368,42 +369,16 @@ programmation d'écoute par plage horaire (E2).
 
 ### Ce que le propriétaire doit trancher
 
-1. **Retirer le code du chat ATC et de la simulation** (1.3, et la part JS de 1.1) : −4 500
-   lignes ; rien ne tourne dessus ici. **Tranché le 10/10 : on retire.** Le chat est
-   l'assistant vocal « AI Advisory » (voix et ciel envoyés à l'API temps réel d'OpenAI, en
-   anglais, facturé à la minute), pas les transcriptions par fréquence, qui restent. Un
-   assistant *local*, en français, lisant nos données, est une question à ouvrir plus tard,
-   et ne partirait pas de ce code.
-2. **Les sources ADS-B autres que tar1090, et SRT** (1.4) : les garder pour qu'un autre
-   récepteur puisse utiliser le dépôt public, ou les retirer. Mon avis : garder les sources
-   ADS-B (c'est 720 lignes et c'est ce qui rend le dépôt utile à d'autres), retirer SRT.
-   **Reformulé par le propriétaire (10/10) : de quelles sources audio un autre utilisateur
-   aurait-il besoin ?** Vérifié sur le code et sur ffmpeg 8.0.1 (Homebrew) : co-atc passe
-   l'adresse de la source à ffmpeg (`-i`), donc tout protocole de ffmpeg marche déjà —
-   HTTP/HTTPS (Icecast, Shoutcast, les flux à la LiveATC ou Broadcastify, RTLSDR-Airband),
-   RTSP, RTMP, TCP, UDP/RTP, fichiers — **et SRT, que ffmpeg lit nativement** (`libsrt`
-   est dans le ffmpeg de Homebrew). Le lecteur SRT en Go (208 lignes, 9 paquets tiers)
-   est donc un doublon : le retirer ne retire pas SRT, à condition de noter « ffmpeg avec
-   libsrt » dans la documentation. **Ce qui manque vraiment à un outil public**, et que ni
-   le code ni la configuration ne permettent : une **entrée audio locale** (sortie casque
-   d'un scanner ou d'un récepteur dans la carte son, câble audio virtuel depuis SDR++,
-   SDR# ou GQRX — le montage le plus courant chez un amateur à un seul récepteur) et le
-   **PCM brut par UDP** (GQRX, SDR++, `rtl_fm`), parce que les deux demandent des options
-   *avant* `-i` (`-f avfoundation`/`alsa`/`dshow`, `-f s16le -ar 48000`) que la
-   configuration ne sait pas exprimer. Une seule évolution couvre les deux : des **options
-   d'entrée ffmpeg par source** (≈ 3 h). Les récepteurs web (KiwiSDR, WebSDR) restent hors
-   champ : ils passent par un pont vers un flux local. À trancher : retirer le lecteur SRT
-   en Go et ajouter les options d'entrée, ou garder le lecteur tel quel.
-3. **La langue de l'interface** : anglais (`lang="en"`, dépôt public) ou français pour lui.
-   **Tranché le 10/10 : l'interface reste en anglais à ce stade.** Exception : l'interprétation
-   logique d'une communication (clairances en clair, 3.5) suit la langue de la communication,
-   donc en français quand la transmission est en français. Une version en/fr de l'interface
-   viendra dans un second temps ; d'ici là, pas de chaîne traduite à la volée ni de mélange.
-4. **Le fond de carte par défaut** : Carto sombre (déjà en cache par le service worker) ou OSM.
-5. **L'ordre** : les paliers 0, 1 et 2 d'abord (≈ 5 j, l'interface s'allège et ses deux
-   griefs disparaissent), puis le palier 3 (ce qu'atc-scribe sait et ne montre pas). C'est
-   l'ordre que je recommande ; l'inverse est défendable si c'est le palier 3 qui lui manque
-   le plus au quotidien.
+| # | Arbitrage | État |
+|---|---|---|
+| 1 | Retirer le chat ATC (« AI Advisory ») et la simulation | **tranché le 10/10 : oui** — c'est l'assistant vocal OpenAI, pas les transcriptions par fréquence |
+| 2 | Sources ADS-B hors tar1090, et SRT | **tranché le 10/10 (D71)** : sources ADS-B gardées ; lecteur SRT retiré, ffmpeg lit SRT ; options d'entrée ajoutées (UDP brut, carte son) |
+| 3 | Langue de l'interface | **tranché le 10/10 : anglais** ; l'interprétation d'une communication suit sa langue ; version en/fr plus tard |
+| 4 | Fond de carte par défaut | **en cours** : préférence pour le sombre, et des fonds aéronautiques avec pistes et plans d'aéroport ; étude des sources et des licences en cours (VAC du SIA comprises) |
+| 5 | Ordre des paliers | **ouvert** : je recommande 0, 1, 2 puis 3 ; 4 et 5 ensuite, 5.4 en continu |
+
+Le détail de chaque arbitrage, tel qu'il a été instruit, est dans les sections précédentes et
+dans D71 (`05-decisions.md`).
 
 ## État
 
