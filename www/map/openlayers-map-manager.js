@@ -17,6 +17,94 @@
  *   degradation when subsets are unavailable.
  */
 (function () {
+    // ------------------------------------------------------------ airport layout
+    //
+    // Runways, taxiways, aprons and terminals around the station, from
+    // OpenStreetMap, written per station by tools/airport-layout/fetch.py. Drawn
+    // to read on a dark base map as well as a light one; colours to tune by eye.
+    const AIRPORT_LAYOUT_URL = '/data/airport-layout.geojson';
+    const AIRPORT_LAYOUT_COLORS = {
+        runway: '#e4e4e4',
+        runwayLabel: '#ffffff',
+        taxiway: '#efe3a0',
+        apron: 'rgba(190, 190, 190, 0.16)',
+        terminal: 'rgba(170, 182, 214, 0.30)',
+    };
+    const airportLayoutStyleCache = new Map();
+    const featureCosLat = new WeakMap();
+
+    function zoomForResolution(resolution) {
+        return Math.log2(156543.03392804097 / resolution);
+    }
+
+    // A Web Mercator pixel spans resolution * cos(latitude) metres on the ground.
+    function groundMetresPerPixel(feature, resolution) {
+        let cosLat = featureCosLat.get(feature);
+        if (cosLat === undefined) {
+            const extent = feature.getGeometry().getExtent();
+            const lat = window.ol.proj.toLonLat([0, (extent[1] + extent[3]) / 2])[1];
+            cosLat = Math.cos(lat * Math.PI / 180);
+            featureCosLat.set(feature, cosLat);
+        }
+        return resolution * cosLat;
+    }
+
+    function cachedStyle(key, create) {
+        let style = airportLayoutStyleCache.get(key);
+        if (!style) {
+            style = create();
+            airportLayoutStyleCache.set(key, style);
+        }
+        return style;
+    }
+
+    // Runways at their real width (the width tag, 45 m without it), 2 px at least,
+    // with their designation from z13; taxiways from z12; aprons and terminals as
+    // faint fills; nothing but runways below z9.
+    function airportLayoutStyle(feature, resolution) {
+        const ol = window.ol;
+        const kind = feature.get('aeroway');
+        const zoom = zoomForResolution(resolution);
+        if (kind !== 'runway' && zoom < 9) return null;
+        const type = feature.getGeometry().getType();
+        const isArea = type === 'Polygon' || type === 'MultiPolygon';
+
+        if (kind === 'runway') {
+            const label = zoom >= 13 ? (feature.get('ref') || '') : '';
+            const text = label ? new ol.style.Text({
+                text: label,
+                font: 'bold 11px sans-serif',
+                fill: new ol.style.Fill({ color: AIRPORT_LAYOUT_COLORS.runwayLabel }),
+                stroke: new ol.style.Stroke({ color: '#000000', width: 3 }),
+                overflow: true,
+            }) : undefined;
+            if (isArea) {
+                return cachedStyle(`runway-area|${label}`, () => new ol.style.Style({
+                    fill: new ol.style.Fill({ color: AIRPORT_LAYOUT_COLORS.runway }),
+                    text,
+                }));
+            }
+            const widthMetres = parseFloat(feature.get('width')) || 45;
+            const widthPx = Math.max(2, widthMetres / groundMetresPerPixel(feature, resolution));
+            return cachedStyle(`runway|${widthPx.toFixed(1)}|${label}`, () => new ol.style.Style({
+                stroke: new ol.style.Stroke({ color: AIRPORT_LAYOUT_COLORS.runway, width: widthPx, lineCap: 'butt' }),
+                text,
+            }));
+        }
+
+        if (kind === 'taxiway') {
+            if (zoom < 12) return null;
+            return cachedStyle(`taxiway|${isArea}`, () => new ol.style.Style(isArea
+                ? { fill: new ol.style.Fill({ color: 'rgba(239, 227, 160, 0.25)' }) }
+                : { stroke: new ol.style.Stroke({ color: AIRPORT_LAYOUT_COLORS.taxiway, width: 1 }) }));
+        }
+
+        const color = kind === 'terminal' ? AIRPORT_LAYOUT_COLORS.terminal : AIRPORT_LAYOUT_COLORS.apron;
+        return cachedStyle(`${kind}|${isArea}`, () => new ol.style.Style(isArea
+            ? { fill: new ol.style.Fill({ color }) }
+            : { stroke: new ol.style.Stroke({ color, width: 1 }) }));
+    }
+
     class OpenLayersMapManager {
         constructor(store, CONFIG) {
             this.store = store;
@@ -119,9 +207,29 @@
                 heliports: createLayerState(126, this.store?.settings?.showHeliports !== false),
                 navaids: createLayerState(127, this.store?.settings?.showNavaids !== false),
                 allRunways: createLayerState(115, this.store?.settings?.showAllRunways === true),
+                // Above the base map, under everything else (trails 300, aircraft 400).
+                airportLayout: createLayerState(100, this.store?.settings?.showAirportLayout !== false),
             };
+            this._referenceLayerState.airportLayout.layer.setStyle(airportLayoutStyle);
+            this._referenceLayerState.airportLayout.source.setAttributions('&copy; OpenStreetMap contributors (ODbL)');
 
             this._rangeRingLayerState = createLayerState(110, this.store?.settings?.showRings !== false);
+        }
+
+        // The file is generated per station and may be absent: the layer then
+        // stays empty, and nothing is reported.
+        _loadAirportLayout() {
+            const state = this._referenceLayerState.airportLayout;
+            if (!state || this._airportLayoutRequested) return;
+            this._airportLayoutRequested = true;
+            fetch(AIRPORT_LAYOUT_URL, { credentials: 'same-origin' })
+                .then((response) => (response.ok ? response.json() : null))
+                .then((geojson) => {
+                    if (!geojson || !Array.isArray(geojson.features)) return;
+                    const features = new window.ol.format.GeoJSON().readFeatures(geojson, { featureProjection: 'EPSG:3857' });
+                    state.source.addFeatures(features);
+                })
+                .catch(() => {});
         }
 
         _clearReferenceLayer(layerName) {
@@ -1027,6 +1135,7 @@
             this._ensureTrailLayer();
             this._ensureOverlayLayer();
             this._ensureReferenceLayers();
+            this._loadAirportLayout();
             this._initOverlayRegistry();
             this._ensureReferencePopup();
 
