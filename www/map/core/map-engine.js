@@ -28,7 +28,7 @@
         function normalizeBaseMapStyle(styleId) {
             if (!styleId || typeof styleId !== 'string') return 'osm-dark';
             const value = styleId.trim().toLowerCase();
-            if (value === 'ign' || value === 'ign-dark' || value === 'osm' || value === 'osm-dark') return value;
+            if (value === 'ign' || value === 'ign-dark' || value === 'osm' || value === 'osm-dark' || value === 'none') return value;
             return 'osm-dark';
         }
 
@@ -90,10 +90,12 @@
 
         // A base layer for this style. Its class gives it its own canvas, so that
         // the dark filter applies to it alone.
+        // 'none' hides the base layer: aircraft and the airport layout on black.
         function createBaseMapLayer(styleId) {
             return new window.ol.layer.Tile({
                 className: 'ol-layer atc-basemap',
                 source: createBaseMapSource(styleId),
+                visible: normalizeBaseMapStyle(styleId) !== 'none',
             });
         }
 
@@ -166,6 +168,8 @@
 
             if (!baseLayer) return;
 
+            baseLayer.setVisible(normalizedStyle !== 'none');
+            if (normalizedStyle === 'none') return;
             const source = createBaseMapSource(normalizedStyle);
             baseLayer.setSource(source);
             applyBaseMapTheme(map && map.getTargetElement(), normalizedStyle);
