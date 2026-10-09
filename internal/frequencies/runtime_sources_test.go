@@ -29,7 +29,7 @@ func newSourcesService(t *testing.T) (*Service, string) {
 	c.Transcription.FFmpegFormat = "s16le"
 	c.Frequencies.ReconnectIntervalSecs = 3600
 	c.Frequencies.Sources = []cfg.FrequencyConfig{{ID: "mix", Name: "Configured mix", URL: gone.URL + "/aero.mp3"}}
-	s := NewService(c, log, nil, nil, nil, nil, nil, nil)
+	s := NewService(c, log, nil, nil, nil, nil)
 	t.Cleanup(s.Stop)
 	return s, gone.URL
 }

@@ -201,16 +201,6 @@ func (l *Logger) Named(name string) *Logger {
 	return &Logger{Logger: l.Logger.Named(name)}
 }
 
-// WithRequestID returns a logger with the request ID field
-func (l *Logger) WithRequestID(requestID string) *Logger {
-	return l.With(zap.String("request_id", requestID))
-}
-
-// WithError returns a logger with the error field
-func (l *Logger) WithError(err error) *Logger {
-	return l.With(zap.Error(err))
-}
-
 // The process-wide log level, held atomically so it can be changed at runtime.
 // Package scope because every Logger built by New shares one core threshold, and a
 // caller changing the level means "make the server quieter", not "make this one

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -365,24 +364,6 @@ func (sp *StreamProcessor) IsClientConnected(clientID string) bool {
 	return false
 }
 
-// RemoveClient removes a client from the stream processor.
-func (sp *StreamProcessor) RemoveClient(clientID string) {
-	sp.clientsMu.Lock()
-	defer sp.clientsMu.Unlock()
-
-	if reader, exists := sp.clients[clientID]; exists {
-		sp.logger.Info("Removing client", String("clientID", clientID))
-		reader.Close()
-		delete(sp.clients, clientID)
-		delete(sp.clientLastActive, clientID)
-
-		// Log the current client count
-		sp.logger.Info("Client removed",
-			String("clientID", clientID),
-			Int("remaining_clients", len(sp.clients)))
-	}
-}
-
 // GetClientCount returns the number of connected clients.
 func (sp *StreamProcessor) GetClientCount() int {
 	sp.clientsMu.RLock()
@@ -396,14 +377,6 @@ type NonClosingReader struct {
 	io.ReadCloser
 	processor *StreamProcessor
 	clientID  string
-}
-
-// NewNonClosingReader creates a new NonClosingReader.
-func NewNonClosingReader(r io.ReadCloser) *NonClosingReader {
-	return &NonClosingReader{
-		ReadCloser: r,
-		// processor and clientID will be set by the StreamProcessor.AddClient method
-	}
 }
 
 // Read reads data and updates the last activity time
@@ -502,9 +475,7 @@ func NewService(
 	logger *logger.Logger,
 	wsServer *websocket.Server,
 	transcriptionStorage *sqlite.TranscriptionStorage,
-	aircraftStorage *sqlite.AircraftStorage,
 	clearanceStorage *sqlite.ClearanceStorage,
-	templateRenderer transcription.TemplateRenderer,
 	fleet transcription.FleetProvider,
 ) *Service {
 	// EXPERIMENT: Reduce buffer size to see impact on perceived lag from "live"
@@ -531,7 +502,6 @@ func NewService(
 	}
 
 	transcriptionConfig := transcription.Config{
-		Backend:            config.Transcription.Backend,
 		FrequencyLanguages: frequencyLanguages,
 		Local: transcription.LocalSTTConfig{
 			ServerURL:         config.Transcription.Local.ServerURL,
@@ -542,80 +512,27 @@ func NewService(
 			SegmentPrerollMs:  config.Transcription.Local.SegmentPrerollMs,
 			SilenceThreshold:  config.Transcription.Local.SilenceThreshold,
 		},
-		OpenAIAPIKey:          config.Transcription.OpenAIAPIKey,
-		Model:                 config.Transcription.Model,
-		Language:              config.Transcription.Language,
-		NoiseReduction:        config.Transcription.NoiseReduction,
-		ChunkMs:               config.Transcription.ChunkMs,
-		BufferSizeKB:          config.Transcription.BufferSizeKB,
-		FFmpegPath:            config.Transcription.FFmpegPath,
-		FFmpegSampleRate:      config.Transcription.FFmpegSampleRate,
-		FFmpegChannels:        config.Transcription.FFmpegChannels,
-		FFmpegFormat:          config.Transcription.FFmpegFormat,
-		ReconnectIntervalSec:  config.Transcription.ReconnectIntervalSec,
-		MaxRetries:            config.Transcription.MaxRetries,
-		TurnDetectionType:     config.Transcription.TurnDetectionType,
-		PrefixPaddingMs:       config.Transcription.PrefixPaddingMs,
-		SilenceDurationMs:     config.Transcription.SilenceDurationMs,
-		VADThreshold:          config.Transcription.VADThreshold,
-		RetryMaxAttempts:      config.Transcription.RetryMaxAttempts,
-		RetryInitialBackoffMs: config.Transcription.RetryInitialBackoffMs,
-		RetryMaxBackoffMs:     config.Transcription.RetryMaxBackoffMs,
-		PromptPath:            config.Transcription.PromptPath,
-		TimeoutSeconds:        config.Transcription.TimeoutSeconds,
-		LogDir:                config.Transcription.LogDir,
-	}
-
-	// Load the prompt from file
-	promptBytes, err := os.ReadFile(config.Transcription.PromptPath)
-	if err != nil {
-		logger.Error("Failed to read transcription prompt file, using empty prompt",
-			Error(err),
-			String("path", config.Transcription.PromptPath))
-		transcriptionConfig.Prompt = ""
-	} else {
-		transcriptionConfig.Prompt = string(promptBytes)
-		logger.Info("Loaded transcription prompt from file",
-			String("path", config.Transcription.PromptPath),
-			Int("prompt_length", len(transcriptionConfig.Prompt)))
+		Language:         config.Transcription.Language,
+		FFmpegSampleRate: config.Transcription.FFmpegSampleRate,
+		LogDir:           config.Transcription.LogDir,
 	}
 
 	postProcessingConfig := transcription.PostProcessingConfig{
-		Enabled:               config.PostProcessing.Enabled,
-		Model:                 config.PostProcessing.Model,
-		IntervalSeconds:       config.PostProcessing.IntervalSeconds,
-		BatchSize:             config.PostProcessing.BatchSize,
-		ContextTranscriptions: config.PostProcessing.ContextTranscriptions,
-		SystemPromptPath:      config.PostProcessing.SystemPromptPath,
-		TimeoutSeconds:        config.PostProcessing.TimeoutSeconds,
-
-		Backend:              config.PostProcessing.Backend,
-		AirlinesDatPath:      config.PostProcessing.AirlinesDatPath,
-		MinScore:             config.PostProcessing.MinScore,
-		MinDigits:            config.PostProcessing.MinDigits,
-		FleetLastSeenMinutes: config.PostProcessing.FleetLastSeenMinutes,
-	}
-
-	// Convert frequency configs to the format expected by TranscriptionManager
-	var frequencyConfigs []transcription.FrequencyConfig
-	for _, freq := range config.Frequencies.Sources {
-		frequencyConfigs = append(frequencyConfigs, transcription.FrequencyConfig{
-			ID:   freq.ID,
-			Name: freq.Name,
-		})
+		Enabled:         config.PostProcessing.Enabled,
+		IntervalSeconds: config.PostProcessing.IntervalSeconds,
+		BatchSize:       config.PostProcessing.BatchSize,
+		AirlinesDatPath: config.PostProcessing.AirlinesDatPath,
+		MinScore:        config.PostProcessing.MinScore,
+		MinDigits:       config.PostProcessing.MinDigits,
 	}
 
 	transcriptionManager := transcription.NewTranscriptionManager(
 		wsServer,
 		transcriptionStorage,
-		aircraftStorage,
 		clearanceStorage,
 		logger.Named("transcribe"),
-		config.Transcription.OpenAIAPIKey,
 		transcriptionConfig,
 		postProcessingConfig,
-		templateRenderer,
-		frequencyConfigs,
 		fleet,
 	)
 

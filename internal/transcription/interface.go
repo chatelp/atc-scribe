@@ -7,4 +7,4 @@ type ProcessorInterface interface {
 }
 
 // Ensure the processor implements the interface
-var _ ProcessorInterface = (*Processor)(nil)
+var _ ProcessorInterface = (*LocalProcessor)(nil)

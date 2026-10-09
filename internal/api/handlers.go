@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,12 +14,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/yegors/co-atc/internal/adsb"
-	"github.com/yegors/co-atc/internal/atcchat"
 	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
-	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/transcription"
 	"github.com/yegors/co-atc/internal/weather"
@@ -33,8 +30,6 @@ type Handler struct {
 	adsbService          *adsb.Service
 	frequenciesService   *frequencies.Service
 	weatherService       *weather.Service
-	atcChatService       *atcchat.Service
-	simulationService    *simulation.Service
 	refService           *reference.Service
 	config               *config.Config
 	logger               *logger.Logger
@@ -56,7 +51,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new API handler
-func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, atcChatService *atcchat.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Handler {
+func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Handler {
 	// The grammar's values live in the same daily database as the transcriptions
 	// they came from.
 	valueStorage := sqlite.NewPhraseologyStorage(sqlite.DBOf(transcriptionStorage))
@@ -109,8 +104,6 @@ func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Servi
 		adsbService:          adsbService,
 		frequenciesService:   frequenciesService,
 		weatherService:       weatherService,
-		atcChatService:       atcChatService,
-		simulationService:    simulationService,
 		refService:           refService,
 		config:               config,
 		logger:               logger.Named("api-handler"),
@@ -862,9 +855,6 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 			"buffer_size_kb":          h.config.Frequencies.BufferSizeKB,
 			"reconnect_interval_secs": h.config.Frequencies.ReconnectIntervalSecs,
 		},
-		"atc_chat": map[string]interface{}{
-			"enabled": h.config.ATCChat.Enabled,
-		},
 	}
 
 	WriteJSON(w, http.StatusOK, publicConfig)
@@ -1180,288 +1170,6 @@ func (h *Handler) GetRunways(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusOK, h.refService.GetRunways())
-}
-
-// calculateBearing calculates the initial bearing from point 1 to point 2
-func calculateBearing(lat1, lon1, lat2, lon2 float64) float64 {
-	// Convert to radians
-	lat1 = lat1 * math.Pi / 180
-	lon1 = lon1 * math.Pi / 180
-	lat2 = lat2 * math.Pi / 180
-	lon2 = lon2 * math.Pi / 180
-
-	// Calculate bearing
-	y := math.Sin(lon2-lon1) * math.Cos(lat2)
-	x := math.Cos(lat1)*math.Sin(lat2) - math.Sin(lat1)*math.Cos(lat2)*math.Cos(lon2-lon1)
-	bearing := math.Atan2(y, x) * 180 / math.Pi
-
-	// Normalize to 0-360
-	return math.Mod(math.Mod(bearing, 360)+360, 360)
-}
-
-// calculateDestinationPoint calculates a destination point given a starting point, bearing, and distance
-func calculateDestinationPoint(lat, lon, bearing, distanceNM float64) (float64, float64) {
-	// Convert to radians
-	lat = lat * math.Pi / 180
-	lon = lon * math.Pi / 180
-	bearing = bearing * math.Pi / 180
-
-	// Earth radius in nautical miles
-	earthRadius := 3440.065 // 6371 km / 1.852 km/nm
-
-	// Calculate destination point
-	distRatio := distanceNM / earthRadius
-	lat2 := math.Asin(math.Sin(lat)*math.Cos(distRatio) + math.Cos(lat)*math.Sin(distRatio)*math.Cos(bearing))
-	lon2 := lon + math.Atan2(
-		math.Sin(bearing)*math.Sin(distRatio)*math.Cos(lat),
-		math.Cos(distRatio)-math.Sin(lat)*math.Sin(lat2),
-	)
-
-	// Convert back to degrees
-	lat2 = lat2 * 180 / math.Pi
-	lon2 = lon2 * 180 / math.Pi
-
-	return lat2, lon2
-}
-
-// fetchMetarData fetches METAR data from the Windy API with retry logic
-func (h *Handler) fetchMetarData(airportCode string) (interface{}, error) {
-	url := fmt.Sprintf("https://node.windy.com/airports/metar/%s", airportCode)
-
-	// Create a new HTTP client with increased timeout
-	client := &http.Client{
-		Timeout: 10 * time.Second, // Increased from 5 to 10 seconds
-	}
-
-	// Retry configuration
-	maxRetries := 2
-	var lastErr error
-	var metarData interface{}
-
-	// Try to fetch with retries
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Exponential backoff between retries
-			backoffDuration := time.Duration(500*(1<<uint(attempt-1))) * time.Millisecond
-			h.logger.Info("Retrying METAR data fetch",
-				logger.String("airport", airportCode),
-				logger.Int("attempt", attempt),
-				logger.String("backoff", backoffDuration.String()))
-			time.Sleep(backoffDuration)
-		}
-
-		// Make the request
-		resp, err := client.Get(url)
-		if err != nil {
-			lastErr = fmt.Errorf("error making request to Windy API: %w", err)
-			h.logger.Warn("METAR API request failed, may retry",
-				logger.String("airport", airportCode),
-				logger.Error(err),
-				logger.Int("attempt", attempt+1),
-				logger.Int("max_attempts", maxRetries+1))
-			continue
-		}
-
-		// Ensure response body is closed
-		defer resp.Body.Close()
-
-		// Check response status
-		if resp.StatusCode != http.StatusOK {
-			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-			h.logger.Warn("METAR API returned non-OK status, may retry",
-				logger.String("airport", airportCode),
-				logger.Int("status_code", resp.StatusCode),
-				logger.Int("attempt", attempt+1),
-				logger.Int("max_attempts", maxRetries+1))
-			continue
-		}
-
-		// Read and parse the response
-		if err := json.NewDecoder(resp.Body).Decode(&metarData); err != nil {
-			lastErr = fmt.Errorf("error decoding METAR data: %w", err)
-			h.logger.Warn("Failed to decode METAR data, may retry",
-				logger.String("airport", airportCode),
-				logger.Error(err),
-				logger.Int("attempt", attempt+1),
-				logger.Int("max_attempts", maxRetries+1))
-			continue
-		}
-
-		// Success - return the data
-		if attempt > 0 {
-			h.logger.Info("Successfully fetched METAR data after retries",
-				logger.String("airport", airportCode),
-				logger.Int("attempts_needed", attempt+1))
-		}
-		return metarData, nil
-	}
-
-	// If we get here, all attempts failed
-	h.logger.Error("All attempts to fetch METAR data failed",
-		logger.String("airport", airportCode),
-		logger.Error(lastErr),
-		logger.Int("max_attempts", maxRetries+1))
-	return nil, lastErr
-}
-
-// fetchTAFData fetches TAF data from the Windy API with retry logic
-func (h *Handler) fetchTAFData(airportCode string) (interface{}, error) {
-	url := fmt.Sprintf("https://node.windy.com/airports/taf/%s", airportCode)
-
-	// Create a new HTTP client with increased timeout
-	client := &http.Client{
-		Timeout: 10 * time.Second, // Increased from 5 to 10 seconds
-	}
-
-	// Retry configuration
-	maxRetries := 2
-	var lastErr error
-	var tafData interface{}
-
-	// Try to fetch with retries
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Exponential backoff between retries
-			backoffDuration := time.Duration(500*(1<<uint(attempt-1))) * time.Millisecond
-			h.logger.Info("Retrying TAF data fetch",
-				logger.String("airport", airportCode),
-				logger.Int("attempt", attempt),
-				logger.String("backoff", backoffDuration.String()))
-			time.Sleep(backoffDuration)
-		}
-
-		// Make the request
-		resp, err := client.Get(url)
-		if err != nil {
-			lastErr = fmt.Errorf("error making request to Windy API: %w", err)
-			h.logger.Warn("TAF API request failed, may retry",
-				logger.String("airport", airportCode),
-				logger.Error(err),
-				logger.Int("attempt", attempt+1),
-				logger.Int("max_attempts", maxRetries+1))
-			continue
-		}
-
-		// Ensure response body is closed
-		defer resp.Body.Close()
-
-		// Check response status
-		if resp.StatusCode != http.StatusOK {
-			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-			h.logger.Warn("TAF API returned non-OK status, may retry",
-				logger.String("airport", airportCode),
-				logger.Int("status_code", resp.StatusCode),
-				logger.Int("attempt", attempt+1),
-				logger.Int("max_attempts", maxRetries+1))
-			continue
-		}
-
-		// Read and parse the response
-		if err := json.NewDecoder(resp.Body).Decode(&tafData); err != nil {
-			lastErr = fmt.Errorf("error decoding TAF data: %w", err)
-			h.logger.Warn("Failed to decode TAF data, may retry",
-				logger.String("airport", airportCode),
-				logger.Error(err),
-				logger.Int("attempt", attempt+1),
-				logger.Int("max_attempts", maxRetries+1))
-			continue
-		}
-
-		// Success - return the data
-		if attempt > 0 {
-			h.logger.Info("Successfully fetched TAF data after retries",
-				logger.String("airport", airportCode),
-				logger.Int("attempts_needed", attempt+1))
-		}
-		return tafData, nil
-	}
-
-	// If we get here, all attempts failed
-	h.logger.Error("All attempts to fetch TAF data failed",
-		logger.String("airport", airportCode),
-		logger.Error(lastErr),
-		logger.Int("max_attempts", maxRetries+1))
-	return nil, lastErr
-}
-
-// fetchNOTAMData fetches NOTAM data from the Windy API with retry logic
-func (h *Handler) fetchNOTAMData(airportCode string) (interface{}, error) {
-	url := fmt.Sprintf("https://node.windy.com/airports/notams/%s", airportCode)
-
-	// Create a new HTTP client with increased timeout
-	client := &http.Client{
-		Timeout: 10 * time.Second, // Increased from 5 to 10 seconds
-	}
-
-	// Retry configuration
-	maxRetries := 2
-	var lastErr error
-	var notamData interface{}
-
-	// Try to fetch with retries
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Exponential backoff between retries
-			backoffDuration := time.Duration(500*(1<<uint(attempt-1))) * time.Millisecond
-			h.logger.Info("Retrying NOTAM data fetch",
-				logger.String("airport", airportCode),
-				logger.Int("attempt", attempt),
-				logger.String("backoff", backoffDuration.String()))
-			time.Sleep(backoffDuration)
-		}
-
-		// Make the request
-		resp, err := client.Get(url)
-		if err != nil {
-			lastErr = fmt.Errorf("error making request to Windy API: %w", err)
-			h.logger.Warn("NOTAM API request failed, may retry",
-				logger.String("airport", airportCode),
-				logger.Error(err),
-				logger.Int("attempt", attempt+1),
-				logger.Int("max_attempts", maxRetries+1))
-			continue
-		}
-
-		// Ensure response body is closed
-		defer resp.Body.Close()
-
-		// Check response status
-		if resp.StatusCode != http.StatusOK {
-			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-			h.logger.Warn("NOTAM API returned non-OK status, may retry",
-				logger.String("airport", airportCode),
-				logger.Int("status_code", resp.StatusCode),
-				logger.Int("attempt", attempt+1),
-				logger.Int("max_attempts", maxRetries+1))
-			continue
-		}
-
-		// Read and parse the response
-		if err := json.NewDecoder(resp.Body).Decode(&notamData); err != nil {
-			lastErr = fmt.Errorf("error decoding NOTAM data: %w", err)
-			h.logger.Warn("Failed to decode NOTAM data, may retry",
-				logger.String("airport", airportCode),
-				logger.Error(err),
-				logger.Int("attempt", attempt+1),
-				logger.Int("max_attempts", maxRetries+1))
-			continue
-		}
-
-		// Success - return the data
-		if attempt > 0 {
-			h.logger.Info("Successfully fetched NOTAM data after retries",
-				logger.String("airport", airportCode),
-				logger.Int("attempts_needed", attempt+1))
-		}
-		return notamData, nil
-	}
-
-	// If we get here, all attempts failed
-	h.logger.Error("All attempts to fetch NOTAM data failed",
-		logger.String("airport", airportCode),
-		logger.Error(lastErr),
-		logger.Int("max_attempts", maxRetries+1))
-	return nil, lastErr
 }
 
 // GetAllFrequencies returns all frequencies with recent transcriptions
@@ -1818,21 +1526,6 @@ func parseAircraftFilters(r *http.Request) (float64, float64, string, []string, 
 		refLat, refLon, refHex, refFlight, excludeOtherAirportsGrounded, simple
 }
 
-// getHexCoordinates gets coordinates from an aircraft hex code
-func (h *Handler) getHexCoordinates(hexCode string) (float64, float64, error) {
-	// Look up aircraft by hex code
-	aircraft, found := h.adsbService.GetAircraftByHex(hexCode)
-	if !found {
-		return 0, 0, fmt.Errorf("aircraft with hex %s not found", hexCode)
-	}
-
-	if aircraft.ADSB == nil || !aircraft.ADSB.HasPosition() {
-		return 0, 0, fmt.Errorf("aircraft with hex %s has no position data", hexCode)
-	}
-	lat, lon, _ := aircraft.ADSB.Position()
-	return lat, lon, nil
-}
-
 // getRefAircraft gets the reference aircraft by hex code
 func (h *Handler) getRefAircraft(hexCode string) (*adsb.Aircraft, error) {
 	// Look up aircraft by hex code
@@ -1892,216 +1585,6 @@ func haversine(lat1, lon1, lat2, lon2 float64) float64 {
 	return adsb.Haversine(lat1, lon1, lat2, lon2)
 }
 
-// This function has been replaced by getHexCoordinates and getFlightCoordinates
-
-// CreateATCChatSession creates a new ATC chat session
-func (h *Handler) CreateATCChatSession(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	session, err := h.atcChatService.CreateSession(r.Context())
-	if err != nil {
-		// Check if this is a missing API key error - handle gracefully
-		if strings.Contains(err.Error(), "OpenAI API key is required") {
-			h.logger.Warn("ATC Chat session creation failed - API key not configured")
-			http.Error(w, "ATC Chat requires OpenAI API key configuration", http.StatusServiceUnavailable)
-			return
-		}
-
-		// For other errors, log at error level with stack trace
-		h.logger.Error("Failed to create ATC chat session", logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to create session: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	h.logger.Info("Created ATC chat session",
-		logger.String("session_id", session.ID))
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(session); err != nil {
-		h.logger.Error("Failed to encode session response", logger.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-// EndATCChatSession terminates an ATC chat session
-func (h *Handler) EndATCChatSession(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessionID := chi.URLParam(r, "sessionId")
-	if sessionID == "" {
-		http.Error(w, "Session ID is required", http.StatusBadRequest)
-		return
-	}
-
-	if err := h.atcChatService.EndSession(r.Context(), sessionID); err != nil {
-		h.logger.Error("Failed to end ATC chat session",
-			logger.String("session_id", sessionID),
-			logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to end session: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	h.logger.Info("Ended ATC chat session",
-		logger.String("session_id", sessionID))
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"status":     "success",
-		"session_id": sessionID,
-		"message":    "Session ended successfully",
-	})
-}
-
-// HandleATCChatWebSocket handles WebSocket connections for ATC chat
-func (h *Handler) HandleATCChatWebSocket(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessionID := chi.URLParam(r, "sessionId")
-	if sessionID == "" {
-		http.Error(w, "Session ID is required", http.StatusBadRequest)
-		return
-	}
-
-	// Create ATC chat handlers and delegate to them
-	atcChatHandlers := NewATCChatHandlers(h.atcChatService, h.logger)
-
-	// Update the URL parameter to match what the ATC chat handler expects
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("sessionID", sessionID)
-	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
-
-	atcChatHandlers.WebSocketHandler(w, r)
-}
-
-// GetATCChatSessionStatus returns the status of an ATC chat session
-func (h *Handler) GetATCChatSessionStatus(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessionID := chi.URLParam(r, "sessionId")
-	if sessionID == "" {
-		http.Error(w, "Session ID is required", http.StatusBadRequest)
-		return
-	}
-
-	status, err := h.atcChatService.GetSessionStatus(sessionID)
-	if err != nil {
-		h.logger.Error("Failed to get session status",
-			logger.String("session_id", sessionID),
-			logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to get session status: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(status); err != nil {
-		h.logger.Error("Failed to encode status response", logger.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-// GetATCChatSessions returns all active ATC chat sessions
-func (h *Handler) GetATCChatSessions(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessions := h.atcChatService.ListActiveSessions()
-
-	response := map[string]interface{}{
-		"sessions": sessions,
-		"count":    len(sessions),
-		"status":   "success",
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.logger.Error("Failed to encode sessions response", logger.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-// GetATCChatAirspaceStatus returns current airspace status for ATC chat
-func (h *Handler) GetATCChatAirspaceStatus(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	status := h.atcChatService.GetAirspaceStatus()
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(status); err != nil {
-		h.logger.Error("Failed to encode airspace status response", logger.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-// UpdateATCChatSessionContext updates the session context with fresh airspace data
-func (h *Handler) UpdateATCChatSessionContext(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessionID := chi.URLParam(r, "sessionId")
-	if sessionID == "" {
-		http.Error(w, "Session ID is required", http.StatusBadRequest)
-		return
-	}
-
-	h.logger.Debug("Received request to update session context",
-		logger.String("session_id", sessionID))
-
-	// Generate the system prompt and variables that will be sent to AI
-	promptWithVars, err := h.atcChatService.GenerateSystemPromptWithVariables(sessionID)
-	if err != nil {
-		h.logger.Error("Failed to generate system prompt for context update",
-			logger.String("session_id", sessionID),
-			logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to generate system prompt: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	// Update session context with fresh airspace data
-	if err := h.atcChatService.UpdateSessionContextOnDemand(sessionID); err != nil {
-		h.logger.Error("Failed to update session context",
-			logger.String("session_id", sessionID),
-			logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to update session context: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	h.logger.Info("Session context updated successfully",
-		logger.String("session_id", sessionID))
-
-	// Return success response with the actual instructions sent to AI and individual variables
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":        "success",
-		"message":       "Session context updated with fresh airspace data",
-		"instructions":  promptWithVars.Prompt,
-		"prompt_length": len(promptWithVars.Prompt),
-		"variables":     promptWithVars.Variables,
-	})
-}
-
 // convertClearancesToAPIFormat converts clearance records to API format
 func (h *Handler) convertClearancesToAPIFormat(clearances []*sqlite.ClearanceRecord) []adsb.ClearanceData {
 	result := make([]adsb.ClearanceData, len(clearances))
@@ -2133,152 +1616,6 @@ func (h *Handler) formatTimeSince(duration time.Duration) string {
 	} else {
 		return fmt.Sprintf("%dd", int(duration.Hours()/24))
 	}
-}
-
-// CreateSimulatedAircraft creates a new simulated aircraft
-func (h *Handler) CreateSimulatedAircraft(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Lat          float64 `json:"lat"`
-		Lon          float64 `json:"lon"`
-		Altitude     float64 `json:"altitude"`
-		Heading      float64 `json:"heading"`
-		Speed        float64 `json:"speed"`
-		VerticalRate float64 `json:"vertical_rate"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	// Validate input
-	if req.Lat < -90 || req.Lat > 90 || req.Lon < -180 || req.Lon > 180 {
-		http.Error(w, "Invalid coordinates", http.StatusBadRequest)
-		return
-	}
-
-	if req.Altitude < 0 || req.Altitude > 60000 {
-		http.Error(w, "Invalid altitude (0-60000 ft)", http.StatusBadRequest)
-		return
-	}
-
-	if req.Heading < 0 || req.Heading >= 360 {
-		http.Error(w, "Invalid heading (0-359 degrees)", http.StatusBadRequest)
-		return
-	}
-
-	if req.Speed < 0 || req.Speed > 500 {
-		http.Error(w, "Invalid speed (0-500 knots)", http.StatusBadRequest)
-		return
-	}
-
-	if req.VerticalRate < -3000 || req.VerticalRate > 3000 {
-		http.Error(w, "Invalid vertical rate (-3000 to +3000 fpm)", http.StatusBadRequest)
-		return
-	}
-
-	aircraft, err := h.simulationService.CreateAircraft(
-		req.Lat, req.Lon, req.Altitude,
-		req.Heading, req.Speed, req.VerticalRate,
-	)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	h.logger.Info("Created simulated aircraft via API",
-		logger.String("hex", aircraft.Hex),
-		logger.String("flight", aircraft.Flight))
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":   "success",
-		"aircraft": aircraft,
-	})
-}
-
-// UpdateSimulationControls updates the control parameters for a simulated aircraft
-func (h *Handler) UpdateSimulationControls(w http.ResponseWriter, r *http.Request) {
-	hex := chi.URLParam(r, "hex")
-	if hex == "" {
-		http.Error(w, "Missing hex parameter", http.StatusBadRequest)
-		return
-	}
-
-	var req struct {
-		Heading      float64 `json:"heading"`
-		Speed        float64 `json:"speed"`
-		VerticalRate float64 `json:"vertical_rate"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	// Validate input
-	if req.Heading < 0 || req.Heading >= 360 {
-		http.Error(w, "Invalid heading (0-359 degrees)", http.StatusBadRequest)
-		return
-	}
-
-	if req.Speed < 0 || req.Speed > 500 {
-		http.Error(w, "Invalid speed (0-500 knots)", http.StatusBadRequest)
-		return
-	}
-
-	if req.VerticalRate < -3000 || req.VerticalRate > 3000 {
-		http.Error(w, "Invalid vertical rate (-3000 to +3000 fpm)", http.StatusBadRequest)
-		return
-	}
-
-	err := h.simulationService.UpdateControls(hex, req.Heading, req.Speed, req.VerticalRate)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	h.logger.Debug("Updated simulation controls via API",
-		logger.String("hex", hex),
-		logger.Float64("heading", req.Heading),
-		logger.Float64("speed", req.Speed),
-		logger.Float64("vertical_rate", req.VerticalRate))
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "success",
-	})
-}
-
-// RemoveSimulatedAircraft removes a simulated aircraft
-func (h *Handler) RemoveSimulatedAircraft(w http.ResponseWriter, r *http.Request) {
-	hex := chi.URLParam(r, "hex")
-	if hex == "" {
-		http.Error(w, "Missing hex parameter", http.StatusBadRequest)
-		return
-	}
-
-	err := h.simulationService.RemoveAircraft(hex)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	h.logger.Info("Removed simulated aircraft via API",
-		logger.String("hex", hex))
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "success",
-	})
-}
-
-// GetSimulatedAircraft returns all simulated aircraft
-func (h *Handler) GetSimulatedAircraft(w http.ResponseWriter, r *http.Request) {
-	aircraft := h.simulationService.GetAllAircraft()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(aircraft)
 }
 
 // authUsers maps the accounts from the configuration file into the auth package,

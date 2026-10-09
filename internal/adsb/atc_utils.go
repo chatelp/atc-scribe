@@ -3,7 +3,6 @@ package adsb
 import (
 	"fmt"
 	"math"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -225,77 +224,6 @@ func CalculateRelativeBearing(lat1, lon1, heading1, lat2, lon2 float64) float64 
 // MetersToNM converts meters to nautical miles
 func MetersToNM(meters float64) float64 {
 	return meters / METERS_PER_NM
-}
-
-// NMToMeters converts nautical miles to meters
-func NMToMeters(nm float64) float64 {
-	return nm * METERS_PER_NM
-}
-
-// FeetToMeters converts feet to meters
-func FeetToMeters(feet float64) float64 {
-	return feet / FEET_PER_METER
-}
-
-// MetersToFeet converts meters to feet
-func MetersToFeet(meters float64) float64 {
-	return meters * FEET_PER_METER
-}
-
-// ParseCoordinates parses a string in the format "lat,lon" to float64 values
-func ParseCoordinates(coordStr string) (float64, float64, error) {
-	parts := strings.Split(coordStr, ",")
-	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("invalid coordinate format, expected 'lat,lon'")
-	}
-
-	lat, err := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
-	if err != nil {
-		return 0, 0, fmt.Errorf("invalid latitude: %w", err)
-	}
-
-	lon, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-	if err != nil {
-		return 0, 0, fmt.Errorf("invalid longitude: %w", err)
-	}
-
-	return lat, lon, nil
-}
-
-// IsHexCode checks if a string is a valid hex code (ICAO address)
-func IsHexCode(s string) bool {
-	hexPattern := regexp.MustCompile(`^[0-9a-fA-F]{6}$`)
-	return hexPattern.MatchString(s)
-}
-
-// IsFlightNumber checks if a string is likely a flight number
-func IsFlightNumber(s string) bool {
-	// Most flight numbers are 2-3 letters followed by 1-4 digits
-	flightPattern := regexp.MustCompile(`^[A-Za-z]{2,3}[0-9]{1,4}$`)
-	return flightPattern.MatchString(s)
-}
-
-// IsTailNumber checks if a string is likely a tail/registration number
-func IsTailNumber(s string) bool {
-	// Common tail number patterns:
-	// N-numbers (US): N followed by 1-5 digits or 1-4 digits followed by 1-2 letters
-	// C-XXXX (Canada): C- followed by 4 characters
-	// G-XXXX (UK): G- followed by 4 characters
-	tailPatterns := []*regexp.Regexp{
-		regexp.MustCompile(`^N[0-9]{1,5}$`),              // N12345
-		regexp.MustCompile(`^N[0-9]{1,4}[A-Za-z]{1,2}$`), // N123AB
-		regexp.MustCompile(`^[A-Z]-[A-Z0-9]{4}$`),        // C-FKWZ, G-ABCD
-		regexp.MustCompile(`^[A-Z]{2}-[A-Z0-9]{3,4}$`),   // VH-ABC, JA-8089
-		regexp.MustCompile(`^[A-Z]{3}[0-9]{1,4}[A-Z]?$`), // Various other formats
-	}
-
-	for _, pattern := range tailPatterns {
-		if pattern.MatchString(s) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // --- ICAO to Tail Number Conversion Functions ---
@@ -795,29 +723,6 @@ func CalculateRunwayCenterlineDistance(aircraftLat, aircraftLon float64, thresho
 	centerlineDistance := distanceToAircraft * math.Sin(angleDiff*math.Pi/180.0)
 
 	return centerlineDistance
-}
-
-// IsOnRunwayApproach determines if aircraft meets approach criteria for a specific runway
-func IsOnRunwayApproach(aircraftLat, aircraftLon, heading, altitude float64, threshold RunwayThreshold, config config.FlightPhasesConfig) bool {
-	// Calculate distance to threshold
-	distanceMeters := Haversine(aircraftLat, aircraftLon, threshold.Latitude, threshold.Longitude)
-	distanceNM := MetersToNM(distanceMeters)
-
-	// Check distance constraint
-	if distanceNM > float64(config.ApproachMaxDistanceNM) {
-		return false
-	}
-
-	// For approach phase, we also need to be below a certain altitude (5000 feet as per plan)
-	if altitude > 5000 {
-		return false
-	}
-
-	// Calculate runway heading (this is simplified - in real implementation we'd need the opposite threshold)
-	// For now, we'll assume we have the runway heading available
-	// This would need to be enhanced with actual runway data
-
-	return true
 }
 
 // getOppositeThreshold returns the opposite threshold ID for a given threshold

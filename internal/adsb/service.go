@@ -195,16 +195,6 @@ type Storage interface {
 	GetStaleActiveAircraft(activeHexCodes []string, cutoff time.Time) ([]*Aircraft, error)
 }
 
-// SimulationService defines the interface for simulation service
-type SimulationService interface {
-	UpdatePositions()
-	GenerateADSBData() []ADSBTarget
-	IsSimulated(hex string) bool
-	GetAllAircraft() interface{}                                           // Returns simulation aircraft data
-	GetAircraft(hex string) (interface{}, bool)                            // Returns specific simulated aircraft
-	UpdateControls(hex string, heading, speed, verticalRate float64) error // Update simulation controls
-}
-
 // Service is the main service for ADS-B data processing
 type Service struct {
 	voiceState // what the radio has said about each aircraft; see voice.go
@@ -231,8 +221,6 @@ type Service struct {
 	runwayJudge        *RunwayJudge              // The one judge of each aircraft's runway (D69)
 	flightPhasesConfig config.FlightPhasesConfig // Flight phases configuration
 	changeDetector     *ChangeDetector           // Tracks aircraft changes
-	broadcastChan      chan []AircraftChange     // Channel for broadcasting changes
-	simulationService  SimulationService         // Simulation service for simulated aircraft
 	trajectoryTracker  *TrajectoryTracker        // Trajectory-based phase detection
 }
 
@@ -253,7 +241,6 @@ func NewService(
 	adsbCfg config.ADSBConfig,
 	flightPhasesConfig config.FlightPhasesConfig,
 	wsServer WebSocketServer,
-	simulationService SimulationService,
 ) *Service {
 	// Set default signal lost timeout if not configured
 	signalLostTimeout := time.Duration(adsbCfg.SignalLostTimeoutSecs) * time.Second
@@ -280,7 +267,6 @@ func NewService(
 		wsServer:           wsServer,
 		signalLostTimeout:  signalLostTimeout,
 		flightPhasesConfig: flightPhasesConfig,
-		simulationService:  simulationService,
 	}
 
 	// Always enable WebSocket streaming for aircraft updates
@@ -330,17 +316,6 @@ func NewService(
 	}
 
 	return service
-}
-
-// startBroadcastWorker starts the worker that broadcasts aircraft changes via WebSocket
-func (s *Service) startBroadcastWorker() {
-	go func() {
-		for changes := range s.broadcastChan {
-			for _, change := range changes {
-				s.broadcastAircraftChange(change)
-			}
-		}
-	}()
 }
 
 // broadcastAircraftChange broadcasts a single aircraft change via WebSocket
@@ -438,53 +413,6 @@ func (s *Service) predictionBroadcastLoop(ctx context.Context) {
 	}
 }
 
-// sendPhaseChangeAlert sends a phase change alert via WebSocket
-func (s *Service) sendPhaseChangeAlert(aircraft *Aircraft, fromPhase, toPhase string, runwayInfo *RunwayApproachInfo) {
-	s.sendPhaseChangeAlertWithEvent(aircraft, fromPhase, toPhase, "phase_change", runwayInfo)
-}
-
-// sendPhaseChangeAlertWithEvent sends a phase change alert with event type via WebSocket
-func (s *Service) sendPhaseChangeAlertWithEvent(aircraft *Aircraft, fromPhase, toPhase, eventType string, runwayInfo *RunwayApproachInfo) {
-	if s.wsServer != nil {
-		lat, lon, _ := aircraft.ADSB.Position()
-		alert := PhaseChangeAlert{
-			Type:      "phase_change",
-			Hex:       aircraft.Hex,
-			Flight:    aircraft.Flight,
-			FromPhase: fromPhase,
-			ToPhase:   toPhase,
-			EventType: eventType,
-			Timestamp: time.Now().UTC(),
-			Location: struct {
-				Lat float64 `json:"lat"`
-				Lon float64 `json:"lon"`
-				Alt float64 `json:"alt"`
-			}{
-				Lat: roundTo(lat, 6),
-				Lon: roundTo(lon, 6),
-				Alt: aircraft.ADSB.AltBaro.Float64(),
-			},
-			RunwayInfo: runwayInfo,
-		}
-
-		s.wsServer.Broadcast(&websocket.Message{
-			Type: "phase_change",
-			Data: map[string]interface{}{
-				"alert": alert,
-			},
-		})
-
-		s.logger.Info("Phase change alert sent",
-			logger.String("hex", aircraft.Hex),
-			logger.String("flight", aircraft.Flight),
-			logger.String("transition", fromPhase+" → "+toPhase),
-			logger.String("event_type", eventType),
-			logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
-			logger.Bool("on_ground", aircraft.OnGround),
-		)
-	}
-}
-
 // Start starts the ADS-B service
 func (s *Service) Start(ctx context.Context) error {
 	s.logger.Info("Starting ADS-B service",
@@ -555,19 +483,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 		return err
 	}
 
-	// Update simulated aircraft positions and inject simulated data
-	if s.simulationService != nil {
-		s.simulationService.UpdatePositions()
-		simulatedTargets := s.simulationService.GenerateADSBData()
-
-		// Append simulated aircraft to raw data
-		rawData.Aircraft = append(rawData.Aircraft, simulatedTargets...)
-
-		s.logger.Debug("Injected simulated aircraft into ADSB data",
-			logger.Int("count", len(simulatedTargets)))
-	}
-
-	// Process raw data (now includes simulated aircraft)
+	// Process raw data
 	newAircraft := s.ProcessRawData(rawData)
 
 	// Create a map of active aircraft hex codes
@@ -758,9 +674,8 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 			}
 		}
 
-		// Enrich with BSDB and simulation data (in-memory lookups)
+		// Enrich with BSDB data (in-memory lookups)
 		s.enrichWithRefData(newAircraft)
-		s.updateSimulationFields(newAircraft)
 		s.enrichWithATCDerivedData(newAircraft)
 
 		// Overlay trajectory-based predictions (computed fresh after phase detection)
@@ -792,24 +707,6 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 	)
 
 	return nil
-}
-
-// updateSimulationFields updates the IsSimulated field and simulation controls for aircraft
-func (s *Service) updateSimulationFields(aircraft []*Aircraft) {
-	for _, a := range aircraft {
-		if a.ADSB != nil {
-			a.IsSimulated = (s.simulationService != nil && s.simulationService.IsSimulated(a.Hex)) || a.ADSB.Type == "sim"
-
-			// Update simulation controls if this is a simulated aircraft
-			if a.IsSimulated && a.SimulationControls == nil {
-				a.SimulationControls = &SimulationControls{
-					TargetHeading:      NumberOrZero(a.ADSB.TrueHeading),
-					TargetSpeed:        NumberOrZero(a.ADSB.TAS),
-					TargetVerticalRate: NumberOrZero(a.ADSB.BaroRate),
-				}
-			}
-		}
-	}
 }
 
 func (s *Service) enrichWithATCDerivedData(aircraft []*Aircraft) {
@@ -947,11 +844,6 @@ func (s *Service) landingRunway(lat, lon, track, alt float64) (string, *RunwayAp
 	return airport, best
 }
 
-// GetRunwayData returns the runways of the reference airport.
-func (s *Service) GetRunwayData() RunwayData {
-	return s.ref.load().Runways
-}
-
 // GetRunwayInUseScores returns the top N runway-in-use probability scores.
 func (s *Service) GetRunwayInUseScores(n int) []RunwayScore {
 	if s.trajectoryTracker != nil {
@@ -983,18 +875,9 @@ func (s *Service) enrichWithRefData(aircraft []*Aircraft) {
 	}
 }
 
-// UpdateSimulationControls updates the control parameters for a simulated aircraft
-func (s *Service) UpdateSimulationControls(hex string, heading, speed, verticalRate float64) error {
-	if s.simulationService == nil {
-		return fmt.Errorf("simulation service not available")
-	}
-	return s.simulationService.UpdateControls(hex, heading, speed, verticalRate)
-}
-
 // GetAllAircraft returns all aircraft
 func (s *Service) GetAllAircraft() []*Aircraft {
 	aircraft := s.storage.GetAll()
-	s.updateSimulationFields(aircraft)
 	s.enrichWithRefData(aircraft)
 	s.enrichWithATCDerivedData(aircraft)
 	return aircraft
@@ -1004,7 +887,6 @@ func (s *Service) GetAllAircraft() []*Aircraft {
 // This uses database-level filtering for better performance on large databases
 func (s *Service) GetAllAircraftWithLastSeenFilter(lastSeenMinutes int) []*Aircraft {
 	aircraft := s.storage.GetAllWithLastSeenFilter(lastSeenMinutes)
-	s.updateSimulationFields(aircraft)
 	s.enrichWithRefData(aircraft)
 	s.enrichWithATCDerivedData(aircraft)
 	return aircraft
@@ -1014,7 +896,6 @@ func (s *Service) GetAllAircraftWithLastSeenFilter(lastSeenMinutes int) []*Aircr
 // Skips phase history and takeoff/landing time queries for better performance
 func (s *Service) GetAllAircraftMinimal(lastSeenMinutes int) []*Aircraft {
 	aircraft := s.storage.GetAllMinimal(lastSeenMinutes)
-	s.updateSimulationFields(aircraft)
 	s.enrichWithRefData(aircraft)
 	s.enrichWithATCDerivedData(aircraft)
 	return aircraft
@@ -1024,7 +905,6 @@ func (s *Service) GetAllAircraftMinimal(lastSeenMinutes int) []*Aircraft {
 func (s *Service) GetAircraftByHex(hex string) (*Aircraft, bool) {
 	aircraft, found := s.storage.GetByHex(hex)
 	if found && aircraft != nil {
-		s.updateSimulationFields([]*Aircraft{aircraft})
 		s.enrichWithRefData([]*Aircraft{aircraft})
 		s.enrichWithATCDerivedData([]*Aircraft{aircraft})
 
@@ -1067,16 +947,6 @@ func (s *Service) GetFilteredAircraft(
 		status,
 		tookOffAfter, tookOffBefore, landedAfter, landedBefore,
 	)
-	s.updateSimulationFields(aircraft)
-	s.enrichWithRefData(aircraft)
-	s.enrichWithATCDerivedData(aircraft)
-	return aircraft
-}
-
-// GetFilteredAircraftSimple is a simplified version for backward compatibility
-func (s *Service) GetFilteredAircraftSimple(minAltitude, maxAltitude float64, status ...string) []*Aircraft {
-	aircraft := s.storage.GetFiltered(minAltitude, maxAltitude, status, nil, nil, nil, nil)
-	s.updateSimulationFields(aircraft)
 	s.enrichWithRefData(aircraft)
 	s.enrichWithATCDerivedData(aircraft)
 	return aircraft
@@ -2054,30 +1924,14 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 
 		aircraftStatus := "active" // Always set to active for aircraft in current ADSB data
 
-		// Check if this is a simulated aircraft
-		isSimulated := (s.simulationService != nil && s.simulationService.IsSimulated(raw.Hex)) || raw.Type == "sim"
-		var simulationControls *SimulationControls
-
-		if isSimulated {
-			// For simulated aircraft, extract controls from the raw data type field
-			// The simulation service will have already populated the ADSB data with current values
-			simulationControls = &SimulationControls{
-				TargetHeading:      NumberOrZero(raw.TrueHeading), // Use current heading as target
-				TargetSpeed:        NumberOrZero(raw.TAS),         // Use current TAS as target
-				TargetVerticalRate: NumberOrZero(raw.BaroRate),    // Use current vertical rate as target
-			}
-		}
-
 		a := &Aircraft{
-			Hex:                raw.Hex,
-			Flight:             flightName,
-			Airline:            airlineName,
-			AirlineCountry:     airlineCountry,
-			Status:             aircraftStatus,
-			LastSeen:           now.Add(-time.Duration(NumberOrZero(raw.Seen)) * time.Second),
-			ADSB:               &raw,
-			IsSimulated:        isSimulated,
-			SimulationControls: simulationControls,
+			Hex:            raw.Hex,
+			Flight:         flightName,
+			Airline:        airlineName,
+			AirlineCountry: airlineCountry,
+			Status:         aircraftStatus,
+			LastSeen:       now.Add(-time.Duration(NumberOrZero(raw.Seen)) * time.Second),
+			ADSB:           &raw,
 		}
 
 		a.ADSB.ATCDerived = computeATCDerivedMetrics(a.ADSB, a.Distance)
