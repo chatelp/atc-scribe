@@ -55,10 +55,17 @@ const CONFIG = {
     weatherRefreshInterval: 30 * 60 * 1000,  // 30 minutes for weather data
 };
 
-// Base maps the map engine offers (map/core/map-engine.js); anything else saved
-// in localStorage falls back to osm, the only one that still serves tiles without
-// a key (the Carto dark and light tiles now say "API KEY REQUIRED").
-const MAP_STYLES = ['dark', 'light', 'osm'];
+// Base maps the map engine offers (map/core/map-engine.js). None needs a key: the
+// Carto ones, which now do, are gone (docs-fr/audit-2026-10-09/fonds-de-carte.md).
+const MAP_STYLES = ['ign-dark', 'ign', 'osm-dark', 'osm'];
+
+// The base map shown until one is chosen: the IGN plan, darkened, for a station in
+// mainland France (which it covers), OSM darkened anywhere else. Also the fallback
+// for a saved style that is no longer offered (the FAA charts, Carto dark and light).
+function defaultMapStyle(lat, lon) {
+    const inMainlandFrance = lat >= 41 && lat <= 51.5 && lon >= -5.5 && lon <= 9.8;
+    return inMainlandFrance ? 'ign-dark' : 'osm-dark';
+}
 
 // Initialize WebSocket client
 const wsClient = new WebSocketClient(CONFIG.wsUrl);
@@ -368,13 +375,16 @@ document.addEventListener('alpine:init', () => {
         _readDividerId: {}, // ID of the first already-read message when viewer opens with unread
         frequencyConnectionStatus: {}, // Tracks connection status per frequency (connecting, connected, failed)
 
+        // True while no valid base map is saved, so the default one is shown.
+        mapStyleIsDefault: !MAP_STYLES.includes(localStorage.getItem('mapStyle')),
+
         // Settings
         settings: {
+            // Until the station's position is known, a browser with no valid saved
+            // style gets osm-dark; fetchStationData then applies defaultMapStyle.
             mapStyle: (() => {
-                // A browser that saved one of the FAA charts removed since (vfr-sectional,
-                // terminal, ifr-low, ifr-high) gets osm, not an empty map.
                 const savedStyle = localStorage.getItem('mapStyle');
-                return MAP_STYLES.includes(savedStyle) ? savedStyle : 'osm';
+                return MAP_STYLES.includes(savedStyle) ? savedStyle : 'osm-dark';
             })(),
             showLabels: JSON.parse(localStorage.getItem('showLabels')) ?? true,
             showPaths: JSON.parse(localStorage.getItem('showPaths')) ?? true,
@@ -451,7 +461,9 @@ document.addEventListener('alpine:init', () => {
             const previousSettings = { ...this.previousSettings };
             
             // Save to localStorage
-            localStorage.setItem('mapStyle', this.settings.mapStyle);
+            // A default base map is not a choice: it is not saved, so that it can
+            // still follow the station's position.
+            if (!this.mapStyleIsDefault) localStorage.setItem('mapStyle', this.settings.mapStyle);
             localStorage.setItem('showLabels', this.settings.showLabels);
             localStorage.setItem('showPaths', this.settings.showPaths);
             localStorage.setItem('showRings', this.settings.showRings);
@@ -2187,11 +2199,23 @@ document.addEventListener('alpine:init', () => {
 
         setMapStyle() {
             if (!MAP_STYLES.includes(this.settings.mapStyle)) {
-                this.settings.mapStyle = 'osm';
+                this.settings.mapStyle = defaultMapStyle(this.stationLatitude, this.stationLongitude);
             }
+            this.mapStyleIsDefault = false;
             this.saveSettings();
             if (this.mapManager && typeof this.mapManager.setMapStyle === 'function') {
                 this.mapManager.setMapStyle(this.settings.mapStyle);
+            }
+        },
+
+        // The station's position is known: a base map nobody chose follows it.
+        applyDefaultMapStyle() {
+            if (!this.mapStyleIsDefault) return;
+            const style = defaultMapStyle(this.stationLatitude, this.stationLongitude);
+            if (style === this.settings.mapStyle) return;
+            this.settings.mapStyle = style;
+            if (this.mapManager && typeof this.mapManager.setMapStyle === 'function') {
+                this.mapManager.setMapStyle(style);
             }
         },
 
@@ -4119,6 +4143,7 @@ async initAircraftDataSource() {
                 const data = await response.json();
                 this.stationLatitude = data.latitude;
                 this.stationLongitude = data.longitude;
+                this.applyDefaultMapStyle();
                 this.stationElevationFeet = data.elevation_feet;
                 this.stationCruiseAltitudeFt = Number.isFinite(data.cruise_altitude_ft) ? data.cruise_altitude_ft : 18000;
                 this.stationAirportCode = data.airport_code;

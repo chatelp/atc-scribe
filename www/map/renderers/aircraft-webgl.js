@@ -292,7 +292,8 @@
 
     function getAltitudeBandColor(aircraft, store) {
         const band = getAltitudeColorBand(aircraft, store);
-        const isBrightMap = (store?.settings?.mapStyle || 'dark').toLowerCase() !== 'dark';
+        // ign-dark and osm-dark are dark maps; ign and osm are bright ones.
+        const isBrightMap = !(store?.settings?.mapStyle || 'dark').toLowerCase().endsWith('dark');
 
         if (isBrightMap) {
             switch (band) {
@@ -507,7 +508,7 @@
             const isHovered = !!properties.hovered;
             const deemphasized = !!properties.deemphasized;
             const currentMapStyle = (store?.settings?.mapStyle || 'dark').toLowerCase();
-            const isBrightMapStyle = currentMapStyle !== 'dark';
+            const isBrightMapStyle = !currentMapStyle.endsWith('dark');
             const baseTextOpacity = deemphasized
                 ? (isBrightMapStyle ? 0.72 : 0.5)
                 : (isBrightMapStyle ? 1 : 0.9);
