@@ -18,14 +18,11 @@ import (
 
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/api"
-	"github.com/yegors/co-atc/internal/atcchat"
 	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
-	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
-	"github.com/yegors/co-atc/internal/templating"
 	"github.com/yegors/co-atc/internal/transcription"
 	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"github.com/yegors/co-atc/internal/weather"
@@ -145,26 +142,22 @@ func main() {
 	// server starts, serves the map and the audio, and transcribes nothing --
 	// one error line per transmission and no transcript, which is a worse
 	// failure than not starting at all.
-	var sttSidecar *transcription.Sidecar
-	if cfg.Transcription.Backend == transcription.BackendLocal {
-		sttSidecar = transcription.NewSidecar(transcription.SidecarConfig{
-			ServerURL:             cfg.Transcription.Local.ServerURL,
-			Command:               cfg.Transcription.Local.Command,
-			StartupTimeoutSeconds: cfg.Transcription.Local.StartupTimeoutSeconds,
-		}, log)
-		sidecarCtx, sidecarCancel := context.WithTimeout(signalCtx, 5*time.Minute)
-		if err := sttSidecar.Start(sidecarCtx); err != nil {
-			sidecarCancel()
-			fatalLog := log.WithOptions(zap.AddStacktrace(zapcore.PanicLevel))
-			fatalLog.Fatal("Local transcription sidecar unavailable", logger.Error(err))
-		}
+	sttSidecar := transcription.NewSidecar(transcription.SidecarConfig{
+		ServerURL:             cfg.Transcription.Local.ServerURL,
+		Command:               cfg.Transcription.Local.Command,
+		StartupTimeoutSeconds: cfg.Transcription.Local.StartupTimeoutSeconds,
+	}, log)
+	sidecarCtx, sidecarCancel := context.WithTimeout(signalCtx, 5*time.Minute)
+	if err := sttSidecar.Start(sidecarCtx); err != nil {
 		sidecarCancel()
-		// A sidecar that dies later is restarted, instead of leaving the server
-		// transcribing nothing until someone notices (28/09).
-		sttSidecar.Supervise(signalCtx)
-		defer sttSidecar.Stop()
+		fatalLog := log.WithOptions(zap.AddStacktrace(zapcore.PanicLevel))
+		fatalLog.Fatal("Local transcription sidecar unavailable", logger.Error(err))
 	}
-	// Processor has been moved into the service
+	sidecarCancel()
+	// A sidecar that dies later is restarted, instead of leaving the server
+	// transcribing nothing until someone notices (28/09).
+	sttSidecar.Supervise(signalCtx)
+	defer sttSidecar.Stop()
 
 	// Create SQLite storage
 	var adsbStorage adsb.Storage
@@ -225,9 +218,6 @@ func main() {
 	// Start WebSocket server
 	go wsServer.Run()
 
-	// Create simulation service
-	simulationService := simulation.NewService(log)
-
 	adsbService := adsb.NewService(
 		adsbClient,
 		adsbStorage,
@@ -237,7 +227,6 @@ func main() {
 		cfg.ADSB,
 		cfg.FlightPhases,
 		wsServer,
-		simulationService,
 	)
 
 	// Load reference data (aircraft, airlines, airports, runways, navaids)
@@ -287,7 +276,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create weather service first (needed for templating)
+	// Create weather service
 	weatherConfigConverted := weather.ConfigWeatherConfig{
 		RefreshIntervalMinutes: cfg.Weather.RefreshIntervalMinutes,
 		APIBaseURL:             cfg.Weather.APIBaseURL,
@@ -316,25 +305,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create templating service
-	templateService := templating.NewService(
-		adsbService,
-		weatherService,
-		transcriptionStorage,
-		nil, // frequencies service not available yet
-		cfg,
-		log,
-	)
-
 	// Create frequencies service.
 	// The fleet adapter is what lets a spoken callsign be attached to a real
-	// target; with post_processing.backend = "openai" it is simply never read.
+	// target.
 	fleet := &adsbFleet{service: adsbService, lastSeenMinutes: cfg.PostProcessing.FleetLastSeenMinutes}
 
 	// What the radio has said about each aircraft, carried on the aircraft itself
 	// so the map can show which targets the controller is actually talking to.
 	adsbService.SetVoiceIndex(newVoiceIndex(context.Background(), transcriptionStorage, 5*time.Second, log))
-	frequenciesService := frequencies.NewService(cfg, log, wsServer, transcriptionStorage, sqliteStorage, clearanceStorage, templateService, fleet)
+	frequenciesService := frequencies.NewService(cfg, log, wsServer, transcriptionStorage, clearanceStorage, fleet)
 	// Each frequency's sector: its airport and kind, the sizes from the settings
 	// panel, the airport's position from the reference data. Off unless the
 	// panel says so, and for a frequency that names no airport.
@@ -363,44 +342,14 @@ func main() {
 			PrefixDigits: m.PrefixDigits}
 	})
 
-	// Update templating service with frequencies service
-	templateService = templating.NewService(
-		adsbService,
-		weatherService,
-		transcriptionStorage,
-		frequenciesService,
-		cfg,
-		log,
-	)
-
 	// Start frequencies service
 	if err := frequenciesService.Start(ctx); err != nil {
 		log.Error("Failed to start frequencies service", logger.Error(err))
 		os.Exit(1)
 	}
 
-	// Create ATC Chat service (if enabled)
-	var atcChatService *atcchat.Service
-	if cfg.ATCChat.Enabled {
-		log.Info("Creating ATC Chat service")
-		atcChatService, err = atcchat.NewService(
-			templateService,
-			cfg,
-			log,
-		)
-		if err != nil {
-			log.Error("Failed to create ATC Chat service", logger.Error(err))
-			// Continue without ATC Chat service rather than failing
-			atcChatService = nil
-		} else {
-			log.Info("ATC Chat service created successfully")
-		}
-	} else {
-		log.Info("ATC Chat service disabled in configuration")
-	}
-
 	// Create API router
-	router := api.NewRouter(adsbService, frequenciesService, weatherService, atcChatService, simulationService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
+	router := api.NewRouter(adsbService, frequenciesService, weatherService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
 	router.Handler().AttachRuntime(runtimeSettings, sqliteStorage.GetDB(), sttSidecar)
 
 	// --- Setup for multiple HTTP servers ---
@@ -476,21 +425,7 @@ func main() {
 	log.Info("Frequencies service stopped.")
 
 	// After the frequencies service: nothing will ask it to transcribe again.
-	if sttSidecar != nil {
-		sttSidecar.Stop()
-	}
-
-	// Stop ATC Chat service if it was created
-	if atcChatService != nil {
-		log.Info("Stopping ATC Chat service...")
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		if err := atcChatService.Shutdown(shutdownCtx); err != nil {
-			log.Error("Error shutting down ATC Chat service", logger.Error(err))
-		} else {
-			log.Info("ATC Chat service stopped.")
-		}
-		shutdownCancel()
-	}
+	sttSidecar.Stop()
 
 	// Stop any active transcription processors
 	// This will be handled by the frequencies service when we integrate the transcription service

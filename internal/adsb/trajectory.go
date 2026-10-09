@@ -223,26 +223,6 @@ func (at *AircraftTrajectory) Latest() *TrajectorySnapshot {
 	return &at.Snapshots[idx]
 }
 
-// SnapshotsInWindow returns valid snapshots within the last windowSec seconds,
-// ordered oldest to newest. Allocates a slice — use ForEachSnapshot for hot paths.
-func (at *AircraftTrajectory) SnapshotsInWindow(windowSec float64) []TrajectorySnapshot {
-	if at.Count == 0 {
-		return nil
-	}
-	latest := at.Latest()
-	if latest == nil {
-		return nil
-	}
-	cutoff := latest.Timestamp.Add(-time.Duration(windowSec * float64(time.Second)))
-	result := make([]TrajectorySnapshot, 0, at.Count)
-	at.ForEachSnapshot(func(snap *TrajectorySnapshot) {
-		if snap.Valid && !snap.Timestamp.Before(cutoff) {
-			result = append(result, *snap)
-		}
-	})
-	return result
-}
-
 // ─── Trajectory Tracker (top-level) ───────────────────────────────────────────
 
 // TrajectoryConfig holds tunable parameters for the trajectory system.
@@ -450,14 +430,6 @@ func (tt *TrajectoryTracker) Ingest(hex string, snap TrajectorySnapshot) {
 	}
 	at.AddSnapshot(snap)
 	tt.mu.Unlock()
-}
-
-// GetTrajectory returns the per-aircraft trajectory, or nil if not tracked.
-func (tt *TrajectoryTracker) GetTrajectory(hex string) *AircraftTrajectory {
-	tt.mu.RLock()
-	at := tt.aircraft[hex]
-	tt.mu.RUnlock()
-	return at
 }
 
 // EnsureDerived recomputes the derived state for the given aircraft if it is

@@ -47,7 +47,6 @@ func newTestProcessor(t *testing.T, fleet FleetProvider) (*GrammarProcessor, *sq
 		fleet,
 		PostProcessingConfig{
 			Enabled:         true,
-			Backend:         BackendLocal,
 			AirlinesDatPath: filepath.Join("..", "..", "assets", "airlines.dat"),
 			BatchSize:       20,
 			IntervalSeconds: 1,

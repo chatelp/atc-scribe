@@ -213,13 +213,6 @@ func (s *Service) GetRunways() []*RunwayInfo {
 	return s.runways
 }
 
-// GetHomeRunways returns runways for the home airport only.
-func (s *Service) GetHomeRunways() []*RunwayInfo {
-	s.homeMu.RLock()
-	defer s.homeMu.RUnlock()
-	return s.homeRunways
-}
-
 // GetHomeRunwayData returns the backward-compatible RunwayData struct for phase detection.
 func (s *Service) GetHomeRunwayData() adsb.RunwayData {
 	s.homeMu.RLock()

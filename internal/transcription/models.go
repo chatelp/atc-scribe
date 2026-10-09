@@ -1,20 +1,16 @@
 package transcription
 
 import (
-	"time"
+	"github.com/yegors/co-atc/internal/transcription/phraseology"
+	"github.com/yegors/co-atc/pkg/logger"
 )
 
-// TranscriptionEvent represents a transcription event
-type TranscriptionEvent struct {
-	Type      string    // "delta" or "completed"
-	Text      string    // The transcription text
-	Timestamp time.Time // When the event occurred
-}
-
-// Backend names for the transcription engine.
-const (
-	BackendOpenAI = "openai"
-	BackendLocal  = "local"
+// Import the logger package's exported functions
+var (
+	String = logger.String
+	Int    = logger.Int
+	Int64  = logger.Int64
+	Error  = logger.Error
 )
 
 // LocalSTTConfig configures the local speech-to-text sidecar backend.
@@ -34,32 +30,34 @@ type LocalSTTConfig struct {
 	SilenceThreshold  float64 `toml:"silence_threshold"`   // RMS below which a frame is silence (default 0.005)
 }
 
-// Config represents the configuration for the transcription service
+// Config represents the configuration for the transcription service.
+// Transcription is local: the sidecar in sidecar/, see docs/LOCAL-STT.md.
 type Config struct {
-	Backend               string // "openai" or "local"
-	Local                 LocalSTTConfig
-	FrequencyLanguages    map[string]string // frequency id -> expected language, from the catalogue
-	OpenAIAPIKey          string
-	Model                 string
-	Language              string
-	NoiseReduction        string
-	ChunkMs               int
-	BufferSizeKB          int
-	FFmpegPath            string
-	FFmpegSampleRate      int
-	FFmpegChannels        int
-	FFmpegFormat          string
-	ReconnectIntervalSec  int
-	MaxRetries            int
-	TurnDetectionType     string
-	PrefixPaddingMs       int
-	SilenceDurationMs     int
-	VADThreshold          float64
-	RetryMaxAttempts      int
-	RetryInitialBackoffMs int
-	RetryMaxBackoffMs     int
-	PromptPath            string
-	Prompt                string // Loaded from PromptPath
-	TimeoutSeconds        int    // HTTP timeout for OpenAI API requests
-	LogDir                string // Optional directory for transcription log files
+	Local              LocalSTTConfig
+	FrequencyLanguages map[string]string // frequency id -> expected language, from the catalogue
+	Language           string            // expected language when the catalogue gives none
+	FFmpegSampleRate   int               // rate of the PCM the frequencies service decodes
+	LogDir             string            // Optional directory for transcription log files
+}
+
+// PostProcessingConfig configures the second stage of the pipeline, the
+// phraseology grammar that fills in speaker, callsign and clearances of a
+// stored transcription against live ADS-B. See docs-fr/17-appariement.md.
+type PostProcessingConfig struct {
+	Enabled         bool
+	IntervalSeconds int
+	BatchSize       int
+
+	AirlinesDatPath string
+	MinScore        float64
+	MinDigits       int
+
+	// Rules, when set, gives the association rules in force for each
+	// transmission, so that a change from the settings panel applies to the
+	// next one. Nil keeps the matcher as MinDigits configured it.
+	Rules func() phraseology.Rules
+
+	// SectorOf, when set, gives the part of the sky a frequency can be talking
+	// to, read for every transmission; false means the whole sky.
+	SectorOf func(frequencyID string) (phraseology.Sector, bool)
 }

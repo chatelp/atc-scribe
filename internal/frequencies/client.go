@@ -149,35 +149,3 @@ func (b *bufferedReadCloser) Read(p []byte) (n int, err error) {
 func (b *bufferedReadCloser) Close() error {
 	return b.Closer.Close()
 }
-
-// ExtractMetadata extracts metadata from response headers
-func (c *Client) ExtractMetadata(headers http.Header) StreamMetadata {
-	metadata := StreamMetadata{
-		ContentType: headers.Get("Content-Type"),
-		Description: headers.Get("icy-description"),
-		Genre:       headers.Get("icy-genre"),
-		Name:        headers.Get("icy-name"),
-	}
-
-	// Extract bitrate
-	if bitrateStr := headers.Get("icy-br"); bitrateStr != "" {
-		var bitrate int
-		if _, err := fmt.Sscanf(bitrateStr, "%d", &bitrate); err == nil {
-			metadata.Bitrate = bitrate
-		}
-	}
-
-	// Set format based on content type
-	switch metadata.ContentType {
-	case "audio/mpeg":
-		metadata.Format = "mp3"
-	case "audio/aac":
-		metadata.Format = "aac"
-	case "audio/ogg":
-		metadata.Format = "ogg"
-	default:
-		metadata.Format = "unknown"
-	}
-
-	return metadata
-}

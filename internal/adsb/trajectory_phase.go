@@ -556,27 +556,3 @@ func (tt *TrajectoryTracker) WasDescendingTowardAirport(hex string) bool {
 }
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
-
-// LogDerivedState logs the key derived state fields for debugging.
-func (tt *TrajectoryTracker) LogDerivedState(hex string) {
-	d := tt.EnsureDerived(hex)
-	if d == nil {
-		return
-	}
-	tt.logger.Debug("Trajectory derived state",
-		logger.String("hex", hex),
-		logger.Int("valid_points", d.ValidPointCount),
-		logger.Float64("alt_mean", d.AltMean),
-		logger.Float64("alt_trend_fpm", d.AltTrendFPM),
-		logger.Float64("gs_mean", d.GSMean),
-		logger.Float64("gs_trend", d.GSTrendKtsPerSec),
-		logger.Float64("vr_mean", d.VRMean),
-		logger.Float64("dist_airport_nm", d.DistToAirportNM),
-		logger.Float64("dist_trend", d.DistTrendNMPerSec),
-		logger.Bool("descending", d.IsDescending),
-		logger.Bool("climbing", d.IsClimbing),
-		logger.Bool("level", d.IsLevel),
-		logger.Bool("approaching", d.IsApproachingAirport),
-		logger.Bool("turning", d.IsTurning),
-	)
-}
