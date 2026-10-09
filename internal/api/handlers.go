@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/yegors/co-atc/internal/adsb"
-	"github.com/yegors/co-atc/internal/atcchat"
 	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
@@ -33,7 +31,6 @@ type Handler struct {
 	adsbService          *adsb.Service
 	frequenciesService   *frequencies.Service
 	weatherService       *weather.Service
-	atcChatService       *atcchat.Service
 	simulationService    *simulation.Service
 	refService           *reference.Service
 	config               *config.Config
@@ -56,7 +53,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new API handler
-func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, atcChatService *atcchat.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Handler {
+func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Handler {
 	// The grammar's values live in the same daily database as the transcriptions
 	// they came from.
 	valueStorage := sqlite.NewPhraseologyStorage(sqlite.DBOf(transcriptionStorage))
@@ -109,7 +106,6 @@ func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Servi
 		adsbService:          adsbService,
 		frequenciesService:   frequenciesService,
 		weatherService:       weatherService,
-		atcChatService:       atcChatService,
 		simulationService:    simulationService,
 		refService:           refService,
 		config:               config,
@@ -861,9 +857,6 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"frequencies": map[string]interface{}{
 			"buffer_size_kb":          h.config.Frequencies.BufferSizeKB,
 			"reconnect_interval_secs": h.config.Frequencies.ReconnectIntervalSecs,
-		},
-		"atc_chat": map[string]interface{}{
-			"enabled": h.config.ATCChat.Enabled,
 		},
 	}
 
@@ -1893,214 +1886,6 @@ func haversine(lat1, lon1, lat2, lon2 float64) float64 {
 }
 
 // This function has been replaced by getHexCoordinates and getFlightCoordinates
-
-// CreateATCChatSession creates a new ATC chat session
-func (h *Handler) CreateATCChatSession(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	session, err := h.atcChatService.CreateSession(r.Context())
-	if err != nil {
-		// Check if this is a missing API key error - handle gracefully
-		if strings.Contains(err.Error(), "OpenAI API key is required") {
-			h.logger.Warn("ATC Chat session creation failed - API key not configured")
-			http.Error(w, "ATC Chat requires OpenAI API key configuration", http.StatusServiceUnavailable)
-			return
-		}
-
-		// For other errors, log at error level with stack trace
-		h.logger.Error("Failed to create ATC chat session", logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to create session: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	h.logger.Info("Created ATC chat session",
-		logger.String("session_id", session.ID))
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(session); err != nil {
-		h.logger.Error("Failed to encode session response", logger.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-// EndATCChatSession terminates an ATC chat session
-func (h *Handler) EndATCChatSession(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessionID := chi.URLParam(r, "sessionId")
-	if sessionID == "" {
-		http.Error(w, "Session ID is required", http.StatusBadRequest)
-		return
-	}
-
-	if err := h.atcChatService.EndSession(r.Context(), sessionID); err != nil {
-		h.logger.Error("Failed to end ATC chat session",
-			logger.String("session_id", sessionID),
-			logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to end session: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	h.logger.Info("Ended ATC chat session",
-		logger.String("session_id", sessionID))
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"status":     "success",
-		"session_id": sessionID,
-		"message":    "Session ended successfully",
-	})
-}
-
-// HandleATCChatWebSocket handles WebSocket connections for ATC chat
-func (h *Handler) HandleATCChatWebSocket(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessionID := chi.URLParam(r, "sessionId")
-	if sessionID == "" {
-		http.Error(w, "Session ID is required", http.StatusBadRequest)
-		return
-	}
-
-	// Create ATC chat handlers and delegate to them
-	atcChatHandlers := NewATCChatHandlers(h.atcChatService, h.logger)
-
-	// Update the URL parameter to match what the ATC chat handler expects
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("sessionID", sessionID)
-	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
-
-	atcChatHandlers.WebSocketHandler(w, r)
-}
-
-// GetATCChatSessionStatus returns the status of an ATC chat session
-func (h *Handler) GetATCChatSessionStatus(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessionID := chi.URLParam(r, "sessionId")
-	if sessionID == "" {
-		http.Error(w, "Session ID is required", http.StatusBadRequest)
-		return
-	}
-
-	status, err := h.atcChatService.GetSessionStatus(sessionID)
-	if err != nil {
-		h.logger.Error("Failed to get session status",
-			logger.String("session_id", sessionID),
-			logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to get session status: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(status); err != nil {
-		h.logger.Error("Failed to encode status response", logger.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-// GetATCChatSessions returns all active ATC chat sessions
-func (h *Handler) GetATCChatSessions(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessions := h.atcChatService.ListActiveSessions()
-
-	response := map[string]interface{}{
-		"sessions": sessions,
-		"count":    len(sessions),
-		"status":   "success",
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.logger.Error("Failed to encode sessions response", logger.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-// GetATCChatAirspaceStatus returns current airspace status for ATC chat
-func (h *Handler) GetATCChatAirspaceStatus(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	status := h.atcChatService.GetAirspaceStatus()
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(status); err != nil {
-		h.logger.Error("Failed to encode airspace status response", logger.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-}
-
-// UpdateATCChatSessionContext updates the session context with fresh airspace data
-func (h *Handler) UpdateATCChatSessionContext(w http.ResponseWriter, r *http.Request) {
-	if h.atcChatService == nil {
-		http.Error(w, "ATC Chat service not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	sessionID := chi.URLParam(r, "sessionId")
-	if sessionID == "" {
-		http.Error(w, "Session ID is required", http.StatusBadRequest)
-		return
-	}
-
-	h.logger.Debug("Received request to update session context",
-		logger.String("session_id", sessionID))
-
-	// Generate the system prompt and variables that will be sent to AI
-	promptWithVars, err := h.atcChatService.GenerateSystemPromptWithVariables(sessionID)
-	if err != nil {
-		h.logger.Error("Failed to generate system prompt for context update",
-			logger.String("session_id", sessionID),
-			logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to generate system prompt: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	// Update session context with fresh airspace data
-	if err := h.atcChatService.UpdateSessionContextOnDemand(sessionID); err != nil {
-		h.logger.Error("Failed to update session context",
-			logger.String("session_id", sessionID),
-			logger.Error(err))
-		http.Error(w, fmt.Sprintf("Failed to update session context: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	h.logger.Info("Session context updated successfully",
-		logger.String("session_id", sessionID))
-
-	// Return success response with the actual instructions sent to AI and individual variables
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":        "success",
-		"message":       "Session context updated with fresh airspace data",
-		"instructions":  promptWithVars.Prompt,
-		"prompt_length": len(promptWithVars.Prompt),
-		"variables":     promptWithVars.Variables,
-	})
-}
 
 // convertClearancesToAPIFormat converts clearance records to API format
 func (h *Handler) convertClearancesToAPIFormat(clearances []*sqlite.ClearanceRecord) []adsb.ClearanceData {

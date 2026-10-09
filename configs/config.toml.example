@@ -397,10 +397,10 @@ silence_threshold = 0.005     # an SDR stream sits at -90 dBFS when squelch is c
 # repository, and nobody cloning it should find themselves locked out of their own
 # receiver by a password they never set.
 #
-# Note what is unprotected while this is false. Three routes already write:
-# POST /station moves the station's position, POST/PUT/DELETE /simulation/aircraft
-# injects aircraft into the map, and POST /atc-chat/session spends OpenAI credit if
-# a key is configured. On a network you do not control, turn this on.
+# Note what is unprotected while this is false. Two routes already write:
+# POST /station moves the station's position, and POST/PUT/DELETE
+# /simulation/aircraft injects aircraft into the map. On a network you do not
+# control, turn this on.
 enabled = false
 
 # Create an account without ever writing the password down:
@@ -582,42 +582,3 @@ fetch_notams = true
 
 # Cache settings
 cache_expiry_minutes = 60  # How long to keep cached data if refresh fails
-
-#######################################################
-# ATC Chat Configuration
-#######################################################
-[atc_chat]
-# Enable/disable ATC Chat feature
-enabled = true
-
-# OpenAI API settings for realtime chat
-openai_api_key = ""              # Replace with your actual API key
-realtime_model = "gpt-realtime-2025-08-28"
-voice = "ash"  # Voice options: 'alloy', 'ash',
-
-# Audio settings
-input_audio_format = "pcm16"
-output_audio_format = "pcm16"
-sample_rate = 24000
-channels = 1
-
-# Session settings
-max_response_tokens = 4096
-temperature = 0.6
-# Turn detection type: "server_vad", "semantic_vad", or "none" (to disable turn detection)
-turn_detection_type = "none"
-vad_threshold = 0.3
-silence_duration_ms = 200
-
-# Context settings
-max_context_aircraft = 200
-transcription_history_seconds = 300
-
-# System prompt configuration
-system_prompt_path = "prompts/atc_chat_prompt.txt"
-
-# Automatic system prompt refresh interval in seconds (0 = disabled)
-# This will automatically send session updates with latest airspace data
-# Set to 0 to disable timer-based updates - context will be updated on PTT press instead. Do not enable unless you like burning through your API credits.
-refresh_system_prompt = 0
-

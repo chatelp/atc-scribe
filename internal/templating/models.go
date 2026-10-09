@@ -76,14 +76,6 @@ func DefaultFormattingOptions() FormattingOptions {
 	}
 }
 
-// ATCChatFormattingOptions returns formatting options optimized for ATC Chat
-func ATCChatFormattingOptions() FormattingOptions {
-	opts := DefaultFormattingOptions()
-	opts.IncludeTranscriptionHistory = true
-	opts.MaxAircraft = 200 // Use a high default, will be overridden by config
-	return opts
-}
-
 // PostProcessorFormattingOptions returns formatting options optimized for Post-Processor
 func PostProcessorFormattingOptions() FormattingOptions {
 	opts := DefaultFormattingOptions()

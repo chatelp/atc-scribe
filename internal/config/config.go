@@ -28,7 +28,6 @@ type Config struct {
 	PostProcessing PostProcessingConfig `toml:"post_processing"` // Post-processing settings for transcriptions
 	FlightPhases   FlightPhasesConfig   `toml:"flight_phases"`   // Flight phase detection settings
 	Weather        WeatherConfig        `toml:"wx"`              // Weather data fetching and caching settings
-	ATCChat        ATCChatConfig        `toml:"atc_chat"`        // ATC Chat voice assistant settings
 	Auth           AuthConfig           `toml:"auth"`            // Who may use this server; see internal/auth
 }
 
@@ -898,11 +897,6 @@ func (c *Config) ValidateOpenAIKeys() error {
 		fmt.Printf("WARN: No OpenAI API key provided for transcription - transcription features will be disabled\n")
 	}
 
-	// Check ATC chat API key if ATC chat is enabled
-	if c.ATCChat.Enabled && c.ATCChat.OpenAIAPIKey == "" {
-		fmt.Printf("WARN: ATC Chat is enabled but no OpenAI API key provided - ATC chat features will be disabled\n")
-	}
-
 	// Check post-processing API key if post-processing is enabled.
 	// The local backend needs no key: it reads airlines.dat and live ADS-B.
 	if c.PostProcessing.Enabled && c.PostProcessing.Backend != PostProcessingBackendLocal {
@@ -964,36 +958,4 @@ type WeatherConfig struct {
 	FetchTAF               bool   `toml:"fetch_taf"`                // Whether to fetch TAF data
 	FetchNOTAMs            bool   `toml:"fetch_notams"`             // Whether to fetch NOTAM data
 	CacheExpiryMinutes     int    `toml:"cache_expiry_minutes"`     // How long to keep cached data if refresh fails
-}
-
-// ATCChatConfig contains ATC Chat voice assistant configuration
-type ATCChatConfig struct {
-	// Feature toggle
-	Enabled bool `toml:"enabled"` // Enable or disable ATC Chat feature
-
-	// OpenAI API settings
-	OpenAIAPIKey  string `toml:"openai_api_key"` // OpenAI API key for realtime chat
-	RealtimeModel string `toml:"realtime_model"` // OpenAI realtime model to use
-	Voice         string `toml:"voice"`          // Voice for audio responses
-
-	// Audio settings
-	InputAudioFormat  string `toml:"input_audio_format"`  // Input audio format (e.g., "pcm16")
-	OutputAudioFormat string `toml:"output_audio_format"` // Output audio format (e.g., "pcm16")
-	SampleRate        int    `toml:"sample_rate"`         // Audio sample rate in Hz
-	Channels          int    `toml:"channels"`            // Number of audio channels
-
-	// Session settings
-	MaxResponseTokens int     `toml:"max_response_tokens"` // Maximum tokens in response
-	Temperature       float64 `toml:"temperature"`         // Response randomness (0.0-1.0)
-	TurnDetectionType string  `toml:"turn_detection_type"` // Turn detection method
-	VADThreshold      float64 `toml:"vad_threshold"`       // Voice activity detection threshold
-	SilenceDurationMs int     `toml:"silence_duration_ms"` // Silence duration for turn detection
-
-	// Context settings
-	MaxContextAircraft          int `toml:"max_context_aircraft"`          // Maximum aircraft to include in context
-	TranscriptionHistorySeconds int `toml:"transcription_history_seconds"` // Seconds of transcription history to include
-
-	// System prompt configuration
-	SystemPromptPath        string `toml:"system_prompt_path"`    // Path to system prompt template file
-	RefreshSystemPromptSecs int    `toml:"refresh_system_prompt"` // Automatic system prompt refresh interval in seconds (0 = disabled)
 }

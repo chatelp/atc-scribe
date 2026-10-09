@@ -18,7 +18,6 @@ import (
 
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/api"
-	"github.com/yegors/co-atc/internal/atcchat"
 	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
@@ -379,28 +378,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create ATC Chat service (if enabled)
-	var atcChatService *atcchat.Service
-	if cfg.ATCChat.Enabled {
-		log.Info("Creating ATC Chat service")
-		atcChatService, err = atcchat.NewService(
-			templateService,
-			cfg,
-			log,
-		)
-		if err != nil {
-			log.Error("Failed to create ATC Chat service", logger.Error(err))
-			// Continue without ATC Chat service rather than failing
-			atcChatService = nil
-		} else {
-			log.Info("ATC Chat service created successfully")
-		}
-	} else {
-		log.Info("ATC Chat service disabled in configuration")
-	}
-
 	// Create API router
-	router := api.NewRouter(adsbService, frequenciesService, weatherService, atcChatService, simulationService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
+	router := api.NewRouter(adsbService, frequenciesService, weatherService, simulationService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
 	router.Handler().AttachRuntime(runtimeSettings, sqliteStorage.GetDB(), sttSidecar)
 
 	// --- Setup for multiple HTTP servers ---
@@ -478,18 +457,6 @@ func main() {
 	// After the frequencies service: nothing will ask it to transcribe again.
 	if sttSidecar != nil {
 		sttSidecar.Stop()
-	}
-
-	// Stop ATC Chat service if it was created
-	if atcChatService != nil {
-		log.Info("Stopping ATC Chat service...")
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		if err := atcChatService.Shutdown(shutdownCtx); err != nil {
-			log.Error("Error shutting down ATC Chat service", logger.Error(err))
-		} else {
-			log.Info("ATC Chat service stopped.")
-		}
-		shutdownCancel()
 	}
 
 	// Stop any active transcription processors

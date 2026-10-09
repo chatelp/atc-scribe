@@ -1,9 +1,6 @@
 package templating
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
@@ -11,8 +8,6 @@ import (
 	"github.com/yegors/co-atc/internal/weather"
 	"github.com/yegors/co-atc/pkg/logger"
 )
-
-const atcRenderedPromptDebugPath = "data/atc_chat_system_prompt_rendered.txt"
 
 // Service provides the main templating functionality
 type Service struct {
@@ -48,31 +43,6 @@ func NewService(
 		aggregator: aggregator,
 		logger:     logger.Named("templating-service"),
 	}
-}
-
-// RenderATCChatTemplate renders the ATC chat template with full context
-func (s *Service) RenderATCChatTemplate(templatePath string) (string, error) {
-	opts := ATCChatFormattingOptions()
-	rendered, err := s.engine.RenderTemplate(templatePath, opts)
-	if err != nil {
-		return "", err
-	}
-
-	if writeErr := s.writeRenderedATCChatPrompt(rendered); writeErr != nil {
-		s.logger.Warn("Failed to write rendered ATC chat system prompt debug file",
-			logger.String("path", atcRenderedPromptDebugPath),
-			logger.Error(writeErr))
-	}
-
-	return rendered, nil
-}
-
-func (s *Service) writeRenderedATCChatPrompt(rendered string) error {
-	if err := os.MkdirAll(filepath.Dir(atcRenderedPromptDebugPath), 0o755); err != nil {
-		return err
-	}
-
-	return os.WriteFile(atcRenderedPromptDebugPath, []byte(rendered), 0o644)
 }
 
 // RenderPostProcessorTemplate renders the post-processor template without transcription history
