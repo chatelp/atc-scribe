@@ -3,46 +3,36 @@ package templating
 import (
 	"fmt"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/config"
-	"github.com/yegors/co-atc/internal/frequencies"
-	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/weather"
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
 const activeRunwayProbabilityThreshold = 0.15
-const defaultTranscriptionHistorySeconds = 600
 
 // DataAggregator collects and formats airspace data for template rendering
 type DataAggregator struct {
-	adsbService          *adsb.Service
-	weatherService       *weather.Service
-	transcriptionStorage *sqlite.TranscriptionStorage
-	frequencyService     *frequencies.Service
-	config               *config.Config
-	logger               *logger.Logger
+	adsbService    *adsb.Service
+	weatherService *weather.Service
+	config         *config.Config
+	logger         *logger.Logger
 }
 
 // NewDataAggregator creates a new data aggregator
 func NewDataAggregator(
 	adsbService *adsb.Service,
 	weatherService *weather.Service,
-	transcriptionStorage *sqlite.TranscriptionStorage,
-	frequencyService *frequencies.Service,
 	config *config.Config,
 	logger *logger.Logger,
 ) *DataAggregator {
 	return &DataAggregator{
-		adsbService:          adsbService,
-		weatherService:       weatherService,
-		transcriptionStorage: transcriptionStorage,
-		frequencyService:     frequencyService,
-		config:               config,
-		logger:               logger.Named("template-aggregator"),
+		adsbService:    adsbService,
+		weatherService: weatherService,
+		config:         config,
+		logger:         logger.Named("template-aggregator"),
 	}
 }
 
@@ -53,8 +43,7 @@ func (da *DataAggregator) GetTemplateContext(opts FormattingOptions) (*TemplateC
 	da.logger.Debug("Aggregating template context",
 		logger.Int("max_aircraft", maxAircraft),
 		logger.Bool("include_weather", opts.IncludeWeather),
-		logger.Bool("include_runways", opts.IncludeRunways),
-		logger.Bool("include_transcription_history", opts.IncludeTranscriptionHistory))
+		logger.Bool("include_runways", opts.IncludeRunways))
 
 	context := &TemplateContext{
 		Timestamp: time.Now().UTC(),
@@ -92,21 +81,9 @@ func (da *DataAggregator) GetTemplateContext(opts FormattingOptions) (*TemplateC
 		context.ActiveRunways = da.getActiveRunwayScores(2)
 	}
 
-	// Get recent communications if requested (only for ATC Chat)
-	if opts.IncludeTranscriptionHistory {
-		communications, err := da.getRecentCommunications()
-		if err != nil {
-			da.logger.Error("Failed to get recent communications", logger.Error(err))
-			// Continue with empty communications rather than failing completely
-			communications = []TranscriptionSummary{}
-		}
-		context.TranscriptionHistory = communications
-	}
-
 	da.logger.Debug("Template context aggregated",
 		logger.Int("aircraft_count", len(context.Aircraft)),
-		logger.Int("runway_count", len(context.Runways)),
-		logger.Int("communication_count", len(context.TranscriptionHistory)))
+		logger.Int("runway_count", len(context.Runways)))
 
 	return context, nil
 }
@@ -233,55 +210,6 @@ func (da *DataAggregator) getRunwayData() ([]RunwayInfo, error) {
 		}
 	}
 	return runways, nil
-}
-
-// getRecentCommunications retrieves recent radio communications
-func (da *DataAggregator) getRecentCommunications() ([]TranscriptionSummary, error) {
-	if da.transcriptionStorage == nil {
-		return []TranscriptionSummary{}, nil
-	}
-
-	// Get recent transcriptions (default: last 10 minutes)
-	timeWindowSeconds := defaultTranscriptionHistorySeconds
-
-	since := time.Now().UTC().Add(-time.Duration(timeWindowSeconds) * time.Second)
-	endTime := time.Now().UTC()
-
-	transcriptions, err := da.transcriptionStorage.GetTranscriptionsByTimeRange(since, endTime, 100, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get recent transcriptions: %w", err)
-	}
-
-	// Convert to TranscriptionSummary format
-	var communications []TranscriptionSummary
-	for _, t := range transcriptions {
-		content := strings.TrimSpace(t.ContentProcessed)
-		if content == "" {
-			content = strings.TrimSpace(t.Content)
-		}
-
-		if content == "" {
-			continue
-		}
-
-		// Get frequency name
-		frequencyName := t.FrequencyID
-		if da.frequencyService != nil {
-			if freq, ok := da.frequencyService.GetFrequencyByID(t.FrequencyID); ok {
-				frequencyName = freq.Name
-			}
-		}
-
-		communications = append(communications, TranscriptionSummary{
-			Timestamp: t.CreatedAt,
-			Frequency: frequencyName,
-			Content:   content,
-			Speaker:   t.SpeakerType,
-			Callsign:  t.Callsign,
-		})
-	}
-
-	return communications, nil
 }
 
 // getAirportInfo returns airport information from config

@@ -387,30 +387,6 @@ func FormatActiveRunwaysData(scores []adsb.RunwayScore) string {
 	return strings.TrimSpace(builder.String())
 }
 
-// FormatTranscriptionHistory formats recent communications for template rendering
-func FormatTranscriptionHistory(communications []TranscriptionSummary) string {
-	if len(communications) == 0 {
-		return "No recent radio communications available."
-	}
-
-	var builder strings.Builder
-	builder.WriteString("RECENT RADIO COMMUNICATIONS:\n\n")
-
-	for _, comm := range communications {
-		timeSince := time.Since(comm.Timestamp)
-		builder.WriteString(fmt.Sprintf("• [%s ago] %s", formatDuration(timeSince), comm.Frequency))
-		if comm.Speaker != "" {
-			builder.WriteString(fmt.Sprintf(" (%s)", comm.Speaker))
-		}
-		if comm.Callsign != "" {
-			builder.WriteString(fmt.Sprintf(" [%s]", comm.Callsign))
-		}
-		builder.WriteString(fmt.Sprintf(": %s\n", comm.Content))
-	}
-
-	return builder.String()
-}
-
 // FormatAirportData formats airport information for template rendering
 func FormatAirportData(airport AirportInfo) string {
 	var builder strings.Builder

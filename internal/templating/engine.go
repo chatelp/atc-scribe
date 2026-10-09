@@ -33,8 +33,7 @@ func (e *Engine) RenderTemplate(templatePath string, opts FormattingOptions) (st
 		logger.String("template_path", templatePath),
 		logger.Int("max_aircraft", opts.MaxAircraft),
 		logger.Bool("include_weather", opts.IncludeWeather),
-		logger.Bool("include_runways", opts.IncludeRunways),
-		logger.Bool("include_transcription_history", opts.IncludeTranscriptionHistory))
+		logger.Bool("include_runways", opts.IncludeRunways))
 
 	// Load template if not in cache
 	tmpl, err := e.getTemplate(templatePath)
@@ -65,34 +64,6 @@ func (e *Engine) RenderTemplate(templatePath string, opts FormattingOptions) (st
 	return rendered, nil
 }
 
-// RenderTemplateWithContext renders a template with pre-aggregated context data
-func (e *Engine) RenderTemplateWithContext(templatePath string, context *TemplateContext, opts FormattingOptions) (string, error) {
-	e.logger.Debug("Rendering template with provided context",
-		logger.String("template_path", templatePath))
-
-	// Load template if not in cache
-	tmpl, err := e.getTemplate(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to get template: %w", err)
-	}
-
-	// Format the data for template rendering
-	data := e.prepareTemplateData(context, opts)
-
-	// Render the template
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	rendered := buf.String()
-	e.logger.Debug("Template rendered successfully with context",
-		logger.String("template_path", templatePath),
-		logger.Int("rendered_length", len(rendered)))
-
-	return rendered, nil
-}
-
 // prepareTemplateData converts raw context data to formatted template data
 func (e *Engine) prepareTemplateData(context *TemplateContext, opts FormattingOptions) TemplateData {
 	data := TemplateData{
@@ -117,13 +88,6 @@ func (e *Engine) prepareTemplateData(context *TemplateContext, opts FormattingOp
 	} else {
 		data.Runways = "Runway information not available."
 		data.ActiveRunways = "Active runway detection not available."
-	}
-
-	// Format transcription history if requested (only for ATC Chat)
-	if opts.IncludeTranscriptionHistory {
-		data.TranscriptionHistory = FormatTranscriptionHistory(context.TranscriptionHistory)
-	} else {
-		data.TranscriptionHistory = ""
 	}
 
 	// Format airport data
@@ -178,91 +142,4 @@ func (e *Engine) loadTemplate(templatePath string) (*template.Template, error) {
 	}
 
 	return tmpl, nil
-}
-
-// ReloadTemplate forces a template to be reloaded from file
-func (e *Engine) ReloadTemplate(templatePath string) error {
-	e.cacheMutex.Lock()
-	defer e.cacheMutex.Unlock()
-
-	// Load template from file
-	tmpl, err := e.loadTemplate(templatePath)
-	if err != nil {
-		return err
-	}
-
-	// Update cache
-	e.templateCache[templatePath] = tmpl
-	e.logger.Info("Template reloaded",
-		logger.String("template_path", templatePath))
-
-	return nil
-}
-
-// ReloadAllTemplates forces all cached templates to be reloaded from files
-func (e *Engine) ReloadAllTemplates() error {
-	e.cacheMutex.Lock()
-	defer e.cacheMutex.Unlock()
-
-	var errors []string
-	reloadedCount := 0
-
-	for templatePath := range e.templateCache {
-		tmpl, err := e.loadTemplate(templatePath)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", templatePath, err))
-			continue
-		}
-		e.templateCache[templatePath] = tmpl
-		reloadedCount++
-	}
-
-	if len(errors) > 0 {
-		e.logger.Error("Some templates failed to reload",
-			logger.Int("successful", reloadedCount),
-			logger.Int("failed", len(errors)))
-		return fmt.Errorf("failed to reload %d templates: %v", len(errors), errors)
-	}
-
-	e.logger.Info("All templates reloaded successfully",
-		logger.Int("count", reloadedCount))
-
-	return nil
-}
-
-// ClearCache clears the template cache
-func (e *Engine) ClearCache() {
-	e.cacheMutex.Lock()
-	defer e.cacheMutex.Unlock()
-
-	templateCount := len(e.templateCache)
-	e.templateCache = make(map[string]*template.Template)
-
-	e.logger.Info("Template cache cleared",
-		logger.Int("cleared_count", templateCount))
-}
-
-// GetCacheStats returns statistics about the template cache
-func (e *Engine) GetCacheStats() map[string]interface{} {
-	e.cacheMutex.RLock()
-	defer e.cacheMutex.RUnlock()
-
-	templates := make([]string, 0, len(e.templateCache))
-	for path := range e.templateCache {
-		templates = append(templates, path)
-	}
-
-	return map[string]interface{}{
-		"cached_template_count": len(e.templateCache),
-		"cached_templates":      templates,
-	}
-}
-
-// GetRawTemplate returns the raw template content without processing
-func (e *Engine) GetRawTemplate(templatePath string) (string, error) {
-	content, err := ioutil.ReadFile(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read template file '%s': %w", templatePath, err)
-	}
-	return string(content), nil
 }
