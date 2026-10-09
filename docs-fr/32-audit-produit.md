@@ -118,7 +118,7 @@ de départ, qui visaient un fork réintégrable dans co-atc. Relu : `00-mission.
    à fermer proprement (Q7 : « Windy gardée, Q36 »), pour que la mission ne promette plus ce
    que le plan ne fait pas.
 
-### Décision proposée : D71 — atc-scribe est un produit à part
+### Décision : D71 — atc-scribe est un produit à part *(validée le 10/10)*
 
 1. **Le dépôt reste un fork git** : historique amont, remote `upstream`, licence MIT de Yegor S,
    crédit dans le README — D19.1, D6, D7 inchangés ; `docs/` reste à eux.
@@ -144,15 +144,19 @@ de départ, qui visaient un fork réintégrable dans co-atc. Relu : `00-mission.
 une station de réception, né d'un fork de Co-ATC ») ; README : « What is different » réécrit,
 « used as they are » retiré, assistant vocal « removed », une ligne sur les sources audio ;
 Q11 reçoit une note « remplacée par D71 » ; Q7 est fermée ; CLAUDE.md cite D71.
-**Rien de tout cela n'est fait tant que le propriétaire n'a pas validé.**
+**Validée le 10/10 ; les documents ont été mis à jour le même jour** (mission, README, Q11,
+Q7, CLAUDE.md, D71 dans `05-decisions.md`).
 
 ### Où en est le code
 
 Le retrait du lecteur SRT et les options d'entrée ffmpeg ont été écrits le 10/10 avant cette
-mise au point : compilé, `go vet` et tests verts (dont deux nouveaux), **ni commité ni poussé,
-rangés dans une réserve git** (`git stash list` : « WIP sources audio »). Ils ne touchent pas
-la production, dont le binaire date du 2/10. Ils entrent dans D71.5 (contribuable) et D71.6
-(réutilisable) et attendent la validation.
+mise au point, rangés en réserve git le temps de l'alignement, puis **commités après la
+validation, en deux commits autonomes** comme D71.5 le demande : d'abord les options d'entrée
+et les options HTTP réservées aux sources HTTP (offrable à l'amont tel quel : c'est un défaut
+amont, mesuré — ffmpeg 8.0.1 s'arrête sur « Option reconnect not found » pour toute source non
+HTTP), puis le retrait du lecteur SRT (le nôtre). Compilé, `go vet`, tests `-race` verts, deux
+tests nouveaux. La production n'est pas relancée dessus : son binaire date du 2/10 ; le
+prochain lancement prendra le nouveau, et l'instance d'essai passe avant (garde-fou 3).
 
 ## Le jugement du propriétaire (09/10)
 
@@ -406,4 +410,8 @@ programmation d'écoute par plage horaire (E2).
 - 09/10 : cadre posé ; trois études menées en parallèle (Sonnet), rapports dans
   `runs/audit-2026-10-09/` ; jugement du propriétaire, propositions et **consolidation**
   inscrits. `atc_chat.enabled` passé à `false`. D19 et CLAUDE.md corrigés sur l'empreinte.
-  En attente des cinq arbitrages ci-dessus avant d'ouvrir un chantier.
+- 10/10 : chat « AI Advisory » retiré (arbitrage 1), interface en anglais (arbitrage 3),
+  règle « ne rien casser » (sept garde-fous), question des sources audio instruite ;
+  **alignement avec les textes fondateurs, D71 validée**, documents mis à jour ; premier
+  code sous D71 : options d'entrée ffmpeg, puis retrait du lecteur SRT. Restent à trancher :
+  le fond de carte (étude en cours) et l'ordre des paliers.

@@ -2,9 +2,18 @@
 
 ## En une phrase
 
-Adapter [Co-ATC](https://github.com/yegors/co-atc) pour qu'il tourne **entièrement en
+Faire tourner l'écoute et la transcription de la radio aéronautique **entièrement en
 local, sans aucune API cloud**, sur une station bilingue français/anglais — et en faire
-un dépôt public réutilisable.
+un **produit public pour une station de réception**, né d'un fork de
+[Co-ATC](https://github.com/yegors/co-atc).
+
+> **Révision du 10/10 (D71).** La phrase d'origine disait « adapter Co-ATC … et en faire
+> un dépôt public réutilisable ». Après 263 commits, atc-scribe est devenu un produit à
+> part : on ne rebase plus, ce qui n'a pas de rôle ici se retire, l'interface est la nôtre,
+> et ce qui est utile à l'amont reste identifiable, un correctif par commit autonome.
+> « Réutilisable » veut dire : une autre station, avec ses propres flux (tout ce que ffmpeg
+> lit), tar1090/readsb ou une autre source ADS-B, Apple Silicon pour le sidecar ou tout
+> service qui honore `docs/LOCAL-STT.md`. Détail et audit : `32-audit-produit.md`.
 
 ## Pourquoi un fork plutôt qu'une contribution
 
@@ -38,14 +47,17 @@ format des résultats, la latence, la gestion des files d'attente et la qualité
 - adaptation de l'ingestion audio à la chaîne RTLSDR-Airband existante
 - configuration station : position, fréquences, terrains et pistes d'Île-de-France
 - remplacement des sources météo par des sources françaises (METAR/TAF/NOTAM du SIA
-  ou d'Aviation Weather Center)
+  ou d'Aviation Weather Center) — *abandonné le 10/10 : Q7 fermée, Windy gardée (Q36)*
 - documentation d'installation reproductible pour un tiers
 
 **Hors périmètre pour l'instant, à rediscuter :**
 
 - l'assistant vocal (`[atc_chat]`) — dépend d'un modèle de langue ; on décidera plus
-  tard s'il passe en local, s'il devient optionnel ou s'il disparaît
-- l'extraction de clairances par IA — même question
+  tard s'il passe en local, s'il devient optionnel ou s'il disparaît — *tranché le
+  10/10 : il disparaît (D71) ; un assistant local en français est une question à
+  rouvrir plus tard, sans partir de ce code*
+- l'extraction de clairances par IA — même question — *tranché : une grammaire de
+  phraséologie à vocabulaire fermé, sans modèle (README, « What is different »)*
 - toute exposition sur Internet : Co-ATC n'a **aucune authentification** et son auteur
   le dit explicitement. Le service reste sur le réseau local.
 

@@ -147,10 +147,14 @@ n'est mesuré.** Il faut le jeu de test annoté de `04-corpus.md` d'abord.
 
 Détail complet dans `07-carte-openai.md`.
 
-### Q7 — Quelles sources pour la météo française ?
+### Q7 — Quelles sources pour la météo française ? *(**fermée le 10/10**, D71)*
 
 Windy est à remplacer. METAR et TAF sont disponibles publiquement ; les NOTAM français
 passent par le SIA. À arbitrer selon les conditions d'utilisation.
+
+**Fermée le 10/10** : Windy est gardée (Q36). Elle fournit METAR, TAF et NOTAM pour LFPO
+(144 relevés par jour le 03/10), rien ne manque à l'usage, et seul un code d'aéroport
+part vers l'extérieur. À rouvrir si Windy change ses conditions.
 
 ### Q8 — Licence du fork : **tranchée** *(15/09)*
 
@@ -215,7 +219,11 @@ deux cas. Il manque donc soit une ligne au CSV, soit une définition explicite.
 sur la station. Sans importance pour la suite du chantier, mais à régler avant publication
 — un dépôt public qui annonce trois nombres différents pour la même chose s'expose.
 
-### Q11 — Vrai fork rebasable, ou dépôt séparé ? *(mesuré le 15/09, **révisé par D19 le 16/09**)*
+### Q11 — Vrai fork rebasable, ou dépôt séparé ? *(mesuré le 15/09, **révisé par D19 le 16/09**, **remplacée par D71 le 10/10**)*
+
+> **Remplacée par D71 (10/10).** L'objectif « rebasable » est abandonné pour de bon : on ne
+> rebase plus, l'interface devient la nôtre, et ce qui est utile à l'amont se contribue par
+> commits autonomes. La forme du dépôt (fork git, historique, licence) reste celle décidée ici.
 
 > **La réponse « oui » tient toujours pour la forme du dépôt, mais plus pour la
 > méthode de travail.** Ce qui suit a été mesuré avant que le fork n'écrive une ligne ;
@@ -4842,6 +4850,42 @@ la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1
 
 La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
 validée contre `actual_runway_off`.
+
+### D71 — atc-scribe est un produit à part *(10/10)*
+
+**Demandé par le propriétaire le 09/10** (« on s'est suffisamment écarté de co-atc … pour
+qu'atc-scribe soit un produit à part entière »), **mesuré** (263 commits, +33 941 / −1 312
+lignes, 130 fichiers nouveaux ; empreinte sur `app.js` 8,8 %, `index.html` 17,9 %,
+`adsb/service.go` 9 % ; amont muet depuis le 3 mai), **confronté aux textes fondateurs** le
+10/10 (doc 32, « Alignement ») et **validé** le même jour. D71 remplace l'objectif de Q11
+(« vrai fork rebasable ») et prolonge D19.
+
+1. **Le dépôt reste un fork git** : historique amont, remote `upstream`, licence MIT de
+   Yegor S, crédit dans le README. D19.1, D6 et D7 inchangés ; `docs/` reste à eux.
+2. **On ne rebase plus, jamais.** Si l'amont reprenait, on y prendrait des cerises
+   (`cherry-pick`), commit par commit.
+3. **Ce qui n'a pas de rôle ici se retire, il ne dort pas** : chat vocal OpenAI, simulation,
+   couches de cartes américaines, chemin de transcription OpenAI (exécution de D3, décidée
+   le 15/09 et jamais faite), lecteur SRT natif (ffmpeg lit SRT). Tout reste dans
+   l'historique git.
+4. **L'interface est la nôtre** : réglages, alertes, barre radio, téléphone, et ce
+   qu'atc-scribe sait sans le montrer (doc 32, palier 3). La disposition générale reste
+   celle de l'amont, par choix du propriétaire.
+5. **Le contribuable reste identifiable et s'allonge.** Liste : sidecar et `local.go`
+   (contrat `docs/LOCAL-STT.md`), rotation de base (Q26), `internal/auth/`, état serveur
+   (`server_handlers.go`), correctif WebSocket (doc 32, 0.1), index SQLite redondants
+   (0.4), fuite de contexte de `go vet`, options d'entrée ffmpeg et options HTTP réservées
+   aux sources HTTP (commit du 10/10). **Règle : un correctif contribuable = un commit
+   autonome**, qui ne dépend d'aucun de nos retraits, pour qu'on puisse l'offrir tel quel.
+   Premier exemple : les deux commits du 10/10, options d'entrée d'abord (offrable), retrait
+   du lecteur SRT ensuite (le nôtre).
+6. **« Réutilisable » veut dire** : une station avec ses propres flux (tout ce que ffmpeg
+   lit), tar1090/readsb ou l'une des autres sources ADS-B (gardées), Apple Silicon pour le
+   sidecar ou tout service qui honore `docs/LOCAL-STT.md`. Le README le dit en ces termes.
+
+**Documents mis à jour le 10/10** : `00-mission.md` (phrase et révision), README (« What is
+different », « used as they are » retiré), Q11 (note), Q7 (fermée), CLAUDE.md, doc 32.
+**Règle du chantier, rappel** : ne rien casser de ce qui marche (sept garde-fous, doc 32).
 
 ### D70 — co-atc joignable par le réseau local, connexion obligatoire *(01/10)*
 

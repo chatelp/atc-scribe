@@ -54,12 +54,19 @@ working notes that produced them are in [`docs-fr/`](docs-fr/) (in French).
 | Callsign → aircraft matching | GPT-4o, given the live ADS-B list | weighted edit distance against the same list |
 | Authentication | none | Argon2id + server-side sessions |
 | Operational state | not exposed | `GET /api/v1/server` — database growth, disk, retention |
-| Voice assistant | OpenAI Realtime | untouched, and off unless you supply a key |
-| Weather | Windy | unchanged so far — see `Q7` in the working notes |
+| Voice assistant | OpenAI Realtime | removed (October 2026): it cannot run without the key, and nothing here needs it |
+| Weather | Windy | kept: it works, and only an airport code leaves the house |
+| Runways | runway extensions drawn on the map | a runway judge checked against FlightAware (368 verdicts of 368), and a PAR-style approach view |
+| Audio sources | HTTP streams, plus a native SRT reader | anything FFmpeg reads, with per-source input options (raw PCM over UDP, a receiver on the sound card); SRT through FFmpeg's libsrt |
+| Sources added while running | none | `PUT /api/v1/sources/{id}`, for a station that publishes one stream per channel |
 
-Upstream's map, ADS-B ingestion, flight-phase detection and web interface are used
-**as they are**. They are the larger and better half of this program, and nothing
-here improves on them.
+Upstream's map, ADS-B ingestion and flight-phase detection are the larger half of this
+program and stay close to what they are. The interface started as upstream's and is
+becoming this project's own. **Since October 2026, atc-scribe is developed as a product
+in its own right, not as a fork that tracks upstream**: nothing is rebased, what has no
+role here is removed rather than left dormant, and what would be useful upstream is kept
+as self-contained commits that can be offered as they are. The reasoning, with the
+numbers, is in [`docs-fr/32-audit-produit.md`](docs-fr/32-audit-produit.md) (in French).
 
 ## Status, honestly
 
@@ -270,7 +277,10 @@ adds enough to make that a choice rather than a fact.
 - **FFmpeg** — audio ingestion (upstream's installation notes still apply, see
   [`README-upstream.md`](README-upstream.md))
 - **An ADS-B source** — a local `tar1090`/`readsb` is what this is built against
-- **An audio source** — an Icecast mount, or any stream FFmpeg can read
+- **An audio source** — an Icecast mount, or anything FFmpeg can read: an HTTP
+  stream, raw PCM over UDP from an SDR program, a receiver plugged into the
+  sound card (`ffmpeg_input_options`, see `configs/config.toml.example`), SRT
+  if your FFmpeg has libsrt (Homebrew's does)
 - **Python 3.11+ and Apple Silicon** for the transcription sidecar. MLX is
   Apple-only; on other hardware, point `[transcription.local] server_url` at any service
   that honours the `docs/LOCAL-STT.md` contract.
