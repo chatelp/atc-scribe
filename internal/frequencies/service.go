@@ -51,6 +51,7 @@ func NewStreamProcessor(
 	id string,
 	audioURL string,
 	ffmpegReconnect bool,
+	inputOptions []string,
 	client *Client,
 	config *cfg.Config,
 	logger *logger.Logger,
@@ -67,6 +68,7 @@ func NewStreamProcessor(
 		FFmpegTimeoutSecs:        config.Frequencies.FFmpegTimeoutSecs,
 		FFmpegReconnectDelaySecs: config.Frequencies.FFmpegReconnectDelaySecs,
 		NoFFmpegReconnect:        !ffmpegReconnect,
+		InputOptions:             inputOptions,
 	}
 
 	audioProcessor, err := audio.NewCentralAudioProcessor(
@@ -688,6 +690,7 @@ func (s *Service) startSource(freqConfig *cfg.FrequencyConfig) bool {
 		id,
 		freqConfig.URL,
 		freqConfig.ReconnectsInFFmpeg(),
+		freqConfig.FFmpegInputOptions,
 		s.client,
 		s.config,
 		s.logger,
@@ -995,6 +998,7 @@ func (s *Service) GetAudioStream(ctx context.Context, id string, clientID string
 				id,
 				freqConfig.URL,
 				freqConfig.ReconnectsInFFmpeg(),
+				freqConfig.FFmpegInputOptions,
 				s.client,
 				s.config,
 				s.logger,

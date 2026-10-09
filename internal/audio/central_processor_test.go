@@ -10,17 +10,57 @@ import (
 
 func argsFor(t *testing.T, noReconnect bool) []string {
 	t.Helper()
+	return argsForSource(t, "http://example.invalid/a.mp3", nil, noReconnect)
+}
+
+func argsForSource(t *testing.T, url string, inputOptions []string, noReconnect bool) []string {
+	t.Helper()
 	log, err := logger.New(logger.Config{Level: "error", Format: "console"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := NewCentralAudioProcessor(context.Background(), "x", "http://example.invalid/a.mp3",
+	p, err := NewCentralAudioProcessor(context.Background(), "x", url,
 		CentralProcessorConfig{FFmpegPath: "ffmpeg", SampleRate: 16000, Channels: 1, Format: "s16le",
-			FFmpegReconnectDelaySecs: 5, NoFFmpegReconnect: noReconnect}, log)
+			FFmpegTimeoutSecs: 10, FFmpegReconnectDelaySecs: 5, NoFFmpegReconnect: noReconnect,
+			InputOptions: inputOptions}, log)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return p.ffmpegArgs()
+}
+
+// Raw PCM over UDP, or a receiver on the sound card, is a source too: what
+// ffmpeg needs to read it goes right before -i, in the order given.
+func TestInputOptionsComeBeforeTheInput(t *testing.T) {
+	opts := []string{"-f", "s16le", "-ar", "48000", "-ac", "1"}
+	args := argsForSource(t, "udp://127.0.0.1:7355", opts, false)
+	i := slices.Index(args, "-i")
+	if i < len(opts) || !slices.Equal(args[i-len(opts):i], opts) {
+		t.Errorf("the input options should sit right before -i: %v", args)
+	}
+	if args[i+1] != "udp://127.0.0.1:7355" {
+		t.Errorf("the input follows -i: %v", args)
+	}
+}
+
+// -timeout and -reconnect are options of ffmpeg's HTTP protocol: on any other
+// input ffmpeg stops with "Option reconnect not found" (8.0.1, measured), so
+// they are not passed there, whatever the defaults say.
+func TestHTTPOptionsStayOffOtherInputs(t *testing.T) {
+	httpOnly := []string{"-timeout", "-reconnect", "-reconnect_at_eof", "-reconnect_streamed", "-reconnect_delay_max"}
+	for _, url := range []string{"udp://127.0.0.1:7355", ":0", "srt://host:4200", "/tmp/a.wav"} {
+		for _, flag := range httpOnly {
+			if args := argsForSource(t, url, nil, false); slices.Contains(args, flag) {
+				t.Errorf("%s: %s should not be passed: %v", url, flag, args)
+			}
+		}
+	}
+	args := argsForSource(t, "HTTPS://example.invalid/a.mp3", nil, false)
+	for _, flag := range httpOnly {
+		if !slices.Contains(args, flag) {
+			t.Errorf("https keeps %s: %v", flag, args)
+		}
+	}
 }
 
 // Upstream's behaviour stays the default: ffmpeg reconnects by itself.

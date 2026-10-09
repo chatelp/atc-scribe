@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
+	"strings"
 
 	cfg "github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/transcription/phraseology"
@@ -39,9 +41,20 @@ func validateSource(fc cfg.FrequencyConfig) error {
 	if !sourceID.MatchString(fc.ID) {
 		return fmt.Errorf("id %q: letters, digits, '.', '_' and '-' only, 64 characters at most", fc.ID)
 	}
+	// A network address only: a station says what it publishes, and the
+	// operator's own hardware -- a capture device, a file -- stays in the
+	// configuration file, under their hand.
 	u, err := url.Parse(fc.URL)
-	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "srt") {
-		return fmt.Errorf("url %q: an http, https or srt address is required", fc.URL)
+	if err != nil || u.Host == "" || !networkSchemes[u.Scheme] {
+		return fmt.Errorf("url %q: a network address is required (http, https, srt, udp, rtp, rtsp, rtmp, tcp)", fc.URL)
+	}
+	if len(fc.FFmpegInputOptions) > 32 {
+		return fmt.Errorf("ffmpeg_input_options: %d items, maximum is 32", len(fc.FFmpegInputOptions))
+	}
+	for _, o := range fc.FFmpegInputOptions {
+		if len(o) > 128 || strings.ContainsAny(o, "\x00\n\r") {
+			return fmt.Errorf("ffmpeg_input_options: %q: one word of 128 characters at most", o)
+		}
 	}
 	if len([]rune(fc.Name)) > 120 {
 		return fmt.Errorf("name is %d characters, maximum is 120", len([]rune(fc.Name)))
@@ -63,6 +76,11 @@ func validateSource(fc cfg.FrequencyConfig) error {
 
 var sectorAirport = regexp.MustCompile(`^[A-Z]{4}$`)
 
+var networkSchemes = map[string]bool{
+	"http": true, "https": true, "srt": true, "udp": true,
+	"rtp": true, "rtsp": true, "rtmp": true, "tcp": true,
+}
+
 // sameDisplay also covers the sector: it is read at each match, so a change
 // needs no reconnection.
 func sameDisplay(a, b cfg.FrequencyConfig) bool {
@@ -76,7 +94,8 @@ func sameDisplay(a, b cfg.FrequencyConfig) bool {
 // in the list must not cause one.
 func sameConnection(a, b cfg.FrequencyConfig) bool {
 	return a.ID == b.ID && a.URL == b.URL && a.TranscribeAudio == b.TranscribeAudio &&
-		a.Language == b.Language && a.ReconnectsInFFmpeg() == b.ReconnectsInFFmpeg()
+		a.Language == b.Language && a.ReconnectsInFFmpeg() == b.ReconnectsInFFmpeg() &&
+		slices.Equal(a.FFmpegInputOptions, b.FFmpegInputOptions)
 }
 
 // AddSource starts a frequency that is not in the configuration. Adding the

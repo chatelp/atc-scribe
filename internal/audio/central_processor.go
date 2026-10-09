@@ -56,6 +56,7 @@ type CentralAudioProcessor struct {
 	ffmpegStdout             io.ReadCloser
 	srtReader                *SRTReader // Native SRT reader (used instead of ffmpeg for srt://)
 	sourceType               sourceType // Which backend is being used
+	inputOptions             []string   // ffmpeg options placed before -i, from the source
 	multiReader              *MultiReader
 	ctx                      context.Context
 	cancel                   context.CancelFunc
@@ -89,6 +90,12 @@ type CentralProcessorConfig struct {
 	// loop, which is right for a stream that always exists and wrong for one a
 	// station creates and removes as it changes what it listens to.
 	NoFFmpegReconnect bool
+
+	// InputOptions go on ffmpeg's command line before -i, as the source gives
+	// them: the format and rate of raw PCM over UDP, or the capture device of
+	// a receiver plugged into the sound card. Empty for a stream ffmpeg
+	// recognises by itself, which is every HTTP one.
+	InputOptions []string
 }
 
 // NewCentralAudioProcessor creates a new central audio processor.
@@ -121,6 +128,7 @@ func NewCentralAudioProcessor(
 		ffmpegReconnectDelaySecs: config.FFmpegReconnectDelaySecs,
 		noFFmpegReconnect:        config.NoFFmpegReconnect,
 		sourceType:               srcType,
+		inputOptions:             config.InputOptions,
 		multiReader:              multiReader,
 		ctx:                      procCtx,
 		cancel:                   procCancel,
@@ -408,39 +416,49 @@ func (p *CentralAudioProcessor) startFFmpeg() error {
 }
 
 // ffmpegArgs is ffmpeg's command line for this processor's stream.
+//
+// The timeout and reconnection knobs are options of ffmpeg's HTTP protocol:
+// given with any other input -- raw PCM over UDP, a capture device -- ffmpeg
+// stops with "Option reconnect not found" (ffmpeg 8.0.1, measured 10/10). They
+// go only with http and https; the source's own input options cover the rest.
 func (p *CentralAudioProcessor) ffmpegArgs() []string {
-	// HTTP stream configuration - optimized for low latency with reconnection
 	args := []string{
-		"-loglevel", "error",  // Minimal logging
+		"-loglevel", "error", // Minimal logging
 		"-fflags", "nobuffer", // Disable input buffering
 		"-flags", "low_delay", // Enable low delay mode
 	}
 
-	// Add timeout if configured (convert seconds to microseconds)
-	if p.ffmpegTimeoutSecs > 0 {
-		timeoutMicros := p.ffmpegTimeoutSecs * 1000000
-		args = append(args, "-timeout", fmt.Sprintf("%d", timeoutMicros))
+	if isHTTP(p.audioURL) {
+		// Add timeout if configured (convert seconds to microseconds)
+		if p.ffmpegTimeoutSecs > 0 {
+			args = append(args, "-timeout", fmt.Sprintf("%d", p.ffmpegTimeoutSecs*1000000))
+		}
+		if !p.noFFmpegReconnect {
+			args = append(args,
+				"-reconnect", "1", // Enable reconnection
+				"-reconnect_at_eof", "1", // Reconnect at end of file
+				"-reconnect_streamed", "1", // Reconnect for streamed inputs
+				"-reconnect_delay_max", fmt.Sprintf("%d", p.ffmpegReconnectDelaySecs), // Configurable reconnect delay
+			)
+		}
 	}
-
-	// Add reconnection settings
-	if !p.noFFmpegReconnect {
-		args = append(args,
-			"-reconnect", "1", // Enable reconnection
-			"-reconnect_at_eof", "1", // Reconnect at end of file
-			"-reconnect_streamed", "1", // Reconnect for streamed inputs
-			"-reconnect_delay_max", fmt.Sprintf("%d", p.ffmpegReconnectDelaySecs), // Configurable reconnect delay
-		)
-	}
+	args = append(args, p.inputOptions...)
 	args = append(args,
-		"-i", p.audioURL,            // Input URL
-		"-f", p.format,              // Output format (should be s16le for raw PCM)
-		"-acodec", "pcm_s16le",      // Audio codec
-		"-ac", fmt.Sprintf("%d", p.channels),    // Channels
-		"-ar", fmt.Sprintf("%d", p.sampleRate),  // Sample rate
-		"-flush_packets", "1",       // Flush packets immediately
-		"pipe:1",                    // Output to stdout
+		"-i", p.audioURL, // Input URL, or a capture device named by the input options
+		"-f", p.format, // Output format (should be s16le for raw PCM)
+		"-acodec", "pcm_s16le", // Audio codec
+		"-ac", fmt.Sprintf("%d", p.channels), // Channels
+		"-ar", fmt.Sprintf("%d", p.sampleRate), // Sample rate
+		"-flush_packets", "1", // Flush packets immediately
+		"pipe:1", // Output to stdout
 	)
 	return args
+}
+
+// isHTTP reports that ffmpeg will read the source with its HTTP protocol.
+func isHTTP(audioURL string) bool {
+	u := strings.ToLower(audioURL)
+	return strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://")
 }
 
 // stopFFmpeg stops the ffmpeg process
