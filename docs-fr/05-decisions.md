@@ -874,6 +874,13 @@ Profondeur de nos modifications sur les fichiers amont, rapportée à leur taill
 | `cmd/server/main.go` | 486 | 24,7 % |
 | `internal/api/routes.go` | 117 | 116 % *(mais 117 lignes)* |
 
+> **Remesuré le 09/10 (Q52, audit produit)** : 263 commits, +33 941 / −1 312 lignes, 130
+> fichiers nouveaux. Empreinte sur `www/app.js` **8,8 %** (534 lignes, contre 93 le 16/09),
+> sur `www/index.html` **17,9 %**, sur `internal/adsb/service.go` **9 %**, sur
+> `internal/api/handlers.go` 6,6 %. La règle de D19 tient (modifier l'amont quand c'est le
+> plus simple) ; l'argument « les gros fichiers sont effleurés » ne tient plus pour
+> l'interface. Voir `32-audit-produit.md`.
+
 Les seuls fichiers amont réellement réécrits sont **courts**. Les gros sont effleurés.
 D16 annonçait « le fork touche le frontend pour la première fois » comme une rupture :
 la mesure dit 1,7 %.

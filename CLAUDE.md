@@ -65,10 +65,13 @@ et il a dû le rappeler.
   exacte. La position de la station est déjà publique via FlightAware, mais la
   configuration d'exemple doit rester générique.
 - **Le dépôt reste un fork, mais la rebasabilité n'a plus valeur de contrainte.**
-  Mesuré le 16/09 (D19) : l'amont est silencieux depuis le 3 mai 2026, et notre empreinte
-  sur ses fichiers est faible là où ça compterait — 1,7 % de `www/app.js`, 0,2 % de
-  `internal/adsb/service.go`. **Modifie un fichier amont quand c'est la façon la plus
-  simple d'écrire la chose** ; n'ajoute pas d'accesseur pour contourner une signature.
+  Mesuré le 16/09 (D19), remesuré le 09/10 (Q52) : l'amont est silencieux depuis le 3 mai
+  2026 ; notre empreinte sur ses fichiers, faible au départ (1,7 % de `www/app.js`, 0,2 % de
+  `internal/adsb/service.go`), vaut aujourd'hui 8,8 % et 9 %, et 263 commits d'avance.
+  **Modifie un fichier amont quand c'est la façon la plus simple d'écrire la chose** ;
+  n'ajoute pas d'accesseur pour contourner une signature. Depuis le 09/10, atc-scribe se
+  traite comme un produit à part : l'audit `docs-fr/32-audit-produit.md` liste ce qui se
+  retire de l'amont et ce qui se construit.
   En revanche, **garde identifiable ce qui est contribuable** : le sidecar de
   transcription, le correctif de rotation de base (Q26), l'authentification et l'état
   serveur doivent pouvoir partir en pull request tels quels.
