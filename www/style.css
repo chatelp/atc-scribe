@@ -278,15 +278,6 @@ input[type=range].dual-range-max:focus {
     border-radius: 0 2px 2px 0;
 }
 
-/* AI Advisory Audio Visualizer */
-#ai-vis-bar {
-    @apply transition-all duration-[50ms] ease-out;
-    background-color: #a855f7 !important; /* Purple color for AI */
-    box-shadow: 0 0 8px #a855f7 !important;
-    opacity: 1 !important;
-    border-radius: 0 2px 2px 0;
-}
-
 /* Custom Scrollbar Styles */
 /* For Webkit browsers (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
