@@ -75,12 +75,10 @@
                     current: new window.ol.source.Vector(),
                 };
 
-                const baseLayer = new window.ol.layer.Tile({
-                    source: new window.ol.source.XYZ({
-                        url: 'https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                        attributions: '&copy; OpenStreetMap contributors &copy; CARTO',
-                    }),
-                });
+                // The main map's base map, darkened or not like it.
+                const baseLayer = manager.engine && typeof manager.engine.createBaseMapLayer === 'function'
+                    ? manager.engine.createBaseMapLayer()
+                    : new window.ol.layer.Tile({ source: new window.ol.source.OSM() });
 
                 const historicalLayer = new window.ol.layer.Vector({ source: manager.tracksMiniMapLayers.historical });
                 const hindcastLayer = new window.ol.layer.Vector({ source: manager.tracksMiniMapLayers.hindcast });
@@ -105,6 +103,9 @@
                     view: new window.ol.View({ center, zoom: 10 }),
                     controls: [],
                 });
+                if (manager.engine && typeof manager.engine.applyBaseMapTheme === 'function') {
+                    manager.engine.applyBaseMapTheme(manager.tracksMiniMap.getTargetElement());
+                }
             } catch (error) {
                 console.error('Error creating mini-map:', error);
                 manager.tracksMiniMap = null;

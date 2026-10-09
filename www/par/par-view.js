@@ -215,6 +215,7 @@
 
         container.addEventListener('click', (ev) => {
             hideTip();
+            if (ev.target.closest('a[href]')) return;   // the VAC link opens its tab, nothing else
             const toggle = ev.target.closest('[data-par-toggle]');
             if (toggle) {
                 const key = toggle.getAttribute('data-par-toggle');
@@ -397,10 +398,17 @@
                 .map((o) => o.f);
 
             const width = Math.max(480, container.clientWidth - 34);
+            // The SIA's chart, in a new tab: its terms allow a link, not a frame.
+            const vac = window.ParVac ? window.ParVac.vacLink(apt.code, new Date()) : null;
+            const vacLink = vac
+                ? `<a class="par-vac" href="${esc(vac.url)}" target="_blank" rel="noopener"${helpAttr('VAC',
+                    `Visual approach chart of ${apt.code}, from the SIA, AIRAC cycle of ${vac.cycle}. Opens in a new tab.`)}>VAC</a>`
+                : '';
             const header = `
                 <div class="par-header">
                     <span class="par-airport"${HELP.view()}>${esc(apt.code)}</span>
                     <span class="par-name"${HELP.view()}>${esc(apt.name || '')}</span>
+                    ${vacLink}
                     <span class="par-sep">·</span>
                     <span${HELP.inUse(inUse.length > 1)}>${inUse.length > 1 ? 'Runways' : 'Runway'} in use <b>${inUse.length
                         ? inUse.map((r) => esc(r.end) + ` <span class="par-dim">${Math.round(r.probability * 100)}%</span>`).join(' · ')
