@@ -76,6 +76,84 @@ gain / effort / risque, et le propriétaire tranche ce qui devient chantier.
 - **Mesurer avant de conclure** : chaque suppression proposée cite le fichier et le nombre
   de lignes, chaque friction cite le geste et le nombre de clics.
 
+## Alignement avec les objectifs de départ (10/10, à valider avant tout code)
+
+Demande du propriétaire : avant de coder, vérifier que le plan ne contredit pas les objectifs
+de départ, qui visaient un fork réintégrable dans co-atc. Relu : `00-mission.md`, le
+« Why a fork » du README public, Q11 (15/09), D19 (16/09), D3 (15/09), Q7.
+
+### Ce que les textes fondateurs disent
+
+| Texte | Ce qu'il promet | Tenu ? |
+|---|---|---|
+| `00-mission.md` | « Adapter Co-ATC pour qu'il tourne entièrement en local … et en faire un dépôt public réutilisable » ; trois apports : zéro cloud, bilingue, multicanal réel | oui ; les trois apports existent et sont mesurés |
+| `00-mission.md`, hors périmètre | l'assistant vocal et l'extraction de clairances par IA : « on décidera plus tard s'il passe en local, devient optionnel ou disparaît » | la question était ouverte ; tranchée le 10/10 : il disparaît |
+| `00-mission.md`, périmètre | météo française (SIA) à la place de Windy (Q7) | **non fait** ; Windy marche (144 relevés/jour) et l'audit la garde |
+| Q11 (15/09) | « vrai fork rebasable », parce que notre part est profonde mais étroite : « nous ne touchons pas une ligne de l'interface » | **plus vrai** : 17,9 % d'`index.html`, 8,8 % d'`app.js`, et le plan UX va bien au-delà |
+| D19 (16/09) | le dépôt reste un fork git (historique, remote, MIT, crédit) ; **la rebasabilité n'est plus une règle** ; « ce qui est contribuable reste identifiable » (sidecar et `local.go`, Q26, `auth`, état serveur) | tenu ; c'est la règle en vigueur |
+| D3 (15/09) | « transcription entièrement locale, l'API OpenAI est retirée » | décidé, **pas fait** : 1 990 lignes du chemin OpenAI sont toujours là |
+| README public | « Upstream's map, ADS-B ingestion, flight-phase detection and web interface are used **as they are** … nothing here improves on them » ; assistant vocal « untouched, and off unless you supply a key » | **faux depuis la PAR et le juge des pistes** ; faux dès que le chat part |
+
+### Les contradictions, et comment les lever
+
+1. **« Fork réintégrable » (Q11) contre « produit à part » (Q52).** Q11 a été révisée par D19
+   dès le 16/09 : on ne rebase plus, on ne code plus pour rester rebasable. L'audit ne crée pas
+   la rupture, il la constate et l'étend à l'interface. Ce qui reste de l'intention d'origine,
+   et qui a un sens : **contribuer en amont ce qui est utile à d'autres**, par des correctifs
+   autonomes qu'on peut proposer tels quels, sans que le dépôt entier ait à se rapprocher.
+   Lever : une décision explicite (D71 ci-dessous) qui remplace l'objectif de Q11.
+2. **« Interface utilisée telle quelle » (README, Q11) contre la refonte UX (paliers 1, 2, 4).**
+   Une fois la page Réglages, les alertes et le téléphone refaits, l'interface est la nôtre.
+   L'amont n'a rien publié depuis le 3 mai ; rien à absorber. Lever : le dire dans D71 et
+   réécrire la section « What is different » du README.
+3. **« Dépôt public réutilisable » contre « retirer ce qui ne sert pas ici ».** Pas de
+   contradiction si « réutilisable » est défini : *une autre station, avec son propre
+   récepteur et ses propres flux, sur Apple Silicon ou avec un service compatible
+   `LOCAL-STT`*. Ce qui sert cette définition se garde ou s'étend (sources audio par ffmpeg,
+   options d'entrée, sources ADS-B autres que tar1090) ; ce qui ne la sert pas se retire
+   (chat OpenAI, simulation, couches de cartes américaines, chemin OpenAI déjà retiré par D3).
+4. **D3 non exécutée.** Retirer le chemin OpenAI (1.2) n'est pas une décision nouvelle :
+   c'est l'exécution de D3, en retard de trois semaines.
+5. **Q7 abandonnée en silence.** La météo française n'a jamais été faite et Windy convient ;
+   à fermer proprement (Q7 : « Windy gardée, Q36 »), pour que la mission ne promette plus ce
+   que le plan ne fait pas.
+
+### Décision proposée : D71 — atc-scribe est un produit à part
+
+1. **Le dépôt reste un fork git** : historique amont, remote `upstream`, licence MIT de Yegor S,
+   crédit dans le README — D19.1, D6, D7 inchangés ; `docs/` reste à eux.
+2. **On ne rebase plus, jamais** ; si l'amont reprenait, on y prendrait des cerises
+   (`cherry-pick`) commit par commit, pas l'inverse.
+3. **Ce qui n'a pas de rôle ici se retire**, il ne dort pas : chat vocal OpenAI, simulation,
+   couches américaines, chemin de transcription OpenAI (D3). Tout reste dans l'historique git.
+4. **L'interface est la nôtre** : réglages, alertes, barre radio, téléphone, et ce qu'atc-scribe
+   sait et ne montre pas. La disposition générale reste celle de l'amont, par choix du
+   propriétaire.
+5. **Le contribuable reste identifiable, et s'allonge** : en plus de la liste de D19 (sidecar
+   et `local.go`, rotation Q26, `auth`, état serveur), le correctif WebSocket (0.1), les deux
+   index SQLite (0.4), la fuite de contexte signalée par `go vet`, et les options d'entrée
+   ffmpeg avec les options HTTP réservées aux sources HTTP (code écrit le 10/10, en réserve).
+   Règle : **un correctif contribuable = un commit autonome**, qui ne dépend d'aucun de nos
+   retraits, pour qu'on puisse l'offrir en l'état.
+6. **« Réutilisable » veut dire** : une station avec ses propres flux (tout ce que ffmpeg lit),
+   tar1090/readsb ou l'une des autres sources ADS-B, Apple Silicon pour le sidecar ou tout
+   service qui honore `docs/LOCAL-STT.md`. Le README le dit en ces termes.
+
+**Si D71 est validée, les documents changent ainsi** : `00-mission.md` reçoit un paragraphe
+« Révision du 10/10 » (la phrase d'une ligne devient « … et en faire un produit public pour
+une station de réception, né d'un fork de Co-ATC ») ; README : « What is different » réécrit,
+« used as they are » retiré, assistant vocal « removed », une ligne sur les sources audio ;
+Q11 reçoit une note « remplacée par D71 » ; Q7 est fermée ; CLAUDE.md cite D71.
+**Rien de tout cela n'est fait tant que le propriétaire n'a pas validé.**
+
+### Où en est le code
+
+Le retrait du lecteur SRT et les options d'entrée ffmpeg ont été écrits le 10/10 avant cette
+mise au point : compilé, `go vet` et tests verts (dont deux nouveaux), **ni commité ni poussé,
+rangés dans une réserve git** (`git stash list` : « WIP sources audio »). Ils ne touchent pas
+la production, dont le binaire date du 2/10. Ils entrent dans D71.5 (contribuable) et D71.6
+(réutilisable) et attendent la validation.
+
 ## Le jugement du propriétaire (09/10)
 
 Il est le seul utilisateur ; sa liste prime sur l'inventaire. Dans ses mots :

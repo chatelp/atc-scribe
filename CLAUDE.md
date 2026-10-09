@@ -69,9 +69,11 @@ et il a dû le rappeler.
   2026 ; notre empreinte sur ses fichiers, faible au départ (1,7 % de `www/app.js`, 0,2 % de
   `internal/adsb/service.go`), vaut aujourd'hui 8,8 % et 9 %, et 263 commits d'avance.
   **Modifie un fichier amont quand c'est la façon la plus simple d'écrire la chose** ;
-  n'ajoute pas d'accesseur pour contourner une signature. Depuis le 09/10, atc-scribe se
-  traite comme un produit à part : l'audit `docs-fr/32-audit-produit.md` liste ce qui se
-  retire de l'amont et ce qui se construit.
+  n'ajoute pas d'accesseur pour contourner une signature. Le 09/10, le propriétaire a
+  demandé un audit pour traiter atc-scribe comme un produit à part (Q52) ; la décision qui
+  en tire les conséquences, D71, est **proposée et non validée** : voir
+  `docs-fr/32-audit-produit.md`, section « Alignement ». Tant qu'elle ne l'est pas, D19
+  s'applique telle quelle.
   En revanche, **garde identifiable ce qui est contribuable** : le sidecar de
   transcription, le correctif de rotation de base (Q26), l'authentification et l'état
   serveur doivent pouvoir partir en pull request tels quels.
