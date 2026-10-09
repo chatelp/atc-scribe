@@ -4901,8 +4901,10 @@ sur l'usage réel d'une seule personne, Mac et téléphone par Tailscale. Le pro
 son jugement (interface lourde, déplacements lents, réglages mal faits, alertes inutiles,
 disposition à garder) ; les trois rapports sont consolidés dans le doc 32 en six paliers,
 ≈ 18 jours. **Premier arbitrage (10/10) : le chat « AI Advisory » (assistant vocal OpenAI,
-4 500 lignes, inutilisable sans clé) est retiré.** Quatre arbitrages restent : sources ADS-B
-hors tar1090 et SRT, langue de l'interface, fond de carte par défaut, ordre des paliers.
+4 500 lignes, inutilisable sans clé) est retiré. Langue (10/10) : l'interface reste en anglais ;
+l'interprétation d'une communication suit sa langue ; version en/fr dans un second temps.**
+Trois arbitrages restent : sources ADS-B hors tar1090 et SRT, fond de carte par défaut, ordre
+des paliers.
 **Règle du chantier (propriétaire, 10/10) : ne pas casser ce qui marche**, même en optimisant ;
 les sept garde-fous sont dans le doc 32 (un pas par commit, filet avant tout retrait, instance
 d'essai d'abord, mesures de référence rejouées, validation à l'usage, rien de renommé de ce qui
