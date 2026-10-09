@@ -35,6 +35,9 @@ func (h *Handler) PutSource(w http.ResponseWriter, r *http.Request) {
 		FFmpegReconnect *bool   `json:"ffmpeg_reconnect"`
 		SectorAirport   string  `json:"sector_airport"`
 		SectorKind      string  `json:"sector_kind"`
+		// ffmpeg options before -i, for raw PCM over UDP for instance:
+		// ["-f","s16le","-ar","48000","-ac","1"]. See config.FrequencyConfig.
+		FFmpegInputOptions []string `json:"ffmpeg_input_options"`
 	}
 	dec := json.NewDecoder(io.LimitReader(r.Body, 4096))
 	dec.DisallowUnknownFields()
@@ -56,6 +59,8 @@ func (h *Handler) PutSource(w http.ResponseWriter, r *http.Request) {
 		FFmpegReconnect: body.FFmpegReconnect,
 		SectorAirport:   body.SectorAirport,
 		SectorKind:      body.SectorKind,
+
+		FFmpegInputOptions: body.FFmpegInputOptions,
 	})
 	switch {
 	case errors.Is(err, frequencies.ErrConfiguredSource):

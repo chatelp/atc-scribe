@@ -290,6 +290,14 @@ type FrequencyConfig struct {
 	// reconnect_interval_secs instead.
 	FFmpegReconnect *bool `toml:"ffmpeg_reconnect"`
 
+	// FFmpegInputOptions go on ffmpeg's command line before -i, for a source
+	// ffmpeg cannot recognise by itself: raw PCM over UDP needs its format and
+	// rate (["-f", "s16le", "-ar", "48000", "-ac", "1"]); a receiver plugged
+	// into the sound card needs its capture device (["-f", "avfoundation"] on
+	// macOS, "alsa" or "pulse" on Linux, "dshow" on Windows, the device named
+	// by url). Empty for an HTTP stream, which is the common case.
+	FFmpegInputOptions []string `toml:"ffmpeg_input_options"`
+
 	// SectorAirport and SectorKind say which aircraft this frequency can be
 	// talking to: those near that airport (ICAO code) within the radius and
 	// below the ceiling the settings give for its kind -- "approach",
