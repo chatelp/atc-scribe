@@ -39,10 +39,12 @@
         // The Géoplateforme answers about one tile in twenty with a 400 "layer
         // unknown" that a later request does not get (measured 10/10: 4 of 60
         // at z13, 4 of 80 on one tile, in runs of one or two requests). A failed
-        // tile stayed empty, a black square under the dark filter. Tiles are
-        // fetched with up to five tries, spaced 0.5, 1, 2 and 4 s with some
-        // jitter: three quick ones, all fired together by a page asking for 25
-        // tiles at once, still left 3 of 25 tiles empty at z15. Both servers
+        // tile stayed empty, a black square under the dark filter. Refusals come
+        // in spells that can hold one tile for several seconds (one z15 tile was
+        // refused five times over 8 s while its neighbours loaded; 25 parallel
+        // requests from curl were all served, so it is not a limit on
+        // concurrency). Tiles are fetched with up to seven tries, spaced 0.5 s
+        // to 16 s with some jitter, about 30 s in all. Both servers
         // allow it (Access-Control-Allow-Origin: *), and the browser still
         // caches by their headers.
         function loadTileWithRetry(tile, src) {
@@ -59,7 +61,7 @@
                         image.src = url;
                     })
                     .catch(() => {
-                        if (n < 5) setTimeout(() => attempt(n + 1), 500 * 2 ** (n - 1) + Math.random() * 300);
+                        if (n < 7) setTimeout(() => attempt(n + 1), 500 * 2 ** (n - 1) + Math.random() * 300);
                         else image.src = src; // let OpenLayers see the failure
                     });
             };
