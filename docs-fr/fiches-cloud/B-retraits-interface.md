@@ -36,8 +36,8 @@ L'interface doit rester identique pour tout ce qui sert.
    `www/map/openlayers-map-manager.js`). **Le fond par défaut devient `osm`**, et c'est aussi
    le repli de `normalizeStyle` (aujourd'hui `'dark'`) : vérifié le 10/10, **c'est le seul fond
    qui marche encore** — les fonds Carto `dark` et `light` renvoient une tuile « API KEY
-   REQUIRED », les fonds FAA sont vides sur Paris. **Ne retire pas `dark` ni `light`** et ne
-   touche pas à `www/sw.js` : leur remplacement est la décision 0.2, prise sur le Mac. **Attention
+   REQUIRED », les fonds FAA sont vides sur Paris. **À cette étape, ne retire pas encore
+   `dark` ni `light`** et ne touche pas à `www/sw.js` : c'est l'étape 6. **Attention
    aux préférences enregistrées** : un navigateur dont la clé `localStorage` `mapStyle` vaut un
    fond retiré doit retomber sur `osm`, pas sur une carte vide ; ne renomme pas la clé.
 5. **Les clones** (section 4 de l'audit) : les `set*Opacity`, les `toggle*` de couches, les
