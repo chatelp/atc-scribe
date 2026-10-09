@@ -140,8 +140,147 @@ travail, sans toucher à la disposition ; C1 et C2 sont les deux demandes du pro
 A4 ouvre B2 et B3. D1 se mesure dès la prochaine séance, avant de choisir. Le reste attend
 les rapports.
 
+## Consolidation des trois rapports (09/10)
+
+Rapports bruts : `runs/audit-2026-10-09/{ux,backend,frontend-code}.md` (131, 123 et 142
+lignes). Tout ce qui suit est mesuré, sauf mention. Aucun serveur ne tournait pendant l'audit :
+pas de mesure de charge réelle ni de fluidité sur trafic vivant.
+
+### Ce que les trois rapports établissent
+
+**Interface.**
+- **Téléphone à 390 px : inutilisable.** Carte de 0 px de large (colonne droite fixe de
+  480 px), page de 514 px coupée de 124 px, barre radio de 2 494 px sans défilement. Aucune
+  règle `@media` dans `style.css`, aucun attribut `aria-`, 97 textes de 7 à 10 px.
+- **Mac à 1 440 px : la barre radio déborde dès 5 fréquences** ; à 7, les pistes en service,
+  la météo et l'heure sortent de l'écran. Chaque tuile fait 260 à 296 px et répète la fréquence.
+- **Réglages** : un volet de 320 px, 700 lignes, 1 392 px de défilement ; 7 sections dont 5
+  amont sans objet (Display, General, Debug — 39 % du défilement —, Station, Simulated) ; les
+  22 réglages utiles sont en dernier. Pas de bouton de déconnexion.
+- **Alertes** : 418 lignes ; 13 306 changements de phase le 04/10, dont 72 % de bruit (UNK,
+  CRZ, NEW) ; l'alerte de clairance appelle `this.addAlert`, défini nulle part (à confirmer en
+  console) ; le clic droit n'a pas d'équivalent tactile.
+- **L'avion identifié est invisible dans 80 % des cas** : le badge `@indicatif` n'apparaît que
+  sur les lignes pilote ; 345 des 1 696 transmissions appariées du 04/10 l'affichent.
+- **Fond de carte par défaut** : la carte VFR américaine de la FAA (`vfr-sectional`), tuiles en
+  404 sur Paris, 200 sur New York : un navigateur neuf voit une carte vide.
+- **Chargement** : 5 ressources en CDN (Alpine et Tailwind sans version épinglée), 890 Ko sans
+  compression ni cache (`static.go:107` : `no-store`) ; gzip ramènerait `app.js` de 278 à 56 Ko.
+  **Sans internet, la page ne se charge pas.**
+- **`app.js`** : 6 040 lignes, dont 5 586 dans un seul objet Alpine de 360 propriétés ; 21
+  fonctions jamais appelées (346 lignes) ; 126 `console.log`, dont 21 dans le flux d'avions.
+- **Retirable sans toucher à la station** : chat IA 1 225, simulation 360, fonctions mortes 330,
+  couches américaines 210, clones 230 : **2 355 lignes (13,6 % du JS et du HTML)**.
+- **Déplacements** : tar1090 publie à 1 Hz une position déjà âgée d'1,2 à 1,8 s ; co-atc diffuse
+  un delta par avion plus une extrapolation serveur par seconde ; le navigateur extrapole encore
+  (plafond 30 ips, gain 0,72, recalage lissé). Deux extrapolations empilées sur une donnée à
+  1 Hz. **Le navigateur n'est pas seul en cause ; la latence de bout en bout n'est pas mesurée.**
+
+**Serveur.**
+- 35 077 lignes de Go, **32 % à nous** ; ≈ 6 500 lignes amont (18,6 %) **inactives dans notre
+  configuration** (chat ATC, gabarits, simulation, chemin OpenAI, sources ADS-B hors tar1090,
+  SRT) ; 1 485 lignes **mortes quoi qu'on configure** (81 fonctions, 80 amont).
+- **Un gel démontré en test** : un client WebSocket qui cesse de lire (téléphone en veille,
+  Tailscale qui bascule) fige `Broadcast` après ≈ 0,5 Mo, et la boucle ADS-B avec lui, jusqu'à
+  la fermeture TCP par le noyau. *Jamais vu dans les journaux* : le seul trou diurne (02/10,
+  13:42-13:51) est l'arrêt par le propriétaire et la relance, documentés plus haut.
+- `config.toml` : 559 lignes, 151 clés, dont **46 sans effet** et 20 égales au défaut ; une
+  version réduite tient en ≈ 110 lignes et 85 clés. `atc_chat.enabled = true` sans clé faisait
+  afficher un bouton de chat « Disconnected » en permanence — **passé à `false` le 09/10.**
+- Gains bon marché mesurés : **−14,8 % de base** en retirant deux index SQLite redondants
+  (136 → 116 Mo sur une copie), **−51 % de lignes de journal** en rétrogradant deux messages.
+  L'écriture SQLite (12,3 ms par cycle d'une seconde) et le JSON (2,1 µs) ne sont pas des goulots.
+- Couverture de tests 26,8 % ; `websocket` 0 %, `api` 8 %, `storage` 15 %, `audio` 17 %.
+- **D19 est périmé** : notre empreinte sur `app.js` est passée de 1,7 % à 8,8 %, sur
+  `index.html` de 3,1 % à 17,9 %, sur `adsb/service.go` de 0,2 % à 9 %. La règle tient (modifier
+  l'amont quand c'est le plus simple) ; l'argument « empreinte faible » ne tient plus.
+
+### La liste unique, classée
+
+Classement par gain pour l'usage quotidien, puis effort, puis risque pour la production.
+Efforts en heures (h) ou jours (j), estimés par les rapports ou par moi.
+
+**0. Corrections — avant tout chantier (≈ 1 j)**
+
+| # | Quoi | Effort | Risque |
+|---|---|---|---|
+| 0.1 | **WebSocket** : échéance d'écriture, ping/pong, verrou relâché pendant l'écriture ; le test du gel devient test de non-régression | 4 h | moyen-faible |
+| 0.2 | Fond de carte par défaut utilisable en France (Carto sombre ou OSM) ; retirer les trois fonds FAA | 1 h | nul |
+| 0.3 | Deux messages de journal en `debug` (−51 %) ; fuite de contexte signalée par `go vet` ; `go mod tidy` | 1,5 h | nul |
+| 0.4 | Deux index SQLite redondants, après `EXPLAIN QUERY PLAN` (−14,8 % de base) | 1 h | faible |
+| 0.5 | Bouton **Se déconnecter** (aucun aujourd'hui) | 0,5 h | nul |
+| 0.6 | `atc_chat.enabled = false` | fait | — |
+
+**1. Retirer ce qui ne sert pas ici (≈ 2 à 3 j)**
+
+| # | Quoi | Effort | Risque |
+|---|---|---|---|
+| 1.1 | Interface : chat IA, simulation, fonctions mortes, couches américaines, clones (étapes 1 à 5 du plan `frontend-code.md`, −2 355 lignes) ; volets Debug, Station, Simulated | 9 h | faible |
+| 1.2 | Serveur : 81 fonctions mortes, chemin OpenAI (D3 le dit déjà retiré, −1 990 lignes) | 10 h | nul-faible |
+| 1.3 | Serveur : chat ATC et gabarits (−3 250 lignes) — **décision du propriétaire** | 8 h | faible-moyen |
+| 1.4 | Serveur : sources ADS-B hors tar1090, SRT, simulation (−1 300 lignes, −9 paquets tiers) — **décision** : généralité du dépôt public | 7 h | faible |
+| 1.5 | Accueil : plus d'écran bloquant ; un bandeau « reprendre l'écoute » au premier clic (le seul geste que le navigateur exige) | 2 h | nul |
+| 1.6 | **Relance automatique** de la production après redémarrage du Mac (`launchd`) | 4 h | faible |
+
+**2. Les deux demandes du propriétaire (≈ 2 j)**
+
+| # | Quoi | Effort | Risque |
+|---|---|---|---|
+| 2.1 | **Page Réglages** à part, 5 sections (Écoute · Appariement avec préréglage Mesuré / Prudent / Expérimental · Affichage « ce navigateur » · Compte · Système en lecture) ; supprime le volet de 700 lignes | 12 h | faible |
+| 2.2 | **Alertes** : supprimer la barre (418 lignes, 72 % de bruit, clairance cassée), puis un **journal discret des événements qui comptent** (remise des gaz, changement de piste, MAYDAY ou squawk d'urgence, type d'intérêt, bascule de la station, sidecar ou flux tombé), son au choix par événement | 1,5 h + 1 j | nul |
+
+**3. Montrer ce que le serveur sait déjà (≈ 6 à 7 j)**
+
+| # | Quoi | Effort | Risque |
+|---|---|---|---|
+| 3.1 | **Avion identifié sur 100 % des lignes appariées** (20 % aujourd'hui) ; corps de texte ≥ 11 px | 2 h | nul |
+| 3.2 | **Écouter la transmission transcrite** (A1) : le sidecar renvoie le fichier archivé, co-atc le sert | 1 j | faible |
+| 3.3 | **Fiche de vol** (A2) : chronologie d'un avion toutes fréquences, transferts entendus, verdicts de piste | 1,5 j | faible |
+| 3.4 | **Séquence d'arrivée par piste** (B1), à côté de la PAR | 1,5 j | nul |
+| 3.5 | **Clairances en clair** (A4) sous la transmission | 1 j | nul |
+| 3.6 | **Bandeau d'état** (E3) : antenne (sélection, depuis quand, mode), sidecar (statut et `degraded`), ADS-B, « récepteur prêté ou éteint » au lieu d'une barre vide | 7 h | faible |
+| 3.7 | Preuve de l'appariement au survol (A3) ; aide au survol partout (A5) | 1,5 j | nul |
+
+**4. Lisibilité et accès (≈ 2,5 j)**
+
+| # | Quoi | Effort | Risque |
+|---|---|---|---|
+| 4.1 | **Barre radio** : 7 tuiles visibles à 1 440 px (≈ 150 px la tuile, sans fréquence répétée, défilable) ; pistes en service et heure fixées à droite ; « tout écouter / tout couper » ; volume par fréquence | 5 h | nul |
+| 4.2 | **Téléphone** (sous 768 px) : colonne pleine largeur, carte / PAR / liste en onglets, barre radio défilable, fiche avec bouton fermer, aide au toucher | 10 h | nul |
+| 4.3 | **Chargement** : dépendances servies par co-atc et épinglées (plus d'hôte externe), Tailwind compilé, gzip, scripts en `defer` ; **mesure de latence de bout en bout** (instant d'observation contre instant de dessin) avant toute décision sur le moteur d'animation | 6 h | faible |
+
+**5. Structure, sans changement fonctionnel (≈ 4 j, étalés)**
+
+| # | Quoi | Effort | Risque |
+|---|---|---|---|
+| 5.1 | `app.js` : étapes 6 à 10 du plan (audio, station, fiche avion, flux) ; l'étape 11 (réglages, alertes) se fait avec 2.1 et 2.2 | 19 h | faible, chemin chaud à mesurer |
+| 5.2 | `config.toml` réduit (559 → ≈ 110 lignes) avec défauts en code et détection des clés inconnues | 3 h | moyen-faible |
+| 5.3 | Découper `main()` (463 lignes) et `handlers.go` (2 299) | 6 h | moyen, gain nul à l'exécution |
+| 5.4 | Tests sur ce qui porte la production sans filet : websocket, api, storage, audio | continu | — |
+
+**Plus tard, à discuter** : strips de vol (B2), clairance contre trajectoire (B3), vue d'approche
+en plan (B4), procédures du SIA (B5), les fréquences comme un pupitre (C5, ça bascule l'antenne),
+programmation d'écoute par plage horaire (E2).
+
+### Ce que le propriétaire doit trancher
+
+1. **Retirer le code du chat ATC et de la simulation** (1.3, et la part JS de 1.1) : −4 500
+   lignes ; rien ne tourne dessus ici. Mon avis : oui.
+2. **Les sources ADS-B autres que tar1090, et SRT** (1.4) : les garder pour qu'un autre
+   récepteur puisse utiliser le dépôt public, ou les retirer. Mon avis : garder les sources
+   ADS-B (c'est 720 lignes et c'est ce qui rend le dépôt utile à d'autres), retirer SRT.
+3. **La langue de l'interface** : anglais (`lang="en"`, dépôt public) ou français pour lui.
+   Mon avis : l'interface reste en anglais, mais les aides au survol et les clairances en clair
+   (3.5, 3.7) existent dans les deux langues, la sienne d'abord.
+4. **Le fond de carte par défaut** : Carto sombre (déjà en cache par le service worker) ou OSM.
+5. **L'ordre** : les paliers 0, 1 et 2 d'abord (≈ 5 j, l'interface s'allège et ses deux
+   griefs disparaissent), puis le palier 3 (ce qu'atc-scribe sait et ne montre pas). C'est
+   l'ordre que je recommande ; l'inverse est défendable si c'est le palier 3 qui lui manque
+   le plus au quotidien.
+
 ## État
 
-- 09/10 : cadre posé ; trois études lancées en parallèle, rapports attendus dans
-  `runs/audit-2026-10-09/`. Jugement du propriétaire et propositions inscrits.
-  Consolidation à suivre dans ce fichier.
+- 09/10 : cadre posé ; trois études menées en parallèle (Sonnet), rapports dans
+  `runs/audit-2026-10-09/` ; jugement du propriétaire, propositions et **consolidation**
+  inscrits. `atc_chat.enabled` passé à `false`. D19 et CLAUDE.md corrigés sur l'empreinte.
+  En attente des cinq arbitrages ci-dessus avant d'ouvrir un chantier.
