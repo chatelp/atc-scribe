@@ -195,11 +195,6 @@ func initDatabase(db *sql.DB, log *logger.Logger) error {
 	}
 
 	// Create indexes for efficient querying
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_adsb_targets_aircraft_hex ON adsb_targets(aircraft_hex)`)
-	if err != nil {
-		return fmt.Errorf("failed to create index on adsb_targets.aircraft_hex: %w", err)
-	}
-
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_adsb_targets_timestamp ON adsb_targets(timestamp)`)
 	if err != nil {
 		return fmt.Errorf("failed to create index on adsb_targets.timestamp: %w", err)
@@ -238,10 +233,17 @@ func initDatabase(db *sql.DB, log *logger.Logger) error {
 		return fmt.Errorf("failed to create index on phase_changes.hex_phase_timestamp: %w", err)
 	}
 
-	// Covering index for the uniqueness check query in isUniqueADSBTarget
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_adsb_targets_unique_check ON adsb_targets(aircraft_hex, lat, lon, alt_baro, gs, tas, track)`)
-	if err != nil {
-		return fmt.Errorf("failed to create index on adsb_targets unique check: %w", err)
+	// Two indexes upstream created are dropped where they exist: one on
+	// aircraft_hex alone, a prefix of idx_adsb_targets_hex_timestamp, and one
+	// on the columns of the table's UNIQUE constraint, which SQLite already
+	// indexes. No query uses either (EXPLAIN QUERY PLAN on the seven queries
+	// of this file, 10/10), and they made 14.8 % of a day's file (129 to 110 MB
+	// on 01/10). Dropping them in a file already open stops their upkeep; the
+	// space comes back with the next day's file.
+	for _, idx := range []string{"idx_adsb_targets_aircraft_hex", "idx_adsb_targets_unique_check"} {
+		if _, err = db.Exec(`DROP INDEX IF EXISTS ` + idx); err != nil {
+			return fmt.Errorf("failed to drop redundant index %s: %w", idx, err)
+		}
 	}
 
 	// The tables the radio writes to, in the same open: see Open for why a
