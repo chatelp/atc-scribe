@@ -18,7 +18,6 @@ import (
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
-	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/transcription"
 	"github.com/yegors/co-atc/internal/weather"
@@ -31,7 +30,6 @@ type Handler struct {
 	adsbService          *adsb.Service
 	frequenciesService   *frequencies.Service
 	weatherService       *weather.Service
-	simulationService    *simulation.Service
 	refService           *reference.Service
 	config               *config.Config
 	logger               *logger.Logger
@@ -53,7 +51,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new API handler
-func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Handler {
+func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Handler {
 	// The grammar's values live in the same daily database as the transcriptions
 	// they came from.
 	valueStorage := sqlite.NewPhraseologyStorage(sqlite.DBOf(transcriptionStorage))
@@ -106,7 +104,6 @@ func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Servi
 		adsbService:          adsbService,
 		frequenciesService:   frequenciesService,
 		weatherService:       weatherService,
-		simulationService:    simulationService,
 		refService:           refService,
 		config:               config,
 		logger:               logger.Named("api-handler"),
@@ -1918,152 +1915,6 @@ func (h *Handler) formatTimeSince(duration time.Duration) string {
 	} else {
 		return fmt.Sprintf("%dd", int(duration.Hours()/24))
 	}
-}
-
-// CreateSimulatedAircraft creates a new simulated aircraft
-func (h *Handler) CreateSimulatedAircraft(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Lat          float64 `json:"lat"`
-		Lon          float64 `json:"lon"`
-		Altitude     float64 `json:"altitude"`
-		Heading      float64 `json:"heading"`
-		Speed        float64 `json:"speed"`
-		VerticalRate float64 `json:"vertical_rate"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	// Validate input
-	if req.Lat < -90 || req.Lat > 90 || req.Lon < -180 || req.Lon > 180 {
-		http.Error(w, "Invalid coordinates", http.StatusBadRequest)
-		return
-	}
-
-	if req.Altitude < 0 || req.Altitude > 60000 {
-		http.Error(w, "Invalid altitude (0-60000 ft)", http.StatusBadRequest)
-		return
-	}
-
-	if req.Heading < 0 || req.Heading >= 360 {
-		http.Error(w, "Invalid heading (0-359 degrees)", http.StatusBadRequest)
-		return
-	}
-
-	if req.Speed < 0 || req.Speed > 500 {
-		http.Error(w, "Invalid speed (0-500 knots)", http.StatusBadRequest)
-		return
-	}
-
-	if req.VerticalRate < -3000 || req.VerticalRate > 3000 {
-		http.Error(w, "Invalid vertical rate (-3000 to +3000 fpm)", http.StatusBadRequest)
-		return
-	}
-
-	aircraft, err := h.simulationService.CreateAircraft(
-		req.Lat, req.Lon, req.Altitude,
-		req.Heading, req.Speed, req.VerticalRate,
-	)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	h.logger.Info("Created simulated aircraft via API",
-		logger.String("hex", aircraft.Hex),
-		logger.String("flight", aircraft.Flight))
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":   "success",
-		"aircraft": aircraft,
-	})
-}
-
-// UpdateSimulationControls updates the control parameters for a simulated aircraft
-func (h *Handler) UpdateSimulationControls(w http.ResponseWriter, r *http.Request) {
-	hex := chi.URLParam(r, "hex")
-	if hex == "" {
-		http.Error(w, "Missing hex parameter", http.StatusBadRequest)
-		return
-	}
-
-	var req struct {
-		Heading      float64 `json:"heading"`
-		Speed        float64 `json:"speed"`
-		VerticalRate float64 `json:"vertical_rate"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	// Validate input
-	if req.Heading < 0 || req.Heading >= 360 {
-		http.Error(w, "Invalid heading (0-359 degrees)", http.StatusBadRequest)
-		return
-	}
-
-	if req.Speed < 0 || req.Speed > 500 {
-		http.Error(w, "Invalid speed (0-500 knots)", http.StatusBadRequest)
-		return
-	}
-
-	if req.VerticalRate < -3000 || req.VerticalRate > 3000 {
-		http.Error(w, "Invalid vertical rate (-3000 to +3000 fpm)", http.StatusBadRequest)
-		return
-	}
-
-	err := h.simulationService.UpdateControls(hex, req.Heading, req.Speed, req.VerticalRate)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	h.logger.Debug("Updated simulation controls via API",
-		logger.String("hex", hex),
-		logger.Float64("heading", req.Heading),
-		logger.Float64("speed", req.Speed),
-		logger.Float64("vertical_rate", req.VerticalRate))
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "success",
-	})
-}
-
-// RemoveSimulatedAircraft removes a simulated aircraft
-func (h *Handler) RemoveSimulatedAircraft(w http.ResponseWriter, r *http.Request) {
-	hex := chi.URLParam(r, "hex")
-	if hex == "" {
-		http.Error(w, "Missing hex parameter", http.StatusBadRequest)
-		return
-	}
-
-	err := h.simulationService.RemoveAircraft(hex)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	h.logger.Info("Removed simulated aircraft via API",
-		logger.String("hex", hex))
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "success",
-	})
-}
-
-// GetSimulatedAircraft returns all simulated aircraft
-func (h *Handler) GetSimulatedAircraft(w http.ResponseWriter, r *http.Request) {
-	aircraft := h.simulationService.GetAllAircraft()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(aircraft)
 }
 
 // authUsers maps the accounts from the configuration file into the auth package,

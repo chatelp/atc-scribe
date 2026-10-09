@@ -13,16 +13,15 @@ import (
 
 // New message types for aircraft streaming
 const (
-	MessageTypeAircraftAdded           = "aircraft_added"
-	MessageTypeAircraftUpdate          = "aircraft_update"
-	MessageTypeAircraftRemoved         = "aircraft_removed"
-	MessageTypeAircraftPredictedState  = "aircraft_predicted_state"
-	MessageTypeAircraftBulkRequest     = "aircraft_bulk_request"     // Client requests bulk data
-	MessageTypeAircraftBulkResponse    = "aircraft_bulk_response"    // Server sends bulk data
-	MessageTypeFilterUpdate            = "filter_update"             // Client sends filter preferences
-	MessageTypeSimulationControlUpdate = "simulation_control_update" // Client updates simulation controls
-	MessageTypeFrequencyStatus         = "frequency_status"          // Frequency connection status changes
-	MessageTypeFrequenciesChanged      = "frequencies_changed"       // A source was added or removed while running
+	MessageTypeAircraftAdded          = "aircraft_added"
+	MessageTypeAircraftUpdate         = "aircraft_update"
+	MessageTypeAircraftRemoved        = "aircraft_removed"
+	MessageTypeAircraftPredictedState = "aircraft_predicted_state"
+	MessageTypeAircraftBulkRequest    = "aircraft_bulk_request"  // Client requests bulk data
+	MessageTypeAircraftBulkResponse   = "aircraft_bulk_response" // Server sends bulk data
+	MessageTypeFilterUpdate           = "filter_update"          // Client sends filter preferences
+	MessageTypeFrequencyStatus        = "frequency_status"       // Frequency connection status changes
+	MessageTypeFrequenciesChanged     = "frequencies_changed"    // A source was added or removed while running
 )
 
 // Deadlines on the connection. A client that stops reading -- a phone put to
