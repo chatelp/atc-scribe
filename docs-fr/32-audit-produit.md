@@ -309,11 +309,11 @@ indiqué en fin de ligne quand il a bougé ; chaque ligne se fait sous les sept 
 
 | # | Quoi | Effort | Risque |
 |---|---|---|---|
-| 0.1 | **WebSocket** : échéance d'écriture, ping/pong, verrou relâché pendant l'écriture ; le test du gel devient test de non-régression | 4 h | moyen-faible |
+| 0.1 | **WebSocket** : échéance d'écriture, ping/pong, verrou relâché pendant l'écriture ; le test du gel devient test de non-régression — ***fait le 10/10*** (`24b8cd0`) : le test échoue sur l'ancien code (Broadcast bloqué 10 s), passe en 0,45 s sur le nouveau ; vérifié dans un navigateur sur l'instance d'essai, 55 s, même connexion, 8 286 messages, aucune reconnexion ; la fermeture 1005 d'une page rechargée n'est plus une erreur (`c82df04`) | 4 h | moyen-faible |
 | 0.2 | Fond de carte par défaut utilisable en France ; retirer les trois fonds FAA. *Préférence du propriétaire (10/10) : le sombre, et surtout des fonds **aéronautiques**, plans d'aéroport et pistes bien visibles ; étude en cours (`runs/audit-2026-10-09/fonds-de-carte.md`), la ligne sera précisée à son retour* | 1 h + ? | nul |
-| 0.3 | Deux messages de journal en `debug` (−51 %) ; ~~fuite de contexte signalée par `go vet`~~ ; ~~`go mod tidy`~~ — *fuite et tidy faits le 10/10 (`0bf7f6b`, `e9c336b`), `go vet` propre sur tout le dépôt* | 1 h | nul |
-| 0.4 | Deux index SQLite redondants, après `EXPLAIN QUERY PLAN` (−14,8 % de base) | 1 h | faible |
-| 0.5 | Bouton **Se déconnecter** (aucun aujourd'hui) | 0,5 h | nul |
+| 0.3 | Deux messages de journal en `debug` ; fuite de contexte signalée par `go vet` ; `go mod tidy` — ***fait le 10/10*** (`4978ed1`, `0bf7f6b`, `e9c336b`) : 48 % des lignes du 04/10 ; `go vet` propre sur tout le dépôt | 1 h | nul |
+| 0.4 | Deux index SQLite redondants, après `EXPLAIN QUERY PLAN` (−14,8 % de base) — ***fait le 10/10*** (`7a17b4c`) : plans identiques avant/après sur les sept requêtes ; base du 01/10 compactée 129 → 110 Mo ; supprimés aussi à l'ouverture d'une base qui les a ; vérifié sur la base de l'instance d'essai | 1 h | faible |
+| 0.5 | Bouton **Se déconnecter** (aucun aujourd'hui) — ***fait le 10/10*** (`3f183cb`) : en tête du volet de réglages ; vérifié à 1 440 × 900, cliquable, session fermée côté serveur | 0,5 h | nul |
 | 0.6 | `atc_chat.enabled = false` | fait | — |
 
 **1. Retirer ce qui ne sert pas ici (≈ 2 à 3 j)**
@@ -388,5 +388,10 @@ dans D71 (`05-decisions.md`).
 - 10/10 : chat « AI Advisory » retiré (arbitrage 1), interface en anglais (arbitrage 3),
   règle « ne rien casser » (sept garde-fous), question des sources audio instruite ;
   **alignement avec les textes fondateurs, D71 validée**, documents mis à jour ; premier
-  code sous D71 : options d'entrée ffmpeg, puis retrait du lecteur SRT. Restent à trancher :
-  le fond de carte (étude en cours) et l'ordre des paliers.
+  code sous D71 : options d'entrée ffmpeg, puis retrait du lecteur SRT. Ordre tranché (0, 1,
+  2 puis 3), lanceur de barre de menus au lieu de la relance automatique.
+- 10/10 : **palier 0 fait, sauf 0.2** (fond de carte, étude en cours) : WebSocket, journaux,
+  index, déconnexion, chacun dans son commit, vérifiés sur l'instance d'essai. `bin/co-atc`
+  reconstruit ; l'ancien est gardé (`runs/co-atc.avant-2026-10-09`, binaire du 02/10) pour
+  revenir en une minute. La production ne tourne pas : le prochain lancement prendra le
+  nouveau, et la validation à l'usage (garde-fou 5) se fera à cette séance.
