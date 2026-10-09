@@ -329,6 +329,19 @@ nothing, one error line per transmission.
 Then open `http://localhost:8000`. The first visit asks whether the server is for
 this machine only or needs an account.
 
+The map can draw the airports around your station — runways at their real width,
+taxiways, aprons, terminals — from OpenStreetMap. The data is fetched once, for your
+station, and stays on your machine (it is not in the repository):
+
+```bash
+python3 tools/airport-layout/fetch.py --config configs/config.toml   # --radius-nm 35 by default
+```
+
+It writes `www/data/airport-layout.geojson` (Python 3.11+, nothing to install; it asks
+the Overpass API, `overpass.openstreetmap.fr` then `overpass-api.de`). Run it again
+whenever you want fresher data. Without the file the "Airport layout" layer is simply
+empty. The data is © OpenStreetMap contributors, under the ODbL.
+
 To write an account into the configuration instead, `./bin/co-atc -add-user alice`
 reads a password without echoing it and prints a `[[auth.users]]` block to paste into
 `configs/config.toml`; it writes nothing itself.

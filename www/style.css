@@ -278,15 +278,6 @@ input[type=range].dual-range-max:focus {
     border-radius: 0 2px 2px 0;
 }
 
-/* AI Advisory Audio Visualizer */
-#ai-vis-bar {
-    @apply transition-all duration-[50ms] ease-out;
-    background-color: #a855f7 !important; /* Purple color for AI */
-    box-shadow: 0 0 8px #a855f7 !important;
-    opacity: 1 !important;
-    border-radius: 0 2px 2px 0;
-}
-
 /* Custom Scrollbar Styles */
 /* For Webkit browsers (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
@@ -749,51 +740,6 @@ input[type=range].dual-range-max:focus {
         opacity: 1;
     }
 }
-/* Custom Slider Styles for Simulation Controls */
-.slider-blue::-webkit-slider-thumb {
-    appearance: none;
-    height: 16px;
-    width: 16px;
-    border-radius: 50%;
-    background: #3b82f6;
-    border: 2px solid #1e40af;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    transition: all 0.2s ease;
-}
-
-.slider-blue::-webkit-slider-thumb:hover {
-    background: #2563eb;
-    transform: scale(1.1);
-}
-
-.slider-blue::-moz-range-thumb {
-    height: 16px;
-    width: 16px;
-    border-radius: 50%;
-    background: #3b82f6;
-    border: 2px solid #1e40af;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    transition: all 0.2s ease;
-}
-
-.slider-blue::-moz-range-thumb:hover {
-    background: #2563eb;
-    transform: scale(1.1);
-}
-
-.slider-blue::-webkit-slider-track {
-    background: rgba(30, 64, 175, 0.3);
-    border-radius: 4px;
-    height: 8px;
-}
-
-.slider-blue::-moz-range-track {
-    background: rgba(30, 64, 175, 0.3);
-    border-radius: 4px;
-    height: 8px;
-}
 
 /* ==========================================
    Aircraft Animation Performance Styles
@@ -885,6 +831,15 @@ input[type=range].dual-range-max:focus {
     color: #e0e0e0;
 }
 .par-airport { color: #4CAF50; font-weight: bold; font-size: 15px; }
+.par-vac {
+    padding: 0 5px;
+    border: 1px solid #4CAF50;
+    border-radius: 3px;
+    color: #4CAF50;
+    font-size: 11px;
+    text-decoration: none;
+}
+.par-vac:hover { background: rgba(76, 175, 80, 0.15); }
 .par-dim { color: #8a8a8a; font-weight: normal; }
 .par-sep { color: #555; }
 .par-message { padding: 24px; font-size: 13px; color: #8a8a8a; }
@@ -933,3 +888,11 @@ input[type=range].dual-range-max:focus {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 .par-tip-title { margin-bottom: 2px; color: #4CAF50; font-weight: bold; }
+
+/* Dark base maps (ign-dark, osm-dark): the light IGN or OSM tiles, inverted.
+   map/core/map-engine.js gives the base layer its own canvas (.atc-basemap) and
+   puts .basemap-dark on the map's element, so aircraft, trails and the other
+   layers are not filtered. The values are a starting point, to tune by eye. */
+.basemap-dark .atc-basemap {
+    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+}
