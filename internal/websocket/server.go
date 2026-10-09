@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
@@ -22,6 +23,18 @@ const (
 	MessageTypeSimulationControlUpdate = "simulation_control_update" // Client updates simulation controls
 	MessageTypeFrequencyStatus         = "frequency_status"          // Frequency connection status changes
 	MessageTypeFrequenciesChanged      = "frequencies_changed"       // A source was added or removed while running
+)
+
+// Deadlines on the connection. A client that stops reading -- a phone put to
+// sleep, a VPN that switches routes -- used to block its writer for as long as
+// the kernel kept the TCP connection, with its lock held, and every broadcast,
+// the ADS-B loop's included, waited on that lock: about 0.5 MB after it stopped
+// reading, measured in a test. Now a write that takes longer than writeWait
+// drops the client, and one that answers no ping within pongWait is dropped too.
+const (
+	writeWait  = 10 * time.Second
+	pongWait   = 60 * time.Second
+	pingPeriod = pongWait / 2
 )
 
 // Message represents a WebSocket message
@@ -117,21 +130,10 @@ func (s *Server) Run() {
 			s.mu.RLock()
 			clientsToRemove := make([]*Client, 0)
 			for client := range s.clients {
-				// Check if client is still valid before sending
-				client.mu.Lock()
-				if client.closed {
-					clientsToRemove = append(clientsToRemove, client)
-					client.mu.Unlock()
-					continue
-				}
-				client.mu.Unlock()
-
-				// Send to all clients - filtering is done client-side
-				select {
-				case client.send <- message:
-					// Message sent successfully
-				default:
-					// Channel is full, mark for removal
+				// Send to all clients - filtering is done client-side. SendMessage
+				// checks and sends under the client's lock: checking first and
+				// sending after could send on a channel closed in between.
+				if !client.SendMessage(message) {
 					clientsToRemove = append(clientsToRemove, client)
 				}
 			}
@@ -255,6 +257,12 @@ func (c *Client) readPump() {
 		c.conn.Close()
 	}()
 
+	// Browsers answer pings by themselves, even in a background tab.
+	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+
 	for {
 		// Check if client is closed
 		c.mu.Lock()
@@ -299,9 +307,15 @@ func (c *Client) readPump() {
 	}
 }
 
-// writePump pumps messages from the hub to the WebSocket connection
+// writePump pumps messages from the hub to the WebSocket connection.
+//
+// It is the connection's only writer, and it never holds the client's lock
+// while writing: the lock guards the closed flag and the send channel, which
+// broadcasts take for every client, and a write can wait on the network.
 func (c *Client) writePump() {
+	ticker := time.NewTicker(pingPeriod)
 	defer func() {
+		ticker.Stop()
 		c.mu.Lock()
 		if !c.closed {
 			c.closed = true
@@ -313,6 +327,7 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// Channel closed
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
@@ -320,14 +335,9 @@ func (c *Client) writePump() {
 			}
 
 			c.mu.Lock()
-			if c.closed {
-				c.mu.Unlock()
-				return
-			}
-
-			w, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				c.mu.Unlock()
+			closed := c.closed
+			c.mu.Unlock()
+			if closed {
 				return
 			}
 
@@ -335,23 +345,17 @@ func (c *Client) writePump() {
 			data, err := json.Marshal(message)
 			if err != nil {
 				c.server.logger.Error("Failed to marshal message", Error(err))
-				c.mu.Unlock()
 				continue
 			}
 
-			// Write message
-			//c.server.logger.Debug("Sending message to client",
-			//	String("message_type", message.Type),
-			//	String("message_length", fmt.Sprintf("%d bytes", len(data))))
-
-			w.Write(data)
-
-			// Close writer
-			if err := w.Close(); err != nil {
-				c.mu.Unlock()
+			if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
 				return
 			}
-			c.mu.Unlock()
+
+		case <-ticker.C:
+			if err := c.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait)); err != nil {
+				return
+			}
 
 		case <-c.closeChan:
 			return
