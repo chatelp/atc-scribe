@@ -6,48 +6,69 @@
  *
  * Key responsibilities:
  * - Initialize `window.ol.Map` and `window.ol.View` for the primary map target.
- * - Create and switch basemap sources (dark/light/osm).
+ * - Create and switch basemap sources (Plan IGN v2 and OSM, each light or darkened).
  * - Manage map listeners and expose engine-level utility methods.
  *
  * Quirks / contracts:
- * - An unknown style id (such as a removed FAA chart) resolves to osm.
+ * - An unknown style id (such as a removed FAA or Carto map) resolves to osm-dark.
  */
 (function () {
     function createOpenLayersEngine(options) {
         const targetId = options?.targetId || 'map';
         const initialCenter = options?.center || { lat: 43.6777, lon: -79.6248 };
         const initialZoom = Number.isFinite(options?.zoom) ? options.zoom : 10;
-        let activeBaseMapStyle = typeof options?.baseMapStyle === 'string' ? options.baseMapStyle : 'osm';
+        let activeBaseMapStyle = typeof options?.baseMapStyle === 'string' ? options.baseMapStyle : 'osm-dark';
 
         let map = null;
         let baseLayer = null;
         const listenerKeys = new Map();
+        // ign and osm are light tiles; their -dark variants are the same tiles
+        // with a CSS filter (style.css, .basemap-dark) on the base layer's own
+        // canvas, which the aircraft, trails and other layers do not share.
         function normalizeBaseMapStyle(styleId) {
-            if (!styleId || typeof styleId !== 'string') return 'osm';
+            if (!styleId || typeof styleId !== 'string') return 'osm-dark';
             const value = styleId.trim().toLowerCase();
-            if (value === 'light' || value === 'osm' || value === 'dark') return value;
-            return 'osm';
+            if (value === 'ign' || value === 'ign-dark' || value === 'osm' || value === 'osm-dark') return value;
+            return 'osm-dark';
+        }
+
+        function isDarkBaseMapStyle(styleId) {
+            return normalizeBaseMapStyle(styleId).endsWith('-dark');
         }
 
         function createBaseMapSource(styleId) {
             const normalized = normalizeBaseMapStyle(styleId);
-            if (normalized === 'light') {
+            if (normalized === 'ign' || normalized === 'ign-dark') {
+                // Plan IGN v2 from the Géoplateforme: Licence Ouverte, no key, France only.
                 return new window.ol.source.XYZ({
-                    url: 'https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                    attributions: '&copy; OpenStreetMap contributors &copy; CARTO',
+                    url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0'
+                        + '&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png'
+                        + '&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+                    attributions: '&copy; IGN &ndash; Plan IGN v2',
+                    maxZoom: 19,
                 });
             }
 
-            if (normalized === 'osm') {
-                return new window.ol.source.OSM({
-                    attributions: '&copy; OpenStreetMap contributors',
-                });
-            }
-
-            return new window.ol.source.XYZ({
-                url: 'https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                attributions: '&copy; OpenStreetMap contributors &copy; CARTO',
+            return new window.ol.source.OSM({
+                attributions: '&copy; OpenStreetMap contributors',
             });
+        }
+
+        // A base layer for this style. Its class gives it its own canvas, so that
+        // the dark filter applies to it alone.
+        function createBaseMapLayer(styleId) {
+            return new window.ol.layer.Tile({
+                className: 'ol-layer atc-basemap',
+                source: createBaseMapSource(styleId),
+            });
+        }
+
+        // Darkening is a class on the map's element, so it follows the style
+        // without the layer being rebuilt.
+        function applyBaseMapTheme(targetElement, styleId) {
+            if (targetElement && targetElement.classList) {
+                targetElement.classList.toggle('basemap-dark', isDarkBaseMapStyle(styleId));
+            }
         }
 
         function ensureOL() {
@@ -84,9 +105,7 @@
                     (() => {
                         const normalizedStyle = normalizeBaseMapStyle(activeBaseMapStyle);
                         activeBaseMapStyle = normalizedStyle;
-                        baseLayer = new window.ol.layer.Tile({
-                            source: createBaseMapSource(normalizedStyle),
-                        });
+                        baseLayer = createBaseMapLayer(normalizedStyle);
                         return baseLayer;
                     })(),
                 ],
@@ -102,6 +121,7 @@
             }
 
             map = new window.ol.Map(mapOptions);
+            applyBaseMapTheme(map.getTargetElement(), activeBaseMapStyle);
 
             return map;
         }
@@ -114,6 +134,7 @@
 
             const source = createBaseMapSource(normalizedStyle);
             baseLayer.setSource(source);
+            applyBaseMapTheme(map && map.getTargetElement(), normalizedStyle);
         }
 
         function getBaseMapStyle() {
@@ -212,6 +233,8 @@
             getZoom,
             setBaseMapStyle,
             getBaseMapStyle,
+            createBaseMapLayer: () => createBaseMapLayer(activeBaseMapStyle),
+            applyBaseMapTheme: (targetElement) => applyBaseMapTheme(targetElement, activeBaseMapStyle),
             on,
             off,
             dispose,

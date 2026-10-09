@@ -826,10 +826,12 @@
                                 <div>
                                     <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Map Style</div>
                                     <div class="grid grid-cols-2 gap-1.5">
-                                        <button type="button" @click="$store.atc.settings.mapStyle='dark'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">Dark</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='light'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='light' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">Light</button>
+                                        <button type="button" @click="$store.atc.settings.mapStyle='ign-dark'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='ign-dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IGN dark</button>
+                                        <button type="button" @click="$store.atc.settings.mapStyle='ign'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='ign' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IGN</button>
+                                        <button type="button" @click="$store.atc.settings.mapStyle='osm-dark'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='osm-dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">OSM dark</button>
                                         <button type="button" @click="$store.atc.settings.mapStyle='osm'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
                                                 :class="$store.atc.settings.mapStyle==='osm' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">OpenStreetMap</button>
                                     </div>

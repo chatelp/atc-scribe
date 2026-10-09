@@ -879,3 +879,11 @@ input[type=range].dual-range-max:focus {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 .par-tip-title { margin-bottom: 2px; color: #4CAF50; font-weight: bold; }
+
+/* Dark base maps (ign-dark, osm-dark): the light IGN or OSM tiles, inverted.
+   map/core/map-engine.js gives the base layer its own canvas (.atc-basemap) and
+   puts .basemap-dark on the map's element, so aircraft, trails and the other
+   layers are not filtered. The values are a starting point, to tune by eye. */
+.basemap-dark .atc-basemap {
+    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+}
