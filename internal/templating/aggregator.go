@@ -48,15 +48,10 @@ func NewDataAggregator(
 
 // GetTemplateContext aggregates all current airspace data for templating
 func (da *DataAggregator) GetTemplateContext(opts FormattingOptions) (*TemplateContext, error) {
-	// Override max aircraft with config value if available for ATC chat
 	maxAircraft := opts.MaxAircraft
-	if opts.IncludeTranscriptionHistory && da.config.ATCChat.MaxContextAircraft > 0 {
-		maxAircraft = da.config.ATCChat.MaxContextAircraft
-	}
 
 	da.logger.Debug("Aggregating template context",
 		logger.Int("max_aircraft", maxAircraft),
-		logger.Int("config_max_aircraft", da.config.ATCChat.MaxContextAircraft),
 		logger.Bool("include_weather", opts.IncludeWeather),
 		logger.Bool("include_runways", opts.IncludeRunways),
 		logger.Bool("include_transcription_history", opts.IncludeTranscriptionHistory))
@@ -248,9 +243,6 @@ func (da *DataAggregator) getRecentCommunications() ([]TranscriptionSummary, err
 
 	// Get recent transcriptions (default: last 10 minutes)
 	timeWindowSeconds := defaultTranscriptionHistorySeconds
-	if da.config.ATCChat.TranscriptionHistorySeconds > 0 {
-		timeWindowSeconds = da.config.ATCChat.TranscriptionHistorySeconds
-	}
 
 	since := time.Now().UTC().Add(-time.Duration(timeWindowSeconds) * time.Second)
 	endTime := time.Now().UTC()

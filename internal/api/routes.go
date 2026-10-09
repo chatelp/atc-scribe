@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/yegors/co-atc/internal/adsb"
-	"github.com/yegors/co-atc/internal/atcchat"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
@@ -27,9 +26,9 @@ type Router struct {
 }
 
 // NewRouter creates a new API router
-func NewRouter(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, atcChatService *atcchat.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Router {
+func NewRouter(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Router {
 	return &Router{
-		handler:    NewHandler(adsbService, frequenciesService, weatherService, atcChatService, simulationService, refService, config, logger, wsServer, transcriptionStorage, clearanceStorage),
+		handler:    NewHandler(adsbService, frequenciesService, weatherService, simulationService, refService, config, logger, wsServer, transcriptionStorage, clearanceStorage),
 		middleware: NewMiddleware(logger),
 		config:     config,
 		logger:     logger.Named("api-router"),
@@ -126,15 +125,6 @@ func (r *Router) Routes() http.Handler {
 			router.Get("/navaids", r.handler.GetNavaids)
 			router.Get("/navaids/{ident}", r.handler.GetNavaidByIdent)
 			router.Get("/runways", r.handler.GetRunways)
-
-			// ATC Chat routes
-			router.Post("/atc-chat/session", r.handler.CreateATCChatSession)
-			router.Delete("/atc-chat/session/{sessionId}", r.handler.EndATCChatSession)
-			router.Get("/atc-chat/session/{sessionId}/status", r.handler.GetATCChatSessionStatus)
-			router.Post("/atc-chat/session/{sessionId}/update-context", r.handler.UpdateATCChatSessionContext)
-			router.Get("/atc-chat/sessions", r.handler.GetATCChatSessions)
-			router.Get("/atc-chat/airspace-status", r.handler.GetATCChatAirspaceStatus)
-			router.Get("/atc-chat/ws/{sessionId}", r.handler.HandleATCChatWebSocket)
 
 			// Simulation routes
 			router.Post("/simulation/aircraft", r.handler.CreateSimulatedAircraft)
