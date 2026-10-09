@@ -42,6 +42,8 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `30-association-regles-et-reglages.md` | **référence** : relier une transmission à un avion — chaque règle, son réglage dans co-atc (panneau, `runtime-settings.json`, `config.toml`), sa valeur par défaut, ce qu'elle rapporte |
 | `31-vue-par.md` | **conception et suivi** : la vue PAR, le ciel de profil piste par piste (D67) — décisions, sources des données, questions ouvertes, étapes d'implémentation et leur vérification |
 | `32-audit-produit.md` | **étude** : atc-scribe n'est plus co-atc (Q52) — mesure de l'écart avec l'amont, trois audits parallèles (UX, serveur Go, code de l'interface), consolidation et arbitrage avant tout chantier |
+| `audit-2026-10-09/` | **rapports bruts** de l'audit du 09/10 (UX, serveur Go, code de l'interface), copiés dans le dépôt le 10/10 pour que les sessions cloud les lisent |
+| `fiches-cloud/` | **fiches autonomes pour les sessions cloud** (crédit jusqu'au 5/11) : règles communes, marche à suivre pour le propriétaire, une fiche par tâche ; les rapports des sessions y reviennent |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
 
 > Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas

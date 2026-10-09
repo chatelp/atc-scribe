@@ -26,7 +26,7 @@ avec nos ajouts par-dessus : c'est là que ça se voit le plus (D70 et le son, 0
 ## Périmètre et méthode
 
 Trois études parallèles, factuelles, chiffrées, limitées à 150 lignes chacune, rapports bruts
-dans `runs/audit-2026-10-09/` (hors dépôt) :
+dans `docs-fr/audit-2026-10-09/` (copiés dans le dépôt le 10/10 pour les sessions cloud) :
 
 1. **`ux.md`** : inventaire de chaque panneau, bouton, modale et réglage, classé essentiel /
    utile / inutilisé chez nous / douteux ; frictions (écran d'accueil, clics pour le son,
@@ -246,7 +246,7 @@ les rapports.
 
 ## Consolidation des trois rapports (09/10)
 
-Rapports bruts : `runs/audit-2026-10-09/{ux,backend,frontend-code}.md` (131, 123 et 142
+Rapports bruts : `docs-fr/audit-2026-10-09/{ux,backend,frontend-code}.md` (131, 123 et 142
 lignes). Tout ce qui suit est mesuré, sauf mention. Aucun serveur ne tournait pendant l'audit :
 pas de mesure de charge réelle ni de fluidité sur trafic vivant.
 
@@ -383,7 +383,7 @@ dans D71 (`05-decisions.md`).
 ## État
 
 - 09/10 : cadre posé ; trois études menées en parallèle (Sonnet), rapports dans
-  `runs/audit-2026-10-09/` ; jugement du propriétaire, propositions et **consolidation**
+  `docs-fr/audit-2026-10-09/` ; jugement du propriétaire, propositions et **consolidation**
   inscrits. `atc_chat.enabled` passé à `false`. D19 et CLAUDE.md corrigés sur l'empreinte.
 - 10/10 : chat « AI Advisory » retiré (arbitrage 1), interface en anglais (arbitrage 3),
   règle « ne rien casser » (sept garde-fous), question des sources audio instruite ;
@@ -395,3 +395,11 @@ dans D71 (`05-decisions.md`).
   reconstruit ; l'ancien est gardé (`runs/co-atc.avant-2026-10-09`, binaire du 02/10) pour
   revenir en une minute. La production ne tourne pas : le prochain lancement prendra le
   nouveau, et la validation à l'usage (garde-fou 5) se fera à cette séance.
+- 10/10 : **le crédit cloud du propriétaire (expire le 5/11) est mis au service du chantier.**
+  Ce qui se vérifie sans la station part au cloud par fiches autonomes
+  (`docs-fr/fiches-cloud/`) ; chaque branche revient sur le Mac, où elle est relue et vérifiée
+  (garde-fous) avant d'être intégrée. Vague 1, en parallèle : A, retraits côté serveur (1.2,
+  1.3, 1.4) ; B, retraits côté interface (1.1, étapes 0 à 5 du plan) ; C, tests de storage,
+  audio et frequencies (5.4). Vague 2 après intégration : configuration réduite (5.2),
+  découpage (5.3), tests de l'API. Restent sur le Mac : l'accueil (1.5), le lanceur (1.6),
+  les réglages et les alertes (palier 2), tout ce qui demande la station ou le navigateur.
