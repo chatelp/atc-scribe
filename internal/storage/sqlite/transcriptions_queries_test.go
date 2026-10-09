@@ -86,7 +86,7 @@ func TestTheUnprocessedQueueIsOldestFirstAndEmptiesAsItIsProcessed(t *testing.T)
 		t.Fatalf("queue %v, want [%d %d]", ids(queue), early, late)
 	}
 
-	if err := s.UpdateProcessedTranscription(early, "earlier, processed", "ATC", "AFR1081", "primary"); err != nil {
+	if err := s.UpdateMatchedTranscription(early, "earlier, processed", "ATC", "AFR1081", "primary", nil); err != nil {
 		t.Fatal(err)
 	}
 	queue, _ = s.GetUnprocessedTranscriptions(10)
@@ -101,9 +101,15 @@ func TestTheUnprocessedQueueIsOldestFirstAndEmptiesAsItIsProcessed(t *testing.T)
 	if evidence != nil {
 		t.Errorf("no evidence should be stored as NULL, got %q", *evidence)
 	}
-	done, err := s.GetLastProcessedTranscriptions("125825", 5)
+	all, err := s.GetTranscriptionsByFrequency("125825", 5, 0)
 	if err != nil {
 		t.Fatal(err)
+	}
+	var done []*TranscriptionRecord
+	for _, r := range all {
+		if r.IsProcessed {
+			done = append(done, r)
+		}
 	}
 	if len(done) != 1 || done[0].Callsign != "AFR1081" || done[0].CallsignSource != "primary" ||
 		done[0].SpeakerType != "ATC" || done[0].ContentProcessed != "earlier, processed" {
