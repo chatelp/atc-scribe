@@ -72,7 +72,7 @@ dépendance à désinstaller, seulement du code à ne plus appeler.
 [[frequencies.sources]] url
         │
         ├── http(s)://…  ──► ffmpeg ──┐        internal/audio/central_processor.go:374
-        └── srt://…      ──► gosrt  ──┤        internal/audio/srt_reader.go
+        └── srt://…      ──► gosrt  ──┤        internal/audio/srt_reader.go  (retiré le 10/10, D71 : ffmpeg lit tout)
                                       ▼
                             MultiReader (PCM s16le)   internal/audio/multireader.go
                                       │

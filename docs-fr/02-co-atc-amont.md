@@ -30,7 +30,7 @@ La détection de phase fonctionne : mesurée sur notre trafic, elle a classé 12
 |---|---|---|
 | Go | « 1.21+ » | **`go.mod` exige 1.23.2.** Compilé ici avec go 1.25.6 |
 | Base | SQLite, un fichier par jour | confirmé : `data/co-atc-AAAA-MM-JJ.db`, via **`modernc.org/sqlite`, pur Go — pas de cgo**, donc compilation croisée triviale |
-| Audio | FFmpeg | confirmé, **et SRT natif** via `github.com/datarhei/gosrt` |
+| Audio | FFmpeg | confirmé, **et SRT natif** via `github.com/datarhei/gosrt` — *lecteur natif retiré le 10/10 (D71) : ffmpeg lit SRT lui-même, et toute source passe par lui* |
 | Config | `configs/config.toml` | **le dépôt ne livre que `configs/config.toml.example`** (18 kio). Il faut le copier |
 | Arborescence | `cmd/server`, `internal`, `pkg/logger`, `www`, `configs`, `assets`, `docker`, `prompts` | confirmé, **plus `docs/`, `scripts/` et `.claude/`** |
 | Port | non annoncé | **8000**, pas 8080. `[server] port` |
