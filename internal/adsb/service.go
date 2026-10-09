@@ -1388,7 +1388,7 @@ func (s *Service) updateAircraftStatus(activeAircraft map[string]bool) {
 		}
 
 		timeSinceLastSeen := now.Sub(aircraft.LastSeen)
-		s.logger.Info("Aircraft status updated",
+		s.logger.Debug("Aircraft status updated",
 			logger.String("hex", aircraft.Hex),
 			logger.String("flight", aircraft.Flight),
 			logger.String("new_status", "signal_lost"),
@@ -1839,7 +1839,7 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 				logger.Bool("on_ground", aircraft.OnGround),
 			)
 		} else {
-			s.logger.Info("Phase change detected",
+			s.logger.Debug("Phase change detected",
 				logger.String("hex", aircraft.Hex),
 				logger.String("flight", aircraft.Flight),
 				logger.String("transition", previousPhase+" → "+change.Phase),
