@@ -393,6 +393,7 @@ document.addEventListener('alpine:init', () => {
             showHeliports: JSON.parse(localStorage.getItem('showHeliports')) ?? true,
             showNavaids: JSON.parse(localStorage.getItem('showNavaids')) ?? true,
             showAllRunways: JSON.parse(localStorage.getItem('showAllRunways')) ?? true,
+            showAirportLayout: JSON.parse(localStorage.getItem('showAirportLayout')) ?? true,
             showAirspaceBoundaries: JSON.parse(localStorage.getItem('showAirspaceBoundaries')) ?? false,
             airspaceOpacity: (() => {
                 const value = parseFloat(localStorage.getItem('airspaceOpacity'));
@@ -484,6 +485,7 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('showHeliports', this.settings.showHeliports);
             localStorage.setItem('showNavaids', this.settings.showNavaids);
             localStorage.setItem('showAllRunways', this.settings.showAllRunways);
+            localStorage.setItem('showAirportLayout', this.settings.showAirportLayout);
             localStorage.setItem('showAirspaceBoundaries', this.settings.showAirspaceBoundaries);
             localStorage.setItem('airspaceOpacity', this.settings.airspaceOpacity);
             localStorage.setItem('ringsOpacity', this.settings.ringsOpacity);
@@ -2252,6 +2254,7 @@ document.addEventListener('alpine:init', () => {
         toggleHeliports() { this.applyLayerVisibility('heliports', 'showHeliports'); },
         toggleNavaids() { this.applyLayerVisibility('navaids', 'showNavaids'); },
         toggleAllRunways() { this.applyLayerVisibility('allRunways', 'showAllRunways'); },
+        toggleAirportLayout() { this.applyLayerVisibility('airportLayout', 'showAirportLayout'); },
         toggleAirspaceBoundaries() { this.applyLayerVisibility('airspace-polygons', 'showAirspaceBoundaries'); },
         setAirspaceOpacity() { this.applyLayerOpacity('airspace-polygons', 'airspaceOpacity'); },
         setRingsOpacity() { this.applyLayerOpacity('rangeRings', 'ringsOpacity'); },
@@ -2273,6 +2276,7 @@ document.addEventListener('alpine:init', () => {
             this.mapManager.toggleLayerVisibility('heliports', this.settings.showHeliports);
             this.mapManager.toggleLayerVisibility('navaids', this.settings.showNavaids);
             this.mapManager.toggleLayerVisibility('allRunways', this.settings.showAllRunways);
+            this.mapManager.toggleLayerVisibility('airportLayout', this.settings.showAirportLayout);
             if (typeof this.mapManager.setLayerOpacity === 'function') {
                 this.mapManager.setLayerOpacity('airspace-polygons', this.settings.airspaceOpacity);
                 this.mapManager.setLayerOpacity('rangeRings', this.settings.ringsOpacity);

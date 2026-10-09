@@ -89,3 +89,6 @@ configs/users.json
 # Aeronautical charts (SIA VAC and eAIP charts), kept next to the code for
 # reference. Never published: they are the SIA's, and they expire each cycle.
 /charts/
+
+# Airport layout, generated per station from OpenStreetMap (tools/airport-layout/fetch.py)
+/www/data/airport-layout.geojson

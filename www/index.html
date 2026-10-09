@@ -942,6 +942,15 @@
                                                 <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.allRunwaysOpacity * 100) + '%'" ></span>
                                             </div>
                                         </div>
+
+                                        <!-- Runways, taxiways, aprons from OpenStreetMap: tools/airport-layout/fetch.py -->
+                                        <div class="flex items-center gap-2.5 min-h-[30px]">
+                                            <label class="switch shrink-0">
+                                                <input type="checkbox" x-model="$store.atc.settings.showAirportLayout" @change="$store.atc.toggleAirportLayout()">
+                                                <span class="slider"></span>
+                                            </label>
+                                            <span class="text-sm min-w-[96px]">Airport layout</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
