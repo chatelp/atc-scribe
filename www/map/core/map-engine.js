@@ -6,13 +6,11 @@
  *
  * Key responsibilities:
  * - Initialize `window.ol.Map` and `window.ol.View` for the primary map target.
- * - Create and switch basemap sources (dark/light/osm/VFR/IFR variants).
+ * - Create and switch basemap sources (dark/light/osm).
  * - Manage map listeners and expose engine-level utility methods.
  *
  * Quirks / contracts:
- * - Includes URL fallback transform support for chart tiles with endpoint naming
- *   mismatches (notably terminal chart variants).
- * - Keeps `wrapX` disabled for chart tiles to avoid mirrored-world artifacts.
+ * - An unknown style id (such as a removed FAA chart) resolves to the dark map.
  */
 (function () {
     function createOpenLayersEngine(options) {
@@ -24,86 +22,15 @@
         let map = null;
         let baseLayer = null;
         const listenerKeys = new Map();
-        function createArcGisXyzSource(options) {
-            const hasFallbackTransform = typeof options.fallbackUrlTransform === 'function';
-            return new window.ol.source.XYZ({
-                url: options.url,
-                attributions: options.attributions,
-                minZoom: options.minZoom,
-                maxZoom: options.maxZoom,
-                crossOrigin: 'anonymous',
-                wrapX: false,
-                tileLoadFunction: hasFallbackTransform
-                    ? (imageTile, src) => {
-                        const image = imageTile.getImage();
-                        let fallbackTried = false;
-                        image.crossOrigin = 'anonymous';
-                        image.onerror = () => {
-                            if (!fallbackTried) {
-                                fallbackTried = true;
-                                const fallbackSrc = options.fallbackUrlTransform(src);
-                                if (fallbackSrc && fallbackSrc !== src) {
-                                    image.src = fallbackSrc;
-                                    return;
-                                }
-                            }
-                            image.onerror = null;
-                        };
-                        image.src = src;
-                    }
-                    : undefined,
-            });
-        }
-
         function normalizeBaseMapStyle(styleId) {
             if (!styleId || typeof styleId !== 'string') return 'dark';
             const value = styleId.trim().toLowerCase();
-            if (value === 'light' || value === 'osm' || value === 'dark' || value === 'vfr-sectional' || value === 'terminal' || value === 'ifr-low' || value === 'ifr-high') return value;
+            if (value === 'light' || value === 'osm' || value === 'dark') return value;
             return 'dark';
         }
 
         function createBaseMapSource(styleId) {
             const normalized = normalizeBaseMapStyle(styleId);
-            if (normalized === 'vfr-sectional') {
-                return createArcGisXyzSource({
-                    url: 'https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Sectional/MapServer/tile/{z}/{y}/{x}',
-                    attributions: 'Tiles courtesy of <a href="http://tiles.arcgis.com/">arcgis.com</a>',
-                    minZoom: 8,
-                    maxZoom: 12,
-                });
-            }
-
-            if (normalized === 'terminal') {
-                return createArcGisXyzSource({
-                    url: 'https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Terminal/MapServer/tile/{z}/{y}/{x}',
-                    attributions: 'Tiles courtesy of <a href="http://tiles.arcgis.com/">arcgis.com</a>',
-                    minZoom: 10,
-                    maxZoom: 12,
-                    fallbackUrlTransform: (src) => {
-                        if (typeof src !== 'string') return src;
-                        return src.replace('/VFR_Terminal/', '/VFR_Terminals/');
-                    },
-                });
-            }
-
-            if (normalized === 'ifr-low') {
-                return createArcGisXyzSource({
-                    url: 'https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/IFR_AreaLow/MapServer/tile/{z}/{y}/{x}',
-                    attributions: 'Tiles courtesy of <a href="http://tiles.arcgis.com/">arcgis.com</a>',
-                    minZoom: 8,
-                    maxZoom: 11,
-                });
-            }
-
-            if (normalized === 'ifr-high') {
-                return createArcGisXyzSource({
-                    url: 'https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/IFR_High/MapServer/tile/{z}/{y}/{x}',
-                    attributions: 'Tiles courtesy of <a href="http://tiles.arcgis.com/">arcgis.com</a>',
-                    minZoom: 7,
-                    maxZoom: 11,
-                });
-            }
-
             if (normalized === 'light') {
                 return new window.ol.source.XYZ({
                     url: 'https://{a-d}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',

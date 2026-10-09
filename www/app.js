@@ -41,8 +41,6 @@ const CONFIG = {
     mapAircraftWebGL: false,
     mapOverlays: null,
     aviationChartOverlayUrl: '',
-    weatherRadarWmsUrl: '',
-    weatherRadarWmsParams: {},
     airspaceOverlayGeoJsonUrl: '',
     defaultZoom: 10,
     dataUrl: `${API_BASE_URL}/aircraft`,
@@ -56,6 +54,10 @@ const CONFIG = {
     stationRefreshInterval: 30 * 60 * 1000,  // 30 minutes for station data
     weatherRefreshInterval: 30 * 60 * 1000,  // 30 minutes for weather data
 };
+
+// Base maps the map engine offers (map/core/map-engine.js); anything else saved
+// in localStorage falls back to the dark one.
+const MAP_STYLES = ['dark', 'light', 'osm'];
 
 // Initialize WebSocket client
 const wsClient = new WebSocketClient(CONFIG.wsUrl);
@@ -368,8 +370,10 @@ document.addEventListener('alpine:init', () => {
         // Settings
         settings: {
             mapStyle: (() => {
-                const savedStyle = localStorage.getItem('mapStyle') || 'vfr-sectional';
-                return savedStyle === 'terminal' ? 'vfr-sectional' : savedStyle;
+                // A browser that saved one of the FAA charts removed since (vfr-sectional,
+                // terminal, ifr-low, ifr-high) gets the dark map, not an empty one.
+                const savedStyle = localStorage.getItem('mapStyle');
+                return MAP_STYLES.includes(savedStyle) ? savedStyle : 'dark';
             })(),
             showLabels: JSON.parse(localStorage.getItem('showLabels')) ?? true,
             showPaths: JSON.parse(localStorage.getItem('showPaths')) ?? true,
@@ -402,21 +406,6 @@ document.addEventListener('alpine:init', () => {
             allRunwaysOpacity: (() => {
                 const value = parseFloat(localStorage.getItem('allRunwaysOpacity'));
                 return Number.isFinite(value) ? value : 1;
-            })(),
-            showNexrad: JSON.parse(localStorage.getItem('showNexrad') ?? localStorage.getItem('showWeatherRadar')) ?? false,
-            nexradOpacity: (() => {
-                const value = parseFloat(localStorage.getItem('nexradOpacity'));
-                return Number.isFinite(value) ? value : 0.55;
-            })(),
-            showNoaaInfrared: JSON.parse(localStorage.getItem('showNoaaInfrared')) ?? false,
-            noaaInfraredOpacity: (() => {
-                const value = parseFloat(localStorage.getItem('noaaInfraredOpacity'));
-                return Number.isFinite(value) ? value : 0.55;
-            })(),
-            showNoaaRadar: JSON.parse(localStorage.getItem('showNoaaRadar')) ?? false,
-            noaaRadarOpacity: (() => {
-                const value = parseFloat(localStorage.getItem('noaaRadarOpacity'));
-                return Number.isFinite(value) ? value : 0.55;
             })(),
             minAltitude: parseInt(localStorage.getItem('minAltitude')) || 0,
             maxAltitude: parseInt(localStorage.getItem('maxAltitude')) || 60000,
@@ -489,13 +478,6 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('heliportsOpacity', this.settings.heliportsOpacity);
             localStorage.setItem('navaidsOpacity', this.settings.navaidsOpacity);
             localStorage.setItem('allRunwaysOpacity', this.settings.allRunwaysOpacity);
-            localStorage.setItem('showNexrad', this.settings.showNexrad);
-            localStorage.setItem('nexradOpacity', this.settings.nexradOpacity);
-            localStorage.setItem('showNoaaInfrared', this.settings.showNoaaInfrared);
-            localStorage.setItem('noaaInfraredOpacity', this.settings.noaaInfraredOpacity);
-            localStorage.setItem('showNoaaRadar', this.settings.showNoaaRadar);
-            localStorage.setItem('noaaRadarOpacity', this.settings.noaaRadarOpacity);
-            localStorage.setItem('showWeatherRadar', this.settings.showNexrad);
 
             // Save aircraft animation settings
             localStorage.setItem('aircraftAnimationEnabled', this.settings.aircraftAnimation.enabled);
@@ -2244,8 +2226,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         setMapStyle() {
-            if (this.settings.mapStyle === 'terminal') {
-                this.settings.mapStyle = 'vfr-sectional';
+            if (!MAP_STYLES.includes(this.settings.mapStyle)) {
+                this.settings.mapStyle = 'dark';
             }
             this.saveSettings();
             if (this.mapManager && typeof this.mapManager.setMapStyle === 'function') {
@@ -2301,48 +2283,6 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        toggleNexrad() {
-            this.saveSettings();
-            if (this.mapManager) {
-                this.mapManager.toggleLayerVisibility('nexrad-radar', this.settings.showNexrad);
-            }
-        },
-
-        toggleNoaaInfrared() {
-            this.saveSettings();
-            if (this.mapManager) {
-                this.mapManager.toggleLayerVisibility('noaa-infrared', this.settings.showNoaaInfrared);
-            }
-        },
-
-        toggleNoaaRadar() {
-            this.saveSettings();
-            if (this.mapManager) {
-                this.mapManager.toggleLayerVisibility('noaa-radar', this.settings.showNoaaRadar);
-            }
-        },
-
-        setNexradOpacity() {
-            this.saveSettings();
-            if (this.mapManager && typeof this.mapManager.setOverlayOpacity === 'function') {
-                this.mapManager.setOverlayOpacity('nexrad-radar', this.settings.nexradOpacity);
-            }
-        },
-
-        setNoaaInfraredOpacity() {
-            this.saveSettings();
-            if (this.mapManager && typeof this.mapManager.setOverlayOpacity === 'function') {
-                this.mapManager.setOverlayOpacity('noaa-infrared', this.settings.noaaInfraredOpacity);
-            }
-        },
-
-        setNoaaRadarOpacity() {
-            this.saveSettings();
-            if (this.mapManager && typeof this.mapManager.setOverlayOpacity === 'function') {
-                this.mapManager.setOverlayOpacity('noaa-radar', this.settings.noaaRadarOpacity);
-            }
-        },
-
         setAirspaceOpacity() {
             this.saveSettings();
             if (this.mapManager && typeof this.mapManager.setLayerOpacity === 'function') {
@@ -2393,19 +2333,11 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.mapManager.toggleLayerVisibility('airspace-polygons', this.settings.showAirspaceBoundaries);
-            this.mapManager.toggleLayerVisibility('nexrad-radar', this.settings.showNexrad);
-            this.mapManager.toggleLayerVisibility('noaa-infrared', this.settings.showNoaaInfrared);
-            this.mapManager.toggleLayerVisibility('noaa-radar', this.settings.showNoaaRadar);
             this.mapManager.toggleLayerVisibility('rangeRings', this.settings.showRings);
             this.mapManager.toggleLayerVisibility('airports', this.settings.showAirports);
             this.mapManager.toggleLayerVisibility('heliports', this.settings.showHeliports);
             this.mapManager.toggleLayerVisibility('navaids', this.settings.showNavaids);
             this.mapManager.toggleLayerVisibility('allRunways', this.settings.showAllRunways);
-            if (typeof this.mapManager.setOverlayOpacity === 'function') {
-                this.mapManager.setOverlayOpacity('nexrad-radar', this.settings.nexradOpacity);
-                this.mapManager.setOverlayOpacity('noaa-infrared', this.settings.noaaInfraredOpacity);
-                this.mapManager.setOverlayOpacity('noaa-radar', this.settings.noaaRadarOpacity);
-            }
             if (typeof this.mapManager.setLayerOpacity === 'function') {
                 this.mapManager.setLayerOpacity('airspace-polygons', this.settings.airspaceOpacity);
                 this.mapManager.setLayerOpacity('rangeRings', this.settings.ringsOpacity);

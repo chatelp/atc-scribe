@@ -826,12 +826,6 @@
                                 <div>
                                     <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Map Style</div>
                                     <div class="grid grid-cols-2 gap-1.5">
-                                        <button type="button" @click="$store.atc.settings.mapStyle='vfr-sectional'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='vfr-sectional' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">VFR Sectional</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='ifr-low'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='ifr-low' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IFR Low</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='ifr-high'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='ifr-high' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IFR High</button>
                                         <button type="button" @click="$store.atc.settings.mapStyle='dark'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
                                                 :class="$store.atc.settings.mapStyle==='dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">Dark</button>
                                         <button type="button" @click="$store.atc.settings.mapStyle='light'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
@@ -896,42 +890,6 @@
                                             <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAirspaceBoundaries">
                                                 <input type="range" x-model.number="$store.atc.settings.airspaceOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAirspaceOpacity()" class="flex-1 h-1 bg-background rounded">
                                                 <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.airspaceOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showNexrad" @change="$store.atc.toggleNexrad()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">NEXRAD</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showNexrad">
-                                                <input type="range" x-model.number="$store.atc.settings.nexradOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setNexradOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.nexradOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showNoaaInfrared" @change="$store.atc.toggleNoaaInfrared()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">NOAA Infrared</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showNoaaInfrared">
-                                                <input type="range" x-model.number="$store.atc.settings.noaaInfraredOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setNoaaInfraredOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.noaaInfraredOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showNoaaRadar" @change="$store.atc.toggleNoaaRadar()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">NOAA Radar</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showNoaaRadar">
-                                                <input type="range" x-model.number="$store.atc.settings.noaaRadarOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setNoaaRadarOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.noaaRadarOpacity * 100) + '%'" ></span>
                                             </div>
                                         </div>
 
