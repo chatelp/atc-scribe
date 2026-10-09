@@ -30,12 +30,15 @@ L'interface doit rester identique pour tout ce qui sert.
 3. **Les fonctions mortes** : les 21 fonctions jamais appelées et les 3 champs jamais lus de
    l'audit (section 3), moins celles déjà parties aux étapes 1 et 2. Corrige au passage le
    défaut latent signalé : `cleanup()` lit `window.animationEngine`, jamais assigné.
-4. **Les fonds et couches américains** : VFR et IFR de la FAA, NEXRAD, NOAA (index.html,
-   `app.js`, `map/map-engine.js`, `map/openlayers-map-manager.js`). **Le fond par défaut
-   devient le fond sombre Carto déjà présent** (choix du propriétaire : le sombre) ; ne touche
-   pas aux autres fonds. **Attention aux préférences enregistrées** : un navigateur dont la clé
-   `localStorage` du fond vaut un fond retiré doit retomber sur le sombre, pas sur une carte
-   vide ; ne renomme pas la clé.
+4. **Les fonds et couches américains** : VFR et IFR de la FAA (`vfr-sectional`, `terminal`,
+   `ifr-low`, `ifr-high`), NEXRAD, NOAA (index.html, `app.js`, `www/map/core/map-engine.js`,
+   `www/map/openlayers-map-manager.js`). **Le fond par défaut devient `osm`**, et c'est aussi
+   le repli de `normalizeStyle` (aujourd'hui `'dark'`) : vérifié le 10/10, **c'est le seul fond
+   qui marche encore** — les fonds Carto `dark` et `light` renvoient une tuile « API KEY
+   REQUIRED », les fonds FAA sont vides sur Paris. **Ne retire pas `dark` ni `light`** et ne
+   touche pas à `www/sw.js` : leur remplacement est la décision 0.2, prise sur le Mac. **Attention
+   aux préférences enregistrées** : un navigateur dont la clé `localStorage` `mapStyle` vaut un
+   fond retiré doit retomber sur `osm`, pas sur une carte vide ; ne renomme pas la clé.
 5. **Les clones** (section 4 de l'audit) : les `set*Opacity`, les `toggle*` de couches, les
    trois `toggle*Details` METAR/TAF/NOTAM, `cycleToNext/PreviousAircraft`, fusionnés en
    fonctions paramétrées. **Garde les anciens noms** comme enveloppes d'une ligne s'ils sont lus
