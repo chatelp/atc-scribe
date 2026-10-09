@@ -4880,6 +4880,19 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
+### Q52 — Audit produit : simplifier le code et refaire l'UX, maintenant qu'atc-scribe n'est plus co-atc *(09/10 — ouverte, étude en cours)*
+
+**Constat du propriétaire**, mesuré le 09/10 : 263 commits, +33 941 / −1 312 lignes, 130
+fichiers nouveaux depuis un amont muet depuis le 3 mai. Le cœur (sidecar, liaison station,
+appariement, PAR, juge des pistes, authentification) est à nous ; l'interface est restée celle
+de l'amont, pensée pour un autre usage, et ses défauts sortent à l'usage quotidien (02/10,
+04/10). **Décision** : une étude avant tout chantier, en trois volets parallèles et chiffrés
+(UX, serveur Go, code de l'interface), consolidée dans `docs-fr/32-audit-produit.md`, puis une
+liste unique classée par gain / effort / risque que le propriétaire arbitre. Contraintes :
+la production reste utilisable à chaque étape ; le contribuable reste identifiable ; l'UX se juge
+sur l'usage réel d'une seule personne, Mac et téléphone par Tailscale. Reste à obtenir du
+propriétaire sa propre liste d'irritants (les trois questions du doc 32).
+
 ### Q51 — Une source ADS-B externe en renfort de la station, quand elle perd un avion *(29/09 — ouverte)*
 
 Idée du propriétaire : *« on pourrait d'ailleurs basculer automatiquement vers une API quand on perd
