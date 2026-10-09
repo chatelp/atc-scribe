@@ -221,7 +221,6 @@ type Service struct {
 	runwayJudge        *RunwayJudge              // The one judge of each aircraft's runway (D69)
 	flightPhasesConfig config.FlightPhasesConfig // Flight phases configuration
 	changeDetector     *ChangeDetector           // Tracks aircraft changes
-	broadcastChan      chan []AircraftChange     // Channel for broadcasting changes
 	trajectoryTracker  *TrajectoryTracker        // Trajectory-based phase detection
 }
 
@@ -319,17 +318,6 @@ func NewService(
 	return service
 }
 
-// startBroadcastWorker starts the worker that broadcasts aircraft changes via WebSocket
-func (s *Service) startBroadcastWorker() {
-	go func() {
-		for changes := range s.broadcastChan {
-			for _, change := range changes {
-				s.broadcastAircraftChange(change)
-			}
-		}
-	}()
-}
-
 // broadcastAircraftChange broadcasts a single aircraft change via WebSocket
 func (s *Service) broadcastAircraftChange(change AircraftChange) {
 	var messageType string
@@ -422,53 +410,6 @@ func (s *Service) predictionBroadcastLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		}
-	}
-}
-
-// sendPhaseChangeAlert sends a phase change alert via WebSocket
-func (s *Service) sendPhaseChangeAlert(aircraft *Aircraft, fromPhase, toPhase string, runwayInfo *RunwayApproachInfo) {
-	s.sendPhaseChangeAlertWithEvent(aircraft, fromPhase, toPhase, "phase_change", runwayInfo)
-}
-
-// sendPhaseChangeAlertWithEvent sends a phase change alert with event type via WebSocket
-func (s *Service) sendPhaseChangeAlertWithEvent(aircraft *Aircraft, fromPhase, toPhase, eventType string, runwayInfo *RunwayApproachInfo) {
-	if s.wsServer != nil {
-		lat, lon, _ := aircraft.ADSB.Position()
-		alert := PhaseChangeAlert{
-			Type:      "phase_change",
-			Hex:       aircraft.Hex,
-			Flight:    aircraft.Flight,
-			FromPhase: fromPhase,
-			ToPhase:   toPhase,
-			EventType: eventType,
-			Timestamp: time.Now().UTC(),
-			Location: struct {
-				Lat float64 `json:"lat"`
-				Lon float64 `json:"lon"`
-				Alt float64 `json:"alt"`
-			}{
-				Lat: roundTo(lat, 6),
-				Lon: roundTo(lon, 6),
-				Alt: aircraft.ADSB.AltBaro.Float64(),
-			},
-			RunwayInfo: runwayInfo,
-		}
-
-		s.wsServer.Broadcast(&websocket.Message{
-			Type: "phase_change",
-			Data: map[string]interface{}{
-				"alert": alert,
-			},
-		})
-
-		s.logger.Info("Phase change alert sent",
-			logger.String("hex", aircraft.Hex),
-			logger.String("flight", aircraft.Flight),
-			logger.String("transition", fromPhase+" → "+toPhase),
-			logger.String("event_type", eventType),
-			logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
-			logger.Bool("on_ground", aircraft.OnGround),
-		)
 	}
 }
 
@@ -903,11 +844,6 @@ func (s *Service) landingRunway(lat, lon, track, alt float64) (string, *RunwayAp
 	return airport, best
 }
 
-// GetRunwayData returns the runways of the reference airport.
-func (s *Service) GetRunwayData() RunwayData {
-	return s.ref.load().Runways
-}
-
 // GetRunwayInUseScores returns the top N runway-in-use probability scores.
 func (s *Service) GetRunwayInUseScores(n int) []RunwayScore {
 	if s.trajectoryTracker != nil {
@@ -1011,14 +947,6 @@ func (s *Service) GetFilteredAircraft(
 		status,
 		tookOffAfter, tookOffBefore, landedAfter, landedBefore,
 	)
-	s.enrichWithRefData(aircraft)
-	s.enrichWithATCDerivedData(aircraft)
-	return aircraft
-}
-
-// GetFilteredAircraftSimple is a simplified version for backward compatibility
-func (s *Service) GetFilteredAircraftSimple(minAltitude, maxAltitude float64, status ...string) []*Aircraft {
-	aircraft := s.storage.GetFiltered(minAltitude, maxAltitude, status, nil, nil, nil, nil)
 	s.enrichWithRefData(aircraft)
 	s.enrichWithATCDerivedData(aircraft)
 	return aircraft

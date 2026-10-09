@@ -159,13 +159,6 @@ func NumberPtr(v float64) *float64 {
 	return &v
 }
 
-func IntOrZero(v *int) int {
-	if v == nil {
-		return 0
-	}
-	return *v
-}
-
 func IntPtr(v int) *int {
 	return &v
 }
@@ -387,21 +380,4 @@ type RunwayDepartureInfo struct {
 	DistanceFromThreshold float64 `json:"distance_from_threshold_nm"`
 	HeadingAlignment      float64 `json:"heading_alignment_deg"`
 	OnDeparture           bool    `json:"on_departure"`
-}
-
-// PhaseChangeAlert represents a flight phase change alert
-type PhaseChangeAlert struct {
-	Type      string    `json:"type"` // "phase_change"
-	Hex       string    `json:"hex"`
-	Flight    string    `json:"flight"`
-	FromPhase string    `json:"from_phase"`
-	ToPhase   string    `json:"to_phase"`
-	EventType string    `json:"event_type"` // "takeoff", "landing", "phase_change"
-	Timestamp time.Time `json:"timestamp"`
-	Location  struct {
-		Lat float64 `json:"lat"`
-		Lon float64 `json:"lon"`
-		Alt float64 `json:"alt"`
-	} `json:"location"`
-	RunwayInfo *RunwayApproachInfo `json:"runway_info,omitempty"`
 }
