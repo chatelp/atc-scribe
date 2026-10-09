@@ -315,15 +315,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create templating service
-	templateService := templating.NewService(
-		adsbService,
-		weatherService,
-		transcriptionStorage,
-		nil, // frequencies service not available yet
-		cfg,
-		log,
-	)
+	// The post-processor's prompt template, rendered with live airspace data.
+	// Only post_processing.backend = "openai" reads it.
+	templateService := templating.NewService(adsbService, weatherService, cfg, log)
 
 	// Create frequencies service.
 	// The fleet adapter is what lets a spoken callsign be attached to a real
@@ -361,16 +355,6 @@ func main() {
 			ContextLetters: m.ContextLetters, ContextDigits: m.ContextDigits, ContextNames: m.ContextNames,
 			PrefixDigits: m.PrefixDigits}
 	})
-
-	// Update templating service with frequencies service
-	templateService = templating.NewService(
-		adsbService,
-		weatherService,
-		transcriptionStorage,
-		frequenciesService,
-		cfg,
-		log,
-	)
 
 	// Start frequencies service
 	if err := frequenciesService.Start(ctx); err != nil {
