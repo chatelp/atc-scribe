@@ -13,6 +13,7 @@
 //   - an Alpine expression in index.html calls a bare function that no loaded
 //     script, x-data component or browser global defines;
 //   - a local <script src> of index.html points to a missing file;
+//   - a www/ stylesheet has an unclosed comment or unbalanced braces;
 //   - `node --check` fails on a www/ script, or `node --test www/par/` fails.
 //
 // The store is not parsed: app.js is evaluated in a sandbox with stubbed
@@ -251,6 +252,27 @@ for (const [key, src] of methodSources) {
 }
 for (const id of KNOWN_BROKEN.keys()) {
     if (!brokenSeen.has(id)) problems.push(`tools/www-check/check.mjs: KNOWN_BROKEN "${id}" no longer happens; remove it from the list`);
+}
+
+// ---------------------------------------------------------------- style.css
+
+// Not a CSS parser: comments must close and braces balance, which is what a
+// removal by line range gets wrong.
+for (const f of walk(WWW).filter((f) => f.endsWith('.css'))) {
+    const css = readFileSync(f, 'utf8');
+    const rel = relative(ROOT, f);
+    let depth = 0;
+    for (let i = 0; i < css.length; i++) {
+        if (css[i] === '*' && css[i + 1] === '/') { problems.push(`${rel}:${lineOf(css, i)}: */ without an opening /*`); break; }
+        if (css[i] === '/' && css[i + 1] === '*') {
+            const end = css.indexOf('*/', i + 2);
+            if (end < 0) { problems.push(`${rel}:${lineOf(css, i)}: /* never closed`); break; }
+            i = end + 1; continue;
+        }
+        if (css[i] === '{') depth++;
+        if (css[i] === '}' && --depth < 0) { problems.push(`${rel}:${lineOf(css, i)}: } without a {`); break; }
+    }
+    if (depth > 0) problems.push(`${rel}: ${depth} { never closed`);
 }
 
 // ---------------------------------------------------------------- syntax and tests
