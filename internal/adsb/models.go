@@ -241,38 +241,29 @@ type BSDBData struct {
 
 // Aircraft represents a processed aircraft with essential fields and status
 type Aircraft struct {
-	Hex                string              `json:"hex"`
-	Flight             string              `json:"flight"`
-	Airline            string              `json:"airline"`
-	AirlineCountry     string              `json:"airline_country,omitempty"`
-	Status             string              `json:"status"`
-	LastSeen           time.Time           `json:"last_seen"`
-	OnGround           bool                `json:"on_ground"`
-	DateLanded         *time.Time          `json:"date_landed"`            // Derived from phase_changes table JOIN
-	DateTookoff        *time.Time          `json:"date_tookoff"`           // Derived from phase_changes table JOIN
-	CreatedAt          time.Time           `json:"created_at"`             // When the aircraft was first seen
-	Distance           *float64            `json:"distance,omitempty"`     // Distance in NM from station
-	RelativeDistance   *float64            `json:"rel_distance,omitempty"` // Distance in NM from reference aircraft
-	RelativeBearing    *float64            `json:"rel_bearing,omitempty"`  // Relative bearing from reference aircraft (0 to 360)
-	RelativeAlt        *float64            `json:"rel_altitude,omitempty"` // Relative altitude from reference aircraft (feet)
-	ADSB               *ADSBTarget         `json:"adsb,omitempty"`
-	BSDB               *BSDBData           `json:"bsdb,omitempty"`                // BaseStation.sqb enrichment data
-	History            []PositionMinimal   `json:"history,omitempty"`             // Minimal historical positions for map trails
-	Future             []Position          `json:"future,omitempty"`              // Predicted future positions
-	Hindcast           []Position          `json:"hindcast,omitempty"`            // Predicted positions before first ADS-B contact
-	Phase              *PhaseData          `json:"phase,omitempty"`               // Phase information with current and history
-	Runway             *AircraftRunways    `json:"runway,omitempty"`              // Runways it landed or took off on, per the runway judge (D69)
-	Clearances         []ClearanceData     `json:"clearances,omitempty"`          // Recent clearances for this aircraft
-	Voice              *VoiceData          `json:"voice,omitempty"`               // What the radio has said about this aircraft
-	IsSimulated        bool                `json:"is_simulated"`                  // Whether this is a simulated aircraft
-	SimulationControls *SimulationControls `json:"simulation_controls,omitempty"` // Simulation control parameters
-}
-
-// SimulationControls represents the control parameters for simulated aircraft
-type SimulationControls struct {
-	TargetHeading      float64 `json:"target_heading"`       // Target heading in degrees (0-359)
-	TargetSpeed        float64 `json:"target_speed"`         // Target true airspeed in knots
-	TargetVerticalRate float64 `json:"target_vertical_rate"` // Target vertical rate in feet per minute
+	Hex              string            `json:"hex"`
+	Flight           string            `json:"flight"`
+	Airline          string            `json:"airline"`
+	AirlineCountry   string            `json:"airline_country,omitempty"`
+	Status           string            `json:"status"`
+	LastSeen         time.Time         `json:"last_seen"`
+	OnGround         bool              `json:"on_ground"`
+	DateLanded       *time.Time        `json:"date_landed"`            // Derived from phase_changes table JOIN
+	DateTookoff      *time.Time        `json:"date_tookoff"`           // Derived from phase_changes table JOIN
+	CreatedAt        time.Time         `json:"created_at"`             // When the aircraft was first seen
+	Distance         *float64          `json:"distance,omitempty"`     // Distance in NM from station
+	RelativeDistance *float64          `json:"rel_distance,omitempty"` // Distance in NM from reference aircraft
+	RelativeBearing  *float64          `json:"rel_bearing,omitempty"`  // Relative bearing from reference aircraft (0 to 360)
+	RelativeAlt      *float64          `json:"rel_altitude,omitempty"` // Relative altitude from reference aircraft (feet)
+	ADSB             *ADSBTarget       `json:"adsb,omitempty"`
+	BSDB             *BSDBData         `json:"bsdb,omitempty"`       // BaseStation.sqb enrichment data
+	History          []PositionMinimal `json:"history,omitempty"`    // Minimal historical positions for map trails
+	Future           []Position        `json:"future,omitempty"`     // Predicted future positions
+	Hindcast         []Position        `json:"hindcast,omitempty"`   // Predicted positions before first ADS-B contact
+	Phase            *PhaseData        `json:"phase,omitempty"`      // Phase information with current and history
+	Runway           *AircraftRunways  `json:"runway,omitempty"`     // Runways it landed or took off on, per the runway judge (D69)
+	Clearances       []ClearanceData   `json:"clearances,omitempty"` // Recent clearances for this aircraft
+	Voice            *VoiceData        `json:"voice,omitempty"`      // What the radio has said about this aircraft
 }
 
 // ClearanceData represents clearance information in API responses

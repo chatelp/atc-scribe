@@ -22,7 +22,6 @@ import (
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
-	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/templating"
 	"github.com/yegors/co-atc/internal/transcription"
@@ -224,9 +223,6 @@ func main() {
 	// Start WebSocket server
 	go wsServer.Run()
 
-	// Create simulation service
-	simulationService := simulation.NewService(log)
-
 	adsbService := adsb.NewService(
 		adsbClient,
 		adsbStorage,
@@ -236,7 +232,6 @@ func main() {
 		cfg.ADSB,
 		cfg.FlightPhases,
 		wsServer,
-		simulationService,
 	)
 
 	// Load reference data (aircraft, airlines, airports, runways, navaids)
@@ -363,7 +358,7 @@ func main() {
 	}
 
 	// Create API router
-	router := api.NewRouter(adsbService, frequenciesService, weatherService, simulationService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
+	router := api.NewRouter(adsbService, frequenciesService, weatherService, refService, cfg, log, wsServer, transcriptionStorage, clearanceStorage)
 	router.Handler().AttachRuntime(runtimeSettings, sqliteStorage.GetDB(), sttSidecar)
 
 	// --- Setup for multiple HTTP servers ---

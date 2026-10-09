@@ -397,10 +397,10 @@ silence_threshold = 0.005     # an SDR stream sits at -90 dBFS when squelch is c
 # repository, and nobody cloning it should find themselves locked out of their own
 # receiver by a password they never set.
 #
-# Note what is unprotected while this is false. Two routes already write:
-# POST /station moves the station's position, and POST/PUT/DELETE
-# /simulation/aircraft injects aircraft into the map. On a network you do not
-# control, turn this on.
+# Note what is unprotected while this is false: every route that writes. POST
+# /station moves the station's position, PUT /server/settings changes how long
+# data is kept, PUT /sources adds a stream. On a network you do not control,
+# turn this on.
 enabled = false
 
 # Create an account without ever writing the password down:

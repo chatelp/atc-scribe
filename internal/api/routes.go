@@ -8,7 +8,6 @@ import (
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
-	"github.com/yegors/co-atc/internal/simulation"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/internal/weather"
 	"github.com/yegors/co-atc/internal/websocket"
@@ -26,9 +25,9 @@ type Router struct {
 }
 
 // NewRouter creates a new API router
-func NewRouter(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, simulationService *simulation.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Router {
+func NewRouter(adsbService *adsb.Service, frequenciesService *frequencies.Service, weatherService *weather.Service, refService *reference.Service, config *config.Config, logger *logger.Logger, wsServer *websocket.Server, transcriptionStorage *sqlite.TranscriptionStorage, clearanceStorage *sqlite.ClearanceStorage) *Router {
 	return &Router{
-		handler:    NewHandler(adsbService, frequenciesService, weatherService, simulationService, refService, config, logger, wsServer, transcriptionStorage, clearanceStorage),
+		handler:    NewHandler(adsbService, frequenciesService, weatherService, refService, config, logger, wsServer, transcriptionStorage, clearanceStorage),
 		middleware: NewMiddleware(logger),
 		config:     config,
 		logger:     logger.Named("api-router"),
@@ -125,12 +124,6 @@ func (r *Router) Routes() http.Handler {
 			router.Get("/navaids", r.handler.GetNavaids)
 			router.Get("/navaids/{ident}", r.handler.GetNavaidByIdent)
 			router.Get("/runways", r.handler.GetRunways)
-
-			// Simulation routes
-			router.Post("/simulation/aircraft", r.handler.CreateSimulatedAircraft)
-			router.Put("/simulation/aircraft/{hex}/controls", r.handler.UpdateSimulationControls)
-			router.Delete("/simulation/aircraft/{hex}", r.handler.RemoveSimulatedAircraft)
-			router.Get("/simulation/aircraft", r.handler.GetSimulatedAircraft)
 		})
 	})
 
