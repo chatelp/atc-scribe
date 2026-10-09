@@ -835,6 +835,8 @@
                                                 :class="$store.atc.settings.mapStyle==='osm-dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">OSM dark</button>
                                         <button type="button" @click="$store.atc.settings.mapStyle='osm'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
                                                 :class="$store.atc.settings.mapStyle==='osm' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">OpenStreetMap</button>
+                                        <button type="button" @click="$store.atc.settings.mapStyle='none'; $store.atc.setMapStyle()" class="col-span-2 px-2 py-1.5 text-xs rounded border transition-colors"
+                                                :class="$store.atc.settings.mapStyle==='none' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">None (black)</button>
                                     </div>
                                 </div>
 

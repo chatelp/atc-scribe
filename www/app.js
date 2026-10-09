@@ -57,7 +57,7 @@ const CONFIG = {
 
 // Base maps the map engine offers (map/core/map-engine.js). None needs a key: the
 // Carto ones, which now do, are gone (docs-fr/audit-2026-10-09/fonds-de-carte.md).
-const MAP_STYLES = ['ign-dark', 'ign', 'osm-dark', 'osm'];
+const MAP_STYLES = ['ign-dark', 'ign', 'osm-dark', 'osm', 'none'];
 
 // The base map shown until one is chosen: the IGN plan, darkened, for a station in
 // mainland France (which it covers), OSM darkened anywhere else. Also the fallback
