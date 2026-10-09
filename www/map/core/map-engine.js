@@ -36,6 +36,36 @@
             return normalizeBaseMapStyle(styleId).endsWith('-dark');
         }
 
+        // The Géoplateforme answers about one tile in twenty with a 400 "layer
+        // unknown" that a later request does not get (measured 10/10: 4 of 60
+        // at z13, 4 of 80 on one tile, in runs of one or two requests). A failed
+        // tile stayed empty, a black square under the dark filter. Tiles are
+        // fetched with up to five tries, spaced 0.5, 1, 2 and 4 s with some
+        // jitter: three quick ones, all fired together by a page asking for 25
+        // tiles at once, still left 3 of 25 tiles empty at z15. Both servers
+        // allow it (Access-Control-Allow-Origin: *), and the browser still
+        // caches by their headers.
+        function loadTileWithRetry(tile, src) {
+            const image = tile.getImage();
+            const attempt = (n) => {
+                fetch(src)
+                    .then((response) => {
+                        if (!response.ok) throw new Error(String(response.status));
+                        return response.blob();
+                    })
+                    .then((blob) => {
+                        const url = URL.createObjectURL(blob);
+                        image.addEventListener('load', () => URL.revokeObjectURL(url), { once: true });
+                        image.src = url;
+                    })
+                    .catch(() => {
+                        if (n < 5) setTimeout(() => attempt(n + 1), 500 * 2 ** (n - 1) + Math.random() * 300);
+                        else image.src = src; // let OpenLayers see the failure
+                    });
+            };
+            attempt(1);
+        }
+
         function createBaseMapSource(styleId) {
             const normalized = normalizeBaseMapStyle(styleId);
             if (normalized === 'ign' || normalized === 'ign-dark') {
@@ -46,11 +76,13 @@
                         + '&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
                     attributions: '&copy; IGN &ndash; Plan IGN v2',
                     maxZoom: 19,
+                    tileLoadFunction: loadTileWithRetry,
                 });
             }
 
             return new window.ol.source.OSM({
                 attributions: '&copy; OpenStreetMap contributors',
+                tileLoadFunction: loadTileWithRetry,
             });
         }
 
