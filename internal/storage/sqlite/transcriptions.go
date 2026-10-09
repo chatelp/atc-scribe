@@ -325,11 +325,6 @@ func (s *TranscriptionStorage) GetUnprocessedTranscriptions(batchSize int) ([]*T
 	return readTranscriptions(rows)
 }
 
-// UpdateProcessedTranscription updates a transcription with processed content
-func (s *TranscriptionStorage) UpdateProcessedTranscription(id int64, contentProcessed string, speakerType string, callsign string, callsignSource string) error {
-	return s.UpdateMatchedTranscription(id, contentProcessed, speakerType, callsign, callsignSource, nil)
-}
-
 // UpdateMatchedTranscription is UpdateProcessedTranscription with the words that
 // named the aircraft, written in the same statement: a callsign stored without
 // its evidence, or the reverse, would highlight words that named nothing.
@@ -363,23 +358,4 @@ func (s *TranscriptionStorage) UpdateMatchedTranscription(id int64, contentProce
 	}
 
 	return nil
-}
-
-// GetLastProcessedTranscriptions retrieves the last N processed transcriptions for a given frequency
-func (s *TranscriptionStorage) GetLastProcessedTranscriptions(frequencyID string, limit int) ([]*TranscriptionRecord, error) {
-	// Query records
-	rows, err := s.db.Query(
-		`SELECT `+transcriptionColumns+`
-		FROM transcriptions
-		WHERE frequency_id = ? AND is_processed = 1
-		ORDER BY created_at DESC
-		LIMIT ?`,
-		frequencyID, limit,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query last processed transcriptions: %w", err)
-	}
-	defer rows.Close()
-
-	return readTranscriptions(rows)
 }

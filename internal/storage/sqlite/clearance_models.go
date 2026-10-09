@@ -14,11 +14,3 @@ type ClearanceRecord struct {
 	Status          string    `json:"status"` // "issued", "complied", "deviation"
 	CreatedAt       time.Time `json:"created_at"`
 }
-
-// ExtractedClearance represents clearance data from AI processing
-type ExtractedClearance struct {
-	Callsign string `json:"callsign"`
-	Type     string `json:"type"` // "takeoff" or "landing"
-	Text     string `json:"text"` // Full clearance text
-	Runway   string `json:"runway,omitempty"`
-}
