@@ -10,23 +10,23 @@
  * - Manage map listeners and expose engine-level utility methods.
  *
  * Quirks / contracts:
- * - An unknown style id (such as a removed FAA chart) resolves to the dark map.
+ * - An unknown style id (such as a removed FAA chart) resolves to osm.
  */
 (function () {
     function createOpenLayersEngine(options) {
         const targetId = options?.targetId || 'map';
         const initialCenter = options?.center || { lat: 43.6777, lon: -79.6248 };
         const initialZoom = Number.isFinite(options?.zoom) ? options.zoom : 10;
-        let activeBaseMapStyle = typeof options?.baseMapStyle === 'string' ? options.baseMapStyle : 'dark';
+        let activeBaseMapStyle = typeof options?.baseMapStyle === 'string' ? options.baseMapStyle : 'osm';
 
         let map = null;
         let baseLayer = null;
         const listenerKeys = new Map();
         function normalizeBaseMapStyle(styleId) {
-            if (!styleId || typeof styleId !== 'string') return 'dark';
+            if (!styleId || typeof styleId !== 'string') return 'osm';
             const value = styleId.trim().toLowerCase();
             if (value === 'light' || value === 'osm' || value === 'dark') return value;
-            return 'dark';
+            return 'osm';
         }
 
         function createBaseMapSource(styleId) {

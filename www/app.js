@@ -56,7 +56,8 @@ const CONFIG = {
 };
 
 // Base maps the map engine offers (map/core/map-engine.js); anything else saved
-// in localStorage falls back to the dark one.
+// in localStorage falls back to osm, the only one that still serves tiles without
+// a key (the Carto dark and light tiles now say "API KEY REQUIRED").
 const MAP_STYLES = ['dark', 'light', 'osm'];
 
 // Initialize WebSocket client
@@ -371,9 +372,9 @@ document.addEventListener('alpine:init', () => {
         settings: {
             mapStyle: (() => {
                 // A browser that saved one of the FAA charts removed since (vfr-sectional,
-                // terminal, ifr-low, ifr-high) gets the dark map, not an empty one.
+                // terminal, ifr-low, ifr-high) gets osm, not an empty map.
                 const savedStyle = localStorage.getItem('mapStyle');
-                return MAP_STYLES.includes(savedStyle) ? savedStyle : 'dark';
+                return MAP_STYLES.includes(savedStyle) ? savedStyle : 'osm';
             })(),
             showLabels: JSON.parse(localStorage.getItem('showLabels')) ?? true,
             showPaths: JSON.parse(localStorage.getItem('showPaths')) ?? true,
@@ -2186,7 +2187,7 @@ document.addEventListener('alpine:init', () => {
 
         setMapStyle() {
             if (!MAP_STYLES.includes(this.settings.mapStyle)) {
-                this.settings.mapStyle = 'dark';
+                this.settings.mapStyle = 'osm';
             }
             this.saveSettings();
             if (this.mapManager && typeof this.mapManager.setMapStyle === 'function') {
