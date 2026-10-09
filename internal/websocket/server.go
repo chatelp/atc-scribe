@@ -275,7 +275,9 @@ func (c *Client) readPump() {
 		// Read message
 		_, messageBytes, err := c.conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+			// 1005, no status: what a browser sends when the page is reloaded or closed.
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure,
+				websocket.CloseNormalClosure, websocket.CloseNoStatusReceived) {
 				c.server.logger.Error("WebSocket read error", Error(err))
 			}
 			break
