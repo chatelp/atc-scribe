@@ -54,13 +54,28 @@ gain / effort / risque, et le propriétaire tranche ce qui devient chantier.
 - **Mesurer avant de conclure** : chaque suppression proposée cite le fichier et le nombre
   de lignes, chaque friction cite le geste et le nombre de clics.
 
-## À compléter par le propriétaire
+## Le jugement du propriétaire (09/10)
 
-Il est le seul utilisateur : l'audit n'a de sens qu'avec sa liste à lui. Trois questions :
+Il est le seul utilisateur ; sa liste prime sur l'inventaire. Dans ses mots :
 
-1. Qu'est-ce qui l'agace à chaque séance (gestes répétés, choses à rechercher, lenteurs) ?
-2. Qu'est-ce qu'il n'ouvre jamais ?
-3. Qu'est-ce qu'il voudrait voir d'un coup d'œil en arrivant (sans clic) ?
+1. **Interface lourde et pas très moderne.**
+2. **Affichage lent des déplacements d'avion** — « peut-être incontournable avec un
+   affichage navigateur ». *À mesurer avant de l'admettre* : le serveur relève l'ADS-B
+   toutes les secondes (`fetch_interval_seconds = 1`) et diffuse une prédiction par seconde
+   (`livePredictionBroadcastInterval`), et `app.js` a un moteur d'animation avec ses propres
+   compteurs (images/s, marqueurs mis à jour/s, lignes 339-343). Un navigateur sait animer
+   à 60 images/s ; si c'est saccadé, c'est la chaîne relevé → diffusion → interpolation qui
+   le fait, pas le navigateur. Premier relevé à faire : les compteurs du moteur sur une
+   séance réelle, avec 80 à 110 avions.
+3. **Les réglages sont « totalement mal foutus »** : ils méritent une **page à part,
+   organisée, lisible**, plutôt qu'une modale.
+4. **Les alertes en modale en haut de l'écran** ne sont « ni très intéressantes ni pratiques
+   en l'état ».
+5. **La disposition générale lui convient** : on ne refait pas l'agencement, on l'allège.
+
+Ce que l'audit UX doit donc hiérarchiser : d'abord les réglages et les alertes (3, 4), puis
+l'allègement (1), et une mesure pour trancher la lenteur (2) — sans toucher à la disposition
+(5).
 
 ## État
 
