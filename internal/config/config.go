@@ -160,72 +160,51 @@ type ReferenceConfig struct {
 	NavaidsCSVPath     string `toml:"navaids_csv_path"`             // Path to navaids.csv (OurAirports)
 }
 
-// TranscriptionConfig contains settings for audio transcription services
+// TranscriptionConfig contains settings for audio transcription.
+//
+// Transcription is local: whole transmissions are posted to the sidecar in
+// sidecar/, which honours upstream's docs/LOCAL-STT.md, and no audio leaves
+// the machine. The OpenAI realtime backend was removed (D3, D71); its keys in
+// an older configuration -- openai_api_key, model, prompt_path,
+// noise_reduction, the VAD and retry settings -- are ignored.
 type TranscriptionConfig struct {
-	// Transcription engine: "openai" (default) or "local".
-	// "local" posts audio to the sidecar in sidecar/ and no audio leaves the machine.
+	// Backend must be "local" or empty. "openai" is refused at startup rather
+	// than ignored: a server that silently transcribed nothing would be worse.
 	Backend string             `toml:"backend"`
 	Local   LocalSTTFileConfig `toml:"local"`
 
-	// OpenAI API settings
-	OpenAIAPIKey string `toml:"openai_api_key"` // OpenAI API key for transcription service
-	Model        string `toml:"model"`          // OpenAI model to use (e.g., "gpt-4o-transcribe")
-	Language     string `toml:"language"`       // Primary language for transcription (e.g., "en" for English)
-	PromptPath   string `toml:"prompt_path"`    // Path to the system prompt file for transcription
+	// Expected language when the frequency catalogue gives none (e.g. "en").
+	Language string `toml:"language"`
 
 	// File logging settings
 	LogDir string `toml:"log_dir"` // Optional directory for transcription log files (append-only logs by date and frequency)
 
-	// Audio processing settings
-	NoiseReduction string `toml:"noise_reduction"` // Noise reduction mode: "near_field", "far_field", or "none"
-	ChunkMs        int    `toml:"chunk_ms"`        // Size of audio chunks for processing in milliseconds
-	BufferSizeKB   int    `toml:"buffer_size_kb"`  // Audio buffer size in kilobytes
-
-	// FFmpeg conversion settings
+	// How the frequencies service decodes each stream into the PCM that is
+	// played and transcribed.
 	FFmpegPath       string `toml:"ffmpeg_path"`        // Path to FFmpeg executable
-	FFmpegSampleRate int    `toml:"ffmpeg_sample_rate"` // Audio sample rate in Hz (typically 24000 for OpenAI)
+	FFmpegSampleRate int    `toml:"ffmpeg_sample_rate"` // Audio sample rate in Hz
 	FFmpegChannels   int    `toml:"ffmpeg_channels"`    // Number of audio channels (1 for mono, 2 for stereo)
 	FFmpegFormat     string `toml:"ffmpeg_format"`      // Audio format (e.g., "s16le" for signed 16-bit little-endian PCM)
-
-	// Connection management
-	ReconnectIntervalSec int `toml:"reconnect_interval_sec"` // Seconds to wait before reconnecting after failure
-	MaxRetries           int `toml:"max_retries"`            // Maximum number of connection retry attempts
-
-	// Voice activity detection (VAD) settings
-	TurnDetectionType string  `toml:"turn_detection_type"` // Method for detecting speech turns (e.g., "server_vad")
-	PrefixPaddingMs   int     `toml:"prefix_padding_ms"`   // Milliseconds of audio to include before detected speech
-	SilenceDurationMs int     `toml:"silence_duration_ms"` // Milliseconds of silence to consider end of speech
-	VADThreshold      float64 `toml:"vad_threshold"`       // Threshold for voice activity detection (0.0-1.0)
-
-	// API retry settings
-	RetryMaxAttempts      int `toml:"retry_max_attempts"`       // Maximum number of API call retry attempts
-	RetryInitialBackoffMs int `toml:"retry_initial_backoff_ms"` // Initial backoff time in milliseconds
-	RetryMaxBackoffMs     int `toml:"retry_max_backoff_ms"`     // Maximum backoff time in milliseconds
-
-	// HTTP timeout settings
-	TimeoutSeconds int `toml:"timeout_seconds"` // HTTP timeout for OpenAI API requests in seconds
 }
 
-// PostProcessingConfig contains settings for post-processing of transcriptions
-// Backends for the second stage of the transcription pipeline — the one that
-// assigns a speaker, a callsign and any clearance to a stored transcription.
-const (
-	PostProcessingBackendOpenAI = "openai"
-	PostProcessingBackendLocal  = "local"
-)
+// BackendLocal is the one transcription and post-processing backend.
+const BackendLocal = "local"
 
+// removedBackend is what an older configuration may still name.
+const removedBackend = "openai"
+
+// PostProcessingConfig is the second stage of the transcription pipeline: the
+// one that assigns a speaker, a callsign and any clearance to a stored
+// transcription. It is the phraseology grammar matched against live ADS-B, and
+// needs no key; see docs-fr/17-appariement.md. Upstream's GPT-4o pass was
+// removed with the OpenAI backend; its keys (model, context_transcriptions,
+// system_prompt_path, timeout_seconds) are ignored.
 type PostProcessingConfig struct {
-	Enabled               bool   `toml:"enabled"`                // Enable or disable post-processing
-	Model                 string `toml:"model"`                  // OpenAI model to use for post-processing
-	IntervalSeconds       int    `toml:"interval_seconds"`       // How often to run the post-processing (in seconds)
-	BatchSize             int    `toml:"batch_size"`             // Maximum number of transcriptions to process in each batch
-	ContextTranscriptions int    `toml:"context_transcriptions"` // Number of previous processed transcriptions to include for context
-	SystemPromptPath      string `toml:"system_prompt_path"`     // Path to the system prompt file
-	TimeoutSeconds        int    `toml:"timeout_seconds"`        // HTTP timeout for OpenAI API requests in seconds
+	Enabled         bool `toml:"enabled"`          // Enable or disable post-processing
+	IntervalSeconds int  `toml:"interval_seconds"` // How often to run the post-processing (in seconds)
+	BatchSize       int  `toml:"batch_size"`       // Maximum number of transcriptions to process in each batch
 
-	// Which implementation assigns speaker, callsign and clearances.
-	// "openai" is upstream's GPT-4o pass; "local" is the phraseology grammar
-	// matched against live ADS-B, which needs no key. See docs-fr/17-appariement.md.
+	// Backend must be "local" or empty; "openai" is refused at startup.
 	Backend              string  `toml:"backend"`
 	AirlinesDatPath      string  `toml:"airlines_dat_path"`       // OpenFlights airlines.dat, shipped in assets/
 	MinScore             float64 `toml:"min_score"`               // below this, the matcher refuses rather than guesses
@@ -471,9 +450,8 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-	// Validate post-processing config
-	if c.PostProcessing.Enabled && c.PostProcessing.ContextTranscriptions < 0 {
-		return fmt.Errorf("invalid context_transcriptions value: %d (must be >= 0)", c.PostProcessing.ContextTranscriptions)
+	if err := c.validateBackends(); err != nil {
+		return err
 	}
 	if c.Auth.Enabled {
 		named := 0
@@ -490,15 +468,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("server.tls_cert and server.tls_key must be set together")
 	}
 
-	switch c.PostProcessing.Backend {
-	case "", PostProcessingBackendOpenAI, PostProcessingBackendLocal:
-	default:
-		return fmt.Errorf("invalid post_processing.backend: %q (want %q or %q)",
-			c.PostProcessing.Backend, PostProcessingBackendOpenAI, PostProcessingBackendLocal)
-	}
-	if c.PostProcessing.Enabled && c.PostProcessing.Backend == PostProcessingBackendLocal {
+	if c.PostProcessing.Enabled {
 		if c.PostProcessing.AirlinesDatPath == "" {
-			return fmt.Errorf("post_processing.airlines_dat_path is required when backend = %q", PostProcessingBackendLocal)
+			return fmt.Errorf("post_processing.airlines_dat_path is required when post-processing is enabled")
 		}
 		if c.PostProcessing.MinScore < 0 {
 			return fmt.Errorf("invalid post_processing.min_score: %v (must be >= 0)", c.PostProcessing.MinScore)
@@ -626,11 +598,6 @@ func (c *Config) Validate() error {
 
 	// Validate Weather config
 	if err := c.ValidateWeather(); err != nil {
-		return err
-	}
-
-	// Validate OpenAI API keys for enabled features
-	if err := c.ValidateOpenAIKeys(); err != nil {
 		return err
 	}
 
@@ -889,22 +856,27 @@ func (c *Config) ValidateFlightPhases() error {
 	return nil
 }
 
-// ValidateOpenAIKeys validates OpenAI API keys for enabled features
-func (c *Config) ValidateOpenAIKeys() error {
-	// The local backend needs no key at all; that is the point of it.
-	local := c.Transcription.Backend == "local"
-	if !local && c.Transcription.OpenAIAPIKey == "" {
-		fmt.Printf("WARN: No OpenAI API key provided for transcription - transcription features will be disabled\n")
-	}
-
-	// Check post-processing API key if post-processing is enabled.
-	// The local backend needs no key: it reads airlines.dat and live ADS-B.
-	if c.PostProcessing.Enabled && c.PostProcessing.Backend != PostProcessingBackendLocal {
-		if c.Transcription.OpenAIAPIKey == "" {
-			fmt.Printf("WARN: Post-processing is enabled but no OpenAI API key provided in transcription config - post-processing features will be disabled\n")
+// validateBackends accepts "local" or nothing for both stages, and refuses
+// "openai" with the reason: the backend is gone, and a server started on it
+// would transcribe nothing without saying why.
+func (c *Config) validateBackends() error {
+	for _, b := range []struct {
+		key string
+		val *string
+	}{
+		{"transcription.backend", &c.Transcription.Backend},
+		{"post_processing.backend", &c.PostProcessing.Backend},
+	} {
+		switch *b.val {
+		case "", BackendLocal:
+			*b.val = BackendLocal
+		case removedBackend:
+			return fmt.Errorf("%s = %q: the OpenAI backend was removed, use %q (see sidecar/README.md)",
+				b.key, removedBackend, BackendLocal)
+		default:
+			return fmt.Errorf("invalid %s: %q (want %q)", b.key, *b.val, BackendLocal)
 		}
 	}
-
 	return nil
 }
 
