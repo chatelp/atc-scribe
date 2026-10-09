@@ -68,7 +68,6 @@
             this._referencePopupElement = null;
 
             this._interactionCleanup = null;
-            this._simulationPositionMode = false;
         }
 
         _toMapCoordinate(lat, lon) {
@@ -1668,8 +1667,6 @@
             }
             this._positionHighlightFeature = null;
         }
-        enableSimulationPositionMode() { this._simulationPositionMode = true; }
-        disableSimulationPositionMode() { this._simulationPositionMode = false; }
 
         drawProximityCircle(position, distanceNM) {
             if (!Array.isArray(position) || position.length < 2) return;

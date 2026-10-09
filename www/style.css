@@ -740,51 +740,6 @@ input[type=range].dual-range-max:focus {
         opacity: 1;
     }
 }
-/* Custom Slider Styles for Simulation Controls */
-.slider-blue::-webkit-slider-thumb {
-    appearance: none;
-    height: 16px;
-    width: 16px;
-    border-radius: 50%;
-    background: #3b82f6;
-    border: 2px solid #1e40af;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    transition: all 0.2s ease;
-}
-
-.slider-blue::-webkit-slider-thumb:hover {
-    background: #2563eb;
-    transform: scale(1.1);
-}
-
-.slider-blue::-moz-range-thumb {
-    height: 16px;
-    width: 16px;
-    border-radius: 50%;
-    background: #3b82f6;
-    border: 2px solid #1e40af;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    transition: all 0.2s ease;
-}
-
-.slider-blue::-moz-range-thumb:hover {
-    background: #2563eb;
-    transform: scale(1.1);
-}
-
-.slider-blue::-webkit-slider-track {
-    background: rgba(30, 64, 175, 0.3);
-    border-radius: 4px;
-    height: 8px;
-}
-
-.slider-blue::-moz-range-track {
-    background: rgba(30, 64, 175, 0.3);
-    border-radius: 4px;
-    height: 8px;
-}
 
 /* ==========================================
    Aircraft Animation Performance Styles
