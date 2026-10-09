@@ -2,7 +2,6 @@ package weather
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -166,16 +165,6 @@ func (s *Service) SetAirport(code string) {
 	}
 }
 
-func (s *Service) RefreshNow() {
-	s.logger.Info("Manual weather refresh triggered")
-	go s.fetchAndUpdateCache()
-}
-
-// GetCacheStats returns cache statistics
-func (s *Service) GetCacheStats() map[string]interface{} {
-	return s.cache.GetStats()
-}
-
 // IsStarted returns whether the service is currently running
 func (s *Service) IsStarted() bool {
 	s.mu.RLock()
@@ -248,34 +237,4 @@ func (s *Service) fetchAndUpdateCache() {
 		logger.String("airport", code),
 		logger.String("duration", duration.String()),
 		logger.Int("total_requests", len(results)))
-}
-
-// ValidateConfig validates the weather service configuration
-func ValidateConfig(config WeatherConfig) error {
-	if config.RefreshIntervalMinutes <= 0 {
-		return fmt.Errorf("refresh_interval_minutes must be greater than 0")
-	}
-
-	if config.RequestTimeoutSeconds <= 0 {
-		return fmt.Errorf("request_timeout_seconds must be greater than 0")
-	}
-
-	if config.MaxRetries < 0 {
-		return fmt.Errorf("max_retries must be 0 or greater")
-	}
-
-	if config.CacheExpiryMinutes <= 0 {
-		return fmt.Errorf("cache_expiry_minutes must be greater than 0")
-	}
-
-	if config.APIBaseURL == "" {
-		return fmt.Errorf("api_base_url cannot be empty")
-	}
-
-	// At least one weather type must be enabled
-	if !config.FetchMETAR && !config.FetchTAF && !config.FetchNOTAMs {
-		return fmt.Errorf("at least one weather type must be enabled (fetch_metar, fetch_taf, or fetch_notams)")
-	}
-
-	return nil
 }
