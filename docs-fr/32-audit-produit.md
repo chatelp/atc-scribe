@@ -295,6 +295,23 @@ programmation d'écoute par plage horaire (E2).
 2. **Les sources ADS-B autres que tar1090, et SRT** (1.4) : les garder pour qu'un autre
    récepteur puisse utiliser le dépôt public, ou les retirer. Mon avis : garder les sources
    ADS-B (c'est 720 lignes et c'est ce qui rend le dépôt utile à d'autres), retirer SRT.
+   **Reformulé par le propriétaire (10/10) : de quelles sources audio un autre utilisateur
+   aurait-il besoin ?** Vérifié sur le code et sur ffmpeg 8.0.1 (Homebrew) : co-atc passe
+   l'adresse de la source à ffmpeg (`-i`), donc tout protocole de ffmpeg marche déjà —
+   HTTP/HTTPS (Icecast, Shoutcast, les flux à la LiveATC ou Broadcastify, RTLSDR-Airband),
+   RTSP, RTMP, TCP, UDP/RTP, fichiers — **et SRT, que ffmpeg lit nativement** (`libsrt`
+   est dans le ffmpeg de Homebrew). Le lecteur SRT en Go (208 lignes, 9 paquets tiers)
+   est donc un doublon : le retirer ne retire pas SRT, à condition de noter « ffmpeg avec
+   libsrt » dans la documentation. **Ce qui manque vraiment à un outil public**, et que ni
+   le code ni la configuration ne permettent : une **entrée audio locale** (sortie casque
+   d'un scanner ou d'un récepteur dans la carte son, câble audio virtuel depuis SDR++,
+   SDR# ou GQRX — le montage le plus courant chez un amateur à un seul récepteur) et le
+   **PCM brut par UDP** (GQRX, SDR++, `rtl_fm`), parce que les deux demandent des options
+   *avant* `-i` (`-f avfoundation`/`alsa`/`dshow`, `-f s16le -ar 48000`) que la
+   configuration ne sait pas exprimer. Une seule évolution couvre les deux : des **options
+   d'entrée ffmpeg par source** (≈ 3 h). Les récepteurs web (KiwiSDR, WebSDR) restent hors
+   champ : ils passent par un pont vers un flux local. À trancher : retirer le lecteur SRT
+   en Go et ajouter les options d'entrée, ou garder le lecteur tel quel.
 3. **La langue de l'interface** : anglais (`lang="en"`, dépôt public) ou français pour lui.
    **Tranché le 10/10 : l'interface reste en anglais à ce stade.** Exception : l'interprétation
    logique d'une communication (clairances en clair, 3.5) suit la langue de la communication,
