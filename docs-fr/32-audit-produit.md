@@ -45,6 +45,28 @@ gain / effort / risque, et le propriétaire tranche ce qui devient chantier.
 
 ## Ce que l'audit doit respecter
 
+- **Ne pas casser ce qui marche** (consigne du propriétaire, 10/10). Ce qui tourne aujourd'hui
+  a été mesuré et validé : juge des pistes 368/368 contre FlightAware, appariement mesuré
+  contre l'ADS-B, PAR, lecture française, liaison station, archive audio. Optimiser le code
+  ne vaut rien si l'un d'eux recule. Les garde-fous, à chaque étape :
+  1. **Un pas à la fois, un commit par pas**, défaisable par `git revert`, et le binaire
+     précédent gardé (`runs/co-atc.avant-<date>`) pour revenir en une minute.
+  2. **Le filet avant de retirer quoi que ce soit** : côté interface, le script qui vérifie que
+     chaque `$store.atc.X` d'`index.html` et chaque `store.X` des autres fichiers existe
+     encore, `node --check` et les tests de la PAR ; côté serveur, `go build`, `go vet`,
+     `go test -race ./...`. Le compilateur et ce script tranchent, pas l'intuition.
+  3. **L'instance d'essai d'abord** (`runs/son-test/`, compte, vrais flux de la station) : tout
+     changement se regarde dans un navigateur et s'écoute avant de toucher la production.
+  4. **Les mesures de référence se rejouent** après tout changement d'un chemin qui compte :
+     l'outil d'appariement (`cmd/phraseology`), le juge des pistes sur une journée, les compteurs
+     d'animation avant/après avec 80 à 110 avions pour le flux d'avions.
+  5. **Le propriétaire valide à l'usage**, une journée d'écoute, avant le pas suivant sur
+     le même terrain.
+  6. **On ne renomme rien de ce qui est enregistré chez lui** : les 44 clés `localStorage`
+     (ses préférences), les noms du store lus par `index.html`, les routes de l'API utilisées
+     par `radio-ctl-sync`, le sidecar et les outils.
+  7. **Retirer avant de déplacer** : supprimer du code mort ne change pas l'ordre
+     d'initialisation ; déplacer, si. Et on ne déplace pas ce qui va être réécrit.
 - **Le serveur tourne tous les jours.** Chaque étape doit laisser la production utilisable ;
   rien de « grand soir ».
 - **Garder identifiable ce qui est contribuable** (CLAUDE.md) : sidecar, correctif de
