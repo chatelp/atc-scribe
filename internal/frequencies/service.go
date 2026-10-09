@@ -79,6 +79,7 @@ func NewStreamProcessor(
 		logger.Named("audio"),
 	)
 	if err != nil {
+		procCancel()
 		return nil, fmt.Errorf("failed to create audio processor: %w", err)
 	}
 
