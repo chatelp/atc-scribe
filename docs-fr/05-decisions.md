@@ -4904,7 +4904,12 @@ disposition à garder) ; les trois rapports sont consolidés dans le doc 32 en s
 4 500 lignes, inutilisable sans clé) est retiré. Langue (10/10) : l'interface reste en anglais ;
 l'interprétation d'une communication suit sa langue ; version en/fr dans un second temps.**
 Trois arbitrages restent : sources ADS-B hors tar1090 et SRT, fond de carte par défaut, ordre
-des paliers.
+des paliers. **Avant tout code (demande du 10/10) : l'alignement avec les objectifs de
+départ** — Q11 visait un fork réintégrable, D19 avait déjà retiré la rebasabilité, le README
+public dit encore « interface utilisée telle quelle » et D3 (API OpenAI retirée) n'a jamais été
+exécutée. Les contradictions et la décision proposée (**D71, à valider**) sont dans le doc 32,
+section « Alignement ». Le code du 10/10 (lecteur SRT retiré, options d'entrée ffmpeg) est en
+réserve git, ni commité ni poussé.
 **Règle du chantier (propriétaire, 10/10) : ne pas casser ce qui marche**, même en optimisant ;
 les sept garde-fous sont dans le doc 32 (un pas par commit, filet avant tout retrait, instance
 d'essai d'abord, mesures de référence rejouées, validation à l'usage, rien de renommé de ce qui
