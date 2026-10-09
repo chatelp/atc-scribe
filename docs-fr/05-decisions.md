@@ -4953,7 +4953,9 @@ départ** — Q11 visait un fork réintégrable, D19 avait déjà retiré la reb
 public dit encore « interface utilisée telle quelle » et D3 (API OpenAI retirée) n'a jamais été
 exécutée. Les contradictions et la décision proposée (**D71, à valider**) sont dans le doc 32,
 section « Alignement ». Le code du 10/10 (lecteur SRT retiré, options d'entrée ffmpeg) est en
-réserve git, ni commité ni poussé.
+réserve git, ni commité ni poussé. **Suite (10/10)** : D71 validée et appliquée ; ordre du
+chantier tranché, paliers 0, 1, 2 puis 3 ; **pas de relance automatique** — la production ne
+tourne pas en permanence sur le Mac — mais un **lanceur dans la barre de menus** (doc 32, 1.6).
 **Règle du chantier (propriétaire, 10/10) : ne pas casser ce qui marche**, même en optimisant ;
 les sept garde-fous sont dans le doc 32 (un pas par commit, filet avant tout retrait, instance
 d'essai d'abord, mesures de référence rejouées, validation à l'usage, rien de renommé de ce qui

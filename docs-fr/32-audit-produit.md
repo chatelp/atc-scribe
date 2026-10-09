@@ -325,7 +325,7 @@ indiqué en fin de ligne quand il a bougé ; chaque ligne se fait sous les sept 
 | 1.3 | Serveur : chat ATC et gabarits (−3 250 lignes) — *tranché le 10/10 : on retire* | 8 h | faible-moyen |
 | 1.4 | Serveur : simulation (−375 lignes) — *tranché le 10/10 (D71) : les sources ADS-B hors tar1090 sont **gardées** (réutilisable) ; le lecteur SRT est **retiré** (fait, `e9c336b`, −208 lignes, −9 modules), remplacé par les options d'entrée ffmpeg (`1858fc6`)* | 2 h | faible |
 | 1.5 | Accueil : plus d'écran bloquant ; un bandeau « reprendre l'écoute » au premier clic (le seul geste que le navigateur exige) | 2 h | nul |
-| 1.6 | **Relance automatique** de la production après redémarrage du Mac (`launchd`) | 4 h | faible |
+| 1.6 | ~~Relance automatique (`launchd`)~~ — *refusée le 10/10 : la production ne doit pas tourner en permanence sur le Mac.* **Remplacée par un lanceur dans la barre de menus** : une icône qui dit si la production tourne (et l'instance d'essai) ; Démarrer, Arrêter ; ouvrir co-atc (local, Tailscale) ; antenne et sidecar en une ligne. Application SwiftUI native (`MenuBarExtra`), sans dépendance tierce : Xcode et Swift 6.4 sont sur le Mac (vérifié). Elle reprend la logique de `runs/production.command` (mot de passe rangé, liaison station, arrêt propre) et inscrit/retire la ligne du planning du GPU. | 1 j | faible |
 
 **2. Les deux demandes du propriétaire (≈ 2 j)**
 
@@ -375,7 +375,7 @@ programmation d'écoute par plage horaire (E2).
 | 2 | Sources ADS-B hors tar1090, et SRT | **tranché le 10/10 (D71)** : sources ADS-B gardées ; lecteur SRT retiré, ffmpeg lit SRT ; options d'entrée ajoutées (UDP brut, carte son) |
 | 3 | Langue de l'interface | **tranché le 10/10 : anglais** ; l'interprétation d'une communication suit sa langue ; version en/fr plus tard |
 | 4 | Fond de carte par défaut | **en cours** : préférence pour le sombre, et des fonds aéronautiques avec pistes et plans d'aéroport ; étude des sources et des licences en cours (VAC du SIA comprises) |
-| 5 | Ordre des paliers | **ouvert** : je recommande 0, 1, 2 puis 3 ; 4 et 5 ensuite, 5.4 en continu |
+| 5 | Ordre des paliers | **tranché le 10/10 : 0, 1, 2 puis 3** ; 4 et 5 ensuite, 5.4 en continu. Avec une exception : pas de relance automatique (1.6), un lanceur dans la barre de menus à la place |
 
 Le détail de chaque arbitrage, tel qu'il a été instruit, est dans les sections précédentes et
 dans D71 (`05-decisions.md`).
