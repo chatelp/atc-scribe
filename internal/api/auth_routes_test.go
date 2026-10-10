@@ -52,37 +52,25 @@ func lockedRoutes(s *stack) []route {
 	}
 }
 
-// Without a session every data route is turned away before its handler runs;
-// with one, each answers what it is for.
-func TestEveryDataRouteIsLockedAndOpensToASession(t *testing.T) {
+// Without a session every data route is turned away before its handler runs,
+// and only health, the sign-in question and the first-run question answer;
+// with a session, each route answers what it is for.
+func TestTheLockAndWhatIsReachableWithoutIt(t *testing.T) {
 	s := newStack(t, stackOptions{})
 	routes := lockedRoutes(s)
 	for _, r := range routes {
 		rec := s.do(r.method, r.path, r.body)
 		if rec.Code != http.StatusUnauthorized {
 			t.Errorf("%s %s without a session: got %d, want 401", r.method, r.path, rec.Code)
+			continue
 		}
-		if ct := rec.Header().Get("Content-Type"); rec.Code == http.StatusUnauthorized && ct != "application/json" {
+		if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
 			t.Errorf("%s %s: a 401 is JSON for the page, got %q", r.method, r.path, ct)
 		}
-		if rec.Code == http.StatusUnauthorized && !strings.Contains(rec.Body.String(), "authentication required") {
+		if !strings.Contains(rec.Body.String(), "authentication required") {
 			t.Errorf("%s %s: 401 body %q", r.method, r.path, rec.Body.String())
 		}
 	}
-	s.signIn()
-	for _, r := range routes {
-		rec := s.do(r.method, r.path, r.body)
-		if rec.Code != r.signedIn {
-			t.Errorf("%s %s signed in: got %d, want %d (%s)", r.method, r.path, rec.Code, r.signedIn,
-				strings.TrimSpace(rec.Body.String()))
-		}
-	}
-}
-
-// What is reachable without a session: health, the sign-in question, the
-// first-run question, and nothing else under /api/v1.
-func TestWhatIsReachableWithoutASession(t *testing.T) {
-	s := newStack(t, stackOptions{})
 	for _, path := range []string{"/api/v1/health", "/api/v1/auth/status", "/api/v1/setup/status"} {
 		if rec := s.do("GET", path, ""); rec.Code != http.StatusOK {
 			t.Errorf("GET %s without a session: got %d, want 200", path, rec.Code)
@@ -95,6 +83,15 @@ func TestWhatIsReachableWithoutASession(t *testing.T) {
 	s.get("/api/v1/health", &health)
 	if !health.Status || health.AircraftCount != aircraftSeen {
 		t.Errorf("health = %+v, want the fake receiver's %d aircraft and a good last fetch", health, aircraftSeen)
+	}
+
+	s.signIn()
+	for _, r := range routes {
+		rec := s.do(r.method, r.path, r.body)
+		if rec.Code != r.signedIn {
+			t.Errorf("%s %s signed in: got %d, want %d (%s)", r.method, r.path, rec.Code, r.signedIn,
+				strings.TrimSpace(rec.Body.String()))
+		}
 	}
 }
 
@@ -130,80 +127,119 @@ func TestAuthStatusSaysWhoIsSignedIn(t *testing.T) {
 	}
 }
 
-// The session cookie as the browser must receive it: readable by no script,
-// sent by no other site, and over HTTP not marked Secure -- which would make
-// the browser drop it on the plain-HTTP install this project runs.
-func TestSigningInSetsAStrictHttpOnlyCookie(t *testing.T) {
-	s := newStack(t, stackOptions{})
-	rec := s.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"`+testPassword+`"}`)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("login: %d %s", rec.Code, rec.Body.String())
-	}
-	var body struct {
-		Authenticated bool      `json:"authenticated"`
-		User          string    `json:"user"`
-		ExpiresAt     time.Time `json:"expires_at"`
-	}
-	decode(t, rec, &body)
-	if !body.Authenticated || body.User != testUser || body.ExpiresAt.Before(time.Now().Add(50*time.Minute)) {
-		t.Errorf("login body = %+v, want authenticated as %s for about an hour", body, testUser)
-	}
-	cookies := rec.Result().Cookies()
-	if len(cookies) != 1 {
-		t.Fatalf("got %d cookies, want 1: %v", len(cookies), cookies)
-	}
-	c := cookies[0]
-	switch {
-	case c.Name != auth.CookieName:
-		t.Errorf("cookie name %q, want %q", c.Name, auth.CookieName)
-	case !c.HttpOnly:
-		t.Error("the session cookie is readable by scripts")
-	case c.SameSite != http.SameSiteStrictMode:
-		t.Errorf("SameSite = %v, want Strict", c.SameSite)
-	case c.Path != "/":
-		t.Errorf("Path = %q, want /", c.Path)
-	case c.Secure:
-		t.Error("Secure over plain HTTP: the browser would never send it back")
-	case c.Value == "" || c.Expires.IsZero():
-		t.Errorf("cookie %+v, want a token and an expiry", c)
-	}
+// One session, from the refusals before it to the sign-out after it.
+func TestASessionFromSignInToSignOut(t *testing.T) {
+	shared := newStack(t, stackOptions{})
+
+	t.Run("a wrong password or a bad body gives no session", func(t *testing.T) {
+		s := shared.with(t)
+		rec := s.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"wrong-password"}`)
+		if rec.Code != http.StatusUnauthorized || len(rec.Result().Cookies()) != 0 {
+			t.Errorf("wrong password: %d with %d cookies, want 401 and none", rec.Code, len(rec.Result().Cookies()))
+		}
+		if !strings.Contains(rec.Body.String(), "invalid credentials") {
+			t.Errorf("wrong password body %q", rec.Body.String())
+		}
+		if rec := s.do("POST", "/api/v1/auth/login", `not json`); rec.Code != http.StatusBadRequest {
+			t.Errorf("malformed login: got %d, want 400", rec.Code)
+		}
+		if rec := s.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"`+strings.Repeat("x", 5000)+`"}`); rec.Code != http.StatusBadRequest {
+			t.Errorf("a 5 KB login body: got %d, want 400 (the body is capped at 4 KB)", rec.Code)
+		}
+		if rec := s.do("GET", "/api/v1/aircraft", ""); rec.Code != http.StatusUnauthorized {
+			t.Errorf("after the refusals the data is open: %d", rec.Code)
+		}
+	})
+
+	// The session cookie as the browser must receive it: readable by no
+	// script, sent by no other site, and over HTTP not marked Secure -- which
+	// would make the browser drop it on the plain-HTTP install this project
+	// runs. X-Forwarded-Proto from a client is not believed: this stack
+	// declares no proxy.
+	t.Run("signing in sets a strict HttpOnly cookie", func(t *testing.T) {
+		s := shared.with(t)
+		forwarded := func(r *http.Request) { r.Header.Set("X-Forwarded-Proto", "https") }
+		rec := s.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"`+testPassword+`"}`, forwarded)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("login: %d %s", rec.Code, rec.Body.String())
+		}
+		var body struct {
+			Authenticated bool      `json:"authenticated"`
+			User          string    `json:"user"`
+			ExpiresAt     time.Time `json:"expires_at"`
+		}
+		decode(t, rec, &body)
+		if !body.Authenticated || body.User != testUser || body.ExpiresAt.Before(time.Now().Add(50*time.Minute)) {
+			t.Errorf("login body = %+v, want authenticated as %s for about an hour", body, testUser)
+		}
+		cookies := rec.Result().Cookies()
+		if len(cookies) != 1 {
+			t.Fatalf("got %d cookies, want 1: %v", len(cookies), cookies)
+		}
+		c := cookies[0]
+		switch {
+		case c.Name != auth.CookieName:
+			t.Errorf("cookie name %q, want %q", c.Name, auth.CookieName)
+		case !c.HttpOnly:
+			t.Error("the session cookie is readable by scripts")
+		case c.SameSite != http.SameSiteStrictMode:
+			t.Errorf("SameSite = %v, want Strict", c.SameSite)
+		case c.Path != "/":
+			t.Errorf("Path = %q, want /", c.Path)
+		case c.Secure:
+			t.Error("Secure over plain HTTP, on the word of an untrusted client: the browser would never send it back")
+		case c.Value == "" || c.Expires.IsZero():
+			t.Errorf("cookie %+v, want a token and an expiry", c)
+		}
+		shared.cookie = c
+	})
+
+	t.Run("signing out ends the session", func(t *testing.T) {
+		s := shared.with(t)
+		if s.cookie == nil {
+			t.Skip("no session from the step before")
+		}
+		if rec := s.do("GET", "/api/v1/aircraft", ""); rec.Code != http.StatusOK {
+			t.Fatalf("signed in: %d", rec.Code)
+		}
+		rec := s.do("POST", "/api/v1/auth/logout", "")
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"authenticated":false`) {
+			t.Errorf("logout: %d %s", rec.Code, rec.Body.String())
+		}
+		cleared := false
+		for _, c := range rec.Result().Cookies() {
+			if c.Name == auth.CookieName && c.Value == "" && c.MaxAge < 0 {
+				cleared = true
+			}
+		}
+		if !cleared {
+			t.Errorf("logout did not clear the cookie: %v", rec.Result().Cookies())
+		}
+		// The browser that kept the old cookie is out all the same: the
+		// session is revoked on the server, not only forgotten by the client.
+		if rec := s.do("GET", "/api/v1/aircraft", ""); rec.Code != http.StatusUnauthorized {
+			t.Errorf("the old cookie after logout: %d, want 401", rec.Code)
+		}
+		var st struct{ Authenticated bool }
+		s.get("/api/v1/auth/status", &st)
+		if st.Authenticated {
+			t.Error("auth/status still says authenticated after logout")
+		}
+		// Signing out twice, or without a session, is harmless.
+		if rec := s.do("POST", "/api/v1/auth/logout", ""); rec.Code != http.StatusOK {
+			t.Errorf("logout without a session: %d", rec.Code)
+		}
+	})
 }
 
 // Behind a trusted proxy that says the browser is on HTTPS, the cookie is
-// Secure; the same header from anyone else is not believed.
-func TestTheCookieIsSecureOnlyWhenATrustedProxySaysHTTPS(t *testing.T) {
-	// httptest.NewRequest comes from 192.0.2.1.
+// Secure. (httptest.NewRequest comes from 192.0.2.1.)
+func TestTheCookieIsSecureBehindATrustedProxyOnHTTPS(t *testing.T) {
 	s := newStack(t, stackOptions{proxies: []string{"192.0.2.1"}})
 	forwarded := func(r *http.Request) { r.Header.Set("X-Forwarded-Proto", "https") }
 	rec := s.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"`+testPassword+`"}`, forwarded)
 	if cs := rec.Result().Cookies(); len(cs) != 1 || !cs[0].Secure {
 		t.Errorf("behind the trusted proxy on HTTPS: cookies %v, want one marked Secure", cs)
-	}
-
-	untrusted := newStack(t, stackOptions{})
-	rec = untrusted.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"`+testPassword+`"}`, forwarded)
-	if cs := rec.Result().Cookies(); len(cs) != 1 || cs[0].Secure {
-		t.Errorf("X-Forwarded-Proto from an untrusted client: cookies %v, want one not marked Secure", cs)
-	}
-}
-
-func TestAWrongPasswordOrABadBodyGivesNoSession(t *testing.T) {
-	s := newStack(t, stackOptions{})
-	rec := s.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"wrong-password"}`)
-	if rec.Code != http.StatusUnauthorized || len(rec.Result().Cookies()) != 0 {
-		t.Errorf("wrong password: %d with %d cookies, want 401 and none", rec.Code, len(rec.Result().Cookies()))
-	}
-	if !strings.Contains(rec.Body.String(), "invalid credentials") {
-		t.Errorf("wrong password body %q", rec.Body.String())
-	}
-	if rec := s.do("POST", "/api/v1/auth/login", `not json`); rec.Code != http.StatusBadRequest {
-		t.Errorf("malformed login: got %d, want 400", rec.Code)
-	}
-	if rec := s.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"`+strings.Repeat("x", 5000)+`"}`); rec.Code != http.StatusBadRequest {
-		t.Errorf("a 5 KB login body: got %d, want 400 (the body is capped at 4 KB)", rec.Code)
-	}
-	if rec := s.do("GET", "/api/v1/aircraft", ""); rec.Code != http.StatusUnauthorized {
-		t.Errorf("after the refusals the data is open: %d", rec.Code)
 	}
 }
 
@@ -239,40 +275,5 @@ func TestEightWrongPasswordsLockTheAddress(t *testing.T) {
 	rec = s.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"`+testPassword+`"}`, other)
 	if rec.Code != http.StatusOK {
 		t.Errorf("another address after the lockout: %d, want 200", rec.Code)
-	}
-}
-
-func TestSigningOutEndsTheSession(t *testing.T) {
-	s := newStack(t, stackOptions{})
-	s.signIn()
-	if rec := s.do("GET", "/api/v1/aircraft", ""); rec.Code != http.StatusOK {
-		t.Fatalf("signed in: %d", rec.Code)
-	}
-	rec := s.do("POST", "/api/v1/auth/logout", "")
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"authenticated":false`) {
-		t.Errorf("logout: %d %s", rec.Code, rec.Body.String())
-	}
-	cleared := false
-	for _, c := range rec.Result().Cookies() {
-		if c.Name == auth.CookieName && c.Value == "" && c.MaxAge < 0 {
-			cleared = true
-		}
-	}
-	if !cleared {
-		t.Errorf("logout did not clear the cookie: %v", rec.Result().Cookies())
-	}
-	// The browser that kept the old cookie is out all the same: the session
-	// is revoked on the server, not only forgotten by the client.
-	if rec := s.do("GET", "/api/v1/aircraft", ""); rec.Code != http.StatusUnauthorized {
-		t.Errorf("the old cookie after logout: %d, want 401", rec.Code)
-	}
-	var st struct{ Authenticated bool }
-	s.get("/api/v1/auth/status", &st)
-	if st.Authenticated {
-		t.Error("auth/status still says authenticated after logout")
-	}
-	// Signing out twice, or without a session, is harmless.
-	if rec := s.do("POST", "/api/v1/auth/logout", ""); rec.Code != http.StatusOK {
-		t.Errorf("logout without a session: %d", rec.Code)
 	}
 }
