@@ -19,8 +19,8 @@ type Config struct {
 
 	// Warnings is what Load has to say about the file and cannot log itself,
 	// the logger being built from this very configuration: a key written in
-	// two sections, and (step 4) a key nothing reads any more. One line each,
-	// naming the key; main prints them once the logger exists. Not a TOML field.
+	// two sections, a key nothing reads any more. One line each, naming the
+	// key; main prints them once the logger exists. Not a TOML field.
 	Warnings []string `toml:"-"`
 
 	Server         ServerConfig         `toml:"server"`          // HTTP server settings
@@ -392,14 +392,38 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to decode config file: %w", err)
 	}
 
-	// Strict ADS-B schema: reject unknown keys under [adsb]
-	for _, key := range meta.Undecoded() {
-		if len(key) > 0 && key[0] == "adsb" {
-			return nil, fmt.Errorf("unknown [adsb] configuration key: %s", key.String())
+	config.reconcileDuplicates(meta)
+
+	// A key nothing reads -- left over from a removed feature, or misspelled --
+	// is said, with its name, and ignored. Never refused: the owner's file still
+	// carries [atc_chat] and the OpenAI keys, and a server that will not start
+	// over a line that does nothing is worse than one that says so. (Upstream
+	// refused unknown keys under [adsb] alone; the same line now covers it.)
+	// A whole section nothing reads gets one line with its size, not one per
+	// key: [atc_chat] is seventeen keys in the owner's file.
+	undecoded := meta.Undecoded()
+	gone := map[string]int{}
+	for _, key := range undecoded {
+		if len(key) == 1 && meta.Type(key...) == "Hash" {
+			gone[key[0]] = 0
 		}
 	}
-
-	config.reconcileDuplicates(meta)
+	for _, key := range undecoded {
+		if _, inGone := gone[key[0]]; inGone && len(key) > 1 {
+			gone[key[0]]++
+		}
+	}
+	for _, key := range undecoded {
+		n, inGone := gone[key[0]]
+		switch {
+		case inGone && len(key) == 1:
+			config.warnf("[%s] is not a section of this version and is ignored with its %d %s: remove it", key[0], n, plural(n, "key"))
+		case inGone:
+			// counted above
+		default:
+			config.warnf("%s is not a configuration key of this version and is ignored: remove it, or check its spelling", key.String())
+		}
+	}
 
 	return &config, nil
 }
@@ -437,6 +461,13 @@ func oneHome[T comparable](c *Config, meta toml.MetaData, oldSection, newSection
 	default:
 		*oldField = *newField
 	}
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
 }
 
 func (c *Config) warnf(format string, args ...any) {
