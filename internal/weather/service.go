@@ -20,8 +20,8 @@ type Service struct {
 	airportCode string
 	airportGen  uint64
 
-	cache       *Cache
-	logger      *logger.Logger
+	cache  *Cache
+	logger *logger.Logger
 
 	// Service lifecycle
 	ctx     context.Context
