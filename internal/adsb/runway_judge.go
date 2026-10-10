@@ -21,6 +21,10 @@ type RunwayAssignment struct {
 type AircraftRunways struct {
 	Arrival   *RunwayAssignment `json:"arrival,omitempty"`
 	Departure *RunwayAssignment `json:"departure,omitempty"`
+	// GoAround is set when an aircraft established on an arrival climbs out
+	// past the far end within the go-around window: the runway is the arrival's,
+	// Since the moment it was seen climbing out. The page's event log reads it.
+	GoAround *RunwayAssignment `json:"go_around,omitempty"`
 }
 
 // The runway judge is the one place that decides which runway an aircraft uses,
@@ -172,6 +176,9 @@ func (j *RunwayJudge) Observe(hex string, refs []PhaseReference, o RunwayObserva
 	if ap, end, ok := established(refs, o, true); ok {
 		if arr := e.runways.Arrival; arr != nil && arr.Airport == ap {
 			if o.At.Sub(arr.Since) < goAroundWindow {
+				if ga := e.runways.GoAround; ga == nil || ga.Since.Before(arr.Since) {
+					e.runways.GoAround = &RunwayAssignment{Airport: ap, Runway: arr.Runway, Since: o.At}
+				}
 				return
 			}
 			if o.At.Sub(arr.Since) >= turnaroundGap {
@@ -202,6 +209,10 @@ func (j *RunwayJudge) Get(hex string) *AircraftRunways {
 		c := *d
 		out.Departure = &c
 	}
+	if g := e.runways.GoAround; g != nil {
+		c := *g
+		out.GoAround = &c
+	}
 	return out
 }
 
@@ -227,5 +238,5 @@ func aircraftRunwaysEqual(a, b *AircraftRunways) bool {
 		}
 		return x.Airport == y.Airport && x.Runway == y.Runway
 	}
-	return same(a.Arrival, b.Arrival) && same(a.Departure, b.Departure)
+	return same(a.Arrival, b.Arrival) && same(a.Departure, b.Departure) && same(a.GoAround, b.GoAround)
 }
