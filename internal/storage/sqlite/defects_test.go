@@ -32,6 +32,22 @@ func TestARepeatedPositionWithoutAirspeedIsStoredOnce(t *testing.T) {
 	}
 }
 
+// Not never again, though: an aircraft without a position holding its level,
+// track and speed must still be found around a transmission minutes later. An
+// unchanged state is written again after 10 s.
+func TestAnUnchangedStateIsWrittenAgainEveryTenSeconds(t *testing.T) {
+	s := newAircraftStore(t)
+	for _, sec := range []int{0, 1, 2, 9, 11, 12, 25} {
+		r := report("3949e2", 48.77, 2.10, 0)
+		r.TAS = nil
+		s.Upsert(seen("3949e2", t0.Add(time.Duration(sec)*time.Second), r))
+	}
+	// kept: 0 s, 11 s (more than 10 s after 0), 25 s (more than 10 s after 11)
+	if n := positionsOf(t, s, "3949e2"); n != 3 {
+		t.Errorf("an unchanged state over 25 s: %d rows, want 3 (0, 11 and 25 s)", n)
+	}
+}
+
 // created_at is written as CreatedAt.Format(time.RFC3339), keeping the zone it
 // was given in, and every query compares or sorts it as text. The local
 // transcription dates a transmission from time.Now(), in the host's zone, so
