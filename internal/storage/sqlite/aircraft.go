@@ -1138,7 +1138,12 @@ func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 			aircraftType = aircraft.ADSB.AircraftType
 		}
 
-		// Insert the ADSB target (OR IGNORE handles dedup via UNIQUE constraint)
+		// A position already stored for this aircraft is not stored again. The
+		// UNIQUE constraint alone did that only when every column was set: SQLite
+		// holds NULLs distinct, and tas (a Comm-B field) is NULL in a quarter of
+		// the reports, so those were written at every poll -- 40 % of a day's
+		// rows were exact repeats (04/10: 923 816 of 2 328 654). IS compares NULL
+		// as a value, and the constraint's own index serves the lookup.
 		_, err = tx.Exec(`
 			INSERT OR IGNORE INTO adsb_targets (
 				aircraft_hex, hex, type, flight, registration, aircraft_type, alt_baro, alt_geom, gs, ias, tas, mach, wd, ws, oat, tat,
@@ -1146,9 +1151,10 @@ func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 				category, nav_qnh, nav_altitude_mcp, nav_altitude_fms, nav_heading, nav_modes, lat, lon,
 				nic, rc, seen_pos, r_dst, r_dir, version, nic_baro, nac_p, nac_v, sil, sil_type, gva, sda,
 				alert, spi, mlat, tisb, messages, seen, rssi, timestamp, source_type
-			) VALUES (
-				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-				?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+			) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+			WHERE NOT EXISTS (
+				SELECT 1 FROM adsb_targets
+				WHERE aircraft_hex = ? AND lat IS ? AND lon IS ? AND alt_baro IS ? AND gs IS ? AND tas IS ? AND track IS ?
 			)
 		`,
 			aircraft.Hex, aircraft.ADSB.Hex, aircraft.ADSB.Type, aircraft.ADSB.Flight,
@@ -1168,6 +1174,10 @@ func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 			"", "",
 			nullableIntValue(aircraft.ADSB.Messages), nullableFloatValue(aircraft.ADSB.Seen), nullableFloatValue(aircraft.ADSB.RSSI),
 			aircraft.LastSeen.Format(time.RFC3339), sourceType,
+			// the NOT EXISTS: the same values as above, same conversions
+			aircraft.Hex, nullableFloatValue(aircraft.ADSB.Lat), nullableFloatValue(aircraft.ADSB.Lon),
+			nullableFlexibleFloatValue(aircraft.ADSB.AltBaro), nullableFloatValue(aircraft.ADSB.GS),
+			nullableFloatValue(aircraft.ADSB.TAS), aircraft.ADSB.Track,
 		)
 		if err != nil {
 			return fmt.Errorf("insert ADSB target: %w", err)

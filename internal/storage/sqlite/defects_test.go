@@ -21,8 +21,6 @@ func skipDefect(t *testing.T, what string) {
 // repeat. tas, for one, is only there when the receiver decoded it from a
 // Comm-B reply, so many reports go without it.
 func TestARepeatedPositionWithoutAirspeedIsStoredOnce(t *testing.T) {
-	skipDefect(t, "UNIQUE(aircraft_hex, lat, lon, alt_baro, gs, tas, track) does not deduplicate when one column is NULL: "+
-		"an aircraft reported without tas gets a new adsb_targets row at every poll")
 	s := newAircraftStore(t)
 	for i := 0; i < 3; i++ {
 		r := report("3949e2", 48.77, 2.10, 0)
@@ -41,8 +39,7 @@ func TestARepeatedPositionWithoutAirspeedIsStoredOnce(t *testing.T) {
 // a range given in UTC misses it, and on the night the clocks go back the
 // hour that repeats sorts out of order.
 func TestTranscriptionTimesAreComparedWhateverTheirZone(t *testing.T) {
-	skipDefect(t, "StoreTranscription keeps CreatedAt's zone in created_at, which is compared as text: "+
-		"a UTC time range misses a transmission dated +02:00, and the hour after the clocks go back sorts first")
+	skipDefect(t, "StoreTranscription keeps CreatedAt's zone in created_at, which is compared as text")
 	s := newTranscriptionStore(t)
 	paris, err := time.LoadLocation("Europe/Paris")
 	if err != nil {
