@@ -10,14 +10,14 @@
  * - Manage map listeners and expose engine-level utility methods.
  *
  * Quirks / contracts:
- * - An unknown style id (such as a removed FAA or Carto map) resolves to osm-dark.
+ * - An unknown style id (such as a removed FAA or Carto map) resolves to none.
  */
 (function () {
     function createOpenLayersEngine(options) {
         const targetId = options?.targetId || 'map';
         const initialCenter = options?.center || { lat: 43.6777, lon: -79.6248 };
         const initialZoom = Number.isFinite(options?.zoom) ? options.zoom : 10;
-        let activeBaseMapStyle = typeof options?.baseMapStyle === 'string' ? options.baseMapStyle : 'osm-dark';
+        let activeBaseMapStyle = typeof options?.baseMapStyle === 'string' ? options.baseMapStyle : 'none';
 
         let map = null;
         let baseLayer = null;
@@ -26,10 +26,10 @@
         // with a CSS filter (style.css, .basemap-dark) on the base layer's own
         // canvas, which the aircraft, trails and other layers do not share.
         function normalizeBaseMapStyle(styleId) {
-            if (!styleId || typeof styleId !== 'string') return 'osm-dark';
+            if (!styleId || typeof styleId !== 'string') return 'none';
             const value = styleId.trim().toLowerCase();
             if (value === 'ign' || value === 'ign-dark' || value === 'osm' || value === 'osm-dark' || value === 'none') return value;
-            return 'osm-dark';
+            return 'none';
         }
 
         function isDarkBaseMapStyle(styleId) {

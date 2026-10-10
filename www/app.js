@@ -59,12 +59,12 @@ const CONFIG = {
 // Carto ones, which now do, are gone (docs-fr/audit-2026-10-09/fonds-de-carte.md).
 const MAP_STYLES = ['ign-dark', 'ign', 'osm-dark', 'osm', 'none'];
 
-// The base map shown until one is chosen: the IGN plan, darkened, for a station in
-// mainland France (which it covers), OSM darkened anywhere else. Also the fallback
-// for a saved style that is no longer offered (the FAA charts, Carto dark and light).
+// The base map shown until one is chosen: none, the aircraft and the airport layout on
+// black -- the most readable, in the owner's judgement (10/10); the IGN and OSM maps
+// are a click away. Also the fallback for a saved style that is no longer offered
+// (the FAA charts, Carto dark and light). The station's position no longer matters.
 function defaultMapStyle(lat, lon) {
-    const inMainlandFrance = lat >= 41 && lat <= 51.5 && lon >= -5.5 && lon <= 9.8;
-    return inMainlandFrance ? 'ign-dark' : 'osm-dark';
+    return 'none';
 }
 
 // Initialize WebSocket client
@@ -380,11 +380,10 @@ document.addEventListener('alpine:init', () => {
 
         // Settings
         settings: {
-            // Until the station's position is known, a browser with no valid saved
-            // style gets osm-dark; fetchStationData then applies defaultMapStyle.
+            // A browser with no valid saved style gets defaultMapStyle.
             mapStyle: (() => {
                 const savedStyle = localStorage.getItem('mapStyle');
-                return MAP_STYLES.includes(savedStyle) ? savedStyle : 'osm-dark';
+                return MAP_STYLES.includes(savedStyle) ? savedStyle : defaultMapStyle();
             })(),
             showLabels: JSON.parse(localStorage.getItem('showLabels')) ?? true,
             showPaths: JSON.parse(localStorage.getItem('showPaths')) ?? true,
