@@ -123,6 +123,12 @@ func (cd *ChangeDetector) computeDelta(previous, current *Aircraft) map[string]i
 			delta["true_heading"] = current.ADSB.TrueHeading
 		}
 
+		// Squawk: a change to 7500, 7600 or 7700 in flight must reach the page,
+		// which otherwise kept the code the aircraft had when it appeared.
+		if previous.ADSB.Squawk != current.ADSB.Squawk {
+			delta["squawk"] = current.ADSB.Squawk
+		}
+
 		// ATC derived metrics
 		if !atcDerivedEqual(previous.ADSB.ATCDerived, current.ADSB.ATCDerived) {
 			delta["atc_derived"] = current.ADSB.ATCDerived
