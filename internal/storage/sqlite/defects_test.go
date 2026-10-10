@@ -39,7 +39,6 @@ func TestARepeatedPositionWithoutAirspeedIsStoredOnce(t *testing.T) {
 // a range given in UTC misses it, and on the night the clocks go back the
 // hour that repeats sorts out of order.
 func TestTranscriptionTimesAreComparedWhateverTheirZone(t *testing.T) {
-	skipDefect(t, "StoreTranscription keeps CreatedAt's zone in created_at, which is compared as text")
 	s := newTranscriptionStore(t)
 	paris, err := time.LoadLocation("Europe/Paris")
 	if err != nil {

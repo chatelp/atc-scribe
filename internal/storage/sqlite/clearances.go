@@ -59,6 +59,14 @@ func createClearancesSchema(db execer) error {
 		}
 	}
 
+	// As for transcriptions: both times are compared as text and were kept in
+	// the host's zone until 10/10; converted to UTC once, when the file is opened.
+	for _, col := range []string{"created_at", "timestamp"} {
+		if _, err := db.Exec(`UPDATE clearances SET ` + col + ` = strftime('%Y-%m-%dT%H:%M:%SZ', ` + col + `)
+			WHERE ` + col + ` NOT LIKE '%Z' AND strftime('%Y-%m-%dT%H:%M:%SZ', ` + col + `) IS NOT NULL`); err != nil {
+			return fmt.Errorf("failed to convert clearances.%s to UTC: %w", col, err)
+		}
+	}
 	return nil
 }
 
@@ -77,9 +85,9 @@ func (s *ClearanceStorage) StoreClearance(record *ClearanceRecord) (int64, error
 		record.ClearanceType,
 		record.ClearanceText,
 		record.Runway,
-		record.Timestamp.Format(time.RFC3339),
+		record.Timestamp.UTC().Format(time.RFC3339),
 		record.Status,
-		record.CreatedAt.Format(time.RFC3339),
+		record.CreatedAt.UTC().Format(time.RFC3339),
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert clearance: %w", err)
