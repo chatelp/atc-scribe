@@ -18,17 +18,6 @@ import (
 // and a browser refuses a credentialed answer whose allowed origin is "*".
 const pageOrigin = "http://localhost:8000"
 
-// streamStack is a signed-in stack with a frequency ffmpeg plays itself.
-func streamStack(t *testing.T) *stack {
-	t.Helper()
-	if _, err := exec.LookPath("ffmpeg"); err != nil {
-		t.Skip("ffmpeg not installed")
-	}
-	s := newStack(t, stackOptions{tone: true})
-	s.signIn()
-	return s
-}
-
 // openStream requests the tone on the real port, as the page does, and
 // returns the response; the context ends the request.
 func (s *stack) openStream(ctx context.Context, id, clientID string) *http.Response {
@@ -80,123 +69,130 @@ func expectCORSForThePage(t *testing.T, h http.Header, what string) {
 	}
 }
 
-// The stream as the page plays it: audio/wav, allowed for the page's exact
-// origin with credentials, a WAV header and then audio, for as long as the
-// page listens.
-func TestTheStreamIsWAVForThePagesOrigin(t *testing.T) {
-	s := streamStack(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	resp := s.openStream(ctx, "tone", "page-1")
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("stream: %d", resp.StatusCode)
+// The stream as the page plays it, with real ffmpeg on a tone it generates
+// itself, on one stack.
+func TestTheStreamAsThePagePlaysIt(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
 	}
-	if ct := resp.Header.Get("Content-Type"); ct != "audio/wav" {
-		t.Errorf("Content-Type = %q, want audio/wav", ct)
-	}
-	if cc := resp.Header.Get("Cache-Control"); !strings.Contains(cc, "no-store") {
-		t.Errorf("Cache-Control = %q, want no-store", cc)
-	}
-	if resp.Header.Get("X-Already-Connected") != "" {
-		t.Error("a first request is not 'already connected'")
-	}
-	expectCORSForThePage(t, resp.Header, "GET stream")
-	readWAVHeader(t, resp.Body)
-	// A second of audio at 16 kHz mono 16 bits is 32 000 bytes; ask for a
-	// quarter of it, which the tone delivers in well under the ten seconds.
-	if _, err := io.ReadFull(resp.Body, make([]byte, 8000)); err != nil {
-		t.Fatalf("reading audio after the header: %v", err)
-	}
-}
+	shared := newStack(t, stackOptions{tone: true})
+	shared.signIn()
 
-// A page that asks again with its id while its stream is open is told so and
-// given nothing, rather than a second copy of the audio.
-func TestASecondRequestWithTheSameIdIsToldItIsConnected(t *testing.T) {
-	s := streamStack(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	first := s.openStream(ctx, "tone", "page-1")
-	defer first.Body.Close()
-	readWAVHeader(t, first.Body)
+	// audio/wav, allowed for the page's exact origin with credentials, a WAV
+	// header and then audio, for as long as the page listens.
+	t.Run("WAV for the page's origin", func(t *testing.T) {
+		s := shared.with(t)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		resp := s.openStream(ctx, "tone", "wav-1")
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("stream: %d", resp.StatusCode)
+		}
+		if ct := resp.Header.Get("Content-Type"); ct != "audio/wav" {
+			t.Errorf("Content-Type = %q, want audio/wav", ct)
+		}
+		if cc := resp.Header.Get("Cache-Control"); !strings.Contains(cc, "no-store") {
+			t.Errorf("Cache-Control = %q, want no-store", cc)
+		}
+		if resp.Header.Get("X-Already-Connected") != "" {
+			t.Error("a first request is not 'already connected'")
+		}
+		expectCORSForThePage(t, resp.Header, "GET stream")
+		readWAVHeader(t, resp.Body)
+		// A second of audio at 16 kHz mono 16 bits is 32 000 bytes; ask for
+		// a quarter of it, which the tone delivers in well under ten seconds.
+		if _, err := io.ReadFull(resp.Body, make([]byte, 8000)); err != nil {
+			t.Fatalf("reading audio after the header: %v", err)
+		}
+	})
 
-	second := s.openStream(ctx, "tone", "page-1")
-	defer second.Body.Close()
-	if second.StatusCode != http.StatusOK || second.Header.Get("X-Already-Connected") != "true" {
-		t.Errorf("same id while open: %d, X-Already-Connected %q, want 200 and true", second.StatusCode,
-			second.Header.Get("X-Already-Connected"))
-	}
-	if b, _ := io.ReadAll(second.Body); len(b) != 0 {
-		t.Errorf("same id while open: %d bytes of body, want none", len(b))
-	}
-	// Another page, with its own id, gets its own stream.
-	other := s.openStream(ctx, "tone", "page-2")
-	defer other.Body.Close()
-	if other.StatusCode != http.StatusOK || other.Header.Get("X-Already-Connected") != "" {
-		t.Errorf("another id: %d, X-Already-Connected %q", other.StatusCode, other.Header.Get("X-Already-Connected"))
-	}
-	readWAVHeader(t, other.Body)
-}
+	// A page that asks again with its id while its stream is open is told so
+	// and given nothing, rather than a second copy of the audio.
+	t.Run("a second request with the same id is told it is connected", func(t *testing.T) {
+		s := shared.with(t)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		first := s.openStream(ctx, "tone", "same-1")
+		defer first.Body.Close()
+		readWAVHeader(t, first.Body)
 
-// A page that stops listening frees its reader: asking again with the same
-// id a moment later gets a fresh stream, not "already connected".
-func TestAClientThatClosesFreesItsReader(t *testing.T) {
-	s := streamStack(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	first := s.openStream(ctx, "tone", "page-1")
-	readWAVHeader(t, first.Body)
-	if _, err := io.ReadFull(first.Body, make([]byte, 4000)); err != nil {
-		t.Fatal(err)
-	}
-	cancel() // the page goes away
-	first.Body.Close()
+		second := s.openStream(ctx, "tone", "same-1")
+		defer second.Body.Close()
+		if second.StatusCode != http.StatusOK || second.Header.Get("X-Already-Connected") != "true" {
+			t.Errorf("same id while open: %d, X-Already-Connected %q, want 200 and true", second.StatusCode,
+				second.Header.Get("X-Already-Connected"))
+		}
+		if b, _ := io.ReadAll(second.Body); len(b) != 0 {
+			t.Errorf("same id while open: %d bytes of body, want none", len(b))
+		}
+		// Another page, with its own id, gets its own stream.
+		other := s.openStream(ctx, "tone", "same-2")
+		defer other.Body.Close()
+		if other.StatusCode != http.StatusOK || other.Header.Get("X-Already-Connected") != "" {
+			t.Errorf("another id: %d, X-Already-Connected %q", other.StatusCode, other.Header.Get("X-Already-Connected"))
+		}
+		readWAVHeader(t, other.Body)
+	})
 
-	// The handler notices on its next read; the tone keeps those short.
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
-		again := s.openStream(ctx2, "tone", "page-1")
-		if again.StatusCode == http.StatusOK && again.Header.Get("X-Already-Connected") == "" {
-			readWAVHeader(t, again.Body)
-			if _, err := io.ReadFull(again.Body, make([]byte, 4000)); err != nil {
-				t.Errorf("the fresh stream after a close: %v", err)
+	// A page that stops listening frees its reader: asking again with the
+	// same id a moment later gets a fresh stream, not "already connected".
+	t.Run("a client that closes frees its reader", func(t *testing.T) {
+		s := shared.with(t)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		first := s.openStream(ctx, "tone", "close-1")
+		readWAVHeader(t, first.Body)
+		if _, err := io.ReadFull(first.Body, make([]byte, 4000)); err != nil {
+			t.Fatal(err)
+		}
+		cancel() // the page goes away
+		first.Body.Close()
+
+		// The handler notices on its next read; the tone keeps those short.
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+			again := s.openStream(ctx2, "tone", "close-1")
+			if again.StatusCode == http.StatusOK && again.Header.Get("X-Already-Connected") == "" {
+				readWAVHeader(t, again.Body)
+				if _, err := io.ReadFull(again.Body, make([]byte, 4000)); err != nil {
+					t.Errorf("the fresh stream after a close: %v", err)
+				}
+				again.Body.Close()
+				cancel2()
+				return
 			}
 			again.Body.Close()
 			cancel2()
-			return
+			if time.Now().After(deadline) {
+				t.Fatalf("five seconds after the page closed its stream, the same id is still 'already connected' (%d)",
+					again.StatusCode)
+			}
+			time.Sleep(100 * time.Millisecond)
 		}
-		again.Body.Close()
-		cancel2()
-		if time.Now().After(deadline) {
-			t.Fatalf("five seconds after the page closed its stream, the same id is still 'already connected' (%d)",
-				again.StatusCode)
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	})
 }
 
-// HEAD gives the page the headers to decide with, and no audio.
-func TestHeadOnTheStreamAnswersTheHeadersOnly(t *testing.T) {
-	s := newStack(t, stackOptions{}) // no ffmpeg needed: HEAD never opens the source
+// What the stream route answers without opening any audio: HEAD, refusals,
+// the preflight. No ffmpeg needed.
+func TestStreamHeadersAndRefusals(t *testing.T) {
+	s := newStack(t, stackOptions{})
 	s.signIn()
+
+	// HEAD gives the page the headers to decide with, and no audio.
 	rec := s.do("HEAD", "/api/v1/stream/mix", "", func(r *http.Request) { r.Header.Set("Origin", pageOrigin) })
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "audio/wav" || rec.Body.Len() != 0 {
 		t.Errorf("HEAD: %d %q with %d bytes, want 200 audio/wav and nothing", rec.Code, rec.Header().Get("Content-Type"), rec.Body.Len())
 	}
 	expectCORSForThePage(t, rec.Header(), "HEAD stream")
-}
 
-// A stream that does not exist, and a preflight.
-func TestStreamRefusalsAndPreflight(t *testing.T) {
-	s := newStack(t, stackOptions{})
-	s.signIn()
 	if rec := s.do("GET", "/api/v1/stream/nowhere?id=page-1", ""); rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("unknown frequency: %d, want 503", rec.Code)
 	}
 	// The browser's preflight carries no cookie; it is answered before the lock.
 	saved := s.cookie
 	s.cookie = nil
-	rec := s.do("OPTIONS", "/api/v1/stream/mix", "", func(r *http.Request) {
+	rec = s.do("OPTIONS", "/api/v1/stream/mix", "", func(r *http.Request) {
 		r.Header.Set("Origin", pageOrigin)
 		r.Header.Set("Access-Control-Request-Method", "GET")
 	})

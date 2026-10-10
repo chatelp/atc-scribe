@@ -95,17 +95,12 @@ func TestTheServerStateSaysWhatIsRunning(t *testing.T) {
 	}
 }
 
-func TestTheServerStateWithoutASidecarOrWithOneGone(t *testing.T) {
-	none := newStack(t, stackOptions{})
-	none.signIn()
-	var st ServerState
-	none.get("/api/v1/server", &st)
-	if st.Transcription != nil {
-		t.Errorf("no sidecar: transcription = %+v, want absent", st.Transcription)
-	}
-
+// A sidecar that does not answer: the last reading, marked stale, with the
+// reason. (The state without any sidecar is checked with the settings below.)
+func TestTheServerStateWithASidecarGone(t *testing.T) {
 	gone := newStack(t, stackOptions{sidecar: "http://127.0.0.1:1"})
 	gone.signIn()
+	var st ServerState
 	gone.get("/api/v1/server", &st)
 	tr := st.Transcription
 	if tr == nil || tr.Reachable || !tr.Stale || tr.Status != "unknown" || !strings.Contains(tr.Detail, "not reached just now") {
@@ -135,6 +130,9 @@ func TestServerSettingsAreAppliedPersistedAndRefused(t *testing.T) {
 	s.get("/api/v1/server", &st)
 	if st.Logging.Level != "debug" || st.Settings.LogLevel != "debug" {
 		t.Errorf("the server state after the change: logging %+v settings %+v", st.Logging, st.Settings)
+	}
+	if st.Transcription != nil {
+		t.Errorf("no sidecar: transcription = %+v, want absent", st.Transcription)
 	}
 	saved, err := os.ReadFile(filepath.Join(s.dir, config.RuntimeSettingsFile))
 	if err != nil {

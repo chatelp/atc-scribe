@@ -286,6 +286,14 @@ func newStack(t *testing.T, o stackOptions) *stack {
 		values: sqlite.NewPhraseologyStorage(db), tar1090: tar, gone: gone.URL}
 }
 
+// with is the same stack seen from a subtest: Fatal has to be called from
+// the goroutine of the test that is running, and that is the subtest's.
+func (s *stack) with(t *testing.T) *stack {
+	c := *s
+	c.t = t
+	return &c
+}
+
 // do sends one request through the routes, with the session cookie if one is
 // held, and with whatever else the caller sets on it.
 func (s *stack) do(method, path, body string, set ...func(*http.Request)) *httptest.ResponseRecorder {
