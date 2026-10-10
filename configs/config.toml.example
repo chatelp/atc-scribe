@@ -1,237 +1,72 @@
-#######################################################
-# ATC Monitoring System Configuration
-#######################################################
+# atc-scribe configuration. Every key below does something. A key left out takes
+# the default written in internal/config/defaults.go; a key this version no longer
+# reads is named at startup and ignored, never refused. Values that were measured
+# keep their reason in one line; the measurements themselves are in docs-fr/.
 
-#######################################################
-# HTTP Server Configuration
-#######################################################
 [server]
-# Primary HTTP port for the web interface and API
-port = 8000
-
-# Host address to bind to (127.0.0.1 = localhost only, 0.0.0.0 = all interfaces)
-host = "127.0.0.1"
-
-# HTTP request timeouts in seconds
-read_timeout_seconds = 0        # Maximum time to read client request
-write_timeout_seconds = 0        # Maximum time to write response (0 = no timeout, recommended for streaming)
-idle_timeout_seconds = 3600      # Maximum time to wait for the next request when keep-alives are enabled
-
-# Additional ports to listen on (useful for multiple interfaces or port forwarding scenarios)
-additional_ports = [8001, 8002, 8003, 8004]
-
-#######################################################
-# Aircraft Tracking (ADS-B) Configuration
-#######################################################
-
-# TLS served by co-atc itself. Leave both empty behind a reverse proxy that
-# terminates TLS, or fill them to serve HTTPS with no proxy at all -- neither shape
-# is the privileged one, and a standalone install must be as usable as a proxied
-# one. Passkeys, when they arrive, need one of the two: WebAuthn refuses to run on
-# plain HTTP to a LAN address.
-tls_cert = ""
-tls_key = ""
-
-# Reverse proxies whose X-Forwarded-Proto and X-Forwarded-For may be believed, as
-# CIDRs. EMPTY BY DEFAULT, and that matters: a forwarded header trusted from anyone
-# lets any client on the network declare itself already on HTTPS -- so the session
-# cookie loses its Secure flag -- or wear another address to escape the login rate
-# limit. Behind Traefik or Caddy, list the proxy's network and nothing else.
+port = 8000                                 # web interface and API
+host = "127.0.0.1"                          # 0.0.0.0 to reach it from the network; sign-in is then required
+additional_ports = [8001, 8002, 8003, 8004] # the audio streams are spread over these, one per listener
+# Reverse proxies whose X-Forwarded-* headers may be believed, as CIDRs: none by default, on purpose.
 trusted_proxies = []
+# tls_cert and tls_key serve HTTPS with no proxy at all; leave them out behind one.
+
+[auth]
+enabled = false                             # off on purpose: nobody cloning this may be locked out of their own receiver
+# When host is not 127.0.0.1 the first visit asks for an account; or co-atc -add-user <name>
+# prints a [[auth.users]] block (name, Argon2id password_hash) to paste here. A session lives
+# 720 h unused; 8 wrong passwords per address per 15 min. Restarting ends every session.
+
+[station]
+latitude = 43.6777                          # the receiver, decimal degrees (example: Toronto Pearson)
+longitude = -79.6248
+elevation_feet = 569
+airport_code = "CYYZ"                       # ICAO; the reference airport, changeable from the settings panel
+# airport_range_nm = 5 ("at this airport", also for the flight phases), display_range_nm = 100
+# (airports, runways and navaids drawn), runway_extension_length_nm = 10.
 
 [adsb]
-# Data source type:
-# - "external-rapidapi": external ADS-B API (aircraft only)
-# - "external-opensky": OpenSky /states/all API (public network data)
-# - "tar1090": tar1090 base URL exposing aircraft.json, receiver.json, stats.json
-# - "readsb-api": readsb net API endpoint (aircraft only, e.g. ?all)
-# - "readsb-file": local readsb files auto-detected from standard runtime dirs
+# "tar1090" (a local receiver), "readsb-api", "readsb-file", "external-opensky" or "external-rapidapi".
 source_type = "external-opensky"
+tar1090_base_url = "http://192.168.1.166/tar1090/data/"   # where tar1090 serves aircraft.json, receiver.json, stats.json
+# readsb-api needs readsb_api_url; external-rapidapi needs api_key. Fetched every second; an
+# aircraft is signal_lost after 60 s. The source is probed at startup.
 
-# External API configuration (required when source_type = "external-rapidapi")
-# URL template with format placeholders for latitude, longitude, and distance (NM)
-external_source_url = "https://adsbexchange-com1.p.rapidapi.com/v2/lat/%f/lon/%f/dist/%.0f/"
-api_host = "adsbexchange-com1.p.rapidapi.com"
-api_key = ""  # Replace with your actual API key
-# Search radius in nautical miles around the station coordinates
-search_radius_nm = 50
-
-# OpenSky configuration (required when source_type = "external-opensky")
-opensky_base_url = "https://opensky-network.org/api"
-opensky_token_url = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
-# Auth mode: "anonymous" or "oauth2"
-opensky_auth_mode = "anonymous"
-# Required when opensky_auth_mode = "oauth2"
-opensky_oauth2_credentials_path = "configs/opensky_credentials.json"
-
-# Tar1090 configuration (required when source_type = "tar1090")
-# Base URL where aircraft.json, receiver.json, and stats.json are served
-tar1090_base_url = "http://192.168.1.166/tar1090/data/"
-
-# readsb API configuration (required when source_type = "readsb-api")
-# Example: http://192.168.1.60:30152/?all
-readsb_api_url = ""
-
-# readsb file configuration (optional when source_type = "readsb-file")
-# Leave empty to auto-detect from /run/readsb, /var/run/readsb, /run/dump1090-fa, /run/dump1090-mutability
-readsb_data_dir = ""
-
-# Common ADS-B polling configuration
-fetch_interval_seconds = 1      # How often to fetch new aircraft data
-signal_lost_timeout_seconds = 60 # How long to wait before considering a signal lost
-
-#######################################################
-# Logging Configuration
-#######################################################
-[logging]
-# Log level determines the verbosity of application logs
-# Options: "debug", "info", "warn", "error"
-level = "info"
-
-# Log format determines how logs are structured
-# Options: "json" (machine-readable), "console" (human-readable)
-format = "console"
-
-# Where to keep the log, and what bounds it.
-#
-# Empty file = stdout only, which is upstream's behaviour: whatever you redirect
-# it into grows without limit. Measured on this station, one server writes
-# 0.7 MB an hour -- 17 MB a day, nothing next to the database. The bound is not
-# for that case. It is for the one that happened here: a supervision bug started
-# seventeen servers and they put 103 MB into one file in a night.
-#
-# Three bounds, because they catch different things. One file per day keeps the
-# log readable -- "what happened on the night of the 20th" is a question you ask
-# of a file. max_size_mb catches the day that goes wrong. max_files stops the
-# directory growing for ever. Normal use: 17 MB a day, 7 files, ~120 MB.
-file = "runs/co-atc.log"
-max_size_mb = 100
-max_files = 7
-
-#######################################################
-# Storage Configuration
-#######################################################
-[storage]
-# Storage backend type (currently only SQLite is supported)
-type = "sqlite"
-
-# Base path for the SQLite database file
-# The actual filename will be generated as co-atc-YYYY-MM-DD.db
-sqlite_base_path = "data"
-
-# Size kept for the daily databases together, in GB (1 GB = 2^30 bytes). Past it
-# the oldest co-atc-YYYY-MM-DD.db files are deleted, today's never. A size rather
-# than a number of days: a server run on demand made "7 days" delete everything
-# after a week's pause. A full day of continuous running measured 1.8 GB (24/09),
-# 2.6 GB at the busiest rate (D32), so 20 GB is 8 to 11 such days, and months of a
-# server run on demand. Changeable from the settings panel.
-db_retention_gb = 20
-
-#######################################################
-# Station Location Configuration
-#######################################################
-[station]
-# Geographic coordinates of your monitoring station (decimal degrees)
-# Example: Toronto Pearson International Airport (CYYZ)
-latitude = 43.6777
-longitude = -79.6248
-
-# Elevation of your station above sea level (in feet)
-elevation_feet = 569
-
-# ICAO code of the airport (e.g., "CYYZ" for Toronto Pearson)
-airport_code = "CYYZ"
-
-# Length of runway extensions in nautical miles (default: 10.0)
-runway_extension_length_nm = 10.0
-
-# Range in nautical miles to consider aircraft as being at this airport (default: 5.0)
-airport_range_nm = 5.0
-
-# Range in nautical miles for displaying airports, runways, and navaids on the map (default: 100.0)
-display_range_nm = 100.0
-
-#######################################################
-# Reference Data Configuration
-# CSV files used for aircraft enrichment, airport/runway/navaid display.
-# Download with: .\scripts\download_assets.ps1
-#######################################################
-[reference]
-aircraft_csv_path = "assets/aircraft.csv"
-airlines_dat_path = "assets/airlines.dat"
-airports_csv_path = "assets/airports.csv"
-airport_frequencies_csv_path = "assets/airport-frequencies.csv"
-runways_csv_path = "assets/runways.csv"
-navaids_csv_path = "assets/navaids.csv"
-
-#######################################################
-# Radio Frequencies Configuration
-# - A source is anything FFmpeg can read: an HTTP stream (Icecast, LiveATC...), SRT (FFmpeg built
-#   with libsrt), raw PCM over UDP from an SDR program, a receiver on the sound card. See the last examples.
-# - LiveATC says not to steal these streams, so keep that in mind.
-#######################################################
 [frequencies]
-# Audio buffer size in kilobytes for frequency monitoring
-buffer_size_kb = 8
+# A source is anything ffmpeg reads: Icecast or LiveATC over HTTP, SRT (ffmpeg built with
+# libsrt), raw PCM over UDP from an SDR program, a receiver on the sound card. An 8 KB buffer,
+# a reconnect after 5 s. LiveATC asks not to redistribute its streams.
 
-# How long to wait before reconnecting after a stream failure (in seconds)
-reconnect_interval_secs = 5
-
-# FFmpeg timeout configuration for audio stream connections
-# Set to 0 to disable timeout (not recommended for unreliable streams)
-ffmpeg_timeout_secs = 0                 # Connection timeout in seconds (0 = no timeout, default)
-ffmpeg_reconnect_delay_secs = 2         # Reconnection delay in seconds (default: 2)
-
-# Monitored frequencies configuration
-# Each [[frequencies.sources]] block defines one monitored frequency
-
-
-# Toronto Pearson Ground Control
-#[[frequencies.sources]]
-#id = "cyyz_grd"                  # Unique identifier
-#airport = "CYYZ"                 # Toronto Pearson
-#name = "CYYZ Ground"             # Ground Control
-#frequency_mhz = 119.100          # 119.1 MHz
-#url = "https://s1-bos.liveatc.net/cyyz5"
-#order = 2                        # Second in display order
-#transcribe_audio = false         # Not transcribing this frequency
-
-# Toronto Pearson Tower
 [[frequencies.sources]]
-id = "cyyz_twr"                  # Unique identifier
-airport = "CYYZ"                 # Toronto Pearson
-name = "CYYZ Tower"              # Tower Control
-frequency_mhz = 118.700          # 118.7 MHz
+id = "cyyz_twr"                             # unique; names the stream in the database and the API
+airport = "CYYZ"
+name = "CYYZ Tower"
+frequency_mhz = 118.700                     # 0 for a mixed stream that has no single frequency
 url = "https://s1-bos.liveatc.net/cyyz7"
-order = 3                        # Third in display order
-transcribe_audio = true          # Transcribe this frequency
-language = "en"                  # Expected language, from the catalogue rather
-                                 # than from the model: measured on a bilingual
-                                 # band, automatic detection is wrong on 16% of
-                                 # French and 28% of English transmissions.
+order = 3                                   # display order
+transcribe_audio = true
+# From the catalogue, not the model: detection measured wrong on 16% of French, 28% of English.
+language = "en"
 
-# Toronto Pearson Arrivals
 [[frequencies.sources]]
-id = "cyyz_arr"                  # Unique identifier
-airport = "CYYZ"                 # Toronto Pearson
-name = "CYYZ Arrivals"           # Arrivals Control
-frequency_mhz = 124.475          # 124.475 MHz
+id = "cyyz_arr"
+airport = "CYYZ"
+name = "CYYZ Arrivals"
+frequency_mhz = 124.475
 url = "https://s1-fmt2.liveatc.net/cyyz6"
-order = 4                        # Fourth in display order
-transcribe_audio = false          # Transcribe this frequency
+order = 4
+transcribe_audio = false
 
-# Toronto Pearson Departures
 [[frequencies.sources]]
-id = "cyyz_dep"                  # Unique identifier
-airport = "CYYZ"                 # Toronto Pearson
-name = "CYYZ Departures"         # Departures Control
-frequency_mhz = 127.575          # 127.575 MHz
+id = "cyyz_dep"
+airport = "CYYZ"
+name = "CYYZ Departures"
+frequency_mhz = 127.575
 url = "https://s1-bos.liveatc.net/cyyz8"
-order = 5                        # Fifth in display order
-transcribe_audio = false         # Not transcribing this frequency
+order = 5
+transcribe_audio = false
 
-# Local VHF stream over SRT (RTLSDR-Airband + SRT server), read by FFmpeg itself:
-# needs an FFmpeg built with libsrt (Homebrew's is).
+# SRT from RTLSDR-Airband, read by ffmpeg itself (built with libsrt; Homebrew's is).
 [[frequencies.sources]]
 id = "cyyz_lcl"
 airport = "CYYZ"
@@ -241,8 +76,7 @@ url = "srt://192.168.1.166:42069"
 order = 6
 transcribe_audio = true
 
-# Raw PCM over UDP, as GQRX, SDR++ or rtl_fm send it: FFmpeg has to be told
-# the format, rate and channels before it reads the input.
+# Raw PCM over UDP, as GQRX, SDR++ or rtl_fm send it: ffmpeg must be told the format first.
 #[[frequencies.sources]]
 #id = "sdr_udp"
 #name = "SDR++ network sink"
@@ -252,11 +86,9 @@ transcribe_audio = true
 #order = 7
 #transcribe_audio = true
 
-# A receiver plugged into the sound card: the capture device is the input.
-# macOS: "-f", "avfoundation" and url = ":0" (list devices with
-#   ffmpeg -f avfoundation -list_devices true -i "").
-# Linux: "-f", "alsa" and url = "hw:1", or "-f", "pulse" and url = "default".
-# Windows: "-f", "dshow" and url = "audio=Line In".
+# A receiver on the sound card: the capture device is the input. macOS "-f", "avfoundation"
+# with url ":0" (ffmpeg -f avfoundation -list_devices true -i ""); Linux "-f", "alsa" with
+# url "hw:1" or "-f", "pulse" with "default"; Windows "-f", "dshow" with "audio=Line In".
 #[[frequencies.sources]]
 #id = "scanner"
 #name = "Scanner line-in"
@@ -266,273 +98,59 @@ transcribe_audio = true
 #order = 8
 #transcribe_audio = true
 
-#######################################################
-# Audio Transcription Configuration
-#######################################################
 [transcription]
-# Transcription is local: whole transmissions are posted to the sidecar in
-# sidecar/, which runs a Whisper model on this machine -- no API key, and no
-# audio leaving the host. It implements the contract upstream documented in
-# docs/LOCAL-STT.md. Settings for it are in [transcription.local], at the end
-# of this section. ("openai", upstream's realtime backend, was removed.)
-backend = "local"
+# Local, on this machine: whole transmissions are posted to the sidecar in sidecar/, which
+# honours upstream's docs/LOCAL-STT.md; no key, no audio leaves the host. ffmpeg decodes
+# each stream to 24 kHz mono s16le. language = "en" serves a source that names none.
+log_dir = "data/transcriptions"             # raw/{date}_{frequency}.log, append-only; empty to disable
 
-# Expected language when a frequency does not give its own (see
-# [[frequencies.sources]] language).
-language = "en"
-
-# How each stream is decoded into the PCM that is played and transcribed.
-ffmpeg_path = "ffmpeg"           # Path to FFmpeg executable
-ffmpeg_sample_rate = 24000       # Audio sample rate in Hz
-ffmpeg_channels = 1              # Number of audio channels (1 = mono)
-ffmpeg_format = "s16le"          # Audio format (signed 16-bit little-endian PCM, raw format)
-
-# Optional directory for transcription log files (append-only logs)
-# If set, transcriptions will be written to log files organized by date and frequency:
-#   raw/{date}_{frequency_id}.log - transcriptions as the sidecar returned them
-# Leave empty to disable file logging
-log_dir = "data/transcriptions"
-
-# Local speech-to-text.
-#
-# This sub-table MUST stay at the end of [transcription]: everything written
-# after a sub-table header belongs to the sub-table, so a key placed below it
-# silently lands in the wrong place.
-#
-# The realtime API told us where speech began and ended; a local model does not,
-# so this side cuts the stream into transmissions itself. On an SDR feed that is
-# easy -- RTLSDR-Airband writes digital silence between transmissions, measured
-# at -90 dBFS and not a noise floor -- and the defaults below are tuned for that.
-# On a noisier source (LiveATC, for instance) raise silence_threshold.
+# Keep this sub-table last in [transcription]: a key written below it lands in it.
 [transcription.local]
-server_url = "http://127.0.0.1:8178"
-timeout_seconds = 60
-
-# Start the sidecar with the server and stop it on the way out.
-#
-# Leave `command` empty to run the sidecar yourself and just point server_url at
-# it -- upstream's docs/LOCAL-STT.md specifies a URL precisely so it can live in
-# another terminal, on another machine, or in a container.
-#
-# Either way the server probes /health before it starts serving, and refuses to
-# run if nothing answers. Without that probe it starts perfectly, draws the map,
-# streams the audio and transcribes nothing: one error line per transmission and
-# no transcript. That is a worse outcome than not starting.
-#
-# Measured on this station: a cold sidecar answers /health in 1.6 s, and its
-# first transcription costs 2.2 s more than the next one -- under four seconds
-# in total, which is why there is no reason to leave it running permanently.
-#
-# Add --second-opinion to have the sidecar read a transmission twice when the
-# first transcript carries French words, and return both. Measured on 1 378 real
-# transmissions (docs-fr/05-decisions.md, Q29): +8.5% true callsign matches,
-# precision unchanged at 72%, +15% compute -- the gate only opens on 12.5% of
-# transmissions. Asking both models every time was measured too, and is worse:
-# more matches but precision falls to 66%, which means words put in the mouth of
-# the wrong aircraft.
-#
-# Add --fr-detector <multilingual MLX Whisper> to open the second opinion also on
-# transmissions with no French word whose probability of being French, as that
-# model's language detection sees it, reaches --fr-threshold (0.1). The English
-# model often turns French into English and leaves no French word to find.
-# Measured on 665 transmissions (Q50): with whisper-large-v3-turbo, +8% true
-# matches at equal precision, for about 0.6 s more per transmission; whisper-base
-# is nearly free and gains 3%. Give a local path: a hub id is fetched into the
-# Hugging Face cache, wherever that is.
-#
-# Add --fr-no-fallback to read French once at temperature 0: the temperature
-# fallback fires on the French model's loops, and removing it halves the mean
-# French read for the same matches (Q50). The fallback also broke those loops:
-# add --fr-cut-loops with it, which cuts them after the model and leaves fewer
-# than the fallback did.
-#
-# Add --save-audio <dir> to keep every transmission's audio with a daily manifest
-# (sidecar/README.md), on a disk with room: about 1-2 GB a day on two frequencies.
-#
+command = []                                # empty: a sidecar you run yourself at server_url (default http://127.0.0.1:8178)
+# Else the server starts it and stops it on exit; either way it probes /health first (a cold
+# sidecar answers in 1.6 s, measured) and refuses to run half deaf. Options worth their cost:
+# --second-opinion reads a transmission twice when French words appear (+8.5% true callsigns
+# at equal precision, Q29); --fr-detector <multilingual MLX Whisper> opens it on French the
+# English model turned into English (+8%, Q50); --save-audio <dir> keeps every transmission
+# (1-2 GB a day on two frequencies). Details in sidecar/README.md and docs-fr/05-decisions.md.
 # command = ["python3", "sidecar/whisper_server.py", "--preload", "--second-opinion"]
-# command = ["python3", "sidecar/whisper_server.py", "--preload", "--second-opinion",
-#            "--fr-detector", "/path/to/whisper-large-v3-turbo-mlx"]
-command = []
-startup_timeout_seconds = 60
-segment_silence_ms = 600      # silence that ends a transmission
-segment_min_ms = 400          # shorter than this is discarded
-segment_max_seconds = 30
-segment_preroll_ms = 200      # keep audio from before speech starts
-silence_threshold = 0.005     # an SDR stream sits at -90 dBFS when squelch is closed
-
-#######################################################
-# Who may use this server
-#######################################################
-[auth]
-# DISABLED BY DEFAULT, and the default is deliberate: this file ships in a public
-# repository, and nobody cloning it should find themselves locked out of their own
-# receiver by a password they never set.
 #
-# Note what is unprotected while this is false: every route that writes. POST
-# /station moves the station's position, PUT /server/settings changes how long
-# data is kept, PUT /sources adds a stream. On a network you do not control,
-# turn this on.
-enabled = false
+# Cutting the stream into transmissions: 600 ms of silence ends one, under 400 ms is dropped,
+# 30 s at most, 200 ms kept before speech, silence_threshold 0.005 -- an SDR feed sits at
+# -90 dBFS between transmissions; a noisier source such as LiveATC needs a higher threshold.
 
-# Create an account without ever writing the password down:
-#
-#   co-atc -add-user <name>
-#
-# It reads the password without echoing it and prints the block to paste below.
-# Only the Argon2id hash is stored -- there is no recovery, by design.
-#
-# [[auth.users]]
-# name = "someone"
-# password_hash = "$argon2id$v=19$m=65536,t=3,p=2$...$..."
-
-session_ttl_hours = 720        # a session unused for this long expires; use slides it forward
-max_attempts = 8               # wrong passwords allowed per client address...
-attempt_window_minutes = 15    # ...within this window
-
-# Sessions are held in memory, so restarting the server ends every one of them.
-# That is the point: it is the one move an operator can always make to lock
-# everyone out, and it costs one password entry afterwards.
-
-#######################################################
-# Post-Processing Configuration
-#######################################################
 [post_processing]
-# Enable or disable post-processing
-enabled = true
+enabled = true                              # the phraseology grammar against live ADS-B: speaker, callsign, clearance; no key
+# Measured on 1468 transmissions (docs-fr/19-appariement-en-ligne.md): 3 digits minimum, a
+# 60 s fleet window, no score floor -- 138 matches, 69% above chance. Runs every 10 s, 20 at a time.
 
-# Which implementation assigns a speaker, a callsign and any clearance to a
-# stored transcription: a closed-vocabulary grammar for ICAO phraseology,
-# matched against the aircraft the ADS-B receiver can currently see. No key.
-# ("openai", upstream's GPT-4o pass, was removed.)
-backend = "local"
+[storage]
+sqlite_base_path = "data"                   # one co-atc-YYYY-MM-DD.db a day
+db_retention_gb = 20                        # 8 to 11 full days (1.8 GB a day measured, 2.6 at the busiest); the panel can change it
 
-# The four settings below are measured rather than chosen. Against 1468
-# recorded transmissions and the receiver's own ADS-B history, with eight
-# shuffled control fleets, this is the best operating point of the sweep:
-#
-#   min_digits  fleet window  matches  above chance  true matches
-#          3          30s       131        70%           91.1
-#          3          60s       138        69%           94.7   <- these defaults
-#          3         120s       140        66%           91.9
-#          4          60s        58        71%           41.1
-#
-# Raising min_score to 1.0 demands corroboration -- an altitude or an operator
-# name on top of exact digits -- and reaches 88% above chance, but only 26
-# matches, and frequencies where altitude is rarely spoken fall silent.
-airlines_dat_path = "assets/airlines.dat"
-min_score = 0.0             # extra floor on top of the matcher's own 0.6; 0 = none
-min_digits = 3              # shortest spoken number that may be a flight number
-fleet_last_seen_minutes = 1 # how stale an ADS-B target may be and still be a candidate
+[logging]
+level = "info"                              # debug, info, warn, error; changeable from the settings panel
+file = "runs/co-atc.log"                    # empty: stdout. One file a day, 100 MB at most, 7 kept (17 MB a day measured)
 
-# How often to run the post-processing (in seconds)
-interval_seconds = 10
+[reference]
+# OurAirports and tar1090-db files under assets/ (scripts/download_assets.sh): aircraft.csv,
+# airlines.dat (also the grammar's airline telephony), airports.csv, airport-frequencies.csv,
+# runways.csv, navaids.csv. Name a key only to put a file elsewhere.
 
-# Maximum number of transcriptions to process in each batch
-batch_size = 20
-
-#######################################################
-# Flight Phase Detection Configuration
-#######################################################
-[flight_phases]
-# Enable enhanced flight phase detection
-enabled = true
-
-# Altitude thresholds (in feet)
-cruise_altitude_ft = 18000       # Minimum altitude for cruise phase
-departure_altitude_ft = 1000     # Minimum altitude for departure phase
-
-# Speed thresholds (in knots)
-taxiing_min_speed_kts = 1        # Minimum ground speed for taxiing
-taxiing_max_speed_kts = 50       # Maximum ground speed for taxiing
-
-# Approach detection parameters
-approach_centerline_tolerance_nm = 0.5        # Distance from runway centerline
-approach_max_distance_nm = 10                 # Maximum distance from runway threshold
-approach_max_altitude_ft = 5000               # Maximum altitude for approach phase detection
-approach_heading_tolerance_deg = 30           # Heading alignment tolerance
-
-# Timeout configurations - grouped together for clarity
-# These control different aspects of phase transition timing:
-
-# 1. Long-term inactive aircraft cleanup (default: 3600 seconds = 1 hour)
-# Aircraft that haven't had ANY phase change for this duration revert to NEW
-# This is the ultimate cleanup for parked/inactive aircraft
-phase_change_timeout_seconds = 3600
-
-# 2. Ground phase transition prevention (default: 60 seconds, but 1800 = 30 min recommended)
-# Prevents TAX→NEW and T/D→NEW transitions when aircraft briefly stops
-# Helps maintain phase stability during normal ground operations
-phase_transition_timeout_seconds = 1800
-
-# 3. Critical phase preservation (default: 60 seconds)
-# Keeps T/O and T/D phases visible for at least this duration
-# Ensures pilots/controllers can see these important events
-phase_preservation_seconds = 30
-
-# 4. Recent takeoff detection window (default: 30 minutes)
-# How long after takeoff an aircraft is considered "recently departed"
-# Used for DEP phase eligibility
-recent_takeoff_timeout_minutes = 30
-
-# Other phase detection parameters
-airport_range_nm = 5                          # Distance considered "close to airport"
-
-# Ground detection thresholds
-flying_min_tas_kts = 50                       # Minimum true airspeed to be considered flying
-flying_min_alt_ft = 300                       # Minimum altitude to be considered flying
-helicopter_alt_multiplier = 2.0               # Multiplier for helicopter detection
-high_speed_threshold_kts = 200                # Speed above which aircraft is always considered flying
-high_altitude_override_ft = 5000              # Altitude above which aircraft is always considered flying (handles bad speed data)
-
-# Enhanced sensor validation thresholds
-impossible_alt_drop_threshold_ft = 10000      # Altitude above which drops to zero are always considered sensor errors (cruise altitude)
-impossible_speed_drop_threshold_kts = 100     # Speed above which drops to zero at altitude are considered sensor errors
-impossible_speed_drop_min_alt_ft = 5000       # Minimum altitude for impossible speed drop detection
-
-# Signal lost landing detection
-signal_lost_landing_enabled = true            # Enable automatic landing detection for signal lost aircraft
-signal_lost_landing_max_alt_ft = 1000         # Max altitude for signal lost landing detection
-
-# Trajectory-based phase detection
-# The trajectory system maintains a rolling window of recent ADS-B observations per
-# aircraft and uses statistical analysis (OLS regression, median filtering) to make
-# noise-resistant phase decisions instead of relying on single data points.
-trajectory_buffer_duration_sec = 90           # Seconds of ADS-B history per aircraft
-trajectory_min_points = 5                     # Min valid data points before full trajectory analysis
-trajectory_stale_timeout_sec = 300            # Remove aircraft not seen for this long (seconds)
-trajectory_cleanup_interval_sec = 30          # How often to check for stale aircraft (seconds)
-trajectory_descent_threshold_fpm = -200       # Altitude trend below this = descending (feet/min)
-trajectory_climb_threshold_fpm = 200          # Altitude trend above this = climbing (feet/min)
-trajectory_level_band_ft = 200               # Altitude variation within this = level flight (feet)
-trajectory_turning_rate_deg = 1.5            # Track rate above this = turning (degrees/sec)
-
-# Runway-in-use detection
-# Observes aircraft approach/landing/departure patterns to determine which runway
-# ends are currently active. Suppresses false APP on perpendicular/cross runways.
-runway_in_use_window_minutes = 60            # Rolling evidence window (minutes)
-runway_in_use_approach_weight = 2.0          # Weight for APP phase events
-runway_in_use_landing_weight = 3.0           # Weight for T/D events (strongest evidence)
-runway_in_use_climb_weight = 2.0             # Weight for CLB phase events
-runway_in_use_decay_rate = 0.98              # Per-minute exponential time decay (0-1)
-
-#######################################################
-# Weather Data Configuration
-#  - Windy asks: "Do not steal this API. Download your own METARs for free from https://www.aviationweather.gov/dataserver"
-#  - So, please don't use this.
-#######################################################
 [wx]
-# Weather data refresh interval in minutes
-refresh_interval_minutes = 10
-
-# API endpoints and settings
-api_base_url = "https://node.windy.com/airports"
-request_timeout_seconds = 10
-max_retries = 2
-
-# Enable/disable specific weather data types
+# Windy's airport API, every 10 min, cached 60 min. Windy asks not to steal it: METARs are free
+# at https://www.aviationweather.gov/dataserver.
 fetch_metar = true
 fetch_taf = true
 fetch_notams = true
 
-# Cache settings
-cache_expiry_minutes = 60  # How long to keep cached data if refresh fails
+[flight_phases]
+enabled = true                              # taxi, takeoff, departure, cruise, approach, landing, judged from trajectories
+signal_lost_landing_enabled = true          # an aircraft lost below 1000 ft near a runway has landed
+# Five values differ from the code's defaults and stay written: the runway judge was validated
+# 368/368 against FlightAware with them (docs-fr/32-audit-produit.md).
+flying_min_alt_ft = 300                     # flying above this altitude (default 700)
+phase_preservation_seconds = 30             # takeoff and landing stay visible this long (default 60)
+phase_transition_timeout_seconds = 1800     # a stop on the ground this long before taxi goes back to new (default 60)
+runway_in_use_approach_weight = 2.0         # evidence weight of an approach for the runway in use (default 5)
+runway_in_use_climb_weight = 2.0            # same for a climb-out (default 1.5)

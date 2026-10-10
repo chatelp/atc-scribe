@@ -239,6 +239,11 @@ func TestTheReducedExampleLoadsTheSameConfiguration(t *testing.T) {
 			strings.Join(full.Warnings, "\n  "), strings.Join(want, "\n  "))
 	}
 
+	// The reduced one has nothing to be told.
+	if len(reduced.Warnings) != 0 {
+		t.Errorf("the shipped example says at startup:\n  %s", strings.Join(reduced.Warnings, "\n  "))
+	}
+
 	// Where each was read from, and what each had to say, is not configuration.
 	full.ConfigPath, reduced.ConfigPath = "", ""
 	full.Warnings, reduced.Warnings = nil, nil
