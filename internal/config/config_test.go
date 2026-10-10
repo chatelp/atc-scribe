@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -71,6 +73,85 @@ func TestAConfigurationWrittenForTheRemovedPathsStillStarts(t *testing.T) {
 	if len(cfg.Frequencies.Sources) == 0 || cfg.ADSB.SourceType == "" {
 		t.Error("frequencies or adsb were not read")
 	}
+
+	// Its live keys are those of the example of the same day, so the defaults
+	// the code grew since must leave it loading as that example does.
+	full := loadAndValidate(t, frozenExample)
+	cfg.ConfigPath, full.ConfigPath = "", ""
+	cfg.Warnings, full.Warnings = nil, nil
+	if diffs := diffValues("", reflect.ValueOf(*full), reflect.ValueOf(*cfg)); len(diffs) > 0 {
+		t.Errorf("the legacy configuration loads differently from the full example:\n  %s",
+			strings.Join(diffs, "\n  "))
+	}
+}
+
+// legacyWarnings loads the frozen legacy configuration and returns what it
+// says at startup.
+func legacyWarnings(t *testing.T) []string {
+	t.Helper()
+	atRepoRoot(t)
+	return loadAndValidate(t, filepath.Join("internal", "config", "testdata", "legacy-full.toml")).Warnings
+}
+
+// unread says what Load says about a key nothing reads.
+func unread(key string) string {
+	return key + " is not a configuration key of this version and is ignored: remove it, or check its spelling"
+}
+
+// The legacy file writes both duplicates in both homes, like the example of
+// its day, and 37 keys of the removed paths: the 17 of [atc_chat], 16 of
+// [transcription] and 4 of [post_processing] (docs-fr/fiches-cloud/A-rapport.md).
+// It is told each key by name, the section gone in one line, and nothing else.
+func TestTheLegacyConfigurationIsToldItsDuplicatesAndItsDeadKeysByName(t *testing.T) {
+	got := legacyWarnings(t)
+	var want []string
+	want = append(want,
+		"flight_phases.airport_range_nm repeats station.airport_range_nm (5): one key is enough, in [station]",
+		"post_processing.airlines_dat_path repeats reference.airlines_dat_path (assets/airlines.dat): one key is enough, in [reference]",
+	)
+	for _, key := range []string{
+		"transcription.openai_api_key", "transcription.model", "transcription.noise_reduction",
+		"transcription.chunk_ms", "transcription.buffer_size_kb", "transcription.reconnect_interval_sec",
+		"transcription.max_retries", "transcription.turn_detection_type", "transcription.prefix_padding_ms",
+		"transcription.silence_duration_ms", "transcription.vad_threshold", "transcription.retry_max_attempts",
+		"transcription.retry_initial_backoff_ms", "transcription.retry_max_backoff_ms",
+		"transcription.timeout_seconds", "transcription.prompt_path",
+		"post_processing.model", "post_processing.context_transcriptions",
+		"post_processing.timeout_seconds", "post_processing.system_prompt_path",
+	} {
+		want = append(want, unread(key))
+	}
+	want = append(want, "[atc_chat] is not a section of this version and is ignored with its 17 keys: remove it")
+	if len(got) != len(want) {
+		t.Errorf("%d warnings, want %d:\n  %s", len(got), len(want), strings.Join(got, "\n  "))
+	}
+	for _, w := range want {
+		found := false
+		for _, g := range got {
+			found = found || g == w
+		}
+		if !found {
+			t.Errorf("missing %q", w)
+		}
+	}
+}
+
+// Unknown keys are said and ignored in every section, [adsb] included, which
+// upstream alone refused. Starting on a line that does nothing beats not
+// starting over it.
+func TestAnUnknownKeyIsSaidByNameAndNeverRefused(t *testing.T) {
+	atRepoRoot(t)
+	text := withLines(withLines(minimalConfig, "adsb", "fetch_interval_secs = 2"), "server", "prot = 8000")
+	text += "\n[voice_chat]\nenabled = true\n"
+	cfg := loadAndValidate(t, writeConfig(t, text))
+	want := []string{unread("adsb.fetch_interval_secs"), unread("server.prot"),
+		"[voice_chat] is not a section of this version and is ignored with its 1 key: remove it"}
+	if !reflect.DeepEqual(cfg.Warnings, want) {
+		t.Errorf("warnings:\n  %s\nwant:\n  %s", strings.Join(cfg.Warnings, "\n  "), strings.Join(want, "\n  "))
+	}
+	if cfg.ADSB.FetchIntervalSecs != 1 {
+		t.Errorf("the misspelled key must not have changed fetch_interval_seconds: %d", cfg.ADSB.FetchIntervalSecs)
+	}
 }
 
 // The example shipped with the repository must start as it is.
@@ -131,5 +212,235 @@ func TestAnEmptyBackendMeansLocal(t *testing.T) {
 			t.Errorf("[%s] without backend: got %q and %q, want %q", section,
 				cfg.Transcription.Backend, cfg.PostProcessing.Backend, BackendLocal)
 		}
+	}
+}
+
+// frozenExample is configs/config.toml.example as it stood before its
+// reduction (docs-fr/fiches-cloud/D-config-reduite.md), every key written out.
+const frozenExample = "internal/config/testdata/example-2026-10-10.toml"
+
+// The reduction removes from the example every key whose value is the code's
+// default. Absent, such a key must give exactly the value it gave present: the
+// frozen full example and the shipped one must load, validate and come out as
+// the same Config, field by field.
+func TestTheReducedExampleLoadsTheSameConfiguration(t *testing.T) {
+	atRepoRoot(t)
+	full := loadAndValidate(t, frozenExample)
+	reduced := loadAndValidate(t, filepath.Join("configs", "config.toml.example"))
+
+	// The full example writes airport_range_nm and airlines_dat_path in their
+	// two homes, which is exactly what it says at startup, and nothing else.
+	want := []string{
+		"flight_phases.airport_range_nm repeats station.airport_range_nm (5): one key is enough, in [station]",
+		"post_processing.airlines_dat_path repeats reference.airlines_dat_path (assets/airlines.dat): one key is enough, in [reference]",
+	}
+	if !reflect.DeepEqual(full.Warnings, want) {
+		t.Errorf("full example warnings:\n  %s\nwant:\n  %s",
+			strings.Join(full.Warnings, "\n  "), strings.Join(want, "\n  "))
+	}
+
+	// The reduced one has nothing to be told.
+	if len(reduced.Warnings) != 0 {
+		t.Errorf("the shipped example says at startup:\n  %s", strings.Join(reduced.Warnings, "\n  "))
+	}
+
+	// Where each was read from, and what each had to say, is not configuration.
+	full.ConfigPath, reduced.ConfigPath = "", ""
+	full.Warnings, reduced.Warnings = nil, nil
+
+	if diffs := diffValues("", reflect.ValueOf(*full), reflect.ValueOf(*reduced)); len(diffs) > 0 {
+		t.Errorf("the reduced example loads differently from the full one:\n  %s",
+			strings.Join(diffs, "\n  "))
+	}
+	if !reflect.DeepEqual(full, reduced) {
+		t.Error("reflect.DeepEqual disagrees with the field walk; the walk misses something")
+	}
+}
+
+// diffValues walks two values of the same type and names every leaf that
+// differs, as section.field = full | reduced, so a failure says which key.
+func diffValues(path string, a, b reflect.Value) []string {
+	switch a.Kind() {
+	case reflect.Struct:
+		var out []string
+		for i := 0; i < a.NumField(); i++ {
+			name := a.Type().Field(i).Tag.Get("toml")
+			if name == "" || name == "-" {
+				name = a.Type().Field(i).Name
+			}
+			out = append(out, diffValues(path+"."+name, a.Field(i), b.Field(i))...)
+		}
+		return out
+	case reflect.Slice:
+		if a.Len() != b.Len() {
+			return []string{fmt.Sprintf("%s: %d elements | %d", path, a.Len(), b.Len())}
+		}
+		var out []string
+		for i := 0; i < a.Len(); i++ {
+			out = append(out, diffValues(fmt.Sprintf("%s[%d]", path, i), a.Index(i), b.Index(i))...)
+		}
+		return out
+	case reflect.Ptr:
+		if a.IsNil() != b.IsNil() {
+			return []string{fmt.Sprintf("%s: %v | %v", path, a, b)}
+		}
+		if a.IsNil() {
+			return nil
+		}
+		return diffValues(path, a.Elem(), b.Elem())
+	default:
+		if !reflect.DeepEqual(a.Interface(), b.Interface()) {
+			return []string{fmt.Sprintf("%s: %v | %v", path, a.Interface(), b.Interface())}
+		}
+		return nil
+	}
+}
+
+// writeConfig puts text in a temporary config.toml and returns its path.
+func writeConfig(t *testing.T, text string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// minimalConfig says only what no default can guess: where the aircraft come
+// from, where the station is, and which weather to fetch.
+const minimalConfig = `
+[adsb]
+source_type = "tar1090"
+tar1090_base_url = "http://receiver.local/tar1090/data/"
+
+[station]
+latitude = 48.8
+longitude = 2.1
+airport_code = "LFPO"
+
+[wx]
+fetch_metar = true
+`
+
+// A key left out holds the code's default, for every section: the almost
+// empty configuration above validates and comes out as Defaults plus what it
+// said.
+func TestAnAlmostEmptyConfigurationStartsOnTheDefaults(t *testing.T) {
+	atRepoRoot(t)
+	cfg := loadAndValidate(t, writeConfig(t, minimalConfig))
+
+	want := Defaults()
+	want.ADSB.SourceType, want.ADSB.Tar1090BaseURL = "tar1090", "http://receiver.local/tar1090/data/"
+	want.Station.Latitude, want.Station.Longitude, want.Station.AirportCode = 48.8, 2.1, "LFPO"
+	want.Weather.FetchMETAR = true
+	want.PostProcessing.AirlinesDatPath = want.Reference.AirlinesDATPath // the older home, filled from the new one
+	cfg.ConfigPath = ""
+	if diffs := diffValues("", reflect.ValueOf(want), reflect.ValueOf(*cfg)); len(diffs) > 0 {
+		t.Errorf("not the defaults (want | got):\n  %s", strings.Join(diffs, "\n  "))
+	}
+	for _, check := range []struct {
+		name string
+		got  any
+		want any
+	}{
+		{"cruise_altitude_ft", cfg.FlightPhases.CruiseAltitudeFt, 18000},
+		{"flying_min_alt_ft", cfg.FlightPhases.FlyingMinAltFt, 700.0},
+		{"airlines_dat_path", cfg.Reference.AirlinesDATPath, "assets/airlines.dat"},
+		{"server_url", cfg.Transcription.Local.ServerURL, "http://127.0.0.1:8178"},
+		{"opensky_base_url", cfg.ADSB.OpenSkyBaseURL, "https://opensky-network.org/api"},
+		{"db_retention_gb", cfg.Storage.DBRetentionGB, DefaultDBRetentionGB},
+	} {
+		if !reflect.DeepEqual(check.got, check.want) {
+			t.Errorf("%s: got %v, want %v", check.name, check.got, check.want)
+		}
+	}
+}
+
+// A default fills what is absent, not what is wrong: a value written out of
+// bounds is still refused, with its name.
+func TestAValueOutOfBoundsIsStillRefused(t *testing.T) {
+	atRepoRoot(t)
+	for _, bad := range []struct{ section, line, want string }{
+		{"flight_phases", "enabled = true\ncruise_altitude_ft = 0", "cruise_altitude_ft must be positive"},
+		{"adsb", "fetch_interval_seconds = 0", "invalid fetch interval"},
+		{"wx", "refresh_interval_minutes = -1", "refresh_interval_minutes must be greater than 0"},
+		{"logging", `level = "loud"`, "invalid log level"},
+	} {
+		cfg, err := Load(writeConfig(t, withLines(minimalConfig, bad.section, bad.line)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cfg.Validate()
+		if err == nil || !strings.Contains(err.Error(), bad.want) {
+			t.Errorf("[%s] %s: got %v, want %q", bad.section, bad.line, err, bad.want)
+		}
+	}
+}
+
+// withLines adds lines to the section of a TOML text, after the header when
+// the section exists and as a new table otherwise (TOML refuses a table
+// written twice).
+func withLines(text, section, lines string) string {
+	header := "[" + section + "]\n"
+	if strings.Contains(text, header) {
+		return strings.Replace(text, header, header+lines+"\n", 1)
+	}
+	return text + "\n" + header + lines + "\n"
+}
+
+// airport_range_nm belongs to [station] and airlines_dat_path to [reference].
+// The older key of each is still read, and said; written nowhere, the new
+// home's value serves both readers.
+func TestADuplicateKeyHasOneHomeAndTheOldOneIsStillRead(t *testing.T) {
+	atRepoRoot(t)
+	cases := []struct {
+		name        string
+		text        string
+		rangeNM     float64
+		airlines    string
+		wantWarning string
+	}{
+		{"neither written: the default serves both",
+			minimalConfig, 5, "assets/airlines.dat", ""},
+		{"new home only: its value serves both",
+			withLines(withLines(minimalConfig, "station", "airport_range_nm = 7"), "reference", `airlines_dat_path = "x/airlines.dat"`),
+			7, "x/airlines.dat", ""},
+		{"old home only: read, and told where it belongs",
+			withLines(withLines(minimalConfig, "flight_phases", "airport_range_nm = 7"), "post_processing", `airlines_dat_path = "x/airlines.dat"`),
+			7, "x/airlines.dat", "flight_phases.airport_range_nm (7) is read as station.airport_range_nm: write it in [station]"},
+		{"both, equal: told it repeats",
+			withLines(withLines(minimalConfig, "flight_phases", "airport_range_nm = 5"), "station", "airport_range_nm = 5"),
+			5, "assets/airlines.dat", "flight_phases.airport_range_nm repeats station.airport_range_nm (5): one key is enough, in [station]"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := loadAndValidate(t, writeConfig(t, tc.text))
+			if cfg.Station.AirportRangeNM != tc.rangeNM || cfg.FlightPhases.AirportRangeNM != tc.rangeNM {
+				t.Errorf("airport_range_nm: station %v, flight_phases %v, want both %v",
+					cfg.Station.AirportRangeNM, cfg.FlightPhases.AirportRangeNM, tc.rangeNM)
+			}
+			if cfg.Reference.AirlinesDATPath != tc.airlines || cfg.PostProcessing.AirlinesDatPath != tc.airlines {
+				t.Errorf("airlines_dat_path: reference %q, post_processing %q, want both %q",
+					cfg.Reference.AirlinesDATPath, cfg.PostProcessing.AirlinesDatPath, tc.airlines)
+			}
+			if tc.wantWarning == "" {
+				if len(cfg.Warnings) != 0 {
+					t.Errorf("nothing to say, said %q", cfg.Warnings)
+				}
+			} else if len(cfg.Warnings) == 0 || cfg.Warnings[0] != tc.wantWarning {
+				t.Errorf("warnings %q, want first %q", cfg.Warnings, tc.wantWarning)
+			}
+		})
+	}
+
+	// Written differently in both homes, each reader keeps its own value, as
+	// before, and the file is told.
+	cfg := loadAndValidate(t, writeConfig(t, withLines(withLines(minimalConfig, "flight_phases", "airport_range_nm = 8"), "station", "airport_range_nm = 5")))
+	if cfg.Station.AirportRangeNM != 5 || cfg.FlightPhases.AirportRangeNM != 8 {
+		t.Errorf("both written differently: station %v, flight_phases %v, want 5 and 8", cfg.Station.AirportRangeNM, cfg.FlightPhases.AirportRangeNM)
+	}
+	want := "flight_phases.airport_range_nm (8) differs from station.airport_range_nm (5): both are kept as written, but the key belongs in [station] alone"
+	if len(cfg.Warnings) != 1 || cfg.Warnings[0] != want {
+		t.Errorf("warnings %q, want %q", cfg.Warnings, want)
 	}
 }

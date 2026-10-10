@@ -17,6 +17,12 @@ type Config struct {
 	// configuration -- runtime settings, accounts -- lands in the same place.
 	ConfigPath string `toml:"-"`
 
+	// Warnings is what Load has to say about the file and cannot log itself,
+	// the logger being built from this very configuration: a key written in
+	// two sections, a key nothing reads any more. One line each, naming the
+	// key; main prints them once the logger exists. Not a TOML field.
+	Warnings []string `toml:"-"`
+
 	Server         ServerConfig         `toml:"server"`          // HTTP server settings
 	ADSB           ADSBConfig           `toml:"adsb"`            // Aircraft tracking data source settings
 	Frequencies    FrequenciesConfig    `toml:"frequencies"`     // Radio frequency monitoring settings
@@ -146,7 +152,7 @@ type StationConfig struct {
 	ElevationFeet           int     `toml:"elevation_feet"`             // Elevation of the station above sea level in feet
 	AirportCode             string  `toml:"airport_code"`               // ICAO code of the airport (e.g., "CYYZ")
 	RunwayExtensionLengthNM float64 `toml:"runway_extension_length_nm"` // Length of runway extensions in nautical miles
-	AirportRangeNM          float64 `toml:"airport_range_nm"`           // Range in nautical miles to consider aircraft as being at this airport (default: 5.0)
+	AirportRangeNM          float64 `toml:"airport_range_nm"`           // Range in nautical miles to consider aircraft as being at this airport (default: 5.0); also what the flight phases use
 	DisplayRangeNM          float64 `toml:"display_range_nm"`           // Range in nautical miles for displaying airports, runways, and navaids on map (default: 100.0)
 }
 
@@ -206,7 +212,7 @@ type PostProcessingConfig struct {
 
 	// Backend must be "local" or empty; "openai" is refused at startup.
 	Backend              string  `toml:"backend"`
-	AirlinesDatPath      string  `toml:"airlines_dat_path"`       // OpenFlights airlines.dat, shipped in assets/
+	AirlinesDatPath      string  `toml:"airlines_dat_path"`       // Filled from [reference] airlines_dat_path; its own key is the older home, still read with a warning
 	MinScore             float64 `toml:"min_score"`               // below this, the matcher refuses rather than guesses
 	MinDigits            int     `toml:"min_digits"`              // shortest spoken number that may be a flight number
 	FleetLastSeenMinutes int     `toml:"fleet_last_seen_minutes"` // how stale an ADS-B target may be and still be a candidate
@@ -219,7 +225,7 @@ type FrequenciesConfig struct {
 	ReconnectIntervalSecs int               `toml:"reconnect_interval_secs"` // Seconds to wait before reconnecting after stream failure
 
 	// FFmpeg timeout configuration
-	FFmpegTimeoutSecs        int `toml:"ffmpeg_timeout_secs"`         // FFmpeg connection timeout in seconds (0 = no timeout, default: 30)
+	FFmpegTimeoutSecs        int `toml:"ffmpeg_timeout_secs"`         // FFmpeg connection timeout in seconds (0 = no timeout, the default)
 	FFmpegReconnectDelaySecs int `toml:"ffmpeg_reconnect_delay_secs"` // FFmpeg reconnect delay in seconds (default: 2)
 }
 
@@ -328,7 +334,7 @@ type FlightPhasesConfig struct {
 	RecentTakeoffTimeoutMinutes int `toml:"recent_takeoff_timeout_minutes"`
 
 	// Other phase detection parameters
-	AirportRangeNM float64 `toml:"airport_range_nm"` // Distance considered "close to airport"
+	AirportRangeNM float64 `toml:"airport_range_nm"` // Distance considered "close to airport"; filled from [station] airport_range_nm, its own key is the older home, still read with a warning
 
 	// Ground detection thresholds (NEW - making existing constants configurable)
 	FlyingMinTASKts         float64 `toml:"flying_min_tas_kts"`        // Minimum true airspeed to be considered flying
@@ -363,15 +369,16 @@ type FlightPhasesConfig struct {
 	// Observes aircraft approach/landing/departure patterns to determine which runway
 	// ends are currently active. Used to suppress false APP on perpendicular runways.
 	RunwayInUseWindowMinutes  int     `toml:"runway_in_use_window_minutes"`  // Rolling evidence window (default: 60)
-	RunwayInUseApproachWeight float64 `toml:"runway_in_use_approach_weight"` // Weight for APP events (default: 2.0)
+	RunwayInUseApproachWeight float64 `toml:"runway_in_use_approach_weight"` // Weight for APP events (default: 5.0)
 	RunwayInUseLandingWeight  float64 `toml:"runway_in_use_landing_weight"`  // Weight for T/D events (default: 3.0)
-	RunwayInUseClimbWeight    float64 `toml:"runway_in_use_climb_weight"`    // Weight for CLB events (default: 2.0)
+	RunwayInUseClimbWeight    float64 `toml:"runway_in_use_climb_weight"`    // Weight for CLB events (default: 1.5)
 	RunwayInUseDecayRate      float64 `toml:"runway_in_use_decay_rate"`      // Per-minute time decay (default: 0.98)
 }
 
-// Load loads the configuration from the specified file path
+// Load reads the configuration at path over Defaults: a key the file leaves
+// out keeps its default, a key it sets wins.
 func Load(path string) (*Config, error) {
-	var config Config
+	config := Defaults()
 
 	// Check if the file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -385,14 +392,86 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to decode config file: %w", err)
 	}
 
-	// Strict ADS-B schema: reject unknown keys under [adsb]
-	for _, key := range meta.Undecoded() {
-		if len(key) > 0 && key[0] == "adsb" {
-			return nil, fmt.Errorf("unknown [adsb] configuration key: %s", key.String())
+	config.reconcileDuplicates(meta)
+
+	// A key nothing reads -- left over from a removed feature, or misspelled --
+	// is said, with its name, and ignored. Never refused: the owner's file still
+	// carries [atc_chat] and the OpenAI keys, and a server that will not start
+	// over a line that does nothing is worse than one that says so. (Upstream
+	// refused unknown keys under [adsb] alone; the same line now covers it.)
+	// A whole section nothing reads gets one line with its size, not one per
+	// key: [atc_chat] is seventeen keys in the owner's file.
+	undecoded := meta.Undecoded()
+	gone := map[string]int{}
+	for _, key := range undecoded {
+		if len(key) == 1 && meta.Type(key...) == "Hash" {
+			gone[key[0]] = 0
+		}
+	}
+	for _, key := range undecoded {
+		if _, inGone := gone[key[0]]; inGone && len(key) > 1 {
+			gone[key[0]]++
+		}
+	}
+	for _, key := range undecoded {
+		n, inGone := gone[key[0]]
+		switch {
+		case inGone && len(key) == 1:
+			config.warnf("[%s] is not a section of this version and is ignored with its %d %s: remove it", key[0], n, plural(n, "key"))
+		case inGone:
+			// counted above
+		default:
+			config.warnf("%s is not a configuration key of this version and is ignored: remove it, or check its spelling", key.String())
 		}
 	}
 
 	return &config, nil
+}
+
+// reconcileDuplicates gives each value that two sections used to carry one
+// home: airport_range_nm lives in [station], airlines_dat_path in
+// [reference]. The older key is still read when written, so that an existing
+// file keeps its behaviour, and the file is told once at startup.
+func (c *Config) reconcileDuplicates(meta toml.MetaData) {
+	oneHome(c, meta, "flight_phases", "station", "airport_range_nm",
+		&c.FlightPhases.AirportRangeNM, &c.Station.AirportRangeNM)
+	oneHome(c, meta, "post_processing", "reference", "airlines_dat_path",
+		&c.PostProcessing.AirlinesDatPath, &c.Reference.AirlinesDATPath)
+}
+
+// oneHome settles key between its old section and its new one. Neither
+// written, or only the new: the old field takes the new value, nothing to
+// say. Only the old: the new field takes it, with a line saying where it now
+// belongs. Both: each is kept as written -- the two had separate effects and
+// a file that set them differently meant it -- and the file is told.
+func oneHome[T comparable](c *Config, meta toml.MetaData, oldSection, newSection, key string, oldField, newField *T) {
+	oldWritten := meta.IsDefined(oldSection, key)
+	newWritten := meta.IsDefined(newSection, key)
+	switch {
+	case oldWritten && newWritten && *oldField == *newField:
+		c.warnf("%s.%s repeats %s.%s (%v): one key is enough, in [%s]",
+			oldSection, key, newSection, key, *newField, newSection)
+	case oldWritten && newWritten:
+		c.warnf("%s.%s (%v) differs from %s.%s (%v): both are kept as written, but the key belongs in [%s] alone",
+			oldSection, key, *oldField, newSection, key, *newField, newSection)
+	case oldWritten:
+		*newField = *oldField
+		c.warnf("%s.%s (%v) is read as %s.%s: write it in [%s]",
+			oldSection, key, *oldField, newSection, key, newSection)
+	default:
+		*oldField = *newField
+	}
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
+}
+
+func (c *Config) warnf(format string, args ...any) {
+	c.Warnings = append(c.Warnings, fmt.Sprintf(format, args...))
 }
 
 // LoadWithFallbackAndPath loads configuration and returns the resolved config file path.
@@ -464,7 +543,7 @@ func (c *Config) Validate() error {
 
 	if c.PostProcessing.Enabled {
 		if c.PostProcessing.AirlinesDatPath == "" {
-			return fmt.Errorf("post_processing.airlines_dat_path is required when post-processing is enabled")
+			return fmt.Errorf("reference.airlines_dat_path is required when post-processing is enabled: the grammar needs the airline telephony")
 		}
 		if c.PostProcessing.MinScore < 0 {
 			return fmt.Errorf("invalid post_processing.min_score: %v (must be >= 0)", c.PostProcessing.MinScore)
@@ -520,7 +599,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("search_radius_nm must be positive when source_type is external-opensky")
 		}
 		if c.ADSB.OpenSkyAuthMode == "" {
-			c.ADSB.OpenSkyAuthMode = "anonymous"
+			c.ADSB.OpenSkyAuthMode = Defaults().ADSB.OpenSkyAuthMode
 		}
 		switch c.ADSB.OpenSkyAuthMode {
 		case "anonymous":
@@ -553,7 +632,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid fetch interval: %d", c.ADSB.FetchIntervalSecs)
 	}
 	if c.Storage.DBRetentionGB <= 0 {
-		c.Storage.DBRetentionGB = DefaultDBRetentionGB
+		c.Storage.DBRetentionGB = Defaults().Storage.DBRetentionGB
 	}
 
 	// Validate logging config
@@ -619,7 +698,7 @@ func (c *Config) ValidateStation() error {
 
 	// Default display range
 	if c.Station.DisplayRangeNM <= 0 {
-		c.Station.DisplayRangeNM = 100.0
+		c.Station.DisplayRangeNM = Defaults().Station.DisplayRangeNM
 	}
 
 	return nil
@@ -653,7 +732,7 @@ func (c *Config) ValidateFrequencies() error {
 	// Set default values for FFmpeg timeout configuration if not specified
 	// FFmpegTimeoutSecs defaults to 0 (no timeout) - no need to set explicitly
 	if c.Frequencies.FFmpegReconnectDelaySecs == 0 {
-		c.Frequencies.FFmpegReconnectDelaySecs = 2 // Default to 2 seconds
+		c.Frequencies.FFmpegReconnectDelaySecs = Defaults().Frequencies.FFmpegReconnectDelaySecs
 	}
 
 	// Validate frequency sources
@@ -712,85 +791,83 @@ func (c *Config) ValidateFlightPhases() error {
 		return nil // Skip validation if flight phases are disabled
 	}
 
-	// Set default values for new fields if not specified
+	// A value written as 0 means the default, as it always has here. (A key
+	// left out already holds it: Load starts from Defaults.)
+	d := Defaults().FlightPhases
 	if c.FlightPhases.FlyingMinTASKts == 0 {
-		c.FlightPhases.FlyingMinTASKts = 50.0
+		c.FlightPhases.FlyingMinTASKts = d.FlyingMinTASKts
 	}
 	if c.FlightPhases.FlyingMinAltFt == 0 {
-		c.FlightPhases.FlyingMinAltFt = 700.0
+		c.FlightPhases.FlyingMinAltFt = d.FlyingMinAltFt
 	}
 	if c.FlightPhases.HelicopterAltMultiplier == 0 {
-		c.FlightPhases.HelicopterAltMultiplier = 2.0
+		c.FlightPhases.HelicopterAltMultiplier = d.HelicopterAltMultiplier
 	}
 	if c.FlightPhases.HighSpeedThresholdKts == 0 {
-		c.FlightPhases.HighSpeedThresholdKts = 200.0
+		c.FlightPhases.HighSpeedThresholdKts = d.HighSpeedThresholdKts
 	}
 	if c.FlightPhases.PhasePreservationSeconds == 0 {
-		c.FlightPhases.PhasePreservationSeconds = 60
+		c.FlightPhases.PhasePreservationSeconds = d.PhasePreservationSeconds
 	}
 	if c.FlightPhases.PhaseTransitionTimeoutSeconds == 0 {
-		c.FlightPhases.PhaseTransitionTimeoutSeconds = 60
+		c.FlightPhases.PhaseTransitionTimeoutSeconds = d.PhaseTransitionTimeoutSeconds
 	}
 	if c.FlightPhases.HighAltitudeOverrideFt == 0 {
-		c.FlightPhases.HighAltitudeOverrideFt = 5000.0
+		c.FlightPhases.HighAltitudeOverrideFt = d.HighAltitudeOverrideFt
 	}
 	if c.FlightPhases.ImpossibleAltDropThresholdFt == 0 {
-		c.FlightPhases.ImpossibleAltDropThresholdFt = 10000.0
+		c.FlightPhases.ImpossibleAltDropThresholdFt = d.ImpossibleAltDropThresholdFt
 	}
 	if c.FlightPhases.ImpossibleSpeedDropThresholdKts == 0 {
-		c.FlightPhases.ImpossibleSpeedDropThresholdKts = 100.0
+		c.FlightPhases.ImpossibleSpeedDropThresholdKts = d.ImpossibleSpeedDropThresholdKts
 	}
 	if c.FlightPhases.ImpossibleSpeedDropMinAltFt == 0 {
-		c.FlightPhases.ImpossibleSpeedDropMinAltFt = 5000.0
+		c.FlightPhases.ImpossibleSpeedDropMinAltFt = d.ImpossibleSpeedDropMinAltFt
 	}
 	if c.FlightPhases.SignalLostLandingMaxAltFt == 0 {
-		c.FlightPhases.SignalLostLandingMaxAltFt = 1000.0
+		c.FlightPhases.SignalLostLandingMaxAltFt = d.SignalLostLandingMaxAltFt
 	}
 	if c.FlightPhases.ApproachMaxAltitudeFt == 0 {
-		c.FlightPhases.ApproachMaxAltitudeFt = 5000
+		c.FlightPhases.ApproachMaxAltitudeFt = d.ApproachMaxAltitudeFt
 	}
-
-	// Trajectory defaults
 	if c.FlightPhases.TrajectoryBufferDurationSec == 0 {
-		c.FlightPhases.TrajectoryBufferDurationSec = 90
+		c.FlightPhases.TrajectoryBufferDurationSec = d.TrajectoryBufferDurationSec
 	}
 	if c.FlightPhases.TrajectoryMinPoints == 0 {
-		c.FlightPhases.TrajectoryMinPoints = 5
+		c.FlightPhases.TrajectoryMinPoints = d.TrajectoryMinPoints
 	}
 	if c.FlightPhases.TrajectoryStaleTimeoutSec == 0 {
-		c.FlightPhases.TrajectoryStaleTimeoutSec = 300
+		c.FlightPhases.TrajectoryStaleTimeoutSec = d.TrajectoryStaleTimeoutSec
 	}
 	if c.FlightPhases.TrajectoryCleanupIntervalSec == 0 {
-		c.FlightPhases.TrajectoryCleanupIntervalSec = 30
+		c.FlightPhases.TrajectoryCleanupIntervalSec = d.TrajectoryCleanupIntervalSec
 	}
 	if c.FlightPhases.TrajectoryDescentThresholdFPM == 0 {
-		c.FlightPhases.TrajectoryDescentThresholdFPM = -200
+		c.FlightPhases.TrajectoryDescentThresholdFPM = d.TrajectoryDescentThresholdFPM
 	}
 	if c.FlightPhases.TrajectoryClimbThresholdFPM == 0 {
-		c.FlightPhases.TrajectoryClimbThresholdFPM = 200
+		c.FlightPhases.TrajectoryClimbThresholdFPM = d.TrajectoryClimbThresholdFPM
 	}
 	if c.FlightPhases.TrajectoryLevelBandFt == 0 {
-		c.FlightPhases.TrajectoryLevelBandFt = 200
+		c.FlightPhases.TrajectoryLevelBandFt = d.TrajectoryLevelBandFt
 	}
 	if c.FlightPhases.TrajectoryTurningRateDeg == 0 {
-		c.FlightPhases.TrajectoryTurningRateDeg = 1.5
+		c.FlightPhases.TrajectoryTurningRateDeg = d.TrajectoryTurningRateDeg
 	}
-
-	// Runway-in-use defaults
 	if c.FlightPhases.RunwayInUseWindowMinutes == 0 {
-		c.FlightPhases.RunwayInUseWindowMinutes = 60
+		c.FlightPhases.RunwayInUseWindowMinutes = d.RunwayInUseWindowMinutes
 	}
 	if c.FlightPhases.RunwayInUseApproachWeight == 0 {
-		c.FlightPhases.RunwayInUseApproachWeight = 5.0
+		c.FlightPhases.RunwayInUseApproachWeight = d.RunwayInUseApproachWeight
 	}
 	if c.FlightPhases.RunwayInUseLandingWeight == 0 {
-		c.FlightPhases.RunwayInUseLandingWeight = 3.0
+		c.FlightPhases.RunwayInUseLandingWeight = d.RunwayInUseLandingWeight
 	}
 	if c.FlightPhases.RunwayInUseClimbWeight == 0 {
-		c.FlightPhases.RunwayInUseClimbWeight = 1.5
+		c.FlightPhases.RunwayInUseClimbWeight = d.RunwayInUseClimbWeight
 	}
 	if c.FlightPhases.RunwayInUseDecayRate == 0 {
-		c.FlightPhases.RunwayInUseDecayRate = 0.98
+		c.FlightPhases.RunwayInUseDecayRate = d.RunwayInUseDecayRate
 	}
 
 	// Validate altitude thresholds

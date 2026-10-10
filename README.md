@@ -230,15 +230,14 @@ Point 1 is the one we do without — and we measured what that costs before givi
 on it. A dictionary-based text corrector gained **one transmission and lost four
 candidates**. It was deleted.
 
-The grammar plugs in at **upstream's own seam** (`post_processing.backend = "local"`)
-and writes into upstream's tables with upstream's vocabulary. Zero schema migration,
-and you can switch back to GPT-4o with one config key to compare them on the same
-traffic.
+The grammar plugs in at **upstream's own seam** (`post_processing.backend = "local"`,
+the one backend left) and writes into upstream's tables with upstream's vocabulary.
+Zero schema migration.
 
 Its settings come from a sweep, not from taste — 3 digits minimum, 60-second fleet
 window, ambiguous matches refused, no additional score floor. The full table is in
-`docs-fr/19-appariement-en-ligne.md` and repeated as a comment in
-`configs/config.toml.example`, so that the trade-off stays the operator's.
+`docs-fr/19-appariement-en-ligne.md`, and `configs/config.toml.example` sums it up
+in two lines where the keys would go, so that the trade-off stays the operator's.
 
 One rule that looks obviously good and is not: accepting callsigns whose digits are
 **off by one** was measured to be **81 % noise**. It is off by default.
@@ -284,7 +283,7 @@ adds enough to make that a choice rather than a fact.
 - **Python 3.11+ and Apple Silicon** for the transcription sidecar. MLX is
   Apple-only; on other hardware, point `[transcription.local] server_url` at any service
   that honours the `docs/LOCAL-STT.md` contract.
-- **No OpenAI key**, unless you want the voice assistant, which is untouched.
+- **No OpenAI key**: nothing here calls OpenAI.
 
 ## Getting started
 
@@ -346,10 +345,27 @@ To write an account into the configuration instead, `./bin/co-atc -add-user alic
 reads a password without echoing it and prints a `[[auth.users]]` block to paste into
 `configs/config.toml`; it writes nothing itself.
 
-> **The shipped example still defaults to `backend = "openai"`** for both
-> transcription and post-processing, so that a checkout behaves like upstream. To get
-> what this fork is for, set `backend = "local"` in both
-> `[transcription]` and `[transcription.post_processing]`.
+### Configuration
+
+`configs/config.toml.example` is about 150 lines, and every key in it does something.
+A key left out takes the default written in `internal/config/defaults.go`, which is
+the value the example carried when every key was written out, so a short file and a
+long one load the same. What no default can guess stays in the file: where the
+receiver is and which airport it watches, where the aircraft and the streams come
+from, whether sign-in is wanted, and the five flight-phase values that differ from
+the code's defaults, kept because the runway judge was validated with them.
+
+The sections, in the order someone installing meets them: `[server]`, `[auth]`,
+`[station]`, `[adsb]`, `[frequencies]` and its `[[frequencies.sources]]`,
+`[transcription]` and `[transcription.local]`, `[post_processing]`, `[storage]`,
+`[logging]`, `[reference]`, `[wx]`, `[flight_phases]`.
+
+At startup the server says, one line each and by name, what it found in the file
+that it does not read: a key or a whole section left over from a removed feature
+(`[atc_chat]`, the OpenAI keys), a misspelling, `db_retention_days`. It never refuses
+to start over such a line. Two keys that used to be written in two sections have one
+home each, `airport_range_nm` in `[station]` and `airlines_dat_path` in
+`[reference]`; the older key is still read when present, and said.
 
 ## Also in here
 
