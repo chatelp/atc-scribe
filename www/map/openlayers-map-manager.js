@@ -1115,7 +1115,7 @@
                 targetId: 'map',
                 center,
                 zoom,
-                baseMapStyle: this.store?.settings?.mapStyle || 'osm-dark',
+                baseMapStyle: this.store?.settings?.mapStyle || 'none',
             });
             this.engine.init();
             this._olMap = this.engine.getMap();
