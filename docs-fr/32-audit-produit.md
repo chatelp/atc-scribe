@@ -416,6 +416,18 @@ interface (JS + HTML) 13 036 → 10 881. Rapports : `docs-fr/fiches-cloud/{A,B,C
     les comparaisons de texte se trompent d'une à deux heures et la nuit du changement d'heure
     (25/10) trie à l'envers. Corriger change le format lu par les scripts du laboratoire :
     à coordonner avec Whisper-lab.
+- **Les deux défauts de stockage, corrigés le 10/10** (`7db6f42`, `91a3553`), chacun avec son
+  test qui échoue avant et passe après : n°1, une position déjà stockée n'est plus réécrite
+  même quand une colonne est vide (recherche par `IS`, servie par l'index de la contrainte :
+  plan vérifié) — effet attendu : environ −40 % de lignes de positions, à mesurer sur la
+  prochaine journée ; n°2, les transcriptions, clairances et valeurs de phraséologie sont
+  datées en UTC comme les positions, les anciennes lignes converties une fois à l'ouverture
+  du fichier (vérifié sur une copie de la base du 10/10 : 25 lignes `+02:00` → `Z`, ordre
+  inchangé), l'en-tête `X-Created-At` du sidecar et les bornes de `cmd/phraseology` suivent.
+  **Whisper-lab n'est pas encore prévenu** (session fermée) : `created_at` se termine désormais
+  par `Z`, et `phraseology_values.created_at` passe du format Go par défaut à RFC3339.
+- **Fond de carte** : « None » ajouté (plan des aéroports et avions sur noir) et **choisi par
+  défaut** le 10/10, jugement du propriétaire ; IGN et OSM, clairs ou sombres, restent à un clic.
 - **À juger à l'œil par le propriétaire** : le filtre d'assombrissement
   (`style.css`, `.basemap-dark .atc-basemap`) et les couleurs du plan
   (`AIRPORT_LAYOUT_COLORS`, en tête de `openlayers-map-manager.js`).
