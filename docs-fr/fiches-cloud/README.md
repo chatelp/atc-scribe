@@ -20,9 +20,11 @@ seule.*
 | [A — retraits côté serveur](A-retraits-serveur.md) | 1 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/A-retraits-serveur.md, et exécute la fiche A en entier.` | `cloud/a-retraits-serveur` | B, C |
 | [B — retraits côté interface, et la carte réparée](B-retraits-interface.md) | 1 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/B-retraits-interface.md, et exécute la fiche B en entier.` | `cloud/b-retraits-interface` | A, C |
 | [C — tests de ce qui tourne sans filet](C-tests.md) | 1 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/C-tests.md, et exécute la fiche C en entier.` | `cloud/c-tests` | A, B |
+| [D — configuration réduite](D-config-reduite.md) | 2 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/D-config-reduite.md, et exécute la fiche D en entier.` | `cloud/d-config-reduite` | F |
+| [F — tests de l'API](F-tests-api.md) | 2 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/F-tests-api.md, et exécute la fiche F en entier.` | `cloud/f-tests-api` | D |
+| [E — découpage de main() et handlers.go](E-decoupage-serveur.md) | 2, **après D** | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/E-decoupage-serveur.md, et exécute la fiche E en entier.` | `cloud/e-decoupage-serveur` | — |
 
-**Vague 1 intégrée le 10/10** (doc 32, « Retour de la vague 1 »). La vague 2 (configuration réduite, découpage de `main()` et de `handlers.go`, tests de l'API)
-s'écrira quand la vague 1 sera intégrée : elle touche les mêmes fichiers que A.
+**Vague 1 intégrée le 10/10** (doc 32, « Retour de la vague 1 »). **Vague 2 écrite le 10/10** : D et F en parallèle ; E après l'intégration de D (même fichier `main.go`).
 
 ## Pour la session cloud : règles communes, à respecter sans exception
 
