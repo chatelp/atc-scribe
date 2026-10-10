@@ -219,7 +219,7 @@ type FrequenciesConfig struct {
 	ReconnectIntervalSecs int               `toml:"reconnect_interval_secs"` // Seconds to wait before reconnecting after stream failure
 
 	// FFmpeg timeout configuration
-	FFmpegTimeoutSecs        int `toml:"ffmpeg_timeout_secs"`         // FFmpeg connection timeout in seconds (0 = no timeout, default: 30)
+	FFmpegTimeoutSecs        int `toml:"ffmpeg_timeout_secs"`         // FFmpeg connection timeout in seconds (0 = no timeout, the default)
 	FFmpegReconnectDelaySecs int `toml:"ffmpeg_reconnect_delay_secs"` // FFmpeg reconnect delay in seconds (default: 2)
 }
 
@@ -363,15 +363,16 @@ type FlightPhasesConfig struct {
 	// Observes aircraft approach/landing/departure patterns to determine which runway
 	// ends are currently active. Used to suppress false APP on perpendicular runways.
 	RunwayInUseWindowMinutes  int     `toml:"runway_in_use_window_minutes"`  // Rolling evidence window (default: 60)
-	RunwayInUseApproachWeight float64 `toml:"runway_in_use_approach_weight"` // Weight for APP events (default: 2.0)
+	RunwayInUseApproachWeight float64 `toml:"runway_in_use_approach_weight"` // Weight for APP events (default: 5.0)
 	RunwayInUseLandingWeight  float64 `toml:"runway_in_use_landing_weight"`  // Weight for T/D events (default: 3.0)
-	RunwayInUseClimbWeight    float64 `toml:"runway_in_use_climb_weight"`    // Weight for CLB events (default: 2.0)
+	RunwayInUseClimbWeight    float64 `toml:"runway_in_use_climb_weight"`    // Weight for CLB events (default: 1.5)
 	RunwayInUseDecayRate      float64 `toml:"runway_in_use_decay_rate"`      // Per-minute time decay (default: 0.98)
 }
 
-// Load loads the configuration from the specified file path
+// Load reads the configuration at path over Defaults: a key the file leaves
+// out keeps its default, a key it sets wins.
 func Load(path string) (*Config, error) {
-	var config Config
+	config := Defaults()
 
 	// Check if the file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -520,7 +521,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("search_radius_nm must be positive when source_type is external-opensky")
 		}
 		if c.ADSB.OpenSkyAuthMode == "" {
-			c.ADSB.OpenSkyAuthMode = "anonymous"
+			c.ADSB.OpenSkyAuthMode = Defaults().ADSB.OpenSkyAuthMode
 		}
 		switch c.ADSB.OpenSkyAuthMode {
 		case "anonymous":
@@ -553,7 +554,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid fetch interval: %d", c.ADSB.FetchIntervalSecs)
 	}
 	if c.Storage.DBRetentionGB <= 0 {
-		c.Storage.DBRetentionGB = DefaultDBRetentionGB
+		c.Storage.DBRetentionGB = Defaults().Storage.DBRetentionGB
 	}
 
 	// Validate logging config
@@ -619,7 +620,7 @@ func (c *Config) ValidateStation() error {
 
 	// Default display range
 	if c.Station.DisplayRangeNM <= 0 {
-		c.Station.DisplayRangeNM = 100.0
+		c.Station.DisplayRangeNM = Defaults().Station.DisplayRangeNM
 	}
 
 	return nil
@@ -653,7 +654,7 @@ func (c *Config) ValidateFrequencies() error {
 	// Set default values for FFmpeg timeout configuration if not specified
 	// FFmpegTimeoutSecs defaults to 0 (no timeout) - no need to set explicitly
 	if c.Frequencies.FFmpegReconnectDelaySecs == 0 {
-		c.Frequencies.FFmpegReconnectDelaySecs = 2 // Default to 2 seconds
+		c.Frequencies.FFmpegReconnectDelaySecs = Defaults().Frequencies.FFmpegReconnectDelaySecs
 	}
 
 	// Validate frequency sources
@@ -712,85 +713,83 @@ func (c *Config) ValidateFlightPhases() error {
 		return nil // Skip validation if flight phases are disabled
 	}
 
-	// Set default values for new fields if not specified
+	// A value written as 0 means the default, as it always has here. (A key
+	// left out already holds it: Load starts from Defaults.)
+	d := Defaults().FlightPhases
 	if c.FlightPhases.FlyingMinTASKts == 0 {
-		c.FlightPhases.FlyingMinTASKts = 50.0
+		c.FlightPhases.FlyingMinTASKts = d.FlyingMinTASKts
 	}
 	if c.FlightPhases.FlyingMinAltFt == 0 {
-		c.FlightPhases.FlyingMinAltFt = 700.0
+		c.FlightPhases.FlyingMinAltFt = d.FlyingMinAltFt
 	}
 	if c.FlightPhases.HelicopterAltMultiplier == 0 {
-		c.FlightPhases.HelicopterAltMultiplier = 2.0
+		c.FlightPhases.HelicopterAltMultiplier = d.HelicopterAltMultiplier
 	}
 	if c.FlightPhases.HighSpeedThresholdKts == 0 {
-		c.FlightPhases.HighSpeedThresholdKts = 200.0
+		c.FlightPhases.HighSpeedThresholdKts = d.HighSpeedThresholdKts
 	}
 	if c.FlightPhases.PhasePreservationSeconds == 0 {
-		c.FlightPhases.PhasePreservationSeconds = 60
+		c.FlightPhases.PhasePreservationSeconds = d.PhasePreservationSeconds
 	}
 	if c.FlightPhases.PhaseTransitionTimeoutSeconds == 0 {
-		c.FlightPhases.PhaseTransitionTimeoutSeconds = 60
+		c.FlightPhases.PhaseTransitionTimeoutSeconds = d.PhaseTransitionTimeoutSeconds
 	}
 	if c.FlightPhases.HighAltitudeOverrideFt == 0 {
-		c.FlightPhases.HighAltitudeOverrideFt = 5000.0
+		c.FlightPhases.HighAltitudeOverrideFt = d.HighAltitudeOverrideFt
 	}
 	if c.FlightPhases.ImpossibleAltDropThresholdFt == 0 {
-		c.FlightPhases.ImpossibleAltDropThresholdFt = 10000.0
+		c.FlightPhases.ImpossibleAltDropThresholdFt = d.ImpossibleAltDropThresholdFt
 	}
 	if c.FlightPhases.ImpossibleSpeedDropThresholdKts == 0 {
-		c.FlightPhases.ImpossibleSpeedDropThresholdKts = 100.0
+		c.FlightPhases.ImpossibleSpeedDropThresholdKts = d.ImpossibleSpeedDropThresholdKts
 	}
 	if c.FlightPhases.ImpossibleSpeedDropMinAltFt == 0 {
-		c.FlightPhases.ImpossibleSpeedDropMinAltFt = 5000.0
+		c.FlightPhases.ImpossibleSpeedDropMinAltFt = d.ImpossibleSpeedDropMinAltFt
 	}
 	if c.FlightPhases.SignalLostLandingMaxAltFt == 0 {
-		c.FlightPhases.SignalLostLandingMaxAltFt = 1000.0
+		c.FlightPhases.SignalLostLandingMaxAltFt = d.SignalLostLandingMaxAltFt
 	}
 	if c.FlightPhases.ApproachMaxAltitudeFt == 0 {
-		c.FlightPhases.ApproachMaxAltitudeFt = 5000
+		c.FlightPhases.ApproachMaxAltitudeFt = d.ApproachMaxAltitudeFt
 	}
-
-	// Trajectory defaults
 	if c.FlightPhases.TrajectoryBufferDurationSec == 0 {
-		c.FlightPhases.TrajectoryBufferDurationSec = 90
+		c.FlightPhases.TrajectoryBufferDurationSec = d.TrajectoryBufferDurationSec
 	}
 	if c.FlightPhases.TrajectoryMinPoints == 0 {
-		c.FlightPhases.TrajectoryMinPoints = 5
+		c.FlightPhases.TrajectoryMinPoints = d.TrajectoryMinPoints
 	}
 	if c.FlightPhases.TrajectoryStaleTimeoutSec == 0 {
-		c.FlightPhases.TrajectoryStaleTimeoutSec = 300
+		c.FlightPhases.TrajectoryStaleTimeoutSec = d.TrajectoryStaleTimeoutSec
 	}
 	if c.FlightPhases.TrajectoryCleanupIntervalSec == 0 {
-		c.FlightPhases.TrajectoryCleanupIntervalSec = 30
+		c.FlightPhases.TrajectoryCleanupIntervalSec = d.TrajectoryCleanupIntervalSec
 	}
 	if c.FlightPhases.TrajectoryDescentThresholdFPM == 0 {
-		c.FlightPhases.TrajectoryDescentThresholdFPM = -200
+		c.FlightPhases.TrajectoryDescentThresholdFPM = d.TrajectoryDescentThresholdFPM
 	}
 	if c.FlightPhases.TrajectoryClimbThresholdFPM == 0 {
-		c.FlightPhases.TrajectoryClimbThresholdFPM = 200
+		c.FlightPhases.TrajectoryClimbThresholdFPM = d.TrajectoryClimbThresholdFPM
 	}
 	if c.FlightPhases.TrajectoryLevelBandFt == 0 {
-		c.FlightPhases.TrajectoryLevelBandFt = 200
+		c.FlightPhases.TrajectoryLevelBandFt = d.TrajectoryLevelBandFt
 	}
 	if c.FlightPhases.TrajectoryTurningRateDeg == 0 {
-		c.FlightPhases.TrajectoryTurningRateDeg = 1.5
+		c.FlightPhases.TrajectoryTurningRateDeg = d.TrajectoryTurningRateDeg
 	}
-
-	// Runway-in-use defaults
 	if c.FlightPhases.RunwayInUseWindowMinutes == 0 {
-		c.FlightPhases.RunwayInUseWindowMinutes = 60
+		c.FlightPhases.RunwayInUseWindowMinutes = d.RunwayInUseWindowMinutes
 	}
 	if c.FlightPhases.RunwayInUseApproachWeight == 0 {
-		c.FlightPhases.RunwayInUseApproachWeight = 5.0
+		c.FlightPhases.RunwayInUseApproachWeight = d.RunwayInUseApproachWeight
 	}
 	if c.FlightPhases.RunwayInUseLandingWeight == 0 {
-		c.FlightPhases.RunwayInUseLandingWeight = 3.0
+		c.FlightPhases.RunwayInUseLandingWeight = d.RunwayInUseLandingWeight
 	}
 	if c.FlightPhases.RunwayInUseClimbWeight == 0 {
-		c.FlightPhases.RunwayInUseClimbWeight = 1.5
+		c.FlightPhases.RunwayInUseClimbWeight = d.RunwayInUseClimbWeight
 	}
 	if c.FlightPhases.RunwayInUseDecayRate == 0 {
-		c.FlightPhases.RunwayInUseDecayRate = 0.98
+		c.FlightPhases.RunwayInUseDecayRate = d.RunwayInUseDecayRate
 	}
 
 	// Validate altitude thresholds
