@@ -954,9 +954,8 @@
                         </div>
                     </div>
 
-                    <!-- Search and Altitude Filter Row -->
+                    <!-- Search -->
                     <div class="flex mb-2 gap-2">
-                        <!-- Search Box (50%) -->
                         <div class="relative flex-1">
                             <input type="text"
                                    class="filter-input w-full p-1.5 pr-8 border border-border text-text rounded-md text-sm transition-all duration-200 focus:outline-none"
@@ -971,23 +970,49 @@
                                 <i class="fas fa-times text-xs"></i>
                             </button>
                         </div>
-                        
-                        <!-- Altitude Filter (50%) -->
-                        <div class="flex-1 flex gap-1">
-                            <input type="number"
-                                   x-model.number="$store.atc.settings.minAltitude"
-                                   @input.debounce.300ms="$store.atc.applyFilters()"
-                                   placeholder="0"
-                                   min="0"
-                                   max="60000"
-                                   class="filter-input flex-1 p-1.5 border border-border text-text rounded-md text-sm transition-all duration-200 focus:outline-none">
-                            <input type="number"
-                                   x-model.number="$store.atc.settings.maxAltitude"
-                                   @input.debounce.300ms="$store.atc.applyFilters()"
-                                   placeholder="60000"
-                                   min="0"
-                                   max="60000"
-                                   class="filter-input flex-1 p-1.5 border border-border text-text rounded-md text-sm transition-all duration-200 focus:outline-none">
+                    </div>
+
+                    <!-- Altitude band (www/altitude/): floor and ceiling on one
+                         slider, feet below the transition altitude, flight levels above. -->
+                    <div class="mb-2 select-none" x-data="altitudeFilter()">
+                        <div class="flex items-baseline gap-2 text-xs mb-0.5">
+                            <i class="fas fa-arrows-up-down text-text/50"></i>
+                            <span class="font-medium" :class="active ? 'text-highlight' : 'text-text/80'" x-text="band"></span>
+                            <span class="flex-1"></span>
+                            <span class="text-text/50 tabular-nums" :title="'Airborne aircraft in the band, of those seen now'"
+                                  x-text="active ? inBand + ' of ' + airborne + ' airborne' : airborne + ' airborne'"></span>
+                            <button x-show="active" class="text-text/50 hover:text-highlight" title="All altitudes"
+                                    @click="choose(presets[0])"><i class="fas fa-times"></i></button>
+                        </div>
+                        <!-- The traffic of the moment, along the slider. -->
+                        <div class="alt-histogram" aria-hidden="true">
+                            <template x-for="(n, i) in counts" :key="i">
+                                <div class="alt-bin" :class="binInBand(i) ? 'alt-bin-in' : ''"
+                                     :style="'height:' + (n ? Math.max(12, n / peak * 100) : 0) + '%'"></div>
+                            </template>
+                        </div>
+                        <div class="alt-track-wrap">
+                            <div class="alt-track"></div>
+                            <div class="alt-track-band" :style="'left:calc(7px + (100% - 14px) * ' + loPct / 100 + ');right:calc(7px + (100% - 14px) * ' + (100 - hiPct) / 100 + ')'"></div>
+                            <div class="alt-ta" :style="'left:calc(7px + (100% - 14px) * ' + taPct / 100 + ')'" :title="'Transition altitude, ' + label(ta)"></div>
+                            <input type="range" class="alt-range" x-ref="lo" min="0" :max="last" step="1" :value="lo"
+                                   aria-label="Altitude floor" :aria-valuetext="label(min)" :title="'Floor: ' + label(min)"
+                                   @input="moveLo($event.target.value)" @change="save()">
+                            <input type="range" class="alt-range" x-ref="hi" min="0" :max="last" step="1" :value="hi"
+                                   aria-label="Altitude ceiling" :aria-valuetext="label(max)" :title="'Ceiling: ' + label(max)"
+                                   @input="moveHi($event.target.value)" @change="save()">
+                        </div>
+                        <div class="alt-marks" aria-hidden="true">
+                            <template x-for="m in marks" :key="m.text">
+                                <span :style="'left:' + m.at + '%'" x-text="m.text"></span>
+                            </template>
+                        </div>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            <template x-for="p in presets" :key="p.id">
+                                <button class="px-1.5 py-0.5 rounded border text-[11px] leading-4"
+                                        :class="isPreset(p) ? 'border-highlight/60 bg-highlight/15 text-highlight' : 'border-border text-text/70 hover:text-text'"
+                                        :title="p.help" @click="choose(p)" x-text="p.label"></button>
+                            </template>
                         </div>
                     </div>
 
@@ -2190,6 +2215,8 @@
     <!-- Custom JavaScript -->
     <!-- Sign-in overlay; does nothing when auth.enabled is false. -->
     <script src="login.js"></script>
+    <script src="altitude/altitude-scale.js"></script>
+    <script src="altitude/altitude-filter.js"></script>
     <script src="events.js"></script>
     <script src="app.js"></script>
 </body>
