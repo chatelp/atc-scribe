@@ -360,7 +360,7 @@ indiqué en fin de ligne quand il a bougé ; chaque ligne se fait sous les sept 
 |---|---|---|---|
 | 5.1 | `app.js` : étapes 6 à 10 du plan (audio, station, fiche avion, flux) ; l'étape 11 (réglages, alertes) se fait avec 2.1 et 2.2 | 19 h | faible, chemin chaud à mesurer |
 | 5.2 | `config.toml` réduit (559 → ≈ 110 lignes) avec défauts en code et détection des clés inconnues | 3 h | moyen-faible |
-| 5.3 | Découper `main()` (463 lignes) et `handlers.go` (2 299) | 6 h | moyen, gain nul à l'exécution |
+| 5.3 | Découper `main()` (463 lignes) et `handlers.go` (2 299) — ***fait le 10/10*** par la fiche E (`bc311b7`) : `main.go` 112 lignes, `handlers.go` 166 plus six fichiers par domaine ; la fusion des branches décollage/atterrissage d'`adsb/service.go` (étape 4) n'est pas faite, faute de test | 6 h | moyen, gain nul à l'exécution |
 | 5.4 | Tests sur ce qui porte la production sans filet : websocket, api, storage, audio | continu | — |
 
 **Plus tard, à discuter** : strips de vol (B2), clairance contre trajectoire (B3), vue d'approche
@@ -451,6 +451,27 @@ Intégrées dans `local` le 10/10 sans conflit ; `go vet` propre, 15 paquets ver
   reconstruit, ancien gardé (`runs/co-atc.avant-vague2`).
 - **La fiche E** (découpage de `main()` et de `handlers.go`) peut partir : D est intégrée. Elle
   doit garder la boucle des avertissements de configuration dans `main.go`.
+
+### Retour de la fiche E (10/10)
+
+Intégrée le 10/10 (`bc311b7`), sans conflit avec le palier 2 fait entre-temps. `main()` tient
+en une page (`main.go` 695 → 112 lignes, le reste dans `startup.go`, `serve.go`,
+`retention.go`, `add_user.go`) ; `handlers.go` 1 636 → 166 lignes, six fichiers par domaine,
+`GetAllAircraft` en dix fonctions privées. **Vérifié sur le Mac** :
+- la liste des routes figée (`internal/api/testdata/routes.txt`, 45 lignes) passe ;
+- le banc de démarrage (`tools/startup-bench/`, désormais dans le dépôt) rejoué sur `local`
+  puis sur la fusion, deux passes : mêmes lignes de `main()` (34), même ordre de construction
+  (28 étapes), mêmes messages (87) ;
+- un démarrage sur la configuration de l'instance d'essai, avant puis après : mêmes 50 lignes de
+  `main()`, même ordre, mêmes 88 messages ; le seul écart vu (un message de décollage écarté)
+  dépend du trafic et apparaît aussi entre deux démarrages du même binaire ;
+- `go test -race ./...` vert ; la boucle des avertissements de configuration est restée dans
+  `main()`, avant toute construction.
+
+**Laissé** : l'étape 4, la duplication décollage/atterrissage de
+`sendImmediateGroundTransitionAlerts` (≈ 30 lignes), qu'aucun test ne couvre. À reprendre avec
+un test d'abord, ou à laisser : son seul effet visible est l'effet de décollage/atterrissage
+sur la carte.
 
 ## État
 
