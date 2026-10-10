@@ -316,7 +316,7 @@ document.addEventListener('alpine:init', () => {
         wsNextRetryDelayMs: null,
         wsConnectionState: 'idle',
         lastUpdate: null,
-        settingsCollapsed: true, // Hide settings panel by default
+        settingsOpen: false, // the settings page (audit 2.1)
         selectedAircraft: null,
         resumeListeningPending: false, // remembered listening waits for the page's first gesture
         connectionLostSoundPlayed: false, // Track if the connection lost sound has been played

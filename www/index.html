@@ -96,41 +96,185 @@
                 <!-- Main Content -->
                 <main class="flex flex-1 overflow-hidden relative">
                     <!-- Settings Panel -->
-                    <aside id="settings-panel" 
-                          :class="{ '-translate-x-full': $store.atc.settingsCollapsed }"
-                          class="w-80 min-w-80 bg-panel border-r border-border absolute left-0 top-0 bottom-0 transition-transform duration-300 z-50">
-                        <!-- Straddles the panel's edge. Folded, that edge is the window's,
-                             and upstream left half the button outside it: it moves in by
-                             1.5rem so it shows whole, 0.5rem from the edge. -->
-                        <button class="absolute -right-4 top-2.5 w-8 h-8 bg-panel border border-border rounded-full text-text cursor-pointer flex items-center justify-center z-50 transition-transform duration-300"
-                                :class="{ 'rotate-180 translate-x-6': $store.atc.settingsCollapsed }"
-                                @click="$store.atc.settingsCollapsed = !$store.atc.settingsCollapsed">
-                            <i class="fas fa-cog"></i>
-                        </button>
-                        
-                        <div class="p-4 h-full overflow-y-auto overflow-x-hidden bg-panel">
-                            <!-- Who is signed in, and the way out: there was none. First in the
-                                 panel, not with Access at its bottom, so that it is found. Shown
-                                 only when sign-in is required. -->
-                            <div x-data="{ user: null, busy: false }"
-                                 x-init="fetch('/api/v1/auth/status', { credentials: 'same-origin' })
-                                     .then(r => r.ok ? r.json() : null)
-                                     .then(s => { if (s && s.enabled && s.authenticated && s.user) user = s.user; })
-                                     .catch(() => {})"
-                                 x-show="user"
-                                 class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                                <span class="opacity-80">Signed in as <span class="text-highlight" x-text="user"></span></span>
-                                <button :disabled="busy"
-                                        @click="busy = true; fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' })
-                                            .finally(() => location.reload())"
-                                        class="shrink-0 px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
-                                    <i class="fas fa-right-from-bracket mr-1"></i>Sign out
-                                </button>
+                    <!-- Settings: a page of its own (audit 2.1, 10/10). It replaced a 320 px side
+                         panel where the settings that matter came last, 1 300 px down, under five
+                         upstream sections with no use here. The controls are the same, moved: their
+                         bindings are unchanged. The station override by the browser's GPS is gone:
+                         the station does not move. -->
+                    <div x-show="$store.atc.settingsOpen" x-cloak
+                         @keydown.escape.window="$store.atc.settingsOpen = false"
+                         x-data="serverSettings()" x-init="load()"
+                         class="fixed inset-x-0 top-0 bottom-20 z-[70] bg-panel flex">
+                        <nav class="hidden md:flex flex-col gap-1 w-48 shrink-0 border-r border-border p-4 text-sm">
+                            <div class="text-highlight font-semibold mb-2">Settings</div>
+                            <a href="#set-listening" @click.prevent="document.getElementById('set-listening').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">Listening</a>
+                            <a href="#set-matching" @click.prevent="document.getElementById('set-matching').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">Callsign matching</a>
+                            <a href="#set-display" @click.prevent="document.getElementById('set-display').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">Display</a>
+                            <a href="#set-account" @click.prevent="document.getElementById('set-account').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">Account</a>
+                            <a href="#set-system" @click.prevent="document.getElementById('set-system').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">System</a>
+                        </nav>
+                        <div class="flex-1 overflow-y-auto">
+                            <div class="max-w-2xl mx-auto px-4 py-5 grid gap-8">
+                                <div class="flex items-center justify-between gap-3 sticky top-0 bg-panel py-2 z-10">
+                                    <h1 class="text-lg font-semibold">Settings</h1>
+                                    <div class="flex items-center gap-3">
+                                        <template x-if="note"><span class="text-xs" :class="noteBad ? 'text-red-400' : 'text-green-400'" x-text="note"></span></template>
+                                        <button @click="load()" :disabled="busy" title="Reload from the server" class="text-sm opacity-60 hover:opacity-100 disabled:opacity-30"><i class="fas fa-rotate" :class="{ 'fa-spin': busy }"></i></button>
+                                        <button @click="$store.atc.settingsOpen = false" title="Close (Esc)" class="text-lg opacity-70 hover:opacity-100"><i class="fas fa-xmark"></i></button>
+                                    </div>
+                                </div>
+                                <template x-if="error"><div class="text-sm text-red-400" x-text="error"></div></template>
+                        <section id="set-listening" class="scroll-mt-4">
+                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">Listening</h2>
+                            <div class="grid gap-4">
+                            <div>
+                                <span class="text-sm">On air</span>
+                                <div class="text-xs opacity-70 mt-1" x-show="!$store.atc.audioFrequencies.length">No frequency connected.</div>
+                                <ul class="text-xs mt-1 grid gap-0.5">
+                                    <template x-for="f in $store.atc.audioFrequencies" :key="f.id">
+                                        <li x-text="f.name"></li>
+                                    </template>
+                                </ul>
+                                <div class="text-xs opacity-60 mt-1">Chosen at the station; co-atc follows it.</div>
                             </div>
+                            <template x-if="state">
+                                <div class="grid gap-4">
+                                        <!-- The airport phases are judged against. Upstream measured them
+                                             from the receiver; this lets a receiver that does not sit on the
+                                             airport worth watching say which one it is. -->
+                                        <template x-if="state.reference">
+                                            <!-- Label above, select full width: airport names are long and the
+                                                 panel is narrow; side by side they overflowed it and clipped
+                                                 every other control in the section. -->
+                                            <div class="grid gap-1 min-w-0">
+                                                <span class="text-sm">Reference airport</span>
+                                                <div class="min-w-0">
+                                                    <select x-model="draft.reference_airport" @change="save()" :disabled="busy"
+                                                            class="w-full min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                        <template x-for="c in airportChoices()" :key="c.code">
+                                                            <option :value="c.code" :selected="c.code === draft.reference_airport"
+                                                                    x-text="c.code + ' · ' + c.name + ' · ' + c.distance_nm + ' NM'"></option>
+                                                        </template>
+                                                    </select>
+                                                </div>
+                                                <div class="text-xs opacity-60 leading-snug">
+                                                    Approach, departure, takeoff, landing, runway in use and weather are
+                                                    judged against this airport. Distances and range rings stay on the receiver.
+                                                </div>
+                                                <!-- Further airports: Orly and De Gaulle are 13 NM apart and both
+                                                     worth watching (docs-fr/05-decisions.md, Q40). -->
+                                                <span class="text-sm mt-2">Also follow</span>
+                                                <div class="grid gap-0.5 max-h-40 overflow-y-auto min-w-0">
+                                                    <template x-for="c in alsoChoices()" :key="'also-' + c.code">
+                                                        <label class="flex items-center gap-2 text-sm min-w-0 cursor-pointer">
+                                                            <input type="checkbox" :checked="alsoFollowed(c.code)" :disabled="busy"
+                                                                   @change="toggleAlso(c.code)">
+                                                            <span class="truncate" x-text="c.code + ' · ' + c.name + ' · ' + c.distance_nm + ' NM'"></span>
+                                                        </label>
+                                                    </template>
+                                                </div>
+                                                <div class="text-xs opacity-60 leading-snug">
+                                                    Each aircraft is judged against the airport whose runway axis it flies,
+                                                    else the nearest; its phase then shows that airport. Weather stays the
+                                                    reference airport's. Three at most.
+                                                </div>
+                                            </div>
+                                        </template>
 
-                            <!-- Display Settings -->
-                            <section class="mb-5">
-                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Display</h3>
+                                </div>
+                            </template>
+                            </div>
+                        </section>
+                        <section id="set-matching" class="scroll-mt-4">
+                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">Callsign matching</h2>
+                            <div class="grid gap-4">
+                            <template x-if="state">
+                                <div class="grid gap-4">
+                                        <!-- How a transmission is tied to an aircraft. Each rule was measured
+                                             against a shuffled sky before being offered here (docs-fr/05-decisions.md,
+                                             Q30 and Q46); a change applies to the next transmission. -->
+                                        <template x-if="draft.matching">
+                                            <div class="grid gap-1.5 min-w-0">
+                                                <span class="text-sm">Callsign matching</span>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.letters" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">Letters in flight numbers</span>: "seven uniform echo" read as 7UE.
+                                                        59% of callsigns have letters. Measured +27% matched aircraft, precision 73% to 76%.</span>
+                                                </label>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.approx_operators" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">Airline heard roughly</span>: "welling" taken for Vueling,
+                                                        among the airlines in the sky only. Few matches on its own; rescues half-heard ones.</span>
+                                                </label>
+                                                <div class="flex items-center justify-between gap-2.5">
+                                                    <span class="text-xs">Shortest flight number</span>
+                                                    <select x-model.number="draft.matching.min_digits" @change="save()" :disabled="busy"
+                                                            class="bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                        <option value="2">2 digits</option>
+                                                        <option value="3">3 digits</option>
+                                                        <option value="4">4 digits</option>
+                                                    </select>
+                                                </div>
+                                                <div class="text-xs opacity-60 leading-snug">
+                                                    With 2 digits, chance matches about as often as the truth (measured); 3 is the default.
+                                                </div>
+                                                <div class="text-xs opacity-60 leading-snug">
+                                                    An aircraft heard on the frequency in the last two minutes, named again in short:
+                                                </div>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.context_letters" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">By its last letters</span>: "sierra bravo" for AFR23SB. Measured +8, no chance matches.</span>
+                                                </label>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.context_digits" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">By its last two digits</span>: "five four" for LBT554, when no other aircraft just heard ends so. Measured +13.</span>
+                                                </label>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.context_names" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">By its airline alone</span>, when it is the only one of that airline just heard. Measured +68,
+                                                        but ADS-B cannot tell whether the right aircraft was named: to be checked by ear first.</span>
+                                                </label>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.sectors" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">Only aircraft in the frequency's sector</span>, for frequencies that name
+                                                        their airport and kind. Measured on the Roissy approach: chance matches halved, more true ones.</span>
+                                                </label>
+                                                <template x-if="draft.matching.sectors && draft.matching.sector">
+                                                    <div class="grid gap-1 pl-5">
+                                                        <template x-for="kind in ['approach', 'departure', 'tower', 'ground']" :key="kind">
+                                                            <div class="flex items-center justify-between gap-2 text-xs">
+                                                                <span class="capitalize" x-text="kind"></span>
+                                                                <span class="flex items-center gap-1">
+                                                                    <input type="number" min="1" max="250" x-model.number="draft.matching.sector[kind].radius_nm" @change="save()" :disabled="busy"
+                                                                           class="w-14 bg-background border border-border rounded px-1 py-0.5 text-right">
+                                                                    <span class="opacity-60">NM, below</span>
+                                                                    <input type="number" min="500" max="60000" step="500" x-model.number="draft.matching.sector[kind].max_alt_ft" @change="save()" :disabled="busy"
+                                                                           class="w-20 bg-background border border-border rounded px-1 py-0.5 text-right">
+                                                                    <span class="opacity-60">ft</span>
+                                                                </span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.prefix_digits" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">First two digits, airline named</span>: "Air France Five One" for AFR511,
+                                                        right after the airline's name, when no other aircraft of the airline starts so. Measured +1 to 2%, with nearly as much chance on one day: off by default.</span>
+                                                </label>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" x-model="draft.matching.one_digit_off" @change="save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">Accept one digit off</span>: measured 81% noise. For experiments only.</span>
+                                                </label>
+                                            </div>
+                                        </template>
+
+                                </div>
+                            </template>
+                            </div>
+                        </section>
+                        <section id="set-display" class="scroll-mt-4">
+                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">Display <small class="text-xs font-normal opacity-60">this browser</small></h2>
+                            <div class="grid gap-4">
                                 <div class="grid gap-3">
                                     <div class="flex items-center justify-between gap-2.5">
                                         <span class="text-sm">Smoothing Between Updates</span>
@@ -154,12 +298,6 @@
                                         </div>
                                     </div>
                                 </div>
-                            </section>
-                            
-                            
-                            <!-- General Settings -->
-                            <section class="mb-5">
-                                 <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">General Settings</h3>
                                  <div class="grid gap-2.5">
                                            
                                     <div class="flex items-center justify-between gap-2.5">
@@ -184,11 +322,151 @@
                                         </label>
                                     </div>
                                     </div>
-                            </section>
+                            <div class="text-xs opacity-70">Base map and layers: <span class="text-highlight">Map Controls</span>, at the bottom right of the map.</div>
+                            </div>
+                        </section>
+                        <section id="set-account" class="scroll-mt-4">
+                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">Account</h2>
+                            <div class="grid gap-4">
+                            <!-- Who is signed in, and the way out: there was none. First in the
+                                 panel, not with Access at its bottom, so that it is found. Shown
+                                 only when sign-in is required. -->
+                            <div x-data="{ user: null, busy: false }"
+                                 x-init="fetch('/api/v1/auth/status', { credentials: 'same-origin' })
+                                     .then(r => r.ok ? r.json() : null)
+                                     .then(s => { if (s && s.enabled && s.authenticated && s.user) user = s.user; })
+                                     .catch(() => {})"
+                                 x-show="user"
+                                 class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                <span class="opacity-80">Signed in as <span class="text-highlight" x-text="user"></span></span>
+                                <button :disabled="busy"
+                                        @click="busy = true; fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' })
+                                            .finally(() => location.reload())"
+                                        class="shrink-0 px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
+                                    <i class="fas fa-right-from-bracket mr-1"></i>Sign out
+                                </button>
+                            </div>
+                            <template x-if="state">
+                                <div class="grid gap-4">
+                                        <!-- Access: the first-run question, answerable again. Stacked rather
+                                             than side by side, for the same narrow panel. Switching reloads the
+                                             page, since what this browser may see changes with it. -->
+                                        <template x-if="state.access">
+                                            <div class="grid gap-1 min-w-0">
+                                                <span class="text-sm">Access</span>
+                                                <span class="text-xs" x-text="accessLabel()"></span>
+                                                <button x-show="state.access.mode === 'account'" @click="switchAccess('local')"
+                                                        :disabled="busy || !state.access.local_allowed"
+                                                        class="justify-self-start text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40 disabled:cursor-not-allowed">
+                                                    Switch to this machine only
+                                                </button>
+                                                <button x-show="state.access.mode !== 'account' && !newAccount" @click="switchAccess('account')"
+                                                        :disabled="busy"
+                                                        class="justify-self-start text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
+                                                    Require sign-in
+                                                </button>
+                                                <template x-if="newAccount">
+                                                    <div class="grid gap-1.5 min-w-0">
+                                                        <input x-model="newAccount.username" placeholder="User name"
+                                                               autocomplete="username" autocapitalize="none"
+                                                               class="min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                        <input x-model="newAccount.password" type="password"
+                                                               placeholder="Password, 10 characters or more" autocomplete="new-password"
+                                                               class="min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                        <div class="flex gap-2">
+                                                            <button @click="createAccount()" :disabled="busy"
+                                                                    class="text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
+                                                                Create and require sign-in
+                                                            </button>
+                                                            <button @click="newAccount = null" class="text-xs px-2 py-0.5 opacity-60 hover:opacity-100">
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                <div class="text-xs opacity-60 leading-snug" x-text="accessNote()"></div>
+                                            </div>
+                                        </template>
 
-                            <!-- ADS-B Source -->
-                            <section class="mb-5">
-                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">ADS-B Source</h3>
+                                </div>
+                            </template>
+                            </div>
+                        </section>
+                        <section id="set-system" class="scroll-mt-4">
+                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">System</h2>
+                            <div class="grid gap-4">
+                            <template x-if="state">
+                                <div class="grid gap-4">
+                                        <!-- Editable: the only two things that change without a restart. -->
+                                        <div class="flex items-center justify-between gap-2.5">
+                                            <span class="text-sm">Log level</span>
+                                            <select x-model="draft.log_level" @change="save()"
+                                                    class="bg-background border border-border rounded px-2 py-0.5 text-sm">
+                                                <option value="debug">debug</option>
+                                                <option value="info">info</option>
+                                                <option value="warn">warn</option>
+                                                <option value="error">error</option>
+                                            </select>
+                                        </div>
+                            
+                                        <div class="flex items-center justify-between gap-2.5">
+                                            <!-- A size, not a number of days (28/09): the oldest days go
+                                                 past it, today's never. -->
+                                            <span class="text-sm">Keep databases up to</span>
+                                            <div class="flex items-center gap-2">
+                                                <input type="number" min="1" max="1000" step="1"
+                                                       x-model.number="draft.db_retention_gb" @change="save()"
+                                                       class="w-16 bg-background border border-border rounded px-2 py-0.5 text-sm text-right">
+                                                <span class="text-xs opacity-60">GB</span>
+                                            </div>
+                                        </div>
+                            
+                                        <!-- Reported, not editable: changing any of these means reopening
+                                             something, and a panel that silently fails to apply what it
+                                             shows is worse than one that says which half it can. -->
+                                        <div class="border-t border-border pt-2 mt-1 grid gap-1.5 text-xs">
+                                            <div class="flex justify-between gap-2">
+                                                <span class="opacity-60">Database</span>
+                                                <span class="text-right" :class="state.storage.rotates ? '' : 'text-red-400'"
+                                                      x-text="fmtBytes(state.storage.active_db_bytes) + (state.storage.rotates ? ' · rotates daily' : ' · NEVER ROTATES')"></span>
+                                            </div>
+                                            <div class="flex justify-between gap-2" x-show="state.storage.growth_bytes_per_hour > 0">
+                                                <span class="opacity-60">Growing</span>
+                                                <span x-text="fmtBytes(state.storage.growth_bytes_per_hour) + '/h'"></span>
+                                            </div>
+                                            <div class="flex justify-between gap-2" x-show="state.storage.days_until_full > 0">
+                                                <span class="opacity-60">Disk full in</span>
+                                                <span :class="state.storage.days_until_full < 7 ? 'text-red-400' : ''"
+                                                      x-text="state.storage.days_until_full.toFixed(1) + ' days'"></span>
+                                            </div>
+                                            <div class="flex justify-between gap-2">
+                                                <span class="opacity-60">Disk free</span>
+                                                <span x-text="fmtBytes(state.storage.disk_free_bytes)"></span>
+                                            </div>
+                                            <div class="flex justify-between gap-2">
+                                                <span class="opacity-60">Log</span>
+                                                <span class="text-right" :class="state.logging.bounded ? '' : 'text-yellow-400'"
+                                                      x-text="state.logging.bounded
+                                                              ? (state.logging.max_size_mb + ' MB × ' + state.logging.max_files + ' files')
+                                                              : 'stdout only · UNBOUNDED'"></span>
+                                            </div>
+                                            <template x-if="state.transcription">
+                                                <div class="flex justify-between gap-2">
+                                                    <span class="opacity-60">Transcription</span>
+                                                    <span class="text-right" :class="state.transcription.status === 'ok' ? '' : 'text-red-400'"
+                                                          x-text="state.transcription.status + (state.transcription.second_opinion ? ' · second opinion' : '')"></span>
+                                                </div>
+                                            </template>
+                                            <template x-if="state.transcription && state.transcription.detail">
+                                                <div class="text-red-400 leading-snug" x-text="state.transcription.detail"></div>
+                                            </template>
+                                            <div class="flex justify-between gap-2">
+                                                <span class="opacity-60">Uptime</span>
+                                                <span x-text="fmtUptime(state.uptime_seconds)"></span>
+                                            </div>
+                                        </div>
+                                </div>
+                            </template>
                                 <div class="grid gap-2.5 text-xs">
                                     <div class="flex items-center justify-between gap-2">
                                         <span class="text-sm">Mode</span>
@@ -283,11 +561,9 @@
                                         </div>
                                     </div>
                                 </div>
-                            </section>
-                            
-                            <!-- Debug Settings -->
-                            <section class="mb-5">
-                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Debug Settings</h3>
+                            <details class="text-sm">
+                                <summary class="cursor-pointer opacity-80">Performance and debug</summary>
+                                <div class="mt-3 grid gap-2.5">
                                 <div class="grid gap-2.5">
                                     <div class="flex items-center justify-between gap-2">
                                         <span class="text-sm whitespace-nowrap">WebSocket</span>
@@ -396,375 +672,19 @@
                                     
                                     <!-- Removed Map Updates and Data Only Mode debug toggles -->
                                 </div>
-                            </section>
-                            
-                            <!-- Station Position -->
-                            <section class="mb-5">
-                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5">Station</h3>
-                                <div class="grid gap-2.5">
-                                    <!-- GPS Coordinates (always visible) -->
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Position</span>
-                                        <div class="text-xs text-text/70 font-mono">
-                                            <span x-text="($store.atc.stationOverride.active ? $store.atc.stationOverride.latitude : $store.atc.stationLatitude)?.toFixed(6) || '—'"></span>,
-                                            <span x-text="($store.atc.stationOverride.active ? $store.atc.stationOverride.longitude : $store.atc.stationLongitude)?.toFixed(6) || '—'"></span>
-                                        </div>
-                                    </div>
-
-                                    <!-- Override checkbox -->
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Override</span>
-                                        <label class="switch">
-                                            <input type="checkbox"
-                                                   :checked="$store.atc.stationOverride.active"
-                                                   @change="if ($store.atc.stationOverride.active) { $store.atc.clearStationOverride(); } else { $store.atc.stationOverride._showPanel = true; }"
-                                                   x-init="$store.atc.stationOverride._showPanel = $store.atc.stationOverride.active">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-
-                                    <!-- Override options (collapsed when not active) -->
-                                    <div x-show="$store.atc.stationOverride.active || $store.atc.stationOverride._showPanel" class="grid gap-2.5">
-                                        <!-- GPS Coordinate Inputs -->
-                                        <div class="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label class="text-xs text-text/70 block mb-1">Latitude</label>
-                                                <input type="number"
-                                                       x-model="$store.atc.stationOverride.latitude"
-                                                       step="0.000001"
-                                                       placeholder="43.6777"
-                                                       class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
-                                            </div>
-                                            <div>
-                                                <label class="text-xs text-text/70 block mb-1">Longitude</label>
-                                                <input type="number"
-                                                       x-model="$store.atc.stationOverride.longitude"
-                                                       step="0.000001"
-                                                       placeholder="-79.6248"
-                                                       class="w-full px-2 py-1 text-xs bg-background border border-border rounded text-text">
-                                            </div>
-                                        </div>
-
-                                        <!-- Action Buttons -->
-                                        <div class="flex gap-1">
-                                            <button @click="$store.atc.setStationFromMap()"
-                                                    title="Click map to set coordinates"
-                                                    :class="$store.atc.stationOverride.mapClickMode ? 'bg-orange-600/70 text-white' : 'bg-slate-700/50 hover:bg-slate-600/70 text-slate-300 hover:text-white'"
-                                                    class="flex items-center justify-center w-8 h-8 rounded transition-all border border-slate-600/50 hover:border-slate-500">
-                                                <i class="fas fa-crosshairs text-xs"></i>
-                                            </button>
-                                            <button @click="$store.atc.useGeolocation()"
-                                                    title="Use device location"
-                                                    class="flex items-center justify-center w-8 h-8 bg-blue-700/50 hover:bg-blue-600/70 text-blue-300 hover:text-white rounded transition-all border border-blue-600/50 hover:border-blue-500">
-                                                <i class="fas fa-location-arrow text-xs"></i>
-                                            </button>
-                                            <button @click="$store.atc.applyStationOverride()"
-                                                    class="flex-1 px-3 py-1.5 bg-emerald-700/50 hover:bg-emerald-600/70 text-emerald-300 hover:text-white rounded transition-all border border-emerald-600/50 hover:border-emerald-500 font-medium text-xs">
-                                                Apply
-                                            </button>
-                                            <button x-show="$store.atc.stationOverride.active"
-                                                    @click="$store.atc.clearStationOverride()"
-                                                    title="Clear override"
-                                                    class="flex items-center justify-center w-8 h-8 bg-red-700/50 hover:bg-red-600/70 text-red-300 hover:text-white rounded transition-all border border-red-600/50 hover:border-red-500">
-                                                <i class="fas fa-times text-xs"></i>
-                                            </button>
-                                        </div>
-
-                                        <!-- Auto-Update Toggle -->
-                                        <div class="flex items-center justify-between gap-2.5">
-                                            <span class="text-sm">Auto-update from GPS</span>
-                                            <label class="switch">
-                                                <input type="checkbox"
-                                                       x-model="$store.atc.stationOverride.autoUpdate"
-                                                       @change="$store.atc.toggleGeolocationAutoUpdate()">
-                                                <span class="slider"></span>
-                                            </label>
-                                        </div>
-
-                                        <!-- Update Interval -->
-                                        <div x-show="$store.atc.stationOverride.autoUpdate" class="flex items-center justify-between gap-2.5">
-                                            <span class="text-sm">Update interval</span>
-                                            <select x-model="$store.atc.stationOverride.updateInterval"
-                                                    @change="$store.atc.updateGeolocationInterval()"
-                                                    class="px-2 py-1 text-xs bg-background border border-border rounded text-text">
-                                                <option value="30">30s</option>
-                                                <option value="60">1m</option>
-                                                <option value="120">2m</option>
-                                                <option value="300">5m</option>
-                                            </select>
-                                        </div>
-
-                                        <!-- Status Messages -->
-                                        <div x-show="$store.atc.stationOverride.mapClickMode"
-                                             class="text-xs text-orange-400 bg-orange-900/20 border border-orange-700/50 rounded px-2 py-1.5">
-                                            <i class="fas fa-crosshairs mr-1"></i>
-                                            Click on the map to set station location
-                                        </div>
-
-                                        <div x-show="$store.atc.stationOverride.autoUpdate && $store.atc.stationOverride.geolocationStatus"
-                                             class="text-xs text-blue-400 bg-blue-900/20 border border-blue-700/50 rounded px-2 py-1.5">
-                                            <i class="fas fa-satellite-dish mr-1"></i>
-                                            <span x-text="$store.atc.stationOverride.geolocationStatus"></span>
-                                        </div>
-                                    </div>
                                 </div>
-                            </section>
-                            
-                            <!-- Server. Everything above this line is a browser preference kept in
-                                 localStorage; everything below it is the server's own state, read from
-                                 /api/v1/server. Worth separating: one follows you between machines, the
-                                 other decides when data is deleted. -->
-                            <section class="mb-5" x-data="serverSettings()" x-init="load()">
-                                <h3 class="text-highlight text-sm border-b border-border pb-1 mb-2.5 flex items-center justify-between">
-                                    <span>Server</span>
-                                    <button @click="load()" :disabled="busy" class="text-xs opacity-60 hover:opacity-100 disabled:opacity-30">
-                                        <i class="fas fa-rotate" :class="{ 'fa-spin': busy }"></i>
-                                    </button>
-                                </h3>
-                            
-                                <template x-if="error">
-                                    <div class="text-xs text-red-400 mb-2" x-text="error"></div>
-                                </template>
-                            
-                                <template x-if="state">
-                                    <div class="grid gap-2.5">
-                                        <!-- Editable: the only two things that change without a restart. -->
-                                        <div class="flex items-center justify-between gap-2.5">
-                                            <span class="text-sm">Log level</span>
-                                            <select x-model="draft.log_level" @change="save()"
-                                                    class="bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                <option value="debug">debug</option>
-                                                <option value="info">info</option>
-                                                <option value="warn">warn</option>
-                                                <option value="error">error</option>
-                                            </select>
-                                        </div>
-                            
-                                        <div class="flex items-center justify-between gap-2.5">
-                                            <!-- A size, not a number of days (28/09): the oldest days go
-                                                 past it, today's never. -->
-                                            <span class="text-sm">Keep databases up to</span>
-                                            <div class="flex items-center gap-2">
-                                                <input type="number" min="1" max="1000" step="1"
-                                                       x-model.number="draft.db_retention_gb" @change="save()"
-                                                       class="w-16 bg-background border border-border rounded px-2 py-0.5 text-sm text-right">
-                                                <span class="text-xs opacity-60">GB</span>
-                                            </div>
-                                        </div>
-                            
-                                        <!-- The airport phases are judged against. Upstream measured them
-                                             from the receiver; this lets a receiver that does not sit on the
-                                             airport worth watching say which one it is. -->
-                                        <template x-if="state.reference">
-                                            <!-- Label above, select full width: airport names are long and the
-                                                 panel is narrow; side by side they overflowed it and clipped
-                                                 every other control in the section. -->
-                                            <div class="grid gap-1 min-w-0">
-                                                <span class="text-sm">Reference airport</span>
-                                                <div class="min-w-0">
-                                                    <select x-model="draft.reference_airport" @change="save()" :disabled="busy"
-                                                            class="w-full min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                        <template x-for="c in airportChoices()" :key="c.code">
-                                                            <option :value="c.code" :selected="c.code === draft.reference_airport"
-                                                                    x-text="c.code + ' · ' + c.name + ' · ' + c.distance_nm + ' NM'"></option>
-                                                        </template>
-                                                    </select>
-                                                </div>
-                                                <div class="text-xs opacity-60 leading-snug">
-                                                    Approach, departure, takeoff, landing, runway in use and weather are
-                                                    judged against this airport. Distances and range rings stay on the receiver.
-                                                </div>
-                                                <!-- Further airports: Orly and De Gaulle are 13 NM apart and both
-                                                     worth watching (docs-fr/05-decisions.md, Q40). -->
-                                                <span class="text-sm mt-2">Also follow</span>
-                                                <div class="grid gap-0.5 max-h-40 overflow-y-auto min-w-0">
-                                                    <template x-for="c in alsoChoices()" :key="'also-' + c.code">
-                                                        <label class="flex items-center gap-2 text-sm min-w-0 cursor-pointer">
-                                                            <input type="checkbox" :checked="alsoFollowed(c.code)" :disabled="busy"
-                                                                   @change="toggleAlso(c.code)">
-                                                            <span class="truncate" x-text="c.code + ' · ' + c.name + ' · ' + c.distance_nm + ' NM'"></span>
-                                                        </label>
-                                                    </template>
-                                                </div>
-                                                <div class="text-xs opacity-60 leading-snug">
-                                                    Each aircraft is judged against the airport whose runway axis it flies,
-                                                    else the nearest; its phase then shows that airport. Weather stays the
-                                                    reference airport's. Three at most.
-                                                </div>
-                                            </div>
-                                        </template>
-
-                                        <!-- How a transmission is tied to an aircraft. Each rule was measured
-                                             against a shuffled sky before being offered here (docs-fr/05-decisions.md,
-                                             Q30 and Q46); a change applies to the next transmission. -->
-                                        <template x-if="draft.matching">
-                                            <div class="grid gap-1.5 min-w-0">
-                                                <span class="text-sm">Callsign matching</span>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.letters" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">Letters in flight numbers</span>: "seven uniform echo" read as 7UE.
-                                                        59% of callsigns have letters. Measured +27% matched aircraft, precision 73% to 76%.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.approx_operators" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">Airline heard roughly</span>: "welling" taken for Vueling,
-                                                        among the airlines in the sky only. Few matches on its own; rescues half-heard ones.</span>
-                                                </label>
-                                                <div class="flex items-center justify-between gap-2.5">
-                                                    <span class="text-xs">Shortest flight number</span>
-                                                    <select x-model.number="draft.matching.min_digits" @change="save()" :disabled="busy"
-                                                            class="bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                        <option value="2">2 digits</option>
-                                                        <option value="3">3 digits</option>
-                                                        <option value="4">4 digits</option>
-                                                    </select>
-                                                </div>
-                                                <div class="text-xs opacity-60 leading-snug">
-                                                    With 2 digits, chance matches about as often as the truth (measured); 3 is the default.
-                                                </div>
-                                                <div class="text-xs opacity-60 leading-snug">
-                                                    An aircraft heard on the frequency in the last two minutes, named again in short:
-                                                </div>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.context_letters" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">By its last letters</span>: "sierra bravo" for AFR23SB. Measured +8, no chance matches.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.context_digits" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">By its last two digits</span>: "five four" for LBT554, when no other aircraft just heard ends so. Measured +13.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.context_names" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">By its airline alone</span>, when it is the only one of that airline just heard. Measured +68,
-                                                        but ADS-B cannot tell whether the right aircraft was named: to be checked by ear first.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.sectors" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">Only aircraft in the frequency's sector</span>, for frequencies that name
-                                                        their airport and kind. Measured on the Roissy approach: chance matches halved, more true ones.</span>
-                                                </label>
-                                                <template x-if="draft.matching.sectors && draft.matching.sector">
-                                                    <div class="grid gap-1 pl-5">
-                                                        <template x-for="kind in ['approach', 'departure', 'tower', 'ground']" :key="kind">
-                                                            <div class="flex items-center justify-between gap-2 text-xs">
-                                                                <span class="capitalize" x-text="kind"></span>
-                                                                <span class="flex items-center gap-1">
-                                                                    <input type="number" min="1" max="250" x-model.number="draft.matching.sector[kind].radius_nm" @change="save()" :disabled="busy"
-                                                                           class="w-14 bg-background border border-border rounded px-1 py-0.5 text-right">
-                                                                    <span class="opacity-60">NM, below</span>
-                                                                    <input type="number" min="500" max="60000" step="500" x-model.number="draft.matching.sector[kind].max_alt_ft" @change="save()" :disabled="busy"
-                                                                           class="w-20 bg-background border border-border rounded px-1 py-0.5 text-right">
-                                                                    <span class="opacity-60">ft</span>
-                                                                </span>
-                                                            </div>
-                                                        </template>
-                                                    </div>
-                                                </template>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.prefix_digits" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">First two digits, airline named</span>: "Air France Five One" for AFR511,
-                                                        right after the airline's name, when no other aircraft of the airline starts so. Measured +1 to 2%, with nearly as much chance on one day: off by default.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.one_digit_off" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">Accept one digit off</span>: measured 81% noise. For experiments only.</span>
-                                                </label>
-                                            </div>
-                                        </template>
-
-                                        <!-- Access: the first-run question, answerable again. Stacked rather
-                                             than side by side, for the same narrow panel. Switching reloads the
-                                             page, since what this browser may see changes with it. -->
-                                        <template x-if="state.access">
-                                            <div class="grid gap-1 min-w-0">
-                                                <span class="text-sm">Access</span>
-                                                <span class="text-xs" x-text="accessLabel()"></span>
-                                                <button x-show="state.access.mode === 'account'" @click="switchAccess('local')"
-                                                        :disabled="busy || !state.access.local_allowed"
-                                                        class="justify-self-start text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40 disabled:cursor-not-allowed">
-                                                    Switch to this machine only
-                                                </button>
-                                                <button x-show="state.access.mode !== 'account' && !newAccount" @click="switchAccess('account')"
-                                                        :disabled="busy"
-                                                        class="justify-self-start text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
-                                                    Require sign-in
-                                                </button>
-                                                <template x-if="newAccount">
-                                                    <div class="grid gap-1.5 min-w-0">
-                                                        <input x-model="newAccount.username" placeholder="User name"
-                                                               autocomplete="username" autocapitalize="none"
-                                                               class="min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                        <input x-model="newAccount.password" type="password"
-                                                               placeholder="Password, 10 characters or more" autocomplete="new-password"
-                                                               class="min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                        <div class="flex gap-2">
-                                                            <button @click="createAccount()" :disabled="busy"
-                                                                    class="text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
-                                                                Create and require sign-in
-                                                            </button>
-                                                            <button @click="newAccount = null" class="text-xs px-2 py-0.5 opacity-60 hover:opacity-100">
-                                                                Cancel
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </template>
-                                                <div class="text-xs opacity-60 leading-snug" x-text="accessNote()"></div>
-                                            </div>
-                                        </template>
-
-                                        <template x-if="note">
-                                            <div class="text-xs" :class="noteBad ? 'text-red-400' : 'text-green-400'" x-text="note"></div>
-                                        </template>
-                            
-                                        <!-- Reported, not editable: changing any of these means reopening
-                                             something, and a panel that silently fails to apply what it
-                                             shows is worse than one that says which half it can. -->
-                                        <div class="border-t border-border pt-2 mt-1 grid gap-1.5 text-xs">
-                                            <div class="flex justify-between gap-2">
-                                                <span class="opacity-60">Database</span>
-                                                <span class="text-right" :class="state.storage.rotates ? '' : 'text-red-400'"
-                                                      x-text="fmtBytes(state.storage.active_db_bytes) + (state.storage.rotates ? ' · rotates daily' : ' · NEVER ROTATES')"></span>
-                                            </div>
-                                            <div class="flex justify-between gap-2" x-show="state.storage.growth_bytes_per_hour > 0">
-                                                <span class="opacity-60">Growing</span>
-                                                <span x-text="fmtBytes(state.storage.growth_bytes_per_hour) + '/h'"></span>
-                                            </div>
-                                            <div class="flex justify-between gap-2" x-show="state.storage.days_until_full > 0">
-                                                <span class="opacity-60">Disk full in</span>
-                                                <span :class="state.storage.days_until_full < 7 ? 'text-red-400' : ''"
-                                                      x-text="state.storage.days_until_full.toFixed(1) + ' days'"></span>
-                                            </div>
-                                            <div class="flex justify-between gap-2">
-                                                <span class="opacity-60">Disk free</span>
-                                                <span x-text="fmtBytes(state.storage.disk_free_bytes)"></span>
-                                            </div>
-                                            <div class="flex justify-between gap-2">
-                                                <span class="opacity-60">Log</span>
-                                                <span class="text-right" :class="state.logging.bounded ? '' : 'text-yellow-400'"
-                                                      x-text="state.logging.bounded
-                                                              ? (state.logging.max_size_mb + ' MB × ' + state.logging.max_files + ' files')
-                                                              : 'stdout only · UNBOUNDED'"></span>
-                                            </div>
-                                            <template x-if="state.transcription">
-                                                <div class="flex justify-between gap-2">
-                                                    <span class="opacity-60">Transcription</span>
-                                                    <span class="text-right" :class="state.transcription.status === 'ok' ? '' : 'text-red-400'"
-                                                          x-text="state.transcription.status + (state.transcription.second_opinion ? ' · second opinion' : '')"></span>
-                                                </div>
-                                            </template>
-                                            <template x-if="state.transcription && state.transcription.detail">
-                                                <div class="text-red-400 leading-snug" x-text="state.transcription.detail"></div>
-                                            </template>
-                                            <div class="flex justify-between gap-2">
-                                                <span class="opacity-60">Uptime</span>
-                                                <span x-text="fmtUptime(state.uptime_seconds)"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </template>
-                            </section>
+                            </details>
+                            </div>
+                        </section>
+                            </div>
                         </div>
-                    </aside>
+                    </div>
+
+                    <!-- Opens the settings page. -->
+                    <button class="absolute left-2 top-2.5 w-8 h-8 bg-panel border border-border rounded-full text-text cursor-pointer flex items-center justify-center z-50 hover:bg-hover"
+                            title="Settings" @click="$store.atc.settingsOpen = true">
+                        <i class="fas fa-cog"></i>
+                    </button>
                     
                     <!-- Map Container -->
                     <div class="flex-1 relative z-10">
