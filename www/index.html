@@ -973,89 +973,14 @@
                         </div>
                     </div>
                     
-                    <!-- Welcome Splash Screen -->
-                    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-[10000] transition-all duration-500"
-                         :class="{ 'opacity-100 visible splash-screen-enter': $store.atc.showSplashScreen, 'opacity-0 invisible pointer-events-none splash-screen-exit': !$store.atc.showSplashScreen }">
-                        <div class="bg-panel border-2 border-highlight/30 rounded-lg shadow-2xl max-w-2xl w-full mx-4 overflow-hidden splash-content">
-                            <!-- Header -->
-                            <div class="bg-black/50 p-4 border-b border-highlight/20">
-                                <div class="flex items-center justify-between">
-                                    <h2 class="text-2xl font-bold text-highlight">
-                                        <i class="fas fa-plane-arrival mr-2"></i>Co-ATC
-                                    </h2>
-                                    <div class="text-sm text-text/70">
-                                        <i class="fas fa-clock mr-1"></i>
-                                        <span x-text="$store.atc.zuluTime"></span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Content -->
-                            <div class="p-6">
-                                <!-- Welcome Message -->
-                                <div class="mb-6">
-                                    <h3 class="text-xl text-text mb-2">Welcome to Co-ATC</h3>
-                                    <p class="text-text/80">Real-time aircraft tracking and monitoring for modern air traffic control operations.</p>
-                                </div>
-                                
-                                <!-- Station Data -->
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                    <!-- Station Info -->
-                                    <div class="bg-black/30 rounded-lg p-4 border border-border">
-                                        <h4 class="text-highlight text-sm border-b border-border pb-1 mb-3">
-                                            <i class="fas fa-broadcast-tower mr-1"></i>Station Information
-                                        </h4>
-                                        <div class="space-y-2">
-                                            <div class="flex justify-between">
-                                                <!-- Next to the receiver's coordinates, "Airport Code" read as if the
-                                                     receiver sat on that airport. It is the reference airport, which
-                                                     the settings panel can set to one miles away. -->
-                                                <span class="text-text/70">Reference airport:</span>
-                                                <span class="font-mono font-bold" x-text="$store.atc.stationAirportCode || '-'"></span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span class="text-text/70">Coordinates:</span>
-                                                <span class="font-mono" x-text="$store.atc.stationLatitude && $store.atc.stationLongitude ?
-                                                    $store.atc.stationLatitude.toFixed(4) + ', ' + $store.atc.stationLongitude.toFixed(4) : '-'"></span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span class="text-text/70">Elevation:</span>
-                                                <span class="font-mono" x-text="$store.atc.stationElevationFeet ? $store.atc.stationElevationFeet + ' ft' : '-'"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Aircraft Data -->
-                                    <div class="bg-black/30 rounded-lg p-4 border border-border">
-                                        <h4 class="text-highlight text-sm border-b border-border pb-1 mb-3">
-                                            <i class="fas fa-plane mr-1"></i>Aircraft Status
-                                        </h4>
-                                        <div class="space-y-2">
-                                            <div class="flex justify-between">
-                                                <span class="text-text/70">In Air:</span>
-                                                <span class="font-mono font-bold text-highlight" x-text="$store.atc.counts.air_total || '0'"></span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span class="text-text/70">On Ground:</span>
-                                                <span class="font-mono font-bold text-gray-400" x-text="$store.atc.counts.ground_total || '0'"></span>
-                                            </div>
-                                            <div class="flex justify-between">
-                                                <span class="text-text/70">Total Aircraft:</span>
-                                                <span class="font-mono font-bold" x-text="($store.atc.counts.air_total || 0) + ($store.atc.counts.ground_total || 0)"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- METAR Data -->
-                                <div x-show="$store.atc.getLatestMetar()" class="bg-black/30 rounded-lg p-4 border border-border mb-6">
-                                    <h4 class="text-highlight text-sm border-b border-border pb-1 mb-3">
-                                        <i class="fas fa-cloud mr-1"></i>Latest METAR
-                                    </h4>
-                                                                        <div class="font-mono text-xs bg-black/50 p-3 rounded overflow-x-auto whitespace-nowrap">                                        <span x-text="$store.atc.metar && $store.atc.metar.trend && $store.atc.metar.trend.length > 0 ? $store.atc.metar.trend[0].metar : 'No METAR data available'"></span>                                    </div>                                </div>                            </div>                                                        <!-- Connection Status -->                            <div class="bg-black/30 p-3 border-t border-border/50 flex justify-center">                                <div class="flex items-center gap-2 text-sm">                                    <template x-if="$store.atc.connected === true">                                        <div class="flex items-center text-highlight">                                            <i class="fas fa-check-circle mr-2"></i>                                            Connected to Data Stream                                        </div>                                    </template>                                    <template x-if="$store.atc.connected === null">                                        <div class="flex items-center text-yellow-400">                                            <i class="fas fa-spinner fa-spin mr-2"></i>                                            Connecting to Data Stream...                                        </div>                                    </template>                                    <template x-if="$store.atc.connected === false">                                        <div class="flex items-center text-red-400">                                            <i class="fas fa-exclamation-triangle mr-2"></i>                                            Connection Lost - Reconnecting...
-                                            <span class="ml-2 text-red-300/90" x-show="$store.atc.wsReconnectAttempt > 0">(attempt #<span x-text="$store.atc.wsReconnectAttempt"></span>)</span>
-                                        </div>                                    </template>                                </div>                            </div>                                                        <!-- Footer with Start Button -->                            <div class="bg-black/50 p-4 border-t border-highlight/20 flex justify-center">                                <button @click="$store.atc.closeSplashScreen()"                                        :disabled="$store.atc.connected !== true"                                        :class="{                                            'bg-highlight hover:bg-highlight/80 text-white cursor-pointer': $store.atc.connected === true,                                            'bg-gray-600 text-gray-400 cursor-not-allowed': $store.atc.connected !== true                                        }"                                        class="font-bold py-2 px-6 rounded-full transition-all duration-200 flex items-center">                                    <template x-if="$store.atc.connected === true">                                        <div class="flex items-center">                                            <i class="fas fa-play mr-2"></i>                                            Start Monitoring                                        </div>                                    </template>                                    <template x-if="$store.atc.connected !== true">                                        <div class="flex items-center">                                            <i class="fas fa-spinner fa-spin mr-2"></i>                                            <span x-text="$store.atc.connected === null ? 'Waiting for Connection...' : 'Reconnecting...'"></span>                                        </div>                                    </template>                                </button>                            </div>
-                        </div>
+                    <!-- Resume listening. Browsers let a page play sound only after a click
+                         on it; upstream asked for that click with a welcome screen over the
+                         whole map, at every load. Now the first click or key anywhere resumes
+                         the frequencies listened to last time, and this line says so while
+                         something is waiting for it (10/10, audit 1.5). -->
+                    <div x-show="$store.atc.resumeListeningPending" x-transition.opacity
+                         class="absolute left-1/2 -translate-x-1/2 bottom-4 z-40 px-3 py-1.5 rounded-full bg-panel/90 border border-highlight/40 text-xs text-text shadow pointer-events-none">
+                        <i class="fas fa-volume-high mr-1.5 text-highlight"></i>Click anywhere to resume listening
                     </div>
                 </main>
                 
