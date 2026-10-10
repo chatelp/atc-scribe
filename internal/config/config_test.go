@@ -78,9 +78,36 @@ func TestAConfigurationWrittenForTheRemovedPathsStillStarts(t *testing.T) {
 	// the code grew since must leave it loading as that example does.
 	full := loadAndValidate(t, frozenExample)
 	cfg.ConfigPath, full.ConfigPath = "", ""
+	cfg.Warnings, full.Warnings = nil, nil
 	if diffs := diffValues("", reflect.ValueOf(*full), reflect.ValueOf(*cfg)); len(diffs) > 0 {
 		t.Errorf("the legacy configuration loads differently from the full example:\n  %s",
 			strings.Join(diffs, "\n  "))
+	}
+}
+
+// legacyWarnings loads the frozen legacy configuration and returns what it
+// says at startup.
+func legacyWarnings(t *testing.T) []string {
+	t.Helper()
+	atRepoRoot(t)
+	return loadAndValidate(t, filepath.Join("internal", "config", "testdata", "legacy-full.toml")).Warnings
+}
+
+// The legacy file writes both duplicates in both homes, like the example of
+// its day: it is told so, once each.
+func TestTheLegacyConfigurationIsToldAboutItsDuplicates(t *testing.T) {
+	got := legacyWarnings(t)
+	for _, want := range []string{
+		"flight_phases.airport_range_nm repeats station.airport_range_nm (5): one key is enough, in [station]",
+		"post_processing.airlines_dat_path repeats reference.airlines_dat_path (assets/airlines.dat): one key is enough, in [reference]",
+	} {
+		found := false
+		for _, w := range got {
+			found = found || w == want
+		}
+		if !found {
+			t.Errorf("missing warning %q in:\n  %s", want, strings.Join(got, "\n  "))
+		}
 	}
 }
 
@@ -158,8 +185,20 @@ func TestTheReducedExampleLoadsTheSameConfiguration(t *testing.T) {
 	full := loadAndValidate(t, frozenExample)
 	reduced := loadAndValidate(t, filepath.Join("configs", "config.toml.example"))
 
-	// Where each was read from is not configuration.
+	// The full example writes airport_range_nm and airlines_dat_path in their
+	// two homes, which is exactly what it says at startup, and nothing else.
+	want := []string{
+		"flight_phases.airport_range_nm repeats station.airport_range_nm (5): one key is enough, in [station]",
+		"post_processing.airlines_dat_path repeats reference.airlines_dat_path (assets/airlines.dat): one key is enough, in [reference]",
+	}
+	if !reflect.DeepEqual(full.Warnings, want) {
+		t.Errorf("full example warnings:\n  %s\nwant:\n  %s",
+			strings.Join(full.Warnings, "\n  "), strings.Join(want, "\n  "))
+	}
+
+	// Where each was read from, and what each had to say, is not configuration.
 	full.ConfigPath, reduced.ConfigPath = "", ""
+	full.Warnings, reduced.Warnings = nil, nil
 
 	if diffs := diffValues("", reflect.ValueOf(*full), reflect.ValueOf(*reduced)); len(diffs) > 0 {
 		t.Errorf("the reduced example loads differently from the full one:\n  %s",
@@ -246,6 +285,7 @@ func TestAnAlmostEmptyConfigurationStartsOnTheDefaults(t *testing.T) {
 	want.ADSB.SourceType, want.ADSB.Tar1090BaseURL = "tar1090", "http://receiver.local/tar1090/data/"
 	want.Station.Latitude, want.Station.Longitude, want.Station.AirportCode = 48.8, 2.1, "LFPO"
 	want.Weather.FetchMETAR = true
+	want.PostProcessing.AirlinesDatPath = want.Reference.AirlinesDATPath // the older home, filled from the new one
 	cfg.ConfigPath = ""
 	if diffs := diffValues("", reflect.ValueOf(want), reflect.ValueOf(*cfg)); len(diffs) > 0 {
 		t.Errorf("not the defaults (want | got):\n  %s", strings.Join(diffs, "\n  "))
@@ -298,4 +338,61 @@ func withLines(text, section, lines string) string {
 		return strings.Replace(text, header, header+lines+"\n", 1)
 	}
 	return text + "\n" + header + lines + "\n"
+}
+
+// airport_range_nm belongs to [station] and airlines_dat_path to [reference].
+// The older key of each is still read, and said; written nowhere, the new
+// home's value serves both readers.
+func TestADuplicateKeyHasOneHomeAndTheOldOneIsStillRead(t *testing.T) {
+	atRepoRoot(t)
+	cases := []struct {
+		name        string
+		text        string
+		rangeNM     float64
+		airlines    string
+		wantWarning string
+	}{
+		{"neither written: the default serves both",
+			minimalConfig, 5, "assets/airlines.dat", ""},
+		{"new home only: its value serves both",
+			withLines(withLines(minimalConfig, "station", "airport_range_nm = 7"), "reference", `airlines_dat_path = "x/airlines.dat"`),
+			7, "x/airlines.dat", ""},
+		{"old home only: read, and told where it belongs",
+			withLines(withLines(minimalConfig, "flight_phases", "airport_range_nm = 7"), "post_processing", `airlines_dat_path = "x/airlines.dat"`),
+			7, "x/airlines.dat", "flight_phases.airport_range_nm (7) is read as station.airport_range_nm: write it in [station]"},
+		{"both, equal: told it repeats",
+			withLines(withLines(minimalConfig, "flight_phases", "airport_range_nm = 5"), "station", "airport_range_nm = 5"),
+			5, "assets/airlines.dat", "flight_phases.airport_range_nm repeats station.airport_range_nm (5): one key is enough, in [station]"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := loadAndValidate(t, writeConfig(t, tc.text))
+			if cfg.Station.AirportRangeNM != tc.rangeNM || cfg.FlightPhases.AirportRangeNM != tc.rangeNM {
+				t.Errorf("airport_range_nm: station %v, flight_phases %v, want both %v",
+					cfg.Station.AirportRangeNM, cfg.FlightPhases.AirportRangeNM, tc.rangeNM)
+			}
+			if cfg.Reference.AirlinesDATPath != tc.airlines || cfg.PostProcessing.AirlinesDatPath != tc.airlines {
+				t.Errorf("airlines_dat_path: reference %q, post_processing %q, want both %q",
+					cfg.Reference.AirlinesDATPath, cfg.PostProcessing.AirlinesDatPath, tc.airlines)
+			}
+			if tc.wantWarning == "" {
+				if len(cfg.Warnings) != 0 {
+					t.Errorf("nothing to say, said %q", cfg.Warnings)
+				}
+			} else if len(cfg.Warnings) == 0 || cfg.Warnings[0] != tc.wantWarning {
+				t.Errorf("warnings %q, want first %q", cfg.Warnings, tc.wantWarning)
+			}
+		})
+	}
+
+	// Written differently in both homes, each reader keeps its own value, as
+	// before, and the file is told.
+	cfg := loadAndValidate(t, writeConfig(t, withLines(withLines(minimalConfig, "flight_phases", "airport_range_nm = 8"), "station", "airport_range_nm = 5")))
+	if cfg.Station.AirportRangeNM != 5 || cfg.FlightPhases.AirportRangeNM != 8 {
+		t.Errorf("both written differently: station %v, flight_phases %v, want 5 and 8", cfg.Station.AirportRangeNM, cfg.FlightPhases.AirportRangeNM)
+	}
+	want := "flight_phases.airport_range_nm (8) differs from station.airport_range_nm (5): both are kept as written, but the key belongs in [station] alone"
+	if len(cfg.Warnings) != 1 || cfg.Warnings[0] != want {
+		t.Errorf("warnings %q, want %q", cfg.Warnings, want)
+	}
 }
