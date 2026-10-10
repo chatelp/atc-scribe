@@ -331,7 +331,7 @@ indiqué en fin de ligne quand il a bougé ; chaque ligne se fait sous les sept 
 
 | # | Quoi | Effort | Risque |
 |---|---|---|---|
-| 2.1 | **Page Réglages** à part, 5 sections (Écoute · Appariement avec préréglage Mesuré / Prudent / Expérimental · Affichage « ce navigateur » · Compte · Système en lecture) ; supprime le volet de 700 lignes | 12 h | faible |
+| 2.1 | **Page Réglages** à part, 5 sections (Écoute · Appariement avec préréglage Mesuré / Prudent / Expérimental · Affichage « ce navigateur » · Compte · Système en lecture) ; supprime le volet de 700 lignes — ***fait le 10/10*** : page plein écran (roue dentée ; Échap ou croix pour fermer ; la barre radio reste utilisable), cinq rubriques Listening · Callsign matching · Display · Account · System, le diagnostic de performance replié en bas de System ; contrôles déplacés tels quels, liaisons inchangées ; la surcharge de position de la station par GPS est retirée de la page (son code JS reste, à retirer avec le découpage d'`app.js`). Les préréglages Mesuré / Prudent / Expérimental ne sont pas faits : il faudrait d'abord fixer leurs valeurs | 12 h | faible |
 | 2.2 | **Alertes** : supprimer la barre (418 lignes, 72 % de bruit, clairance cassée), puis un **journal discret des événements qui comptent** (remise des gaz, changement de piste, MAYDAY ou squawk d'urgence, type d'intérêt, bascule de la station, sidecar ou flux tombé), son au choix par événement | 1,5 h + 1 j | nul |
 
 **3. Montrer ce que le serveur sait déjà (≈ 6 à 7 j)**
