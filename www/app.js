@@ -250,7 +250,6 @@ document.addEventListener('alpine:init', () => {
         },
         radiosStarted: false, // Initialize radiosStarted to false
         transcriptions: [], // Array of transcription messages
-        aircraftAlerts: [], // Array of aircraft movement alerts
         audioApiUrl: `${API_BASE_URL}/frequencies`,
         transcriptionSearchTerm: '', // For searching transcriptions
         originalTranscriptions: {}, // Store original transcriptions before filtering
@@ -1039,6 +1038,7 @@ document.addEventListener('alpine:init', () => {
                 const r = aircraft.runway || {};
                 const parts = [];
                 if (r.departure) parts.push(`Departed ${r.departure.runway} (${r.departure.airport})`);
+                if (r.go_around) parts.push(`Went around ${r.go_around.runway} (${r.go_around.airport})`);
                 if (r.arrival) {
                     const landed = aircraft.on_ground || (aircraft.date_landed && new Date(aircraft.date_landed) >= new Date(r.arrival.since));
                     parts.push(`${landed ? 'Landed on' : 'Arriving'} ${r.arrival.runway} (${r.arrival.airport})`);
@@ -1179,7 +1179,6 @@ document.addEventListener('alpine:init', () => {
 
             this.saveSettings();
             this.applyFilters();
-            this.refreshAlertsDisplay(); // Refresh alerts based on new filter
 
             // Update map visibility including tracks
             if (this.mapManager) {
@@ -1194,7 +1193,6 @@ document.addEventListener('alpine:init', () => {
 
             this.saveSettings();
             this.applyFilters();
-            this.refreshAlertsDisplay(); // Refresh alerts based on new filter
 
             // Update map visibility including tracks
             if (this.mapManager) {
@@ -1225,7 +1223,6 @@ document.addEventListener('alpine:init', () => {
             this.settings.phaseFilters[phase] = !this.settings.phaseFilters[phase];
             this.saveSettings();
             this.applyFilters();
-            this.refreshAlertsDisplay(); // Refresh alerts based on new filter
 
             // Update map visibility including tracks
             if (this.mapManager) {
@@ -1265,14 +1262,6 @@ document.addEventListener('alpine:init', () => {
             return phaseIconMap[phase] || 'fa-plane';
         },
 
-        // Check if phase alert should be shown based on phase filter settings
-        shouldShowPhaseAlert(phase) {
-            // Only show alerts for phases that are currently enabled in filters
-            // phaseFilters[phase] === false means phase is filtered OUT
-            // phaseFilters[phase] !== false means phase is enabled (true or undefined)
-            return this.settings.phaseFilters && this.settings.phaseFilters[phase] !== false;
-        },
-        
         // Get seconds since last seen for an aircraft
         getSecondsSinceLastSeen(aircraft) {
             if (!aircraft.last_seen) return 'Unknown';
@@ -2991,22 +2980,11 @@ async initAircraftDataSource() {
 
         // Handle phase change messages
         handlePhaseChangeMessage(data) {
-            console.log('Received phase change:', data);
-            
-            // Create alert message for phase change
-            const message = `${data.flight || data.hex} changed phase: ${data.transition}`;
-            
-            // Add to alerts using existing alert system
-            this.addPhaseChangeAlert(data);
-            
             // Trigger visual effect on the map for takeoff/landing (T/O and T/D phases)
             if ((data.phase === 'T/O' || data.phase === 'T/D') && this.mapManager) {
                 const eventType = data.phase === 'T/O' ? 'takeoff' : 'landing';
                 this.mapManager.showTakeoffLandingEffect(data.hex, eventType, data.phase);
             }
-            
-            // Log to console for debugging
-            console.log(`Phase change alert: ${message}`);
         },
 
         // Handle clearance issued messages
@@ -3020,34 +2998,8 @@ async initAircraftDataSource() {
                 this.refreshSelectedAircraftDetails();
             }
             
-            // Show alert for clearance
-            this.showClearanceAlert(data);
-            
             // Log to console for debugging
             console.log(`Clearance issued: ${data.callsign} → ${data.clearance_type.toUpperCase()} CLEARANCE`);
-        },
-
-        // Show clearance alert
-        showClearanceAlert(clearanceData) {
-            const alertText = `${clearanceData.callsign} → ${clearanceData.clearance_type.toUpperCase()} CLEARANCE`;
-            let alertClass;
-            
-            switch(clearanceData.clearance_type) {
-                case 'takeoff':
-                    alertClass = 'alert-takeoff';
-                    break;
-                case 'landing':
-                    alertClass = 'alert-landing';
-                    break;
-                case 'approach':
-                    alertClass = 'alert-approach';
-                    break;
-                default:
-                    alertClass = 'alert-clearance';
-            }
-            
-            // Add to alerts system (reusing existing alert infrastructure)
-            this.addAlert(alertText, alertClass, clearanceData.callsign);
         },
 
         // Refresh selected aircraft details
@@ -3105,13 +3057,6 @@ async initAircraftDataSource() {
             return out + plain(text.slice(at));
         },
 
-        // Handle aircraft movement message
-        handleAircraftMessage(data) {
-            if (data && data.movement) {
-                this.addAircraftAlert(data);
-            }
-        },
-        
         // Handle status update message
         handleStatusUpdateMessage(data) {
             if (!data || !data.hex) return;
@@ -3129,16 +3074,7 @@ async initAircraftDataSource() {
                 }
             }
 
-            // Update status
             aircraft.status = data.new_status;
-
-            // For signal_lost: skip alerts for CRZ phase or grounded aircraft (expected/noisy)
-            if (data.new_status === 'signal_lost') {
-                const currentPhase = aircraft.phase?.current?.[0]?.phase;
-                if (currentPhase === 'CRZ' || data.on_ground) return;
-            }
-
-            this.addStatusAlert(data);
         },
         
         // Request initial aircraft data via WebSocket
@@ -3481,6 +3417,7 @@ async initAircraftDataSource() {
             if (delta.baro_rate !== undefined && aircraft.adsb.baro_rate !== delta.baro_rate) aircraft.adsb.baro_rate = delta.baro_rate;
             if (delta.mag_heading !== undefined && aircraft.adsb.mag_heading !== delta.mag_heading) aircraft.adsb.mag_heading = delta.mag_heading;
             if (delta.true_heading !== undefined && aircraft.adsb.true_heading !== delta.true_heading) aircraft.adsb.true_heading = delta.true_heading;
+            if (delta.squawk !== undefined) aircraft.adsb.squawk = delta.squawk;
             if (delta.source !== undefined && aircraft.adsb.source !== delta.source) aircraft.adsb.source = delta.source;
             if (delta.atc_derived !== undefined && aircraft.adsb.atc_derived !== delta.atc_derived) aircraft.adsb.atc_derived = delta.atc_derived;
 
@@ -3753,305 +3690,6 @@ async initAircraftDataSource() {
             }
         },
         
-        // Add aircraft alert
-        addAircraftAlert(data) {
-            // Create a unique ID for the alert
-            const alertId = Date.now() + '-' + data.hex;
-            
-            // Add the alert to the array for tracking
-            this.aircraftAlerts.push({
-                id: alertId,
-                hex: data.hex,
-                flight: data.flight || data.hex,
-                movement: data.movement,
-                timestamp: data.timestamp || new Date().toISOString()
-            });
-            
-            // Get the alerts container
-            const alertsContainer = document.getElementById('alerts-container');
-            if (!alertsContainer) return;
-            
-            // Hide the "None" text
-            const noAlertsText = document.getElementById('no-alerts-text');
-            if (noAlertsText) {
-                noAlertsText.style.display = 'none';
-            }
-            
-            // Create the alert element
-            const alertElement = document.createElement('div');
-            alertElement.id = alertId;
-            alertElement.className = `inline-flex items-center text-xs px-1.5 py-0.5 rounded ${data.movement === 'tookoff' ? 'text-blue-300' : 'text-green-300'} cursor-pointer hover:bg-black/50`;
-            
-            // Add left-click event to dismiss the alert
-            alertElement.addEventListener('click', () => {
-                this.removeAircraftAlert(alertId);
-            });
-            
-            // Add right-click event to select the aircraft and center the map on it
-            alertElement.addEventListener('contextmenu', (e) => {
-                e.preventDefault(); // Prevent the default context menu
-                this.selectAircraftByHex(data.hex);
-            });
-            
-            // Create the icon
-            const icon = document.createElement('i');
-            icon.className = `fas fa-xs mr-1 ${data.movement === 'tookoff' ? 'fa-plane-departure' : 'fa-plane-arrival'}`;
-            alertElement.appendChild(icon);
-            
-            // Create the text
-            const text = document.createElement('span');
-            text.textContent = data.flight || data.hex;
-            alertElement.appendChild(text);
-            
-            // Add the alert to the container
-            alertsContainer.appendChild(alertElement);
-            
-            // Remove the alert after 60 seconds
-            setTimeout(() => {
-                this.removeAircraftAlert(alertId);
-            }, 60000);
-        },
-
-        // Check if an alert should be shown based on Air/Ground filter settings
-        shouldShowAlert(hex) {
-            const aircraft = this.aircraft[hex];
-            if (!aircraft) return true; // Show alert if we don't have aircraft data yet
-            
-            // Check if aircraft matches current Air/Ground filter settings
-            const showThisAircraft = (aircraft.on_ground && this.settings.showGroundAircraft) ||
-                                   (!aircraft.on_ground && this.settings.showAirAircraft);
-            
-            return showThisAircraft;
-        },
-
-        // Refresh alerts display based on current Air/Ground filter settings and phase filters
-        refreshAlertsDisplay() {
-            const alertsContainer = document.getElementById('alerts-container');
-            if (!alertsContainer) return;
-
-            // Check each alert to see if it should be visible
-            this.aircraftAlerts.forEach(alert => {
-                const alertElement = document.getElementById(alert.id);
-                if (alertElement) {
-                    let shouldShow = this.shouldShowAlert(alert.hex);
-                    
-                    // Additional check for phase change alerts
-                    if (alert.type === 'phase_change' && alert.data && alert.data.phase) {
-                        shouldShow = shouldShow && this.shouldShowPhaseAlert(alert.data.phase);
-                    }
-                    
-                    if (shouldShow) {
-                        alertElement.style.display = 'inline-flex';
-                    } else {
-                        alertElement.style.display = 'none';
-                    }
-                }
-            });
-
-            // Check if any alerts are visible to show/hide "None" text
-            const visibleAlerts = this.aircraftAlerts.filter(alert => {
-                const alertElement = document.getElementById(alert.id);
-                return alertElement && alertElement.style.display !== 'none';
-            });
-
-            const noAlertsText = document.getElementById('no-alerts-text');
-            if (noAlertsText) {
-                noAlertsText.style.display = visibleAlerts.length === 0 ? 'block' : 'none';
-            }
-        },
-        
-        // Add status alert
-        addStatusAlert(data) {
-            // Check if we should show this alert based on Air/Ground filter settings
-            if (!this.shouldShowAlert(data.hex)) {
-                return; // Don't show alert if aircraft doesn't match current filter
-            }
-            
-            // Create a unique ID for the alert
-            const alertId = Date.now() + '-status-' + data.hex;
-            
-            // Add the alert to the array for tracking
-            this.aircraftAlerts.push({
-                id: alertId,
-                hex: data.hex,
-                type: 'status',
-                status: data.new_status,
-                timestamp: new Date()
-            });
-            
-            // Get the alerts container
-            const alertsContainer = document.getElementById('alerts-container');
-            if (!alertsContainer) return;
-            
-            // Hide the "None" text
-            const noAlertsText = document.getElementById('no-alerts-text');
-            if (noAlertsText) {
-                noAlertsText.style.display = 'none';
-            }
-            
-            // Create the alert element
-            const alertElement = document.createElement('div');
-            alertElement.id = alertId;
-            
-            // Set color based on status
-            let colorClass = 'text-yellow-300'; // Default for stale
-            let iconClass = 'fa-exclamation-triangle';
-            let statusText = data.new_status.toUpperCase();
-            
-            // Add left-click event to dismiss the alert
-            alertElement.addEventListener('click', () => {
-                this.removeAircraftAlert(alertId);
-            });
-            
-            // Add right-click event to select the aircraft and center the map on it
-            alertElement.addEventListener('contextmenu', (e) => {
-                e.preventDefault(); // Prevent the default context menu
-                this.selectAircraftByHex(data.hex);
-            });
-            
-            if (data.new_status === 'signal_lost') {
-                colorClass = 'text-gray-400'; // Use grey for signal_lost
-                iconClass = 'fa-ban';
-                statusText = ''; // No additional text, just callsign
-            }
-            
-            alertElement.className = `inline-flex items-center text-xs px-1.5 py-0.5 rounded ${colorClass} cursor-pointer hover:bg-black/50`;
-            
-            // Add icon
-            const icon = document.createElement('i');
-            icon.className = `fas ${iconClass} fa-xs mr-1`;
-            alertElement.appendChild(icon);
-            
-            // Add text
-            const text = document.createElement('span');
-            text.textContent = `${data.flight || data.hex}${statusText}`;
-            alertElement.appendChild(text);
-            
-            // Add the alert to the container
-            alertsContainer.appendChild(alertElement);
-            
-            // Remove the alert after 60 seconds
-            setTimeout(() => {
-                this.removeAircraftAlert(alertId);
-            }, 60000);
-        },
-
-        // Add phase change alert
-        addPhaseChangeAlert(data) {
-            // Check if we should show this alert based on Air/Ground filter settings
-            if (!this.shouldShowAlert(data.hex)) {
-                return; // Don't show alert if aircraft doesn't match current filter
-            }
-
-            // Check if we should show this alert based on phase filter settings
-            if (!this.shouldShowPhaseAlert(data.phase)) {
-                return; // Don't show alert if phase is filtered out
-            }
-            
-            // Create a unique ID for the alert
-            const alertId = Date.now() + '-phase-' + data.hex;
-
-            // Add the alert to the array for tracking
-            this.aircraftAlerts.push({
-                id: alertId,
-                hex: data.hex,
-                type: 'phase_change',
-                data: data
-            });
-
-            // Get the alerts container
-            const alertsContainer = document.getElementById('alerts-container');
-            if (!alertsContainer) return;
-
-            // Hide the "None" text
-            const noAlertsText = document.getElementById('no-alerts-text');
-            if (noAlertsText) {
-                noAlertsText.style.display = 'none';
-            }
-
-            // Use centralized color and icon mapping
-            const colorClass = this.getPhaseColorClass(data.phase);
-            const iconClass = this.getPhaseIconClass(data.phase);
-            const displayText = `${data.flight || data.hex} → ${data.phase}` +
-                (data.airport && this.followedAirports.length > 1 ? ` ${data.airport}` : '');
-
-            // Create the alert element
-            const alertElement = document.createElement('div');
-            alertElement.id = alertId;
-            alertElement.className = `inline-flex items-center text-xs px-1.5 py-0.5 rounded ${colorClass} cursor-pointer hover:bg-black/50`;
-
-            // Add left-click event to dismiss the alert
-            alertElement.addEventListener('click', () => {
-                this.removeAircraftAlert(alertId);
-            });
-
-            // Add right-click event to select the aircraft and center the map on it
-            alertElement.addEventListener('contextmenu', (e) => {
-                e.preventDefault(); // Prevent the default context menu
-                this.selectAircraftByHex(data.hex);
-            });
-
-            // Create icon
-            const icon = document.createElement('i');
-            icon.className = `fas ${iconClass} fa-xs mr-1`;
-            alertElement.appendChild(icon);
-
-            // Create text
-            const text = document.createElement('span');
-            text.textContent = displayText;
-            alertElement.appendChild(text);
-
-            // Add the alert to the container
-            alertsContainer.appendChild(alertElement);
-
-            // Remove the alert after 60 seconds
-            setTimeout(() => {
-                this.removeAircraftAlert(alertId);
-            }, 60000);
-        },
-
-        // Aircraft events are now handled as phase changes (T/O and T/D)
-
-        // Remove aircraft alert
-        removeAircraftAlert(alertId) {
-            // Remove from the array
-            this.aircraftAlerts = this.aircraftAlerts.filter(alert => alert.id !== alertId);
-            
-            // Remove from the DOM
-            const alertElement = document.getElementById(alertId);
-            if (alertElement) {
-                alertElement.remove();
-            }
-            
-            // Show the "None" text if there are no alerts
-            if (this.aircraftAlerts.length === 0) {
-                const noAlertsText = document.getElementById('no-alerts-text');
-                if (noAlertsText) {
-                    noAlertsText.style.display = 'block';
-                }
-            }
-        },
-
-        // Clear all aircraft alerts
-        clearAllAircraftAlerts() {
-            // Remove all alerts from DOM
-            this.aircraftAlerts.forEach(alert => {
-                const alertElement = document.getElementById(alert.id);
-                if (alertElement) {
-                    alertElement.remove();
-                }
-            });
-            
-            // Clear the array
-            this.aircraftAlerts = [];
-            
-            // Show the "None" text
-            const noAlertsText = document.getElementById('no-alerts-text');
-            if (noAlertsText) {
-                noAlertsText.style.display = 'block';
-            }
-        },
-
         getTranscriptionCount(frequencyId) {
             return this.unreadTranscriptions[frequencyId] || 0;
         },
@@ -4554,6 +4192,13 @@ async initAircraftDataSource() {
                 const next = (data && data.frequencies) || [];
                 const kept = new Set(next.map(f => String(f.id)));
                 const before = new Set(this.audioFrequencies.map(f => String(f.id)));
+                const names = list => list.map(f => f.name || f.id).join(', ') || 'nothing';
+                if (before.size && (next.length !== before.size || next.some(f => !before.has(String(f.id))))) {
+                    Alpine.store('events')?.add({
+                        kind: 'station',
+                        text: `Station now on ${names(next)} (was ${names(this.audioFrequencies)})`,
+                    });
+                }
                 this.audioFrequencies.forEach(f => {
                     if (!kept.has(String(f.id)) && audioClient) audioClient.cleanupFrequency(String(f.id));
                 });
@@ -4652,6 +4297,16 @@ async initAircraftDataSource() {
 
             const { frequency_id, status, error } = data;
             console.log(`Frequency ${frequency_id} status changed to: ${status}`, error ? `(${error})` : '');
+
+            // A stream lost, or back after being lost, goes to the event log.
+            const was = this.frequencyConnectionStatus[frequency_id]?.status;
+            const freq = this.audioFrequencies.find(f => String(f.id) === String(frequency_id));
+            const label = (freq && freq.name) || frequency_id;
+            if (status === 'failed' && was !== 'failed') {
+                Alpine.store('events')?.add({ kind: 'stream', text: `${label}: audio stream lost` + (error ? ` (${error})` : '') });
+            } else if (status === 'connected' && was === 'failed') {
+                Alpine.store('events')?.add({ kind: 'stream', text: `${label}: audio stream back` });
+            }
 
             // Update the status tracking object
             this.frequencyConnectionStatus[frequency_id] = {

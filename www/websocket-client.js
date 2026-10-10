@@ -174,11 +174,6 @@ class WebSocketClient {
                 } else if (message.type === 'transcription_update') {
                     this._notifyListeners('transcription_update', message.data);
                 } else if (message.type === 'aircraft') {
-                    if (message.data && message.data.movement) {
-                        if (window.Alpine && Alpine.store('atc')) {
-                            Alpine.store('atc').handleAircraftMessage(message.data);
-                        }
-                    }
                     this._notifyListeners('aircraft', message.data);
                 } else if (message.type === 'status_update') {
                     if (window.Alpine && Alpine.store('atc')) {

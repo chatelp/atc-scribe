@@ -154,7 +154,6 @@
         const trails = new Map();             // hex -> [{t, lat, lon, altBaro}]
         let timer = null;
         let airport = '';
-        let topRoom = 0;
 
         let collapsed = new Set();
         try { collapsed = new Set(JSON.parse(localStorage.getItem('parCollapsed') || '[]')); } catch (e) { /* none kept */ }
@@ -440,13 +439,8 @@
                 return `<section class="par-frame${isInUse ? ' par-in-use' : ''}">${head}${frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse })}</section>`;
             }).join('');
 
-            // Start below the alerts bar, which the view scrolls under. The bar
-            // grows and shrinks as alerts come and go: the room kept for it only
-            // grows, or the whole view would jump under the pointer.
-            const bar = document.getElementById('alerts-bar');
-            const barBottom = bar && bar.offsetParent ? bar.offsetTop + bar.offsetHeight : 60;
-            topRoom = Math.max(topRoom, barBottom + 12);
-            container.style.paddingTop = topRoom + 'px';
+            // Start below the buttons in the map's top left corner.
+            container.style.paddingTop = '56px';
             container.innerHTML = header + body;
         }
 

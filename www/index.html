@@ -685,31 +685,64 @@
                             title="Settings" @click="$store.atc.settingsOpen = true">
                         <i class="fas fa-cog"></i>
                     </button>
+
+                    <!-- The event log (www/events.js): opens on the bell, beside the gear. -->
+                    <button class="absolute left-12 top-2.5 w-8 h-8 bg-panel border border-border rounded-full text-text cursor-pointer flex items-center justify-center z-50 hover:bg-hover"
+                            :class="$store.events.open ? 'border-highlight' : ''"
+                            title="Event log" @click="$store.events.toggleOpen()">
+                        <i class="fas fa-bell"></i>
+                        <span x-show="$store.events.unread > 0" x-cloak
+                              class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center"
+                              x-text="$store.events.unread > 99 ? '99+' : $store.events.unread"></span>
+                    </button>
+                    <div x-show="$store.events.open" x-cloak @keydown.escape.window="$store.events.open = false"
+                         class="absolute left-2 top-12 w-[24rem] max-w-[calc(100%-1rem)] max-h-[60vh] z-50 flex flex-col bg-panel border border-border rounded-lg shadow-[0_5px_15px_rgba(0,0,0,0.5)] text-text text-xs">
+                        <div class="flex items-center gap-2 px-3 py-2 border-b border-border">
+                            <span class="font-medium text-sm">Event log</span>
+                            <span class="text-text/50" x-text="$store.events.list.length ? $store.events.list.length + ' events' : ''"></span>
+                            <span class="flex-1"></span>
+                            <button class="text-text/60 hover:text-text" title="Choose which events ring" @click="$store.events.soundsOpen = !$store.events.soundsOpen">
+                                <i class="fas fa-volume-high"></i>
+                            </button>
+                            <button class="text-text/60 hover:text-text" title="Clear the log" @click="$store.events.clear()" x-show="$store.events.list.length">
+                                <i class="fas fa-trash-can"></i>
+                            </button>
+                            <button class="text-text/60 hover:text-text" title="Close" @click="$store.events.open = false">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div x-show="$store.events.soundsOpen" class="border-b border-border">
+                            <div class="px-3 py-2 grid grid-cols-2 gap-1">
+                                <div class="col-span-2 text-text/50 mb-1">Ring a bell for:</div>
+                                <template x-for="(k, kind) in $store.events.kinds" :key="kind">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" :checked="!!$store.events.sounds[kind]" @change="$store.events.toggleSound(kind)">
+                                        <i class="fas w-4 text-center" :class="[k.icon, k.color]"></i>
+                                        <span x-text="k.label"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="overflow-y-auto">
+                            <div x-show="!$store.events.list.length" class="px-3 py-4 text-text/50">
+                                Nothing yet. Emergencies, go-arounds, runway changes, aircraft of interest
+                                and changes of the station's channels will show here.
+                            </div>
+                            <template x-for="ev in $store.events.list" :key="ev.id">
+                                <div class="flex items-start gap-2 px-3 py-1.5 border-b border-border/40"
+                                     :class="ev.hex ? 'cursor-pointer hover:bg-hover' : ''"
+                                     :title="ev.hex ? 'Show this aircraft' : ''"
+                                     @click="$store.events.select(ev)">
+                                    <span class="text-text/50 tabular-nums shrink-0" x-text="$store.events.time(ev)"></span>
+                                    <i class="fas w-4 text-center mt-0.5 shrink-0" :class="[$store.events.kinds[ev.kind].icon, $store.events.kinds[ev.kind].color]"></i>
+                                    <span x-text="ev.text"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
                     
                     <!-- Map Container -->
                     <div class="flex-1 relative z-10">
-                        <!-- Aircraft Movement Alerts Bar -->
-                        <!-- Static Alerts Bar -->
-                        <div id="alerts-bar" class="absolute top-4 left-1/2 transform -translate-x-1/2 w-1/2 z-[10000]">
-                            <div class="bg-black/60 backdrop-blur-sm border-2 border-highlight/40 rounded-lg shadow-[0_5px_15px_rgba(0,0,0,0.5)] px-3 py-2 w-full min-h-[40px] flex items-center">
-                                <div class="text-text/80 text-xs font-medium mr-2">Alerts:</div>
-                                <div id="alerts-container" class="flex flex-wrap gap-1.5 items-center flex-1">
-                                    <!-- Static "None" text that's always visible when no alerts -->
-                                    <div class="text-text/50 text-xs" id="no-alerts-text">None</div>
-                                    
-                                    <!-- Dynamic alerts will be added here by JavaScript -->
-                                </div>
-                                <!-- Clear all alerts button -->
-                                <button @click="$store.atc.clearAllAircraftAlerts()"
-                                        x-show="$store.atc.aircraftAlerts.length > 0"
-                                        class="ml-2 text-text/40 hover:text-text/80 transition-colors duration-200 cursor-pointer flex items-center justify-center w-4 h-4"
-                                        title="Clear all alerts">
-                                    <i class="fas fa-times text-xs"></i>
-                                </button>
-                                
-                            </div>
-                        </div>
-                        
                         <div id="map" class="h-full w-full bg-black"></div>
 
                         <!-- The main screen shows the radar map or the PAR view of one
@@ -2157,6 +2190,7 @@
     <!-- Custom JavaScript -->
     <!-- Sign-in overlay; does nothing when auth.enabled is false. -->
     <script src="login.js"></script>
+    <script src="events.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
