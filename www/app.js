@@ -502,9 +502,9 @@ document.addEventListener('alpine:init', () => {
             }
             
             // Detect if server-side filter change occurred
+            // The altitude band is applied here, in the page: the bulk request
+            // does not send it, so moving it needs no reload.
             const serverSideChanged = (
-                previousSettings.minAltitude !== this.settings.minAltitude ||
-                previousSettings.maxAltitude !== this.settings.maxAltitude ||
                 previousSettings.lastSeenMinutes !== this.settings.lastSeenMinutes ||
                 previousSettings.excludeOtherAirportsGrounded !== this.settings.excludeOtherAirportsGrounded
             );

@@ -870,3 +870,25 @@ input[type=range].dual-range-max:focus {
 
 /* Alpine: hidden until initialised (the settings page would flash at load). */
 [x-cloak] { display: none !important; }
+
+/* Altitude band slider (www/altitude/): two range inputs over one track, only
+   their handles take the pointer. */
+.alt-histogram { display: flex; align-items: flex-end; gap: 1px; height: 22px; padding: 0 7px; }
+.alt-bin { flex: 1; background: rgba(255, 255, 255, 0.12); border-radius: 1px 1px 0 0; }
+.alt-bin-in { background: rgba(76, 175, 80, 0.75); }
+.alt-track-wrap { position: relative; height: 18px; margin: 0 0 2px; }
+.alt-track, .alt-track-band { position: absolute; top: 7px; height: 4px; border-radius: 2px; }
+.alt-track { left: 7px; right: 7px; background: #333; }
+.alt-track-band { background: #4CAF50; }
+.alt-ta { position: absolute; top: 3px; width: 1px; height: 12px; background: rgba(56, 189, 248, 0.8); pointer-events: none; }
+.alt-range { position: absolute; inset: 0; width: 100%; height: 18px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; pointer-events: none; }
+.alt-range:focus { outline: none; }
+.alt-range::-webkit-slider-runnable-track { background: transparent; height: 18px; }
+.alt-range::-moz-range-track { background: transparent; }
+.alt-range::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 14px; height: 14px; margin-top: 2px; border-radius: 50%; background: #4CAF50; border: 2px solid #0b0b0b; box-shadow: 0 0 0 1px #4CAF50; cursor: grab; }
+.alt-range::-moz-range-thumb { pointer-events: auto; width: 12px; height: 12px; border-radius: 50%; background: #4CAF50; border: 2px solid #0b0b0b; cursor: grab; }
+.alt-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.5); }
+.alt-marks { position: relative; height: 12px; margin: 0 7px; font-size: 9px; line-height: 12px; color: rgba(255, 255, 255, 0.4); }
+.alt-marks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.alt-marks span:first-child { transform: none; }
+.alt-marks span:last-child { transform: translateX(-100%); }

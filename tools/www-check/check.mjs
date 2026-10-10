@@ -79,6 +79,10 @@ function captureStore() {
     };
     const context = vm.createContext(sandbox);
     vm.runInContext(appSource, context, { filename: 'www/app.js' });
+    // Scripts that define x-data factories of their own, besides app.js.
+    for (const f of ['altitude/altitude-filter.js']) {
+        vm.runInContext(readFileSync(join(WWW, f), 'utf8'), context, { filename: `www/${f}` });
+    }
     for (const cb of listeners['alpine:init'] || []) {
         try { cb(); } catch (e) { if (!(e instanceof StoreCaptured)) throw e; }
         if (store) break;
@@ -281,15 +285,15 @@ if (!quick) {
         const r = spawnSync(process.execPath, ['--check', f], { encoding: 'utf8' });
         if (r.status !== 0) problems.push(`node --check ${relative(ROOT, f)}:\n${r.stderr.trim()}`);
     }
-    const tests = walk(join(WWW, 'par')).filter((f) => f.endsWith('.test.js'));
+    const tests = ['par', 'altitude'].flatMap((d) => walk(join(WWW, d))).filter((f) => f.endsWith('.test.js'));
     const r = spawnSync(process.execPath, ['--test', ...tests], { encoding: 'utf8', cwd: ROOT });
-    if (r.status !== 0) problems.push(`node --test www/par/ failed:\n${(r.stdout + r.stderr).trim().split('\n').slice(-30).join('\n')}`);
+    if (r.status !== 0) problems.push(`node --test www/par/ www/altitude/ failed:\n${(r.stdout + r.stderr).trim().split('\n').slice(-30).join('\n')}`);
 }
 
 console.log(`store: ${storeKeys.size} properties defined, ${[...assigned].filter((n) => !storeKeys.has(n)).length} added by assignment`);
 console.log(`index.html: ${htmlStoreNames.size} store names, ${bareCalls} bare calls, ${scripts} local scripts`);
 console.log(`other scripts: ${otherNames.size} store names; store methods: ${thisReads} this.X reads, ${brokenSeen.size} known broken`);
-if (!quick) console.log(`node --check on ${jsFiles.length} files, node --test www/par/`);
+if (!quick) console.log(`node --check on ${jsFiles.length} files, node --test www/par/ www/altitude/`);
 if (problems.length) {
     console.error(`\n${problems.length} problem(s):\n` + problems.map((p) => '  ' + p).join('\n'));
     process.exit(1);
