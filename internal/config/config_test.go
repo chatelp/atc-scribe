@@ -93,21 +93,64 @@ func legacyWarnings(t *testing.T) []string {
 	return loadAndValidate(t, filepath.Join("internal", "config", "testdata", "legacy-full.toml")).Warnings
 }
 
+// unread says what Load says about a key nothing reads.
+func unread(key string) string {
+	return key + " is not a configuration key of this version and is ignored: remove it, or check its spelling"
+}
+
 // The legacy file writes both duplicates in both homes, like the example of
-// its day: it is told so, once each.
-func TestTheLegacyConfigurationIsToldAboutItsDuplicates(t *testing.T) {
+// its day, and 37 keys of the removed paths: the 17 of [atc_chat], 16 of
+// [transcription] and 4 of [post_processing] (docs-fr/fiches-cloud/A-rapport.md).
+// It is told each key by name, the section gone in one line, and nothing else.
+func TestTheLegacyConfigurationIsToldItsDuplicatesAndItsDeadKeysByName(t *testing.T) {
 	got := legacyWarnings(t)
-	for _, want := range []string{
+	var want []string
+	want = append(want,
 		"flight_phases.airport_range_nm repeats station.airport_range_nm (5): one key is enough, in [station]",
 		"post_processing.airlines_dat_path repeats reference.airlines_dat_path (assets/airlines.dat): one key is enough, in [reference]",
+	)
+	for _, key := range []string{
+		"transcription.openai_api_key", "transcription.model", "transcription.noise_reduction",
+		"transcription.chunk_ms", "transcription.buffer_size_kb", "transcription.reconnect_interval_sec",
+		"transcription.max_retries", "transcription.turn_detection_type", "transcription.prefix_padding_ms",
+		"transcription.silence_duration_ms", "transcription.vad_threshold", "transcription.retry_max_attempts",
+		"transcription.retry_initial_backoff_ms", "transcription.retry_max_backoff_ms",
+		"transcription.timeout_seconds", "transcription.prompt_path",
+		"post_processing.model", "post_processing.context_transcriptions",
+		"post_processing.timeout_seconds", "post_processing.system_prompt_path",
 	} {
+		want = append(want, unread(key))
+	}
+	want = append(want, "[atc_chat] is not a section of this version and is ignored with its 17 keys: remove it")
+	if len(got) != len(want) {
+		t.Errorf("%d warnings, want %d:\n  %s", len(got), len(want), strings.Join(got, "\n  "))
+	}
+	for _, w := range want {
 		found := false
-		for _, w := range got {
-			found = found || w == want
+		for _, g := range got {
+			found = found || g == w
 		}
 		if !found {
-			t.Errorf("missing warning %q in:\n  %s", want, strings.Join(got, "\n  "))
+			t.Errorf("missing %q", w)
 		}
+	}
+}
+
+// Unknown keys are said and ignored in every section, [adsb] included, which
+// upstream alone refused. Starting on a line that does nothing beats not
+// starting over it.
+func TestAnUnknownKeyIsSaidByNameAndNeverRefused(t *testing.T) {
+	atRepoRoot(t)
+	text := withLines(withLines(minimalConfig, "adsb", "fetch_interval_secs = 2"), "server", "prot = 8000")
+	text += "\n[voice_chat]\nenabled = true\n"
+	cfg := loadAndValidate(t, writeConfig(t, text))
+	want := []string{unread("adsb.fetch_interval_secs"), unread("server.prot"),
+		"[voice_chat] is not a section of this version and is ignored with its 1 key: remove it"}
+	if !reflect.DeepEqual(cfg.Warnings, want) {
+		t.Errorf("warnings:\n  %s\nwant:\n  %s", strings.Join(cfg.Warnings, "\n  "), strings.Join(want, "\n  "))
+	}
+	if cfg.ADSB.FetchIntervalSecs != 1 {
+		t.Errorf("the misspelled key must not have changed fetch_interval_seconds: %d", cfg.ADSB.FetchIntervalSecs)
 	}
 }
 
