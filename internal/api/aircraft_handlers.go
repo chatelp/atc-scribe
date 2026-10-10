@@ -26,6 +26,83 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		refLat, refLon, refHex, refFlight, excludeOtherAirportsGrounded, simple := parseAircraftFilters(r)
 
 	// Get aircraft data
+	aircraft, usedDBLastSeenFilter := h.fetchAircraft(minAltitude, maxAltitude, status, lastSeenMinutes,
+		tookOffAfter, tookOffBefore, landedAfter, landedBefore, simple)
+
+	// Filter by callsign if provided
+	if callsign != "" {
+		aircraft = filterByCallsign(aircraft, callsign)
+	}
+
+	// Filter by last seen time if provided (only needed if not already filtered at DB level)
+	if lastSeenMinutes > 0 && !usedDBLastSeenFilter {
+		aircraft = filterByLastSeen(aircraft, lastSeenMinutes)
+	}
+
+	// Apply distance filter if provided
+	if distanceNM > 0 {
+		aircraft = h.filterByDistance(aircraft, distanceNM, refLat, refLon, refHex, refFlight)
+	}
+
+	// Apply exclude_other_airports_grounded filter if requested
+	if excludeOtherAirportsGrounded {
+		aircraft = h.excludeOtherAirportsGrounded(aircraft)
+	}
+
+	// Update zero values with last non-zero values from position history
+	h.annotateAircraft(aircraft, distanceNM, refLat, refLon, refHex)
+
+	// Calculate counts by ground/air and active/total
+	counts := countAircraft(aircraft)
+
+	// Populate what voice has said about each aircraft. One grouped query serves
+	// them all, unlike the clearance loop below, which asks once per target.
+	h.attachVoice(aircraft)
+
+	// Populate clearances for each aircraft
+	h.attachClearances(aircraft)
+
+	// Return simplified response if simple=1
+	if simple {
+		simpleAircraft := h.simplifyAircraft(aircraft)
+
+		simpleResponse := adsb.AircraftSimpleResponse{
+			Timestamp: time.Now().UTC(),
+			Count:     len(simpleAircraft),
+			Aircraft:  simpleAircraft,
+		}
+		WriteJSON(w, http.StatusOK, simpleResponse)
+
+		totalDuration := time.Since(start)
+		h.logger.Debug("GetAllAircraft API call completed (simple mode)",
+			logger.Duration("total_duration", totalDuration),
+			logger.Int("final_aircraft_count", len(simpleAircraft)))
+		return
+	}
+
+	// Create response
+	response := adsb.AircraftResponse{
+		Timestamp: time.Now().UTC(), // Use UTC for response timestamp
+		Count:     len(aircraft),
+		Counts:    counts,
+		Aircraft:  aircraft,
+	}
+
+	// Write response
+	WriteJSON(w, http.StatusOK, response)
+
+	totalDuration := time.Since(start)
+	h.logger.Debug("GetAllAircraft API call completed",
+		logger.Duration("total_duration", totalDuration),
+		logger.Int("final_aircraft_count", len(aircraft)))
+}
+
+// The steps of GetAllAircraft, in the order it takes them.
+
+// fetchAircraft reads the aircraft from the service, filtered at the source
+// when the query allows it, and says whether last_seen was already applied.
+func (h *Handler) fetchAircraft(minAltitude, maxAltitude float64, status []string, lastSeenMinutes int,
+	tookOffAfter, tookOffBefore, landedAfter, landedBefore *time.Time, simple bool) ([]*adsb.Aircraft, bool) {
 	dataFetchStart := time.Now()
 	var aircraft []*adsb.Aircraft
 	// Track whether we used database-level last_seen filtering
@@ -58,182 +135,192 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		logger.Int("aircraft_count", len(aircraft)),
 		logger.Bool("used_db_last_seen_filter", usedDBLastSeenFilter))
 
-	// Filter by callsign if provided
-	if callsign != "" {
-		filtered := make([]*adsb.Aircraft, 0)
-		for _, a := range aircraft {
-			if strings.Contains(strings.ToUpper(a.Flight), strings.ToUpper(callsign)) {
-				filtered = append(filtered, a)
-			}
+	return aircraft, usedDBLastSeenFilter
+}
+
+// filterByCallsign keeps the aircraft whose flight contains callsign, in any case.
+func filterByCallsign(aircraft []*adsb.Aircraft, callsign string) []*adsb.Aircraft {
+	filtered := make([]*adsb.Aircraft, 0)
+	for _, a := range aircraft {
+		if strings.Contains(strings.ToUpper(a.Flight), strings.ToUpper(callsign)) {
+			filtered = append(filtered, a)
 		}
-		aircraft = filtered
+	}
+	return filtered
+}
+
+// filterByLastSeen keeps the aircraft seen in the last lastSeenMinutes.
+func filterByLastSeen(aircraft []*adsb.Aircraft, lastSeenMinutes int) []*adsb.Aircraft {
+	now := time.Now().UTC() // Use UTC for cutoff time
+	cutoffTime := now.Add(-time.Duration(lastSeenMinutes) * time.Minute)
+
+	filtered := make([]*adsb.Aircraft, 0)
+	for _, a := range aircraft {
+		if a.LastSeen.After(cutoffTime) {
+			filtered = append(filtered, a)
+		}
+	}
+	return filtered
+}
+
+// filterByDistance keeps the active airborne aircraft within distanceNM of a
+// reference -- coordinates, an aircraft, or a flight, in that order of
+// priority -- sorted by distance from it. A reference that cannot be resolved
+// is logged and the aircraft are returned unfiltered.
+func (h *Handler) filterByDistance(aircraft []*adsb.Aircraft, distanceNM, refLat, refLon float64, refHex, refFlight string) []*adsb.Aircraft {
+	var refLatitude, refLongitude float64
+	var refHeading, refAltitude float64
+	var err error
+	var refType string
+	var refAircraft *adsb.Aircraft
+
+	// Determine which reference to use (in order of priority)
+	if refLat != 0 && refLon != 0 {
+		// Use provided coordinates
+		refLatitude, refLongitude = refLat, refLon
+		refType = "coordinates"
+		err = nil
+	} else if refHex != "" {
+		// Use aircraft hex code
+		refAircraft, err = h.getRefAircraft(refHex)
+		if err == nil && refAircraft != nil && refAircraft.ADSB != nil {
+			if lat, lon, ok := refAircraft.ADSB.Position(); ok {
+				refLatitude = lat
+				refLongitude = lon
+			}
+			refHeading = adsb.NumberOrZero(refAircraft.ADSB.TrueHeading)
+			if refHeading == 0 {
+				refHeading = adsb.NumberOrZero(refAircraft.ADSB.Track) // Use track if true heading is not available
+			}
+			refAltitude = refAircraft.ADSB.AltBaro.Float64()
+		}
+		refType = "hex"
+	} else if refFlight != "" {
+		// Use flight number
+		refLatitude, refLongitude, err = h.getFlightCoordinates(refFlight)
+		refType = "flight"
+	} else {
+		// No valid reference provided
+		err = fmt.Errorf("no valid reference coordinates provided")
+		refType = "none"
 	}
 
-	// Filter by last seen time if provided (only needed if not already filtered at DB level)
-	if lastSeenMinutes > 0 && !usedDBLastSeenFilter {
-		now := time.Now().UTC() // Use UTC for cutoff time
-		cutoffTime := now.Add(-time.Duration(lastSeenMinutes) * time.Minute)
-
+	if err == nil {
 		filtered := make([]*adsb.Aircraft, 0)
 		for _, a := range aircraft {
-			if a.LastSeen.After(cutoffTime) {
-				filtered = append(filtered, a)
+			// Skip aircraft with no position data
+			if a.ADSB == nil || !a.ADSB.HasPosition() {
+				continue
 			}
-		}
-		aircraft = filtered
-	}
+			lat, lon, _ := a.ADSB.Position()
 
-	// Apply distance filter if provided
-	if distanceNM > 0 {
-		var refLatitude, refLongitude float64
-		var refHeading, refAltitude float64
-		var err error
-		var refType string
-		var refAircraft *adsb.Aircraft
-
-		// Determine which reference to use (in order of priority)
-		if refLat != 0 && refLon != 0 {
-			// Use provided coordinates
-			refLatitude, refLongitude = refLat, refLon
-			refType = "coordinates"
-			err = nil
-		} else if refHex != "" {
-			// Use aircraft hex code
-			refAircraft, err = h.getRefAircraft(refHex)
-			if err == nil && refAircraft != nil && refAircraft.ADSB != nil {
-				if lat, lon, ok := refAircraft.ADSB.Position(); ok {
-					refLatitude = lat
-					refLongitude = lon
-				}
-				refHeading = adsb.NumberOrZero(refAircraft.ADSB.TrueHeading)
-				if refHeading == 0 {
-					refHeading = adsb.NumberOrZero(refAircraft.ADSB.Track) // Use track if true heading is not available
-				}
-				refAltitude = refAircraft.ADSB.AltBaro.Float64()
+			// Skip grounded aircraft for proximity queries
+			if a.OnGround {
+				continue
 			}
-			refType = "hex"
-		} else if refFlight != "" {
-			// Use flight number
-			refLatitude, refLongitude, err = h.getFlightCoordinates(refFlight)
-			refType = "flight"
-		} else {
-			// No valid reference provided
-			err = fmt.Errorf("no valid reference coordinates provided")
-			refType = "none"
-		}
 
-		if err == nil {
-			filtered := make([]*adsb.Aircraft, 0)
-			for _, a := range aircraft {
-				// Skip aircraft with no position data
-				if a.ADSB == nil || !a.ADSB.HasPosition() {
-					continue
-				}
-				lat, lon, _ := a.ADSB.Position()
+			// Skip the reference aircraft itself
+			if refHex != "" && a.Hex == refHex {
+				continue
+			}
 
-				// Skip grounded aircraft for proximity queries
-				if a.OnGround {
-					continue
-				}
+			// For proximity queries, only include active aircraft
+			if a.Status != "active" {
+				continue
+			}
 
-				// Skip the reference aircraft itself
-				if refHex != "" && a.Hex == refHex {
-					continue
-				}
+			// Calculate distance
+			distMeters := adsb.Haversine(lat, lon, refLatitude, refLongitude)
+			distNM := adsb.MetersToNM(distMeters)
+			distNM = math.Round(distNM*10) / 10 // Round to 1 decimal place
 
-				// For proximity queries, only include active aircraft
-				if a.Status != "active" {
-					continue
+			// Add to filtered list if within range
+			if distNM <= distanceNM {
+				// For proximity queries, we need to distinguish between:
+				// 1. Distance from station (regular distance field)
+				// 2. Distance from reference aircraft (relative distance field)
+
+				// Calculate distance from station for each aircraft
+				if a.ADSB != nil && a.ADSB.HasPosition() {
+					stationDistMeters := adsb.Haversine(lat, lon, h.config.Station.Latitude, h.config.Station.Longitude)
+					stationDistNM := adsb.MetersToNM(stationDistMeters)
+					stationDistNM = math.Round(stationDistNM*10) / 10 // Round to 1 decimal place
+					a.Distance = &stationDistNM
 				}
 
-				// Calculate distance
-				distMeters := adsb.Haversine(lat, lon, refLatitude, refLongitude)
-				distNM := adsb.MetersToNM(distMeters)
-				distNM = math.Round(distNM*10) / 10 // Round to 1 decimal place
+				// Store the calculated relative distance
+				a.RelativeDistance = &distNM
 
-				// Add to filtered list if within range
-				if distNM <= distanceNM {
-					// For proximity queries, we need to distinguish between:
-					// 1. Distance from station (regular distance field)
-					// 2. Distance from reference aircraft (relative distance field)
+				// If we have a reference aircraft with heading, calculate relative bearing
+				if refAircraft != nil && refHeading > 0 {
+					bearing := adsb.CalculateRelativeBearing(
+						refLatitude, refLongitude, refHeading,
+						lat, lon)
+					a.RelativeBearing = &bearing
 
-					// Calculate distance from station for each aircraft
-					if a.ADSB != nil && a.ADSB.HasPosition() {
-						stationDistMeters := adsb.Haversine(lat, lon, h.config.Station.Latitude, h.config.Station.Longitude)
-						stationDistNM := adsb.MetersToNM(stationDistMeters)
-						stationDistNM = math.Round(stationDistNM*10) / 10 // Round to 1 decimal place
-						a.Distance = &stationDistNM
+					// Calculate relative altitude
+					if refAltitude > 0 && a.ADSB.AltBaro.Float64() > 0 {
+						relAlt := a.ADSB.AltBaro.Float64() - refAltitude
+						a.RelativeAlt = &relAlt
 					}
-
-					// Store the calculated relative distance
-					a.RelativeDistance = &distNM
-
-					// If we have a reference aircraft with heading, calculate relative bearing
-					if refAircraft != nil && refHeading > 0 {
-						bearing := adsb.CalculateRelativeBearing(
-							refLatitude, refLongitude, refHeading,
-							lat, lon)
-						a.RelativeBearing = &bearing
-
-						// Calculate relative altitude
-						if refAltitude > 0 && a.ADSB.AltBaro.Float64() > 0 {
-							relAlt := a.ADSB.AltBaro.Float64() - refAltitude
-							a.RelativeAlt = &relAlt
-						}
-					}
-
-					filtered = append(filtered, a)
 				}
-			}
 
-			// Sort aircraft by relative distance (ascending)
-			sort.Slice(filtered, func(i, j int) bool {
-				// Handle nil cases (shouldn't happen, but just in case)
-				if filtered[i].RelativeDistance == nil {
-					return false
-				}
-				if filtered[j].RelativeDistance == nil {
-					return true
-				}
-				return *filtered[i].RelativeDistance < *filtered[j].RelativeDistance
-			})
-
-			aircraft = filtered
-		} else {
-			h.logger.Error("Failed to resolve reference coordinates",
-				logger.Error(err),
-				logger.String("reference_type", refType),
-				logger.String("ref_hex", refHex),
-				logger.String("ref_flight", refFlight))
-		}
-	}
-
-	// Apply exclude_other_airports_grounded filter if requested
-	if excludeOtherAirportsGrounded {
-		filtered := make([]*adsb.Aircraft, 0)
-		airportRangeNM := h.config.Station.AirportRangeNM
-		if airportRangeNM == 0 {
-			airportRangeNM = 5.0 // Default to 5.0 NM if not configured
-		}
-
-		for _, a := range aircraft {
-			// Include all aircraft that are not on ground, or grounded aircraft within airport range
-			if !a.OnGround {
 				filtered = append(filtered, a)
-			} else if a.ADSB != nil && a.ADSB.HasPosition() {
-				lat, lon, _ := a.ADSB.Position()
-				// Calculate distance from station for grounded aircraft
-				distMeters := adsb.Haversine(lat, lon, h.config.Station.Latitude, h.config.Station.Longitude)
-				distNM := adsb.MetersToNM(distMeters)
-				if distNM <= airportRangeNM {
-					filtered = append(filtered, a)
-				}
 			}
 		}
+
+		// Sort aircraft by relative distance (ascending)
+		sort.Slice(filtered, func(i, j int) bool {
+			// Handle nil cases (shouldn't happen, but just in case)
+			if filtered[i].RelativeDistance == nil {
+				return false
+			}
+			if filtered[j].RelativeDistance == nil {
+				return true
+			}
+			return *filtered[i].RelativeDistance < *filtered[j].RelativeDistance
+		})
+
 		aircraft = filtered
+	} else {
+		h.logger.Error("Failed to resolve reference coordinates",
+			logger.Error(err),
+			logger.String("reference_type", refType),
+			logger.String("ref_hex", refHex),
+			logger.String("ref_flight", refFlight))
+	}
+	return aircraft
+}
+
+// excludeOtherAirportsGrounded drops the aircraft on the ground away from the
+// station's airport.
+func (h *Handler) excludeOtherAirportsGrounded(aircraft []*adsb.Aircraft) []*adsb.Aircraft {
+	filtered := make([]*adsb.Aircraft, 0)
+	airportRangeNM := h.config.Station.AirportRangeNM
+	if airportRangeNM == 0 {
+		airportRangeNM = 5.0 // Default to 5.0 NM if not configured
 	}
 
-	// Update zero values with last non-zero values from position history
+	for _, a := range aircraft {
+		// Include all aircraft that are not on ground, or grounded aircraft within airport range
+		if !a.OnGround {
+			filtered = append(filtered, a)
+		} else if a.ADSB != nil && a.ADSB.HasPosition() {
+			lat, lon, _ := a.ADSB.Position()
+			// Calculate distance from station for grounded aircraft
+			distMeters := adsb.Haversine(lat, lon, h.config.Station.Latitude, h.config.Station.Longitude)
+			distNM := adsb.MetersToNM(distMeters)
+			if distNM <= airportRangeNM {
+				filtered = append(filtered, a)
+			}
+		}
+	}
+	return filtered
+}
+
+// annotateAircraft adds what is computed per aircraft: distance from the
+// station, the ATC-derived metrics, and no history for a proximity query.
+func (h *Handler) annotateAircraft(aircraft []*adsb.Aircraft, distanceNM, refLat, refLon float64, refHex string) {
 	for _, a := range aircraft {
 		updateZeroValuesFromHistory(a)
 
@@ -257,8 +344,10 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		// Future array is now populated by the prediction algorithm
 		adsb.AttachATCDerivedMetrics(a)
 	}
+}
 
-	// Calculate counts by ground/air and active/total
+// countAircraft counts the aircraft on the ground and in the air, active and in total.
+func countAircraft(aircraft []*adsb.Aircraft) adsb.AircraftCounts {
 	groundActive := 0
 	groundTotal := 0
 	airActive := 0
@@ -280,8 +369,16 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Populate what voice has said about each aircraft. One grouped query serves
-	// them all, unlike the clearance loop below, which asks once per target.
+	return adsb.AircraftCounts{
+		GroundActive: groundActive,
+		GroundTotal:  groundTotal,
+		AirActive:    airActive,
+		AirTotal:     airTotal,
+	}
+}
+
+// attachVoice puts on each aircraft what the radio has said about its callsign.
+func (h *Handler) attachVoice(aircraft []*adsb.Aircraft) {
 	if h.transcriptionStorage != nil {
 		if summaries, err := h.transcriptionStorage.VoiceSummaries(); err != nil {
 			h.logger.Error("Failed to summarise voice by callsign", logger.Error(err))
@@ -297,8 +394,10 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
 
-	// Populate clearances for each aircraft
+// attachClearances puts on each aircraft its last ten clearances.
+func (h *Handler) attachClearances(aircraft []*adsb.Aircraft) {
 	for _, aircraft := range aircraft {
 		clearances, err := h.clearanceStorage.GetClearancesByCallsign(aircraft.Flight, 10) // Last 10 clearances
 		if err != nil {
@@ -311,116 +410,83 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		// Convert to API format
 		aircraft.Clearances = h.convertClearancesToAPIFormat(clearances)
 	}
+}
 
-	// Return simplified response if simple=1
-	if simple {
-		simpleAircraft := make([]*adsb.AircraftSimple, 0, len(aircraft))
-		for _, a := range aircraft {
-			airlineName := strings.TrimSpace(a.Airline)
-			if airlineName == "" && h.refService != nil {
-				flight := strings.TrimSpace(strings.ToUpper(a.Flight))
-				if len(flight) >= 3 {
-					icaoCode := flight[:3]
-					if icaoCode[0] >= 'A' && icaoCode[0] <= 'Z' &&
-						icaoCode[1] >= 'A' && icaoCode[1] <= 'Z' &&
-						icaoCode[2] >= 'A' && icaoCode[2] <= 'Z' {
-						if resolved := strings.TrimSpace(h.refService.LookupAirline(icaoCode)); resolved != "" {
-							airlineName = resolved
-						}
+// simplifyAircraft is the simple=1 shape of the aircraft: one flat record each.
+func (h *Handler) simplifyAircraft(aircraft []*adsb.Aircraft) []*adsb.AircraftSimple {
+	simpleAircraft := make([]*adsb.AircraftSimple, 0, len(aircraft))
+	for _, a := range aircraft {
+		airlineName := strings.TrimSpace(a.Airline)
+		if airlineName == "" && h.refService != nil {
+			flight := strings.TrimSpace(strings.ToUpper(a.Flight))
+			if len(flight) >= 3 {
+				icaoCode := flight[:3]
+				if icaoCode[0] >= 'A' && icaoCode[0] <= 'Z' &&
+					icaoCode[1] >= 'A' && icaoCode[1] <= 'Z' &&
+					icaoCode[2] >= 'A' && icaoCode[2] <= 'Z' {
+					if resolved := strings.TrimSpace(h.refService.LookupAirline(icaoCode)); resolved != "" {
+						airlineName = resolved
 					}
 				}
 			}
-
-			sa := &adsb.AircraftSimple{
-				Hex:      a.Hex,
-				Callsign: a.Flight,
-				Airline:  airlineName,
-				Distance: a.Distance,
-				Status:   a.Status,
-			}
-			// Add BSDB data if available
-			if a.BSDB != nil {
-				sa.Registration = a.BSDB.Registration
-				sa.AircraftType = a.BSDB.ICAOTypeCode
-				sa.Manufacturer = a.BSDB.Manufacturer
-				sa.RegisteredOwners = a.BSDB.RegisteredOwners
-			}
-			// Add ADSB data if available
-			if a.ADSB != nil {
-				sa.Lat = a.ADSB.Lat
-				sa.Lon = a.ADSB.Lon
-				sa.AltBaro = math.Round(a.ADSB.AltBaro.Float64()/100) * 100
-				if a.ADSB.GS != nil {
-					v := math.Round(*a.ADSB.GS)
-					sa.GroundSpeed = &v
-				}
-				if a.ADSB.TAS != nil {
-					v := math.Round(*a.ADSB.TAS)
-					sa.TrueAirspeed = &v
-				}
-				if a.ADSB.Track != nil {
-					v := math.Round(*a.ADSB.Track)
-					sa.Track = &v
-				}
-				if a.ADSB.MagHeading != nil {
-					v := math.Round(*a.ADSB.MagHeading)
-					sa.MagHeading = &v
-				}
-				if a.ADSB.BaroRate != nil {
-					v := math.Round(*a.ADSB.BaroRate/100) * 100
-					sa.VerticalRate = &v
-				}
-				sa.Squawk = a.ADSB.Squawk
-				sa.Category = a.ADSB.Category
-				// Use ADSB type if BSDB type not available
-				if sa.AircraftType == "" {
-					sa.AircraftType = a.ADSB.AircraftType
-				}
-				if sa.Registration == "" {
-					sa.Registration = a.ADSB.Registration
-				}
-			}
-			// Add current phase if available
-			if a.Phase != nil && len(a.Phase.Current) > 0 {
-				sa.Phase = a.Phase.Current[0].Phase
-			}
-			simpleAircraft = append(simpleAircraft, sa)
 		}
 
-		simpleResponse := adsb.AircraftSimpleResponse{
-			Timestamp: time.Now().UTC(),
-			Count:     len(simpleAircraft),
-			Aircraft:  simpleAircraft,
+		sa := &adsb.AircraftSimple{
+			Hex:      a.Hex,
+			Callsign: a.Flight,
+			Airline:  airlineName,
+			Distance: a.Distance,
+			Status:   a.Status,
 		}
-		WriteJSON(w, http.StatusOK, simpleResponse)
-
-		totalDuration := time.Since(start)
-		h.logger.Debug("GetAllAircraft API call completed (simple mode)",
-			logger.Duration("total_duration", totalDuration),
-			logger.Int("final_aircraft_count", len(simpleAircraft)))
-		return
+		// Add BSDB data if available
+		if a.BSDB != nil {
+			sa.Registration = a.BSDB.Registration
+			sa.AircraftType = a.BSDB.ICAOTypeCode
+			sa.Manufacturer = a.BSDB.Manufacturer
+			sa.RegisteredOwners = a.BSDB.RegisteredOwners
+		}
+		// Add ADSB data if available
+		if a.ADSB != nil {
+			sa.Lat = a.ADSB.Lat
+			sa.Lon = a.ADSB.Lon
+			sa.AltBaro = math.Round(a.ADSB.AltBaro.Float64()/100) * 100
+			if a.ADSB.GS != nil {
+				v := math.Round(*a.ADSB.GS)
+				sa.GroundSpeed = &v
+			}
+			if a.ADSB.TAS != nil {
+				v := math.Round(*a.ADSB.TAS)
+				sa.TrueAirspeed = &v
+			}
+			if a.ADSB.Track != nil {
+				v := math.Round(*a.ADSB.Track)
+				sa.Track = &v
+			}
+			if a.ADSB.MagHeading != nil {
+				v := math.Round(*a.ADSB.MagHeading)
+				sa.MagHeading = &v
+			}
+			if a.ADSB.BaroRate != nil {
+				v := math.Round(*a.ADSB.BaroRate/100) * 100
+				sa.VerticalRate = &v
+			}
+			sa.Squawk = a.ADSB.Squawk
+			sa.Category = a.ADSB.Category
+			// Use ADSB type if BSDB type not available
+			if sa.AircraftType == "" {
+				sa.AircraftType = a.ADSB.AircraftType
+			}
+			if sa.Registration == "" {
+				sa.Registration = a.ADSB.Registration
+			}
+		}
+		// Add current phase if available
+		if a.Phase != nil && len(a.Phase.Current) > 0 {
+			sa.Phase = a.Phase.Current[0].Phase
+		}
+		simpleAircraft = append(simpleAircraft, sa)
 	}
-
-	// Create response
-	response := adsb.AircraftResponse{
-		Timestamp: time.Now().UTC(), // Use UTC for response timestamp
-		Count:     len(aircraft),
-		Counts: adsb.AircraftCounts{
-			GroundActive: groundActive,
-			GroundTotal:  groundTotal,
-			AirActive:    airActive,
-			AirTotal:     airTotal,
-		},
-		Aircraft: aircraft,
-	}
-
-	// Write response
-	WriteJSON(w, http.StatusOK, response)
-
-	totalDuration := time.Since(start)
-	h.logger.Debug("GetAllAircraft API call completed",
-		logger.Duration("total_duration", totalDuration),
-		logger.Int("final_aircraft_count", len(aircraft)))
+	return simpleAircraft
 }
 
 // GetAircraftByHex returns an aircraft by its hex ID
