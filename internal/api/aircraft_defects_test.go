@@ -2,12 +2,9 @@ package api
 
 import "testing"
 
-// The altitude filters are parsed, passed down, and dropped on the floor:
-// sqlite.AircraftStorage.GetFiltered filters by status only. Nothing in www/
-// sends them, so the page does not meet it.
+// The altitude filters were parsed, passed down, and dropped on the floor:
+// sqlite.AircraftStorage.GetFiltered filtered by status only.
 func TestTheAltitudeFiltersSelectByAltitude(t *testing.T) {
-	skipDefect(t, "min_altitude and max_altitude are accepted by /aircraft and ignored "+
-		"(internal/storage/sqlite/aircraft.go, GetFiltered: status only)")
 	s := aircraftStack(t)
 	var page aircraftPage
 	s.get("/api/v1/aircraft?min_altitude=10000", &page)

@@ -405,7 +405,7 @@ func TestGroundStateAndStatusFilter(t *testing.T) {
 		t.Error("a missing key means the aircraft is not known yet")
 	}
 
-	active := s.GetFiltered(0, 0, []string{"active"}, nil, nil, nil, nil)
+	active := s.GetFiltered(0, 60000, []string{"active"}, nil, nil, nil, nil)
 	if len(active) != 2 {
 		t.Errorf("active: %d aircraft, want 2", len(active))
 	}
@@ -414,7 +414,14 @@ func TestGroundStateAndStatusFilter(t *testing.T) {
 			t.Errorf("filtered aircraft read back incompletely: %+v", a)
 		}
 	}
-	if n := len(s.GetFiltered(0, 0, nil, nil, nil, nil, nil)); n != 3 {
+	if n := len(s.GetFiltered(0, 60000, nil, nil, nil, nil, nil)); n != 3 {
 		t.Errorf("no status filter: %d aircraft, want 3", n)
+	}
+	// 0 to 60 000 ft means no bound; a bound applies to the latest altitude.
+	if got := s.GetFiltered(1000, 60000, nil, nil, nil, nil, nil); len(got) != 2 {
+		t.Errorf("above 1 000 ft: %d aircraft, want the two at 3 000 ft", len(got))
+	}
+	if got := s.GetFiltered(0, 0, nil, nil, nil, nil, nil); len(got) != 1 || got[0].Hex != "ground" {
+		t.Errorf("at 0 ft: %d aircraft, want the one on the ground", len(got))
 	}
 }

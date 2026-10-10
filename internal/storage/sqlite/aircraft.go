@@ -1307,12 +1307,28 @@ func (s *AircraftStorage) GetFiltered(
 		return []*adsb.Aircraft{}
 	}
 
+	// The altitude bounds apply to the latest barometric altitude, which only
+	// the ADS-B rows hold; 0 and 60 000 ft are the "no bound" defaults. With a
+	// bound set, an aircraft without ADS-B data has no altitude to test and is
+	// left out. An aircraft on the ground reports 0 ft.
+	boundAltitude := minAltitude > 0 || maxAltitude < 60000
+
 	// For each aircraft, get the latest ADSB data and position history
 	for hex, aircraft := range aircraftMap {
 		// Get the latest ADSB data
 		adsbData, err := s.getLatestADSBData(hex)
 		if err == nil && adsbData != nil {
 			aircraft.ADSB = adsbData
+		}
+		if boundAltitude {
+			if aircraft.ADSB == nil {
+				delete(aircraftMap, hex)
+				continue
+			}
+			if alt := float64(aircraft.ADSB.AltBaro); alt < minAltitude || alt > maxAltitude {
+				delete(aircraftMap, hex)
+				continue
+			}
 		}
 
 		// History data is not populated in filtered aircraft endpoint
