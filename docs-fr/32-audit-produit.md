@@ -433,6 +433,25 @@ interface (JS + HTML) 13 036 → 10 881. Rapports : `docs-fr/fiches-cloud/{A,B,C
   (`AIRPORT_LAYOUT_COLORS`, en tête de `openlayers-map-manager.js`).
 - Binaire de production reconstruit ; l'ancien est gardé (`runs/co-atc.avant-vague1`).
 
+### Retour de la vague 2, fiches D et F (10/10)
+
+Intégrées dans `local` le 10/10 sans conflit ; `go vet` propre, 15 paquets verts avec `-race`.
+- **D, configuration réduite** : l'exemple passe de 538 à 156 lignes et de 150 à 57 clés ;
+  défauts en code pour le reste ; une clé inconnue est nommée au démarrage, jamais refusée.
+  **Vérifié sur la configuration réelle du propriétaire** : chargée par le code d'avant et par
+  celui d'après, elle ne diffère que par trois réglages d'authentification qui passent de 0 à
+  720 h, 8 essais et 15 min, exactement les valeurs que l'ancien code appliquait quand ils
+  valaient 0 (`orDefault`, `max <= 0`) : aucun changement de comportement. Elle produisait 23
+  avertissements (chat, clés OpenAI, deux doublons) ; **nettoyée le 10/10** (58 lignes retirées,
+  copie `runs/config.toml.avant-vague2`) : même configuration chargée, aucun avertissement.
+- **F, tests de l'API** : couverture 10,9 % → 69,9 % ; 29 routes testées en 401 sans session.
+  **Défaut à trancher** : `/aircraft` reçoit `min_altitude` et `max_altitude` et ne s'en sert pas ;
+  aucun client du dépôt ne les envoie. Proposition : les retirer (D71.3), plutôt que les coder.
+- Instance d'essai démarrée sur cet état : santé et page en 200. Binaire de production
+  reconstruit, ancien gardé (`runs/co-atc.avant-vague2`).
+- **La fiche E** (découpage de `main()` et de `handlers.go`) peut partir : D est intégrée. Elle
+  doit garder la boucle des avertissements de configuration dans `main.go`.
+
 ## État
 
 - 09/10 : cadre posé ; trois études menées en parallèle (Sonnet), rapports dans

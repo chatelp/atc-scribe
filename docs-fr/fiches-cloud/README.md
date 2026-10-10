@@ -24,7 +24,7 @@ seule.*
 | [F — tests de l'API](F-tests-api.md) | 2 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/F-tests-api.md, et exécute la fiche F en entier.` | `cloud/f-tests-api` | D |
 | [E — découpage de main() et handlers.go](E-decoupage-serveur.md) | 2, **après D** | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/E-decoupage-serveur.md, et exécute la fiche E en entier.` | `cloud/e-decoupage-serveur` | — |
 
-**Vague 1 intégrée le 10/10** (doc 32, « Retour de la vague 1 »). **Vague 2 écrite le 10/10** : D et F en parallèle ; E après l'intégration de D (même fichier `main.go`).
+**Vague 1 intégrée le 10/10** (doc 32, « Retour de la vague 1 »). **Vague 2 écrite le 10/10** : D et F intégrées le 10/10 ; **E peut partir** (elle doit garder dans `main.go` la boucle qui journalise `cfg.Warnings`).
 
 ## Pour la session cloud : règles communes, à respecter sans exception
 
