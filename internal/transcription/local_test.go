@@ -36,8 +36,8 @@ func TestTheSidecarIsToldTheTransmissionsOwnDate(t *testing.T) {
 	if got == nil {
 		t.Fatal("the sidecar was never called")
 	}
-	if v := got.Get("X-Created-At"); v != "2026-09-28T09:17:02+02:00" {
-		t.Errorf("X-Created-At = %q, want created_at exactly as stored", v)
+	if v := got.Get("X-Created-At"); v != "2026-09-28T07:17:02Z" {
+		t.Errorf("X-Created-At = %q, want created_at exactly as stored (UTC since 10/10)", v)
 	}
 	if v := got.Get("X-Segment-At"); v != "2026-09-28T07:17:02.345Z" {
 		t.Errorf("X-Segment-At = %q, want the same moment in UTC to the millisecond", v)

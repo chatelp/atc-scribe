@@ -279,13 +279,15 @@ func measureAgainstADSB(dbPath, airlinesPath string, windowSec, controlShift int
 	// same footing, with its own control.
 	q := `SELECT id, created_at, content, frequency_id, COALESCE(content_second, '') FROM transcriptions WHERE content != ''`
 	var args []any
+	// created_at is stored in UTC (since 10/10) and compared as text: a bound
+	// given with an offset is converted first.
 	if from != "" {
 		q += " AND created_at >= ?"
-		args = append(args, from)
+		args = append(args, utcBound(from))
 	}
 	if to != "" {
 		q += " AND created_at < ?"
-		args = append(args, to)
+		args = append(args, utcBound(to))
 	}
 	rows, err = conn.Query(q+" ORDER BY created_at", args...)
 	if err != nil {
@@ -536,4 +538,13 @@ func pct(a, b int) float64 {
 		return 0
 	}
 	return 100 * float64(a) / float64(b)
+}
+
+// utcBound rewrites an RFC3339 time in UTC, as created_at is stored; anything
+// else is passed through unchanged.
+func utcBound(s string) string {
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t.UTC().Format(time.RFC3339)
+	}
+	return s
 }

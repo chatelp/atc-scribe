@@ -208,10 +208,10 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 	req.Header.Set("X-Language", p.language)
 	req.Header.Set("X-Frequency-Id", p.frequencyID)
 	// The transmission's own date, so an archived clip joins its database row
-	// exactly: X-Created-At is the created_at this row will be stored with, and
+	// exactly: X-Created-At is the created_at this row will be stored with (UTC), and
 	// X-Segment-At the same moment in UTC to the millisecond. The sidecar's clock
 	// cannot serve, since under a queue it sees a transmission long after it ended.
-	req.Header.Set("X-Created-At", at.Format(time.RFC3339))
+	req.Header.Set("X-Created-At", at.UTC().Format(time.RFC3339))
 	req.Header.Set("X-Segment-At", at.UTC().Format("2006-01-02T15:04:05.000Z"))
 
 	resp, err := p.client.Do(req)

@@ -110,6 +110,18 @@ func createTranscriptionsSchema(db execer) error {
 		return fmt.Errorf("failed to create created_at index: %w", err)
 	}
 
+	// created_at is compared and sorted as text, so every row must carry the
+	// same zone. Until 10/10 it kept the host's: "+02:00" here, which a range
+	// given in UTC missed, and which sorts the repeated hour backwards on the
+	// night the clocks go back. New rows are written in UTC; rows of a file
+	// written before are converted once, when it is opened (SQLite reads the
+	// offset and converts). Idempotent: converted rows end in Z.
+	_, err = db.Exec(`UPDATE transcriptions SET created_at = strftime('%Y-%m-%dT%H:%M:%SZ', created_at)
+		WHERE created_at NOT LIKE '%Z' AND strftime('%Y-%m-%dT%H:%M:%SZ', created_at) IS NOT NULL`)
+	if err != nil {
+		return fmt.Errorf("failed to convert created_at to UTC: %w", err)
+	}
+
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_speaker_type ON transcriptions(speaker_type)`)
 	if err != nil {
 		return fmt.Errorf("failed to create speaker_type index: %w", err)
@@ -188,7 +200,7 @@ func (s *TranscriptionStorage) StoreTranscription(record *TranscriptionRecord) (
 		(frequency_id, created_at, content, is_complete, is_processed, content_processed, speaker_type, callsign, language, content_second, callsign_source) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.FrequencyID,
-		record.CreatedAt.Format(time.RFC3339),
+		record.CreatedAt.UTC().Format(time.RFC3339),
 		record.Content,
 		record.IsComplete,
 		record.IsProcessed,
@@ -258,7 +270,7 @@ func (s *TranscriptionStorage) GetTranscriptionsByTimeRange(startTime, endTime t
 		WHERE created_at BETWEEN ? AND ? 
 		ORDER BY created_at DESC 
 		LIMIT ? OFFSET ?`,
-		startTime.Format(time.RFC3339), endTime.Format(time.RFC3339), limit, offset,
+		startTime.UTC().Format(time.RFC3339), endTime.UTC().Format(time.RFC3339), limit, offset,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query transcriptions by time range: %w", err)

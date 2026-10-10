@@ -85,7 +85,7 @@ func (s *PhraseologyStorage) StoreValues(values []PhraseologyValue) error {
 	defer stmt.Close()
 
 	for _, v := range values {
-		if _, err := stmt.Exec(v.TranscriptionID, v.Callsign, v.Role, v.Digits, v.Text, v.CreatedAt); err != nil {
+		if _, err := stmt.Exec(v.TranscriptionID, v.Callsign, v.Role, v.Digits, v.Text, v.CreatedAt.UTC().Format(time.RFC3339)); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("failed to store phraseology value: %w", err)
 		}
