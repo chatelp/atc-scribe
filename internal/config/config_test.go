@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -131,5 +133,69 @@ func TestAnEmptyBackendMeansLocal(t *testing.T) {
 			t.Errorf("[%s] without backend: got %q and %q, want %q", section,
 				cfg.Transcription.Backend, cfg.PostProcessing.Backend, BackendLocal)
 		}
+	}
+}
+
+// frozenExample is configs/config.toml.example as it stood before its
+// reduction (docs-fr/fiches-cloud/D-config-reduite.md), every key written out.
+const frozenExample = "internal/config/testdata/example-2026-10-10.toml"
+
+// The reduction removes from the example every key whose value is the code's
+// default. Absent, such a key must give exactly the value it gave present: the
+// frozen full example and the shipped one must load, validate and come out as
+// the same Config, field by field.
+func TestTheReducedExampleLoadsTheSameConfiguration(t *testing.T) {
+	atRepoRoot(t)
+	full := loadAndValidate(t, frozenExample)
+	reduced := loadAndValidate(t, filepath.Join("configs", "config.toml.example"))
+
+	// Where each was read from is not configuration.
+	full.ConfigPath, reduced.ConfigPath = "", ""
+
+	if diffs := diffValues("", reflect.ValueOf(*full), reflect.ValueOf(*reduced)); len(diffs) > 0 {
+		t.Errorf("the reduced example loads differently from the full one:\n  %s",
+			strings.Join(diffs, "\n  "))
+	}
+	if !reflect.DeepEqual(full, reduced) {
+		t.Error("reflect.DeepEqual disagrees with the field walk; the walk misses something")
+	}
+}
+
+// diffValues walks two values of the same type and names every leaf that
+// differs, as section.field = full | reduced, so a failure says which key.
+func diffValues(path string, a, b reflect.Value) []string {
+	switch a.Kind() {
+	case reflect.Struct:
+		var out []string
+		for i := 0; i < a.NumField(); i++ {
+			name := a.Type().Field(i).Tag.Get("toml")
+			if name == "" || name == "-" {
+				name = a.Type().Field(i).Name
+			}
+			out = append(out, diffValues(path+"."+name, a.Field(i), b.Field(i))...)
+		}
+		return out
+	case reflect.Slice:
+		if a.Len() != b.Len() {
+			return []string{fmt.Sprintf("%s: %d elements | %d", path, a.Len(), b.Len())}
+		}
+		var out []string
+		for i := 0; i < a.Len(); i++ {
+			out = append(out, diffValues(fmt.Sprintf("%s[%d]", path, i), a.Index(i), b.Index(i))...)
+		}
+		return out
+	case reflect.Ptr:
+		if a.IsNil() != b.IsNil() {
+			return []string{fmt.Sprintf("%s: %v | %v", path, a, b)}
+		}
+		if a.IsNil() {
+			return nil
+		}
+		return diffValues(path, a.Elem(), b.Elem())
+	default:
+		if !reflect.DeepEqual(a.Interface(), b.Interface()) {
+			return []string{fmt.Sprintf("%s: %v | %v", path, a.Interface(), b.Interface())}
+		}
+		return nil
 	}
 }
