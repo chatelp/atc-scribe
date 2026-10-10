@@ -121,6 +121,24 @@ func TestAGoAroundIsNotADeparture(t *testing.T) {
 	if got == nil || got.Arrival == nil || got.Departure != nil {
 		t.Fatalf("got %+v, want the arrival only", got)
 	}
+	if got.GoAround == nil || got.GoAround.Runway != "09L" || !got.GoAround.Since.Equal(t0.Add(3*time.Minute)) {
+		t.Fatalf("go-around %+v, want 09L at the climb-out", got.GoAround)
+	}
+	// Seen again climbing out: the moment is not moved.
+	j.Observe("ga1", cdgRefs(), pastEnd(t, "09L-27R", "09L", "27R", 2, 2000, t0.Add(4*time.Minute)))
+	if again := j.Get("ga1"); !again.GoAround.Since.Equal(t0.Add(3*time.Minute)) {
+		t.Errorf("go-around moved to %v", again.GoAround.Since)
+	}
+}
+
+// A departure is not a go-around: nothing arrived before it.
+func TestADepartureIsNoGoAround(t *testing.T) {
+	j := NewRunwayJudge()
+	t0 := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+	j.Observe("dep1", cdgRefs(), pastEnd(t, "09L-27R", "09L", "27R", 1.5, 1500, t0))
+	if got := j.Get("dep1"); got == nil || got.Departure == nil || got.GoAround != nil {
+		t.Fatalf("got %+v, want a departure and no go-around", got)
+	}
 }
 
 func TestATurnaroundForgetsTheArrival(t *testing.T) {
