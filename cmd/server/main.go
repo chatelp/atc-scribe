@@ -1,24 +1,19 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"sort"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/api"
-	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
@@ -465,223 +460,6 @@ func main() {
 	log.Info("All HTTP servers shutdown.")
 
 	log.Info("Server fully stopped")
-}
-
-func runDatabaseRetentionCleanup(ctx context.Context, dbDir string, db *sqlite.DB, rt *config.Runtime, log *logger.Logger) {
-	// Two cadences. Rotation is checked every minute so the switch lands close
-	// to midnight; retention is an hourly sweep, which is as often as it can
-	// possibly matter.
-	rotateTicker := time.NewTicker(1 * time.Minute)
-	defer rotateTicker.Stop()
-	retentionTicker := time.NewTicker(1 * time.Hour)
-	defer retentionTicker.Stop()
-
-	sweep := func() {
-		// Read on every pass, not captured once: a retention changed from the
-		// settings panel takes effect on the next sweep rather than at the next
-		// restart.
-		capGB := rt.DBRetentionGB()
-		if err := cleanupOldDailyDatabases(dbDir, db.Path(), capGB, log); err != nil {
-			log.Warn("Periodic database retention cleanup failed",
-				logger.Error(err),
-				logger.String("path", dbDir),
-				logger.Float64("retention_gb", capGB))
-		}
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case <-rotateTicker.C:
-			// The whole point of the loop. Before this, the file opened at
-			// startup was written to for the life of the process and retention
-			// skipped it as the active one, so a server left running simply grew
-			// one database without limit.
-			rotated, err := db.RotateIfNewDay(dbDir, time.Now())
-			if err != nil {
-				log.Error("Failed to rotate to today's database",
-					logger.Error(err), logger.String("dir", dbDir))
-				continue
-			}
-			if rotated {
-				// Yesterday's file is closed now, so it is eligible for deletion
-				// without waiting for the hourly sweep.
-				sweep()
-			}
-
-		case <-retentionTicker.C:
-			sweep()
-		}
-	}
-}
-
-// cleanupOldDailyDatabases keeps the daily databases within capGB together
-// (28/09, D65). Newest first: the files that fit are kept, and from the first one
-// that does not, it and every older file are deleted -- never a newer day for an
-// older one. Today's file is never deleted, and counts. A file's -wal and -shm
-// count with it and go with it.
-func cleanupOldDailyDatabases(dbDir, activeDBPath string, capGB float64, log *logger.Logger) error {
-	if capGB <= 0 {
-		capGB = config.DefaultDBRetentionGB
-	}
-	capBytes := int64(capGB * (1 << 30))
-
-	entries, err := os.ReadDir(dbDir)
-	if err != nil {
-		return fmt.Errorf("read db directory: %w", err)
-	}
-
-	type daily struct {
-		path  string
-		date  time.Time
-		bytes int64
-	}
-	// The same file can be spelled two ways: relative and absolute, or through a
-	// symbolic link (/var is one on macOS, to /private/var). Compared by name
-	// only, today's file passed for an old one there, and went when over the
-	// cap. It is now recognised by name or by identity.
-	absActiveDBPath, _ := filepath.Abs(activeDBPath)
-	activeInfo, _ := os.Stat(activeDBPath)
-	isActive := func(path string) bool {
-		if abs, _ := filepath.Abs(path); abs == absActiveDBPath {
-			return true
-		}
-		if activeInfo == nil {
-			return false
-		}
-		info, err := os.Stat(path)
-		return err == nil && os.SameFile(info, activeInfo)
-	}
-	var files []daily
-	var total int64
-	for _, entry := range entries {
-		fileName := entry.Name()
-		if entry.IsDir() || !strings.HasPrefix(fileName, "co-atc-") || !strings.HasSuffix(fileName, ".db") {
-			continue
-		}
-		fileDate, parseErr := time.Parse("2006-01-02", strings.TrimSuffix(strings.TrimPrefix(fileName, "co-atc-"), ".db"))
-		if parseErr != nil {
-			continue
-		}
-		path := filepath.Join(dbDir, fileName)
-		var size int64
-		for _, p := range []string{path, path + "-wal", path + "-shm"} {
-			if info, err := os.Stat(p); err == nil {
-				size += info.Size()
-			}
-		}
-		if isActive(path) {
-			total += size // kept whatever its size
-			continue
-		}
-		files = append(files, daily{path, fileDate, size})
-	}
-	sort.Slice(files, func(i, j int) bool { return files[i].date.After(files[j].date) })
-
-	deleted, over := 0, false
-	var freed int64
-	for _, f := range files {
-		if !over && total+f.bytes <= capBytes {
-			total += f.bytes
-			continue
-		}
-		over = true
-		for _, p := range []string{f.path, f.path + "-wal", f.path + "-shm"} {
-			if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("remove old db '%s': %w", p, err)
-			}
-		}
-		deleted++
-		freed += f.bytes
-		log.Info("Deleted old database file",
-			logger.String("path", f.path),
-			logger.String("file_date", f.date.Format("2006-01-02")),
-			logger.Int64("bytes", f.bytes))
-	}
-
-	if deleted > 0 {
-		log.Info("Database retention cleanup complete",
-			logger.Int("deleted_files", deleted),
-			logger.Int64("freed_bytes", freed),
-			logger.Int64("kept_bytes", total),
-			logger.Float64("retention_gb", capGB))
-	}
-	return nil
-}
-
-// printNewUser reads a password twice without echoing it and prints the TOML block
-// to paste into the configuration.
-//
-// It prints rather than writes. Rewriting the configuration file would mean a
-// program editing the document that carries every measured default and the reason
-// for it; and a password that has been typed should reach exactly one place, the
-// hash, with no copy left in a backup file along the way.
-func printNewUser(name string) error {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return fmt.Errorf("a user name is required")
-	}
-
-	first, err := readPassword("Password for " + name + ": ")
-	if err != nil {
-		return err
-	}
-	again, err := readPassword("Repeat: ")
-	if err != nil {
-		return err
-	}
-	if first != again {
-		return fmt.Errorf("the two entries differ")
-	}
-
-	hash, err := auth.HashPassword(first)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("\n# Add this to your configuration, under [auth]:\n\n")
-	fmt.Printf("[auth]\nenabled = true\n\n[[auth.users]]\nname = %q\npassword_hash = %q\n\n", name, hash)
-	fmt.Printf("# The password itself is not stored anywhere. Losing it means creating\n")
-	fmt.Printf("# another account with this command; there is no recovery by design.\n")
-	return nil
-}
-
-// stdinReader is shared across reads. A fresh bufio.Reader per call would lose
-// whatever the previous one had already buffered, which makes the second prompt
-// read EOF when the input is piped rather than typed.
-var stdinReader = bufio.NewReader(os.Stdin)
-
-var warnedAboutEcho bool
-
-// readPassword turns off terminal echo through stty rather than pulling in a
-// dependency for it. If echo cannot be turned off -- a pipe, a terminal that does
-// not support it -- the caller is told plainly rather than typing a password into
-// a visible line without knowing.
-func readPassword(prompt string) (string, error) {
-	fmt.Fprint(os.Stderr, prompt)
-
-	stty := exec.Command("stty", "-echo")
-	stty.Stdin = os.Stdin
-	echoOff := stty.Run() == nil
-	if !echoOff && !warnedAboutEcho {
-		warnedAboutEcho = true
-		fmt.Fprint(os.Stderr, "\n[!] this terminal will not hide input; type with that in mind\n"+prompt)
-	}
-
-	line, err := stdinReader.ReadString('\n')
-
-	if echoOff {
-		restore := exec.Command("stty", "echo")
-		restore.Stdin = os.Stdin
-		restore.Run()
-		fmt.Fprintln(os.Stderr)
-	}
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimRight(line, "\r\n"), nil
 }
 
 // isLoopbackHost reports whether a bind address can only be reached from this
