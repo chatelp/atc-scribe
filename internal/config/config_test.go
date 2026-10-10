@@ -73,6 +73,15 @@ func TestAConfigurationWrittenForTheRemovedPathsStillStarts(t *testing.T) {
 	if len(cfg.Frequencies.Sources) == 0 || cfg.ADSB.SourceType == "" {
 		t.Error("frequencies or adsb were not read")
 	}
+
+	// Its live keys are those of the example of the same day, so the defaults
+	// the code grew since must leave it loading as that example does.
+	full := loadAndValidate(t, frozenExample)
+	cfg.ConfigPath, full.ConfigPath = "", ""
+	if diffs := diffValues("", reflect.ValueOf(*full), reflect.ValueOf(*cfg)); len(diffs) > 0 {
+		t.Errorf("the legacy configuration loads differently from the full example:\n  %s",
+			strings.Join(diffs, "\n  "))
+	}
 }
 
 // The example shipped with the repository must start as it is.
@@ -198,4 +207,95 @@ func diffValues(path string, a, b reflect.Value) []string {
 		}
 		return nil
 	}
+}
+
+// writeConfig puts text in a temporary config.toml and returns its path.
+func writeConfig(t *testing.T, text string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// minimalConfig says only what no default can guess: where the aircraft come
+// from, where the station is, and which weather to fetch.
+const minimalConfig = `
+[adsb]
+source_type = "tar1090"
+tar1090_base_url = "http://receiver.local/tar1090/data/"
+
+[station]
+latitude = 48.8
+longitude = 2.1
+airport_code = "LFPO"
+
+[wx]
+fetch_metar = true
+`
+
+// A key left out holds the code's default, for every section: the almost
+// empty configuration above validates and comes out as Defaults plus what it
+// said.
+func TestAnAlmostEmptyConfigurationStartsOnTheDefaults(t *testing.T) {
+	atRepoRoot(t)
+	cfg := loadAndValidate(t, writeConfig(t, minimalConfig))
+
+	want := Defaults()
+	want.ADSB.SourceType, want.ADSB.Tar1090BaseURL = "tar1090", "http://receiver.local/tar1090/data/"
+	want.Station.Latitude, want.Station.Longitude, want.Station.AirportCode = 48.8, 2.1, "LFPO"
+	want.Weather.FetchMETAR = true
+	cfg.ConfigPath = ""
+	if diffs := diffValues("", reflect.ValueOf(want), reflect.ValueOf(*cfg)); len(diffs) > 0 {
+		t.Errorf("not the defaults (want | got):\n  %s", strings.Join(diffs, "\n  "))
+	}
+	for _, check := range []struct {
+		name string
+		got  any
+		want any
+	}{
+		{"cruise_altitude_ft", cfg.FlightPhases.CruiseAltitudeFt, 18000},
+		{"flying_min_alt_ft", cfg.FlightPhases.FlyingMinAltFt, 700.0},
+		{"airlines_dat_path", cfg.Reference.AirlinesDATPath, "assets/airlines.dat"},
+		{"server_url", cfg.Transcription.Local.ServerURL, "http://127.0.0.1:8178"},
+		{"opensky_base_url", cfg.ADSB.OpenSkyBaseURL, "https://opensky-network.org/api"},
+		{"db_retention_gb", cfg.Storage.DBRetentionGB, DefaultDBRetentionGB},
+	} {
+		if !reflect.DeepEqual(check.got, check.want) {
+			t.Errorf("%s: got %v, want %v", check.name, check.got, check.want)
+		}
+	}
+}
+
+// A default fills what is absent, not what is wrong: a value written out of
+// bounds is still refused, with its name.
+func TestAValueOutOfBoundsIsStillRefused(t *testing.T) {
+	atRepoRoot(t)
+	for _, bad := range []struct{ section, line, want string }{
+		{"flight_phases", "enabled = true\ncruise_altitude_ft = 0", "cruise_altitude_ft must be positive"},
+		{"adsb", "fetch_interval_seconds = 0", "invalid fetch interval"},
+		{"wx", "refresh_interval_minutes = -1", "refresh_interval_minutes must be greater than 0"},
+		{"logging", `level = "loud"`, "invalid log level"},
+	} {
+		cfg, err := Load(writeConfig(t, withLines(minimalConfig, bad.section, bad.line)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cfg.Validate()
+		if err == nil || !strings.Contains(err.Error(), bad.want) {
+			t.Errorf("[%s] %s: got %v, want %q", bad.section, bad.line, err, bad.want)
+		}
+	}
+}
+
+// withLines adds lines to the section of a TOML text, after the header when
+// the section exists and as a new table otherwise (TOML refuses a table
+// written twice).
+func withLines(text, section, lines string) string {
+	header := "[" + section + "]\n"
+	if strings.Contains(text, header) {
+		return strings.Replace(text, header, header+lines+"\n", 1)
+	}
+	return text + "\n" + header + lines + "\n"
 }
