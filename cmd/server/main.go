@@ -105,6 +105,11 @@ func main() {
 		logger.String("version", "0.1.0"),
 		logger.String("config_path", resolvedConfigPath),
 	)
+	// What the loader had to say about the file: a key written twice, a key
+	// nothing reads any more. One line each; never a reason not to start.
+	for _, w := range cfg.Warnings {
+		log.Warn(w, logger.String("config_path", resolvedConfigPath))
+	}
 
 	// Arm the shutdown signals before anything is started, not after.
 	//
