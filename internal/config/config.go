@@ -17,6 +17,12 @@ type Config struct {
 	// configuration -- runtime settings, accounts -- lands in the same place.
 	ConfigPath string `toml:"-"`
 
+	// Warnings is what Load has to say about the file and cannot log itself,
+	// the logger being built from this very configuration: a key written in
+	// two sections, and (step 4) a key nothing reads any more. One line each,
+	// naming the key; main prints them once the logger exists. Not a TOML field.
+	Warnings []string `toml:"-"`
+
 	Server         ServerConfig         `toml:"server"`          // HTTP server settings
 	ADSB           ADSBConfig           `toml:"adsb"`            // Aircraft tracking data source settings
 	Frequencies    FrequenciesConfig    `toml:"frequencies"`     // Radio frequency monitoring settings
@@ -146,7 +152,7 @@ type StationConfig struct {
 	ElevationFeet           int     `toml:"elevation_feet"`             // Elevation of the station above sea level in feet
 	AirportCode             string  `toml:"airport_code"`               // ICAO code of the airport (e.g., "CYYZ")
 	RunwayExtensionLengthNM float64 `toml:"runway_extension_length_nm"` // Length of runway extensions in nautical miles
-	AirportRangeNM          float64 `toml:"airport_range_nm"`           // Range in nautical miles to consider aircraft as being at this airport (default: 5.0)
+	AirportRangeNM          float64 `toml:"airport_range_nm"`           // Range in nautical miles to consider aircraft as being at this airport (default: 5.0); also what the flight phases use
 	DisplayRangeNM          float64 `toml:"display_range_nm"`           // Range in nautical miles for displaying airports, runways, and navaids on map (default: 100.0)
 }
 
@@ -206,7 +212,7 @@ type PostProcessingConfig struct {
 
 	// Backend must be "local" or empty; "openai" is refused at startup.
 	Backend              string  `toml:"backend"`
-	AirlinesDatPath      string  `toml:"airlines_dat_path"`       // OpenFlights airlines.dat, shipped in assets/
+	AirlinesDatPath      string  `toml:"airlines_dat_path"`       // Filled from [reference] airlines_dat_path; its own key is the older home, still read with a warning
 	MinScore             float64 `toml:"min_score"`               // below this, the matcher refuses rather than guesses
 	MinDigits            int     `toml:"min_digits"`              // shortest spoken number that may be a flight number
 	FleetLastSeenMinutes int     `toml:"fleet_last_seen_minutes"` // how stale an ADS-B target may be and still be a candidate
@@ -328,7 +334,7 @@ type FlightPhasesConfig struct {
 	RecentTakeoffTimeoutMinutes int `toml:"recent_takeoff_timeout_minutes"`
 
 	// Other phase detection parameters
-	AirportRangeNM float64 `toml:"airport_range_nm"` // Distance considered "close to airport"
+	AirportRangeNM float64 `toml:"airport_range_nm"` // Distance considered "close to airport"; filled from [station] airport_range_nm, its own key is the older home, still read with a warning
 
 	// Ground detection thresholds (NEW - making existing constants configurable)
 	FlyingMinTASKts         float64 `toml:"flying_min_tas_kts"`        // Minimum true airspeed to be considered flying
@@ -393,7 +399,48 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
+	config.reconcileDuplicates(meta)
+
 	return &config, nil
+}
+
+// reconcileDuplicates gives each value that two sections used to carry one
+// home: airport_range_nm lives in [station], airlines_dat_path in
+// [reference]. The older key is still read when written, so that an existing
+// file keeps its behaviour, and the file is told once at startup.
+func (c *Config) reconcileDuplicates(meta toml.MetaData) {
+	oneHome(c, meta, "flight_phases", "station", "airport_range_nm",
+		&c.FlightPhases.AirportRangeNM, &c.Station.AirportRangeNM)
+	oneHome(c, meta, "post_processing", "reference", "airlines_dat_path",
+		&c.PostProcessing.AirlinesDatPath, &c.Reference.AirlinesDATPath)
+}
+
+// oneHome settles key between its old section and its new one. Neither
+// written, or only the new: the old field takes the new value, nothing to
+// say. Only the old: the new field takes it, with a line saying where it now
+// belongs. Both: each is kept as written -- the two had separate effects and
+// a file that set them differently meant it -- and the file is told.
+func oneHome[T comparable](c *Config, meta toml.MetaData, oldSection, newSection, key string, oldField, newField *T) {
+	oldWritten := meta.IsDefined(oldSection, key)
+	newWritten := meta.IsDefined(newSection, key)
+	switch {
+	case oldWritten && newWritten && *oldField == *newField:
+		c.warnf("%s.%s repeats %s.%s (%v): one key is enough, in [%s]",
+			oldSection, key, newSection, key, *newField, newSection)
+	case oldWritten && newWritten:
+		c.warnf("%s.%s (%v) differs from %s.%s (%v): both are kept as written, but the key belongs in [%s] alone",
+			oldSection, key, *oldField, newSection, key, *newField, newSection)
+	case oldWritten:
+		*newField = *oldField
+		c.warnf("%s.%s (%v) is read as %s.%s: write it in [%s]",
+			oldSection, key, *oldField, newSection, key, newSection)
+	default:
+		*oldField = *newField
+	}
+}
+
+func (c *Config) warnf(format string, args ...any) {
+	c.Warnings = append(c.Warnings, fmt.Sprintf(format, args...))
 }
 
 // LoadWithFallbackAndPath loads configuration and returns the resolved config file path.
@@ -465,7 +512,7 @@ func (c *Config) Validate() error {
 
 	if c.PostProcessing.Enabled {
 		if c.PostProcessing.AirlinesDatPath == "" {
-			return fmt.Errorf("post_processing.airlines_dat_path is required when post-processing is enabled")
+			return fmt.Errorf("reference.airlines_dat_path is required when post-processing is enabled: the grammar needs the airline telephony")
 		}
 		if c.PostProcessing.MinScore < 0 {
 			return fmt.Errorf("invalid post_processing.min_score: %v (must be >= 0)", c.PostProcessing.MinScore)
