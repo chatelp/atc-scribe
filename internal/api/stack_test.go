@@ -61,15 +61,19 @@ func cheapHash(password string) string {
 	return testHash
 }
 
-// The station the stack sits at, and the three aircraft its receiver sees:
-// one in cruise, one descending, one on the ground. Generic coordinates.
+// The station the stack sits at, and the four aircraft its receiver sees:
+// one in cruise, one descending, one climbing out farther away, one on the
+// ground. Generic coordinates.
 const (
 	stationLat = 48.80
 	stationLon = 2.05
 
-	hexCruise  = "3c6444" // AFR123, FL350, 25 NM east
-	hexDescent = "4ca1d2" // RYR45, 3 000 ft, descending, 17 NM south-east
-	hexGround  = "39b4c5" // no callsign, on the ground
+	hexCruise  = "3c6444" // AFR123, FL350, 26 NM east
+	hexDescent = "4ca1d2" // RYR45, 3 000 ft, descending, 18 NM south-east
+	hexClimb   = "406a1b" // EZY77, FL200, 34 NM north-east
+	hexGround  = "39b4c5" // no callsign, on the ground, 13 NM east
+
+	aircraftSeen = 4
 )
 
 func f(v float64) *float64 { return &v }
@@ -80,6 +84,8 @@ func stationAircraft() []adsb.ADSBTarget {
 			Track: f(90), BaroRate: f(0), Squawk: "1000", Category: "A3", Seen: f(0.5), Messages: intp(120)},
 		{Hex: hexDescent, Flight: "RYR45", AltBaro: 3000, Lat: f(48.60), Lon: f(2.40), GS: f(180), TAS: f(190),
 			Track: f(270), BaroRate: f(-800), Squawk: "4321", Category: "A3", Seen: f(1), Messages: intp(80)},
+		{Hex: hexClimb, Flight: "EZY77", AltBaro: 20000, Lat: f(49.10), Lon: f(2.80), GS: f(400), TAS: f(420),
+			Track: f(200), BaroRate: f(1500), Squawk: "2000", Category: "A3", Seen: f(0.8), Messages: intp(60)},
 		{Hex: hexGround, AltBaro: 0, Lat: f(48.72), Lon: f(2.37), GS: f(8), Track: f(180),
 			Squawk: "7000", Seen: f(2), Messages: intp(10)},
 	}

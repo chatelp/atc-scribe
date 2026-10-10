@@ -93,8 +93,8 @@ func TestWhatIsReachableWithoutASession(t *testing.T) {
 		AircraftCount int  `json:"aircraft_count"`
 	}
 	s.get("/api/v1/health", &health)
-	if !health.Status || health.AircraftCount != 3 {
-		t.Errorf("health = %+v, want the fake receiver's three aircraft and a good last fetch", health)
+	if !health.Status || health.AircraftCount != aircraftSeen {
+		t.Errorf("health = %+v, want the fake receiver's %d aircraft and a good last fetch", health, aircraftSeen)
 	}
 }
 
