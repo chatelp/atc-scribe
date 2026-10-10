@@ -318,8 +318,7 @@ document.addEventListener('alpine:init', () => {
         lastUpdate: null,
         settingsCollapsed: true, // Hide settings panel by default
         selectedAircraft: null,
-        showSplashScreen: true, // Show splash screen by default
-        splashScreenAudioPlayed: false, // Track if the welcome sound has been played
+        resumeListeningPending: false, // remembered listening waits for the page's first gesture
         connectionLostSoundPlayed: false, // Track if the connection lost sound has been played
         // coordinates removed as they're not needed
         currentTime: new Date().toLocaleTimeString(),
@@ -2094,6 +2093,7 @@ document.addEventListener('alpine:init', () => {
 
                 // Setup keyboard event listeners
                 this.setupKeyboardEvents();
+                this.armResumeOnFirstGesture();
                 
                 audioClient.initAudioContext();
 
@@ -2703,6 +2703,8 @@ async initAircraftDataSource() {
             wsClient.addEventListener('open', () => {
                 console.log('App.js: WebSocket connection now open.');
                 this.connected = true;
+                // From now on a lost connection is shown; never during the first load.
+                this.initialDataLoaded = true;
                 this.wsReconnectAttempt = 0;
                 this.wsNextRetryDelayMs = null;
                 // Reset the connection lost sound flag when connection is re-established
@@ -4677,42 +4679,23 @@ async initAircraftDataSource() {
             return statusInfo ? statusInfo.error : null;
         },
 
-        // Play welcome sound
-        playWelcomeSound() {
-            if (this.splashScreenAudioPlayed) return;
-            
-            try {
-                const audio = new Audio('/sounds/airplane-ding-dong.mp3');
-                audio.volume = 0.7; // Set volume to 70%
-                audio.play().then(() => {
-                    console.log('[Alpine Store] Welcome sound played successfully');
-                    this.splashScreenAudioPlayed = true;
-                }).catch(err => {
-                    console.error('[Alpine Store] Error playing welcome sound:', err);
-                });
-            } catch (err) {
-                console.error('[Alpine Store] Error creating audio element:', err);
-            }
+        // Browsers let a page play sound only after a gesture on it. The first
+        // click or key anywhere resumes what was listened to last time; it
+        // replaced upstream's welcome screen, which blocked the map at every load
+        // to get that click (10/10). Capture phase: it runs before the click's
+        // own handler, so a tile clicked first is toggled after the resume.
+        armResumeOnFirstGesture() {
+            this.resumeListeningPending = this.rememberedListening().length > 0;
+            const onFirstGesture = () => {
+                document.removeEventListener('pointerdown', onFirstGesture, true);
+                document.removeEventListener('keydown', onFirstGesture, true);
+                this.resumeListeningPending = false;
+                this.restoreListening();
+            };
+            document.addEventListener('pointerdown', onFirstGesture, true);
+            document.addEventListener('keydown', onFirstGesture, true);
         },
-        
-        // Close splash screen and play sound
-        closeSplashScreen() {
-            // Play the welcome sound when user clicks the button
-            this.playWelcomeSound();
 
-            // The same click lets the radios play: resume what was listened to.
-            this.restoreListening();
-
-            // Hide the splash screen
-            this.showSplashScreen = false;
-            
-            // Now that the splash screen is closed, we can start showing connection lost messages if needed
-            // This ensures the connection lost overlay never appears during initial loading
-            this.initialDataLoaded = true;
-            
-            console.log('[Alpine Store] Splash screen closed');
-        },
-        
         // Setup keyboard event listeners
         setupKeyboardEvents() {
             document.addEventListener('keydown', (e) => {
