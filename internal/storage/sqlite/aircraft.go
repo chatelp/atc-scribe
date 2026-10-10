@@ -1138,12 +1138,17 @@ func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 			aircraftType = aircraft.ADSB.AircraftType
 		}
 
-		// A position already stored for this aircraft is not stored again. The
-		// UNIQUE constraint alone did that only when every column was set: SQLite
-		// holds NULLs distinct, and tas (a Comm-B field) is NULL in a quarter of
-		// the reports, so those were written at every poll -- 40 % of a day's
-		// rows were exact repeats (04/10: 923 816 of 2 328 654). IS compares NULL
-		// as a value, and the constraint's own index serves the lookup.
+		// A state already stored for this aircraft in the last 10 s is not stored
+		// again. The UNIQUE constraint alone did that only when every column was
+		// set: SQLite holds NULLs distinct, and tas (a Comm-B field) is NULL in a
+		// quarter of the reports, so those were written at every poll -- 40 % of a
+		// day's rows were exact repeats (04/10: 923 816 of 2 328 654). IS compares
+		// NULL as a value, and the constraint's own index serves the lookup.
+		// Not "never again": an aircraft without a position holding its level,
+		// track and speed would then keep one row for its whole flight, and the
+		// lab's checks look for its state around each transmission. A repeat is
+		// written every 10 s at most: 1 453 539 rows that day instead of 2 328 654
+		// (-37.6 %; never again would have been -39.7 %).
 		_, err = tx.Exec(`
 			INSERT OR IGNORE INTO adsb_targets (
 				aircraft_hex, hex, type, flight, registration, aircraft_type, alt_baro, alt_geom, gs, ias, tas, mach, wd, ws, oat, tat,
@@ -1155,6 +1160,7 @@ func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 			WHERE NOT EXISTS (
 				SELECT 1 FROM adsb_targets
 				WHERE aircraft_hex = ? AND lat IS ? AND lon IS ? AND alt_baro IS ? AND gs IS ? AND tas IS ? AND track IS ?
+				AND timestamp > ?
 			)
 		`,
 			aircraft.Hex, aircraft.ADSB.Hex, aircraft.ADSB.Type, aircraft.ADSB.Flight,
@@ -1178,6 +1184,7 @@ func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 			aircraft.Hex, nullableFloatValue(aircraft.ADSB.Lat), nullableFloatValue(aircraft.ADSB.Lon),
 			nullableFlexibleFloatValue(aircraft.ADSB.AltBaro), nullableFloatValue(aircraft.ADSB.GS),
 			nullableFloatValue(aircraft.ADSB.TAS), aircraft.ADSB.Track,
+			aircraft.LastSeen.Add(-repeatedStateInterval).UTC().Format(time.RFC3339),
 		)
 		if err != nil {
 			return fmt.Errorf("insert ADSB target: %w", err)
@@ -1200,6 +1207,9 @@ func (s *AircraftStorage) upsertOnce(aircraft *adsb.Aircraft) (err error) {
 
 	return nil
 }
+
+// repeatedStateInterval is how often an unchanged state is written again (see Upsert).
+const repeatedStateInterval = 10 * time.Second
 
 // Count returns the number of aircraft in the database
 func (s *AircraftStorage) Count() int {
