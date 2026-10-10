@@ -43,6 +43,9 @@ moyen : c'est pourquoi tout se vérifie par comparaison avant/après.
    décollage/atterrissage identiques, ≈ 55 lignes) — **seulement si** la fusion est évidente
    et couverte par un test existant ; sinon, laisse et dis-le.
 
+**Garde** la boucle de `main.go` qui journalise `cfg.Warnings` (fiche D) : elle doit survivre au
+découpage, avant la construction des services.
+
 **Ne touche pas** : `internal/transcription/`, `phraseology/`, `www/`, les messages de journal,
 les signatures publiques.
 
