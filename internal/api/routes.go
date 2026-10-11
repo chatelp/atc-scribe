@@ -1,6 +1,7 @@
 package api
 
 import (
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -43,6 +44,13 @@ func (r *Router) Routes() http.Handler {
 	router.Use(r.middleware.Logger)
 	router.Use(r.middleware.Recoverer)
 	router.Use(r.middleware.CORS(defaultCORSAllowedOrigins))
+	// gzip for text (audit 4.3): the page's scripts, the airport layout and the
+	// aircraft list are the bulk of what a page loads -- 1.2 MB of the 1.76
+	// measured on 11/10 -- and were sent uncompressed. Audio (audio/wav) and the
+	// WebSocket are not among the types; chi's writer passes Flush and Hijack
+	// through, so the stream and the socket are untouched.
+	router.Use(chimw.Compress(5, "text/html", "text/css", "text/javascript", "application/javascript",
+		"application/json", "application/geo+json", "image/svg+xml", "text/plain"))
 
 	// API routes
 	router.Route("/api/v1", func(router chi.Router) {

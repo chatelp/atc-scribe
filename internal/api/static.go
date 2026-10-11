@@ -1,6 +1,7 @@
 package api
 
 import (
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +18,8 @@ type StaticFileHandler struct {
 
 // NewStaticFileHandler creates a new static file handler
 func NewStaticFileHandler(staticDir string, logger *logger.Logger) *StaticFileHandler {
+	// The airport layout is GeoJSON; without this it went out as text/plain.
+	_ = mime.AddExtensionType(".geojson", "application/geo+json")
 	return &StaticFileHandler{
 		staticDir: staticDir,
 		logger:    logger.Named("static-handler"),
@@ -103,10 +106,11 @@ func (h *StaticFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Set headers to prevent caching (for dynamic serving)
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
+	// Always revalidated, never served from the cache without asking: a file
+	// changed on disk is seen on the next load, and an unchanged one costs a 304
+	// instead of its bytes (ServeFile answers If-Modified-Since). Upstream's
+	// no-store made every reload fetch the whole page again (audit 4.3).
+	w.Header().Set("Cache-Control", "no-cache")
 
 	// Serve the file
 	h.logger.Debug("Serving static file",

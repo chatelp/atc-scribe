@@ -48,41 +48,40 @@
     <link rel="preload" href="/sounds/airbus_retard.mp3" as="audio">
     
     <!-- 1) Runtime libraries (must load before map modules) -->
-    <script src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"></script>
             
     <!-- 2) UI framework (store/app bindings) -->
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
     <!-- 3) Shared app clients -->
-    <script src="websocket-client.js"></script>
-    <script src="audio-client.js"></script>
+    <script defer src="websocket-client.js"></script>
+    <script defer src="audio-client.js"></script>
 
     <!-- 4) Map foundation (core primitives and perf metrics) -->
-    <script src="map/core/layer-registry.js"></script>
-    <script src="map/core/event-bus.js"></script>
-    <script src="map/core/visibility-rules.js"></script>
-    <script src="map/core/map-engine.js"></script>
-    <script src="map/perf/telemetry.js"></script>
+    <script defer src="map/core/layer-registry.js"></script>
+    <script defer src="map/core/event-bus.js"></script>
+    <script defer src="map/core/visibility-rules.js"></script>
+    <script defer src="map/core/map-engine.js"></script>
+    <script defer src="map/perf/telemetry.js"></script>
 
     <!-- 5) Map feature modules (user interactions and contextual overlays) -->
-    <script src="map/features/interactions-feature.js"></script>
-    <script src="map/features/proximity-feature.js"></script>
-    <script src="map/features/minimap-feature.js"></script>
+    <script defer src="map/features/interactions-feature.js"></script>
+    <script defer src="map/features/proximity-feature.js"></script>
+    <script defer src="map/features/minimap-feature.js"></script>
 
     <!-- 6) Map renderers (facades first, concrete aircraft renderer second) -->
-    <script src="map/renderers/rendering-facades.js"></script>
-    <script src="map/renderers/aircraft-webgl.js"></script>
+    <script defer src="map/renderers/rendering-facades.js"></script>
+    <script defer src="map/renderers/aircraft-webgl.js"></script>
 
     <!-- 7) Map orchestrator (depends on all map modules above) -->
-    <script src="map/openlayers-map-manager.js"></script>
+    <script defer src="map/openlayers-map-manager.js"></script>
 
     <!-- 8) Aircraft motion smoothing layer (depends on manager) -->
-    <script src="aircraft-animation.js"></script>
+    <script defer src="aircraft-animation.js"></script>
 
     <!-- 9) PAR view: the sky in profile, runway by runway (docs-fr/31-vue-par.md) -->
-    <script src="par/par-geometry.js"></script>
-    <script src="par/par-vac.js"></script>
-    <script src="par/par-view.js"></script>
+    <script defer src="par/par-geometry.js"></script>
+    <script defer src="par/par-vac.js"></script>
+    <script defer src="par/par-view.js"></script>
 </head>
 <body class="bg-background text-text m-0 p-0 font-mono overflow-hidden h-screen flex flex-col" x-data>
     <div id="app-container" class="flex flex-col h-screen">
@@ -2422,12 +2421,16 @@
 
     <!-- Custom JavaScript -->
     <!-- Sign-in overlay; does nothing when auth.enabled is false. -->
-    <script src="login.js"></script>
-    <script src="altitude/altitude-scale.js"></script>
-    <script src="timeline/flight-timeline.js"></script>
-    <script src="altitude/altitude-filter.js"></script>
-    <script src="events.js"></script>
-    <script src="help-tips.js"></script>
-    <script src="app.js"></script>
+    <script defer src="login.js"></script>
+    <script defer src="altitude/altitude-scale.js"></script>
+    <script defer src="timeline/flight-timeline.js"></script>
+    <script defer src="altitude/altitude-filter.js"></script>
+    <script defer src="events.js"></script>
+    <script defer src="help-tips.js"></script>
+    <script defer src="app.js"></script>
+    <!-- Alpine starts after every script above has registered its stores and
+         listeners (alpine:init): with every script deferred, document order is
+         execution order, so it comes last. Pinned (audit 4.3). -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
 </body>
 </html>
