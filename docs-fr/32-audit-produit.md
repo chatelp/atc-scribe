@@ -351,7 +351,7 @@ indiqué en fin de ligne quand il a bougé ; chaque ligne se fait sous les sept 
 
 | # | Quoi | Effort | Risque |
 |---|---|---|---|
-| 4.1 | **Barre radio** : 7 tuiles visibles à 1 440 px (≈ 150 px la tuile, sans fréquence répétée, défilable) ; pistes en service et heure fixées à droite ; « tout écouter / tout couper » ; volume par fréquence | 5 h | nul |
+| 4.1 | **Barre radio** : 7 tuiles visibles à 1 440 px (≈ 150 px la tuile, sans fréquence répétée, défilable) ; pistes en service et heure fixées à droite ; « tout écouter / tout couper » ; volume par fréquence — ***fait le 11/10*** (`47da917`) : tuiles de 160 px (nom seul quand il commence par la fréquence), bande défilable à la molette, reste de la barre à largeur fixe ; bouton « all » (écouter tout / couper tout) ; curseur de volume par tuile, mémorisé par le navigateur ; le fil de transcriptions garde 320 px. **Mesuré à 1 440 px, 7 fréquences, 3 aérodromes suivis : barre de 1 440 px (plus de débordement), 5 tuiles visibles, les 2 autres à un coup de molette** — l'objectif de 7 visibles n'est pas atteint : les voyants d'état (3.6) et les pistes de trois aérodromes prennent ≈ 590 px à droite ; avec deux fréquences et un aérodrome, tout tient sans défiler | 5 h | nul |
 | 4.2 | **Téléphone** (sous 768 px) : colonne pleine largeur, carte / PAR / liste en onglets, barre radio défilable, fiche avec bouton fermer, aide au toucher | 10 h | nul |
 | 4.3 | **Chargement** : dépendances servies par co-atc et épinglées (plus d'hôte externe), Tailwind compilé, gzip, scripts en `defer` ; **mesure de latence de bout en bout** (instant d'observation contre instant de dessin) avant toute décision sur le moteur d'animation | 6 h | faible |
 
