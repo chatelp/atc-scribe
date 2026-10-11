@@ -264,6 +264,9 @@ document.addEventListener('alpine:init', () => {
         // Listening to a transmission again (audit 3.2): whether the sidecar's
         // archive of clips is there, and the clip playing, one at a time.
         audioArchive: { available: false },
+        // What co-atc depends on (GET /status, audit 3.6): the receiver as its
+        // station link reports it, the transcription sidecar, the ADS-B feed.
+        serverStatus: null,
         clip: { id: null, state: 'idle', failed: {} },
         stationLongitude: null,
         stationElevationFeet: null,
@@ -3703,11 +3706,64 @@ async initAircraftDataSource() {
         },
 
         // Select an aircraft by callsign (for clicking on transcription callsigns)
-        async fetchAudioArchive() {
+        async fetchStatus() {
             try {
-                const r = await fetch(`${API_BASE_URL}/audio-archive`, { credentials: 'same-origin' });
-                if (r.ok) this.audioArchive = await r.json();
+                const r = await fetch(`${API_BASE_URL}/status`, { credentials: 'same-origin' });
+                if (!r.ok) return;
+                const st = await r.json();
+                this.serverStatus = st;
+                if (st.audio_archive) this.audioArchive = { available: !!st.audio_archive.available };
             } catch (e) { /* stays as it was */ }
+        },
+
+        // The three lights of the status banner, each with its help.
+        get statusLights() {
+            const st = this.serverStatus;
+            if (!st) return [];
+            const lights = [];
+            const rx = st.receiver;
+            const when = (v) => v ? this.timelineTime(v) : '';
+            if (!rx) {
+                lights.push({ key: 'rx', label: 'Antenna', level: 'unknown', text: '?',
+                    help: 'Nothing reports the receiver\'s state: co-atc only sees its audio streams. On the owner\'s station, radio-ctl-sync reports it.' });
+            } else {
+                const by = { on_air: ['ok', 'On air'], lent: ['warn', 'Lent'], switching: ['warn', 'Switching'], off: ['bad', 'Off'], unknown: ['unknown', '?'] };
+                let [level, text] = by[rx.state] || ['unknown', '?'];
+                if (rx.stale) { level = 'unknown'; text = '?'; }
+                const parts = [rx.label, rx.title, rx.since ? `since ${when(rx.since)}` : '', rx.detail].filter(Boolean);
+                lights.push({ key: 'rx', label: 'Antenna', level, text,
+                    help: (rx.stale ? `No report since ${when(rx.reported_at)}: the station link has stopped. Last known: ` : '') + parts.join(' · ') + '.' });
+            }
+            if (st.transcription) {
+                const t = st.transcription;
+                const level = !t.reachable ? 'bad' : t.status === 'ok' ? 'ok' : t.status === 'degraded' ? 'warn' : 'unknown';
+                const text = !t.reachable ? 'Down' : t.status === 'ok' ? 'OK' : t.status === 'degraded' ? 'Degraded' : '?';
+                lights.push({ key: 'stt', label: 'Transcription', level, text,
+                    help: !t.reachable ? 'The transcription sidecar does not answer: transmissions are not transcribed. co-atc restarts it if it crashed.'
+                        : t.status === 'degraded' ? `The sidecar runs without some of its models (${(t.degraded || []).join(', ')}): fewer aircraft are identified.`
+                        : 'The transcription sidecar answers with all its models.' });
+            }
+            if (st.adsb) {
+                const age = st.adsb.last_fetch ? (Date.now() - Date.parse(st.adsb.last_fetch)) / 1000 : Infinity;
+                const fresh = st.adsb.ok && age < 60;
+                lights.push({ key: 'adsb', label: 'ADS-B', level: fresh ? 'ok' : 'bad', text: fresh ? String(st.adsb.aircraft) : 'Stale',
+                    help: fresh ? `The ADS-B receiver answers: ${st.adsb.aircraft} aircraft in sight now.`
+                        : `No fresh ADS-B data${st.adsb.last_fetch ? ' since ' + when(st.adsb.last_fetch) : ''}: positions on the map are not moving.` });
+            }
+            return lights;
+        },
+
+        // In place of an empty radio bar: why there is nothing to listen to.
+        get receiverMessage() {
+            const rx = this.serverStatus && this.serverStatus.receiver;
+            const since = rx && rx.since ? ` since ${this.timelineTime(rx.since)}` : '';
+            if (rx && !rx.stale) {
+                const said = rx.label ? ` (${rx.label})` : '';
+                if (rx.state === 'lent') return `The receiver is lent${said}${since}: no audio until it is back on the air.`;
+                if (rx.state === 'off') return `The receiver is off${said}${since}.`;
+                if (rx.state === 'switching') return `The receiver is switching channels${said}: the streams come back in a moment.`;
+            }
+            return this.audioFrequencies.length ? '' : 'No frequency connected.';
         },
 
         // Plays a transmission's clip, as the receiver heard it; the same
@@ -4058,10 +4114,11 @@ async initAircraftDataSource() {
                     this.altimetryInterval = setInterval(() => this.updateAltimetry(), 30000);
                     setTimeout(() => this.updateAltimetry(), 5000);
                 }
-                if (!this.audioArchiveInterval) {
-                    this.fetchAudioArchive();
-                    // An external disk may be plugged in or out while the page is open.
-                    this.audioArchiveInterval = setInterval(() => this.fetchAudioArchive(), 300000);
+                if (!this.statusInterval) {
+                    this.fetchStatus();
+                    // The receiver may be lent, a disk unplugged, the sidecar
+                    // restarted while the page is open.
+                    this.statusInterval = setInterval(() => this.fetchStatus(), 15000);
                 }
             } catch (error) {
                 console.error('Error fetching station data:', error);

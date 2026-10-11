@@ -2147,6 +2147,14 @@
                                 </div>
                             </div>
                         </template>
+                        <!-- Why there is nothing to listen to: the receiver lent, off,
+                             switching, or no frequency at all (audit 3.6). -->
+                        <div x-show="$store.atc.receiverMessage" x-cloak
+                             class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-amber-400/30 bg-amber-400/10 text-amber-200 text-[11px] leading-snug max-w-[22rem] cursor-help"
+                             data-help-title="Receiver" :data-help="($store.atc.statusLights.find(l => l.key === 'rx') || {}).help || 'The radio that feeds the audio streams.'">
+                            <i class="fas fa-tower-broadcast"></i>
+                            <span x-text="$store.atc.receiverMessage"></span>
+                        </div>
                     </div>
                 </div>
                 
@@ -2302,6 +2310,21 @@
                             </div>
                         </template>
                     </div>
+                </div>
+
+                <!-- Status banner (audit 3.6): the receiver, the transcription, the ADS-B feed. -->
+                <div class="flex-shrink-0 h-full flex items-center gap-3 px-2 text-[10px]" x-show="$store.atc.statusLights.length">
+                    <template x-for="l in $store.atc.statusLights" :key="l.key">
+                        <div class="flex flex-col items-center leading-tight cursor-help" :data-help-title="l.label" :data-help="l.help">
+                            <span class="uppercase tracking-wider text-text/40 text-[8px]" x-text="l.label"></span>
+                            <span class="flex items-center gap-1 font-mono">
+                                <span class="w-1.5 h-1.5 rounded-full"
+                                      :class="{ 'bg-green-400': l.level === 'ok', 'bg-amber-400': l.level === 'warn', 'bg-red-500': l.level === 'bad', 'bg-gray-500': l.level === 'unknown' }"></span>
+                                <span :class="{ 'text-text/80': l.level === 'ok', 'text-amber-300': l.level === 'warn', 'text-red-400': l.level === 'bad', 'text-text/40': l.level === 'unknown' }"
+                                      x-text="l.text"></span>
+                            </span>
+                        </div>
+                    </template>
                 </div>
 
                 <!-- Right side - Stacked Clocks -->
