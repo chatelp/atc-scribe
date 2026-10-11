@@ -1,0 +1,5 @@
+/* What the Play CDN injected: the preflight reset and the utilities the page
+   uses. style.css stays apart, served as it is. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

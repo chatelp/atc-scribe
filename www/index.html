@@ -6,49 +6,25 @@
     <title>Co-ATC</title>
     
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
     
     <!-- OpenLayers CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.6.1/ol.css">
+    <link rel="stylesheet" href="vendor/ol/ol.css">
     
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        background: '#0a0a0a',
-                        panel: '#1a1a1a',
-                        text: '#e0e0e0',
-                        highlight: '#4CAF50',
-                        warning: '#FFC107',
-                        danger: '#F44336',
-                        border: '#333',
-                        hover: '#2a2a2a',
-                    },
-                    minWidth: {
-                        '72': '18rem',
-                        '96': '24rem',
-                        '104': '26rem',
-                        '120': '30rem',
-                    },
-                    width: {
-                        '104': '26rem',
-                        '120': '30rem',
-                    }
-                }
-            }
-        }
-    </script>
-    
+    <!-- The libraries are served by co-atc itself, pinned, from www/vendor/:
+         no outside host (audit 4.3). -->
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
+    <!-- Tailwind, compiled by tools/tailwind/build.sh from the classes the page
+         uses; rebuild it after changing a class. After style.css on purpose: the
+         Play CDN it replaces injected its styles there, so a utility wins over a
+         rule of style.css on the same element, as it did (measured 11/10). -->
+    <link rel="stylesheet" href="vendor/tailwind.css">
     <link rel="preload" href="/sounds/airbus_retard.mp3" as="audio">
     
     <!-- 1) Runtime libraries (must load before map modules) -->
-    <script defer src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"></script>
+    <script defer src="vendor/ol/ol.js"></script>
             
     <!-- 2) UI framework (store/app bindings) -->
     
@@ -2431,6 +2407,6 @@
     <!-- Alpine starts after every script above has registered its stores and
          listeners (alpine:init): with every script deferred, document order is
          execution order, so it comes last. Pinned (audit 4.3). -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+    <script defer src="vendor/alpine/alpine.min.js"></script>
 </body>
 </html>

@@ -22,6 +22,7 @@
 // listed, never invoked. `--quick` skips node --check and the PAR tests.
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -276,6 +277,24 @@ for (const f of walk(WWW).filter((f) => f.endsWith('.css'))) {
         if (css[i] === '}' && --depth < 0) { problems.push(`${rel}:${lineOf(css, i)}: } without a {`); break; }
     }
     if (depth > 0) problems.push(`${rel}: ${depth} { never closed`);
+}
+
+// ---------------------------------------------------------------- compiled tailwind
+
+// www/vendor/tailwind.css holds the classes the page used when it was built
+// (tools/tailwind/build.sh): one added since renders unstyled. Its first line
+// carries a fingerprint of the sources it was built from, recomputed here.
+{
+    const css = join(WWW, 'vendor', 'tailwind.css');
+    if (!existsSync(css)) {
+        problems.push('www/vendor/tailwind.css is missing: run tools/tailwind/build.sh');
+    } else {
+        const built = (readFileSync(css, 'utf8').match(/^\/\* sources ([0-9a-f]{16}) \*\//) || [])[1];
+        const sources = [join(WWW, 'index.html'), ...jsFiles.filter((f) => !f.includes('/vendor/'))].sort();
+        const h = createHash('sha256');
+        for (const f of sources) { h.update(relative(WWW, f) + '\0'); h.update(readFileSync(f)); }
+        if (h.digest('hex').slice(0, 16) !== built) problems.push('www/vendor/tailwind.css was built from other sources: run tools/tailwind/build.sh');
+    }
 }
 
 // ---------------------------------------------------------------- syntax and tests
