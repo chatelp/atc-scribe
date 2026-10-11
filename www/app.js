@@ -3018,6 +3018,7 @@ async initAircraftDataSource() {
                     callsign_source: data.callsign_source,
                     callsign_evidence: data.callsign_evidence,
                     content_second: data.content_second,
+                    plain: data.plain,
                     is_processed: true
                 };
                 
@@ -3043,6 +3044,7 @@ async initAircraftDataSource() {
                         callsign_source: data.callsign_source,
                         callsign_evidence: data.callsign_evidence,
                         content_second: data.content_second,
+                        plain: data.plain,
                         is_processed: true
                     };
                     
@@ -3065,6 +3067,7 @@ async initAircraftDataSource() {
                             callsign_source: data.callsign_source,
                             callsign_evidence: data.callsign_evidence,
                             content_second: data.content_second,
+                            plain: data.plain,
                             is_processed: true
                         };
                         
@@ -3745,6 +3748,20 @@ async initAircraftDataSource() {
             }
             if (this.clip.id === id) return 'Stop listening.';
             return 'Listen to this transmission again, as the receiver heard it, to check what was transcribed.';
+        },
+
+        // Before a transmission's plain words: who gives them.
+        plainLead(t) {
+            if (t.speaker_type === 'ATC') return 'Controller:';
+            if (t.speaker_type === 'PILOT') return 'Pilot:';
+            return '';
+        },
+
+        plainHelp(t) {
+            const who = t.speaker_type === 'ATC' ? 'What the controller says'
+                : t.speaker_type === 'PILOT' ? 'What the pilot reads back or reports'
+                : 'What the transmission says';
+            return `${who}, in plain words, as the phraseology grammar reads it from the transcript: green for a clearance, amber for a level, heading, speed, frequency or setting. A misheard word can make it wrong: listen again to check.`;
         },
 
         // The aircraft in sight with this callsign, or null.

@@ -1521,10 +1521,15 @@
                                             <div class="text-xs text-text/80 leading-snug mt-0.5"
                                                  x-html="$store.atc.transcriptHtml(ev.transmission.content_processed || ev.transmission.content, (ev.transmission.callsign_source !== 'fr' && ev.transmission.content_processed) ? ev.transmission.callsign_evidence : null)"></div>
                                         </template>
-                                        <template x-if="ev.values && ev.values.length">
-                                            <div class="flex flex-wrap gap-1 mt-0.5">
-                                                <template x-for="v in ev.values" :key="v.id || (v.role + v.text)">
-                                                    <span class="text-[10px] font-mono px-1.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/25" x-text="v.text"></span>
+                                        <!-- In plain words, from the phraseology grammar (audit 3.5). -->
+                                        <template x-if="ev.transmission && ev.transmission.plain && ev.transmission.plain.length">
+                                            <div class="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] cursor-help"
+                                                 data-help-title="In plain words" :data-help="$store.atc.plainHelp(ev.transmission)">
+                                                <span class="text-text/40" x-text="$store.atc.plainLead(ev.transmission)"></span>
+                                                <template x-for="p in ev.transmission.plain" :key="p.text">
+                                                    <span class="px-1.5 rounded border"
+                                                          :class="p.role === 'clearance' ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/25' : 'bg-amber-400/15 text-amber-300 border-amber-400/25'"
+                                                          x-text="p.text"></span>
                                                 </template>
                                             </div>
                                         </template>
@@ -1863,11 +1868,6 @@
                                                       'bg-gray-500/20 text-gray-400': !t.speaker_type
                                                   }"
                                                   x-text="t.speaker_type || 'unknown'"></span>
-                                            <template x-for="v in $store.atc.radioValuesFor(t.id)" :key="v.id">
-                                                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/25"
-                                                      :title="v.role"
-                                                      x-text="v.text"></span>
-                                            </template>
                                         </div>
                                         <div class="text-xs text-text/85 leading-snug"
                                              x-html="$store.atc.transcriptHtml(t.content_processed || t.content, (t.callsign_source !== 'fr' && t.content_processed) ? t.callsign_evidence : null)"></div>
@@ -1876,6 +1876,18 @@
                                             <span class="text-text/70 italic"
                                                   x-html="$store.atc.transcriptHtml(t.content_second, t.callsign_evidence)"></span>
                                         </div>
+                                        <!-- In plain words, from the phraseology grammar (audit 3.5). -->
+                                        <template x-if="t.plain && t.plain.length">
+                                            <div class="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] cursor-help"
+                                                 data-help-title="In plain words" :data-help="$store.atc.plainHelp(t)">
+                                                <span class="text-text/40" x-text="$store.atc.plainLead(t)"></span>
+                                                <template x-for="p in t.plain" :key="p.text">
+                                                    <span class="px-1.5 rounded border"
+                                                          :class="p.role === 'clearance' ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/25' : 'bg-amber-400/15 text-amber-300 border-amber-400/25'"
+                                                          x-text="p.text"></span>
+                                                </template>
+                                            </div>
+                                        </template>
                                     </div>
                                 </template>
                             </div>
@@ -2116,6 +2128,18 @@
                                                     <span class="text-text/70 italic"
                                                           x-html="$store.atc.transcriptHtml(transcription.content_second, transcription.callsign_evidence)"></span>
                                                 </div>
+                                                <!-- In plain words, from the phraseology grammar (audit 3.5). -->
+                                                <template x-if="transcription.plain && transcription.plain.length">
+                                                    <div class="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] cursor-help"
+                                                         data-help-title="In plain words" :data-help="$store.atc.plainHelp(transcription)">
+                                                        <span class="text-text/40" x-text="$store.atc.plainLead(transcription)"></span>
+                                                        <template x-for="p in transcription.plain" :key="p.text">
+                                                            <span class="px-1.5 rounded border"
+                                                                  :class="p.role === 'clearance' ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/25' : 'bg-amber-400/15 text-amber-300 border-amber-400/25'"
+                                                                  x-text="p.text"></span>
+                                                        </template>
+                                                    </div>
+                                                </template>
                                             </div>
                                             </div>
                                         </template>
