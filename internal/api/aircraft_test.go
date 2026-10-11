@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -182,6 +183,21 @@ func TestAircraftRoutes(t *testing.T) {
 		s.get("/api/v1/aircraft?distance_nm=30&ref_flight=afr123", &page)
 		if got, want := page.hexes(), []string{hexCruise, hexDescent, hexClimb}; fmt.Sprint(got) != fmt.Sprint(want) {
 			t.Errorf("within 30 NM of a flight number: %v, want %v", got, want)
+		}
+	})
+
+	// A reference that cannot be found used to drop the filter and answer with
+	// the whole sky; it is an error now, and so is a distance without reference.
+	t.Run("a proximity query needs a reference that exists", func(t *testing.T) {
+		s := shared.with(t)
+		for path, want := range map[string]int{
+			"/api/v1/aircraft?distance_nm=30&ref_hex=000000":    http.StatusNotFound,
+			"/api/v1/aircraft?distance_nm=30&ref_flight=nobody": http.StatusNotFound,
+			"/api/v1/aircraft?distance_nm=30":                   http.StatusBadRequest,
+		} {
+			if rec := s.do("GET", path, ""); rec.Code != want {
+				t.Errorf("GET %s: %d %s, want %d", path, rec.Code, strings.TrimSpace(rec.Body.String()), want)
+			}
 		}
 	})
 

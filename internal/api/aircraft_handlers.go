@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -39,9 +40,19 @@ func (h *Handler) GetAllAircraft(w http.ResponseWriter, r *http.Request) {
 		aircraft = filterByLastSeen(aircraft, lastSeenMinutes)
 	}
 
-	// Apply distance filter if provided
+	// Apply distance filter if provided. A reference that cannot be found is
+	// an error: answering with the whole sky would look like a crowded one.
 	if distanceNM > 0 {
-		aircraft = h.filterByDistance(aircraft, distanceNM, refLat, refLon, refHex, refFlight)
+		var err error
+		aircraft, err = h.filterByDistance(aircraft, distanceNM, refLat, refLon, refHex, refFlight)
+		if err != nil {
+			code := http.StatusNotFound
+			if errors.Is(err, errNoReference) {
+				code = http.StatusBadRequest
+			}
+			http.Error(w, err.Error(), code)
+			return
+		}
 	}
 
 	// Apply exclude_other_airports_grounded filter if requested
@@ -163,11 +174,14 @@ func filterByLastSeen(aircraft []*adsb.Aircraft, lastSeenMinutes int) []*adsb.Ai
 	return filtered
 }
 
+// errNoReference: distance_nm without ref_lat/ref_lon, ref_hex or ref_flight.
+var errNoReference = errors.New("distance_nm needs ref_lat and ref_lon, ref_hex or ref_flight")
+
 // filterByDistance keeps the active airborne aircraft within distanceNM of a
 // reference -- coordinates, an aircraft, or a flight, in that order of
 // priority -- sorted by distance from it. A reference that cannot be resolved
-// is logged and the aircraft are returned unfiltered.
-func (h *Handler) filterByDistance(aircraft []*adsb.Aircraft, distanceNM, refLat, refLon float64, refHex, refFlight string) []*adsb.Aircraft {
+// is an error; the aircraft were once returned unfiltered then.
+func (h *Handler) filterByDistance(aircraft []*adsb.Aircraft, distanceNM, refLat, refLon float64, refHex, refFlight string) ([]*adsb.Aircraft, error) {
 	var refLatitude, refLongitude float64
 	var refHeading, refAltitude float64
 	var err error
@@ -201,7 +215,7 @@ func (h *Handler) filterByDistance(aircraft []*adsb.Aircraft, distanceNM, refLat
 		refType = "flight"
 	} else {
 		// No valid reference provided
-		err = fmt.Errorf("no valid reference coordinates provided")
+		err = errNoReference
 		refType = "none"
 	}
 
@@ -283,13 +297,14 @@ func (h *Handler) filterByDistance(aircraft []*adsb.Aircraft, distanceNM, refLat
 
 		aircraft = filtered
 	} else {
-		h.logger.Error("Failed to resolve reference coordinates",
+		h.logger.Debug("Failed to resolve reference coordinates",
 			logger.Error(err),
 			logger.String("reference_type", refType),
 			logger.String("ref_hex", refHex),
 			logger.String("ref_flight", refFlight))
+		return nil, err
 	}
-	return aircraft
+	return aircraft, nil
 }
 
 // excludeOtherAirportsGrounded drops the aircraft on the ground away from the
