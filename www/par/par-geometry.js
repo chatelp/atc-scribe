@@ -279,7 +279,35 @@
         return best;
     }
 
+    /**
+     * The arrival sequence to one runway end (audit 3.4, a simple AMAN): the
+     * aircraft in its cone coming in, nearest the threshold first, with the
+     * distance to the threshold, the time to it at the present ground speed,
+     * and the gap to the one ahead in NM and in seconds.
+     * placed: [{a, p}] as the PAR view places them in this frame.
+     */
+    function arrivalSequence(frame, endKey, placed) {
+        const e = frame[endKey];
+        const out = [];
+        for (const { a, p } of placed || []) {
+            if (!p || p.side !== endKey || p.movingAway) continue;
+            const distNM = endKey === 'le' ? e.thresholdS - p.s : p.s - e.thresholdS;
+            if (!(distNM > 0)) continue;
+            const gs = a && a.adsb && a.adsb.gs;
+            // Under 30 kt an airborne aircraft's ground speed is not to be trusted.
+            const etaSec = Number.isFinite(gs) && gs > 30 ? (distNM / gs) * 3600 : null;
+            out.push({ a, distNM, gsKt: Number.isFinite(gs) ? gs : null, etaSec, gapNM: null, gapSec: null });
+        }
+        out.sort((x, y) => x.distNM - y.distNM);
+        for (let i = 1; i < out.length; i++) {
+            out[i].gapNM = out[i].distNM - out[i - 1].distNM;
+            if (out[i].etaSec != null && out[i - 1].etaSec != null) out[i].gapSec = out[i].etaSec - out[i - 1].etaSec;
+        }
+        return out;
+    }
+
     return {
+        arrivalSequence,
         FT_PER_NM,
         FT_PER_HPA,
         STD_HPA,

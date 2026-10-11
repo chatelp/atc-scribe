@@ -892,3 +892,14 @@ input[type=range].dual-range-max:focus {
 .alt-marks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .alt-marks span:first-child { transform: none; }
 .alt-marks span:last-child { transform: translateX(-100%); }
+
+/* The arrival sequence under a PAR frame (audit 3.4). */
+.par-seq { margin: 4px 0 2px; font-size: 11px; color: #ccc; }
+.par-seq-title { color: #4CAF50; font-weight: bold; margin-right: 6px; }
+.par-seq table { width: auto; border-collapse: collapse; margin-top: 2px; }
+.par-seq th { text-align: left; font-weight: normal; color: rgba(255, 255, 255, 0.45); padding: 1px 16px 1px 0; }
+.par-seq td { padding: 1px 16px 1px 0; white-space: nowrap; }
+.par-seq tbody tr { cursor: pointer; }
+.par-seq tbody tr:hover { background: rgba(255, 255, 255, 0.05); }
+.par-seq-selected { background: rgba(76, 175, 80, 0.12); }
+.par-seq-tight { color: #fbbf24; }

@@ -70,7 +70,17 @@
             (side ? `, and ${ident.slice(-1)} the ${side}-hand one of parallel runways, as seen when landing` : '');
     }
 
+    // Under this gap on the same final the sequence shows amber: 3 NM is the
+    // usual minimum radar separation there (ICAO Doc 4444).
+    const SEQUENCE_TIGHT_NM = 3;
+
     const HELP = {
+        sequence: (ident) => helpAttr('Arrival sequence',
+            `The aircraft coming in to runway ${ident} in this frame, nearest the threshold first: who lands next, how far, how long at its present ground speed, and how far behind the one ahead. A simple version of the arrival managers controllers use. Click a line to select the aircraft.`),
+        seqDist: () => helpAttr('To threshold', 'Distance along the runway axis to the landing threshold, which may sit some way in from the end of the runway.'),
+        seqEta: () => helpAttr('Time to the threshold', 'At the present ground speed, and the clock time it gives. Aircraft slow down on final, so the real time is usually a little later.'),
+        seqGap: () => helpAttr('Spacing', 'How far behind the aircraft ahead, in distance and in time. Controllers keep at least 3 NM between aircraft on the same final, more behind a heavy one.'),
+        tight: () => helpAttr('Close behind', 'Less than 3 NM behind the aircraft ahead, the usual minimum radar spacing on final. Often a projection effect while one of them turns onto the axis.'),
         view: () => helpAttr('PAR view',
             'The sky seen from the side, runway by runway, the way a Precision Approach Radar shows controllers the aircraft coming down to land. ' +
             'In each frame, height goes up the side and distance along the bottom; underneath, the same aircraft seen from above. ' +
@@ -436,12 +446,44 @@
                         <span class="par-dim"${HELP.count()}>${items.length} aircraft</span>
                     </div>`;
                 if (collapsed.has(key)) return `<section class="par-frame par-collapsed">${head}</section>`;
-                return `<section class="par-frame${isInUse ? ' par-in-use' : ''}">${head}${frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse })}</section>`;
+                return `<section class="par-frame${isInUse ? ' par-in-use' : ''}">${head}${frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse })}${sequenceHtml(f, A, items, selected, true)}${sequenceHtml(f, A === 'le' ? 'he' : 'le', items, selected, false)}</section>`;
             }).join('');
 
             // Start below the buttons in the map's top left corner.
             container.style.paddingTop = '56px';
             container.innerHTML = header + body;
+        }
+
+        // --- The arrival sequence under a frame (audit 3.4) ---------------------
+
+        // Who lands next on this frame's arrival end: distance to the threshold,
+        // time to it at the present ground speed, and the gap to the one ahead.
+        // The other end is shown too when aircraft come in to it: the runway in
+        // use is not always known, and a contrary-flow arrival is worth seeing.
+        function sequenceHtml(f, A, items, selected, always) {
+            const seq = G.arrivalSequence(f, A, items);
+            const ident = f[A].ident;
+            const title = `<span class="par-seq-title"${HELP.sequence(ident)}>Arrivals to ${esc(ident)}</span>`;
+            if (!seq.length) return always ? `<div class="par-seq">${title} <span class="par-dim">none in the cone</span></div>` : '';
+            const mmss = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+            const rows = seq.map((x, i) => {
+                const a = x.a;
+                const cs = esc(((a.flight || '').trim()) || a.hex.toUpperCase());
+                const type = esc((a.adsb && a.adsb.t) || (a.bsdb && a.bsdb.icao_type_code) || '');
+                const eta = x.etaSec != null
+                    ? `${mmss(x.etaSec)} <span class="par-dim">${esc(store.formatDate(new Date(Date.now() + x.etaSec * 1000), true))}</span>`
+                    : '<span class="par-dim">—</span>';
+                const tight = x.gapNM != null && x.gapNM < SEQUENCE_TIGHT_NM;
+                const gap = x.gapNM == null ? '<span class="par-dim">first</span>'
+                    : `<span class="${tight ? 'par-seq-tight' : ''}"${tight ? HELP.tight() : ''}>+${x.gapNM.toFixed(1)} NM` +
+                      (x.gapSec != null ? ` · +${mmss(Math.max(0, x.gapSec))}` : '') + '</span>';
+                return `<tr data-hex="${esc(a.hex)}" class="${a.hex === selected ? 'par-seq-selected' : ''}">` +
+                    `<td class="par-dim">${i + 1}</td><td><b>${cs}</b> <span class="par-dim">${type}</span></td>` +
+                    `<td>${x.distNM.toFixed(1)} NM</td><td>${eta}</td><td>${gap}</td></tr>`;
+            }).join('');
+            return `<div class="par-seq">${title}<table><thead><tr>` +
+                `<th></th><th>Aircraft</th><th${HELP.seqDist()}>To threshold</th><th${HELP.seqEta()}>Time, ETA</th><th${HELP.seqGap()}>Behind the one ahead</th>` +
+                `</tr></thead><tbody>${rows}</tbody></table></div>`;
         }
 
         // --- One frame --------------------------------------------------------

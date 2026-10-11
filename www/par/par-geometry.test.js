@@ -186,3 +186,31 @@ test('the QNH is the median of what the low aircraft near the airport have set',
     assert.deepEqual(G.estimateQnh(list, 48.72, 2.36), { qnh: 1015.2, count: 3 });
     assert.equal(G.estimateQnh([ac(12000, 1013.2)], 48.72, 2.36), null);
 });
+
+test('the arrival sequence: nearest the threshold first, with the gaps between them', () => {
+    const f = orly();
+    const place = (along, track, gs) => {
+        const s = f.lengthNM + along;
+        const input = Object.assign(at(f, s, 0), { altFt: G.glidePathFt(f, 'he', s), track });
+        return { a: { hex: `x${along}`, adsb: { gs } }, p: G.placeInFrame(f, input) };
+    };
+    const placed = [place(8, 242, 160), place(4, 242, 140), place(12, 242, 180), place(6, 62, 150)];
+    const seq = G.arrivalSequence(f, 'he', placed);
+    assert.deepEqual(seq.map((x) => x.a.hex), ['x4', 'x8', 'x12'], 'the departure in the same cone is not in it');
+    assert.ok(Math.abs(seq[0].distNM - 4) < 0.01);
+    assert.ok(Math.abs(seq[0].etaSec - 4 / 140 * 3600) < 0.5);
+    assert.equal(seq[0].gapNM, null);
+    assert.ok(Math.abs(seq[1].gapNM - 4) < 0.01);
+    assert.ok(Math.abs(seq[1].gapSec - (8 / 160 - 4 / 140) * 3600) < 0.5);
+    assert.deepEqual(G.arrivalSequence(f, 'le', placed), [], 'nobody comes in to the other end');
+});
+
+test('the distance is to the threshold, a displaced one included', () => {
+    const f = orly();
+    // Orly 06's threshold is 984 ft in from the runway end.
+    const s = -5;
+    const input = Object.assign(at(f, s, 0), { altFt: G.glidePathFt(f, 'le', s), track: 62 });
+    const seq = G.arrivalSequence(f, 'le', [{ a: { adsb: { gs: 10 } }, p: G.placeInFrame(f, input) }]);
+    assert.ok(Math.abs(seq[0].distNM - (5 + 984 / G.FT_PER_NM)) < 0.01, seq[0].distNM);
+    assert.equal(seq[0].etaSec, null, 'no time from a ground speed under 30 kt');
+});
