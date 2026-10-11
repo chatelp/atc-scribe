@@ -1786,6 +1786,13 @@
                                              'border-gray-500': !t.speaker_type
                                          }">
                                         <div class="flex items-center gap-2 mb-0.5">
+                                            <button x-show="$store.atc.audioArchive.available && t.id"
+                                                    class="w-4 text-center hover:text-highlight"
+                                                    :class="$store.atc.clip.id === t.id ? 'text-highlight' : ($store.atc.clip.failed[t.id] ? 'text-text/30' : 'text-text/60')"
+                                                    @click.stop="$store.atc.playClip(t.id)"
+                                                    data-help-title="Listen again" :data-help="$store.atc.clipHelp(t.id)">
+                                                <i class="fas text-[10px]" :class="$store.atc.clipIcon(t.id)"></i>
+                                            </button>
                                             <span class="text-[10px] font-mono text-text/60" x-text="$store.atc.formatDate(t.created_at, true)"></span>
                                             <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded cursor-help"
                                                   data-help-title="Who is speaking" :data-help="$store.atc.speakerHelp(t.speaker_type)"
@@ -1998,6 +2005,13 @@
                                                 <!-- Who speaks, and the aircraft the transmission was matched to:
                                                      on every matched line, the controller's too (audit 3.1). -->
                                                 <div class="text-text/60 text-[11px] mb-0.5 flex items-center gap-1.5 flex-wrap">
+                                                    <button x-show="$store.atc.audioArchive.available && transcription.id"
+                                                            class="w-4 text-center hover:text-highlight"
+                                                            :class="$store.atc.clip.id === transcription.id ? 'text-highlight' : ($store.atc.clip.failed[transcription.id] ? 'text-text/30' : 'text-text/60')"
+                                                            @click.stop="$store.atc.playClip(transcription.id)"
+                                                            data-help-title="Listen again" :data-help="$store.atc.clipHelp(transcription.id)">
+                                                        <i class="fas text-[10px]" :class="$store.atc.clipIcon(transcription.id)"></i>
+                                                    </button>
                                                     <span x-text="$store.atc.formatTimeAgo(transcription.timestamp)"></span>
                                                     <span class="font-semibold cursor-help"
                                                           :class="{

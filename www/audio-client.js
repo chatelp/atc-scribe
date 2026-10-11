@@ -20,6 +20,9 @@ class AudioClient {
         this.visualizationFrameIds = {};
         this.sourceNodes = {};
         this.gainNodes = {};
+        // Live audio is lowered, not stopped, while an archived clip plays
+        // (store.playClip): the clip is heard, the live channels stay followed.
+        this.duckFactor = 1;
         this.userSetVolumes = {};
         this.lastSignificantAudioTime = {};
         this.secondsSinceLastAudio = {};
@@ -246,11 +249,16 @@ class AudioClient {
      * Audio there is no gain node, and the element itself goes to 0.
      * @param {string} frequencyId
      */
+    setDucked(on) {
+        this.duckFactor = on ? 0.2 : 1;
+        Object.keys(this.gainNodes).forEach((id) => this._applyMute(id));
+    }
+
     _applyMute(frequencyId) {
         const unmuted = this.store.unmutedFrequencies.has(frequencyId);
         const gainNode = this.gainNodes[frequencyId];
         if (gainNode) {
-            gainNode.gain.value = unmuted ? 1 : 0;
+            gainNode.gain.value = unmuted ? this.duckFactor : 0;
         }
         const audioElement = this.audioElements[frequencyId]?.element;
         if (audioElement) {

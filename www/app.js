@@ -261,6 +261,10 @@ document.addEventListener('alpine:init', () => {
         // crews around the station have set, from their ADS-B (nav_qnh), and the
         // transition altitude. Standard 1013 until an aircraft sends its setting.
         altimetry: { qnh: 1013.25, estimated: false, count: 0, ta: 5000 },
+        // Listening to a transmission again (audit 3.2): whether the sidecar's
+        // archive of clips is there, and the clip playing, one at a time.
+        audioArchive: { available: false },
+        clip: { id: null, state: 'idle', failed: {} },
         stationLongitude: null,
         stationElevationFeet: null,
         stationCruiseAltitudeFt: 18000,
@@ -3665,6 +3669,53 @@ async initAircraftDataSource() {
         },
 
         // Select an aircraft by callsign (for clicking on transcription callsigns)
+        async fetchAudioArchive() {
+            try {
+                const r = await fetch(`${API_BASE_URL}/audio-archive`, { credentials: 'same-origin' });
+                if (r.ok) this.audioArchive = await r.json();
+            } catch (e) { /* stays as it was */ }
+        },
+
+        // Plays a transmission's clip, as the receiver heard it; the same
+        // button stops it. One clip at a time: another one stops the first.
+        playClip(id) {
+            if (!id) return;
+            const el = this._clipAudio || (this._clipAudio = new Audio());
+            // Live audio is lowered while a clip plays, and restored after.
+            const duck = (on) => { if (audioClient) audioClient.setDucked(on); };
+            if (this.clip.id === id && this.clip.state !== 'idle') {
+                el.pause();
+                duck(false);
+                this.clip = { ...this.clip, id: null, state: 'idle' };
+                return;
+            }
+            el.pause();
+            el.onplaying = () => { if (this.clip.id === id) { duck(true); this.clip = { ...this.clip, state: 'playing' }; } };
+            el.onended = () => { if (this.clip.id === id) { duck(false); this.clip = { ...this.clip, id: null, state: 'idle' }; } };
+            el.onerror = () => {
+                if (this.clip.id !== id) return;
+                duck(false);
+                this.clip = { id: null, state: 'idle', failed: { ...this.clip.failed, [id]: true } };
+            };
+            this.clip = { ...this.clip, id, state: 'loading' };
+            el.src = `${API_BASE_URL}/transcriptions/${id}/audio`;
+            el.play().catch(() => { /* onerror says why, or the page has had no click yet */ });
+        },
+
+        clipIcon(id) {
+            if (this.clip.failed[id]) return 'fa-volume-xmark';
+            if (this.clip.id !== id) return 'fa-play';
+            return this.clip.state === 'loading' ? 'fa-spinner fa-spin' : 'fa-stop';
+        },
+
+        clipHelp(id) {
+            if (this.clip.failed[id]) {
+                return 'No audio was kept for this transmission: the archive was off, its disk full or unplugged, or the transmission is older than the archive.';
+            }
+            if (this.clip.id === id) return 'Stop listening.';
+            return 'Listen to this transmission again, as the receiver heard it, to check what was transcribed.';
+        },
+
         // The aircraft in sight with this callsign, or null.
         aircraftByCallsign(callsign) {
             const cs = (callsign || '').trim().toUpperCase();
@@ -3958,6 +4009,11 @@ async initAircraftDataSource() {
                 if (!this.altimetryInterval) {
                     this.altimetryInterval = setInterval(() => this.updateAltimetry(), 30000);
                     setTimeout(() => this.updateAltimetry(), 5000);
+                }
+                if (!this.audioArchiveInterval) {
+                    this.fetchAudioArchive();
+                    // An external disk may be plugged in or out while the page is open.
+                    this.audioArchiveInterval = setInterval(() => this.fetchAudioArchive(), 300000);
                 }
             } catch (error) {
                 console.error('Error fetching station data:', error);
