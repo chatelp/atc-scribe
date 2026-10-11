@@ -339,7 +339,7 @@ indiqué en fin de ligne quand il a bougé ; chaque ligne se fait sous les sept 
 
 | # | Quoi | Effort | Risque |
 |---|---|---|---|
-| 3.1 | **Avion identifié sur 100 % des lignes appariées** (20 % aujourd'hui) ; corps de texte ≥ 11 px | 2 h | nul |
+| 3.1 | **Avion identifié sur 100 % des lignes appariées** (20 % aujourd'hui) ; corps de texte ≥ 11 px — ***fait le 11/10*** (`e2d0629`) : dans le fil par fréquence, toute ligne appariée nomme son avion (« ATC → AFR123 » quand le contrôleur lui parle), cliquable tant qu'il est à portée, grisé sinon ; bulles d'aide sur le locuteur, l'avion et la lecture FR ; en-tête de ligne 9 → 11 px (le corps était déjà à 12 px). Mesuré sur la base du 04/10 : 1 696 lignes appariées, 345 affichaient l'avion (20 %), 1 696 maintenant. Vérifié sur l'instance d'essai avec des transmissions injectées dans la page | 2 h | nul |
 | 3.2 | **Écouter la transmission transcrite** (A1) : le sidecar renvoie le fichier archivé, co-atc le sert | 1 j | faible |
 | 3.3 | **Fiche de vol** (A2) : chronologie d'un avion toutes fréquences, transferts entendus, verdicts de piste | 1,5 j | faible |
 | 3.4 | **Séquence d'arrivée par piste** (B1), à côté de la PAR | 1,5 j | nul |
