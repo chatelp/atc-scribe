@@ -1407,6 +1407,7 @@ document.addEventListener('alpine:init', () => {
         
         // Properties for Proximity View
         showProximityView: false,
+        showTimelineView: false, // the flight's story, www/timeline/ (audit 3.3)
         proximityDistance: 5, // Default to 5 NM
         proximityAircraft: [],
         proximityLoading: false,
@@ -1473,6 +1474,36 @@ document.addEventListener('alpine:init', () => {
                     this.aircraftRadio.error = 'Could not load the transmissions (' + e.message + ')';
                 }
             }
+        },
+
+        // The selected aircraft's story: phases, runways, what was said to and
+        // by it on every frequency, transfers, clearances (www/timeline/).
+        get flightTimeline() {
+            const a = this.selectedAircraft;
+            if (!a || !window.FlightTimeline) return [];
+            const sameRadio = this.aircraftRadio.callsign && this.aircraftRadio.callsign === (a.flight || '').trim();
+            return window.FlightTimeline.build({
+                aircraft: a,
+                phases: this.phaseHistoryAircraftHex === a.hex ? this.phaseHistoryData : null,
+                transmissions: sameRadio ? this.aircraftRadio.transcriptions : [],
+                values: sameRadio ? this.aircraftRadio.values : {},
+                frequencies: this.audioFrequencies,
+            });
+        },
+
+        // A timeline's time: the date too when it is not today's.
+        timelineTime(at) {
+            const time = this.formatDate(at, true);
+            const d = new Date(at);
+            const now = new Date();
+            const sameDay = this.showLocalDates
+                ? d.toDateString() === now.toDateString()
+                : d.toISOString().slice(0, 10) === now.toISOString().slice(0, 10);
+            if (sameDay) return time;
+            const day = this.showLocalDates
+                ? d.toLocaleDateString([], { day: '2-digit', month: '2-digit' })
+                : d.toISOString().slice(8, 10) + '/' + d.toISOString().slice(5, 7);
+            return `${day} ${time}`;
         },
 
         // The values recovered from one transcription, for the template.

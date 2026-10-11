@@ -1445,16 +1445,25 @@
                             <!-- Navigation Buttons - 3-way toggle -->
                             <div class="flex gap-1 mb-3">
                                 <!-- Details Button -->
-                                <button @click="$store.atc.aircraftDetailsShowHistoryView = false; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView(); $store.atc.stopPhaseHistoryRefresh()"
-                                        :class="{ 'bg-black/50 border-highlight text-highlight': !$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showProximityView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': $store.atc.aircraftDetailsShowHistoryView || $store.atc.showProximityView }"
+                                <!-- Timeline: the flight's story (www/timeline/) -->
+                                <button @click="$store.atc.showTimelineView = true; $store.atc.aircraftDetailsShowHistoryView = false; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView()"
+                                        :class="{ 'bg-black/50 border-highlight text-highlight': $store.atc.showTimelineView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': !$store.atc.showTimelineView }"
+                                        class="flex-1 py-1.5 px-2 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5"
+                                        data-help-title="Timeline" data-help="The flight's story as the station saw and heard it: first seen, phases, runways, every transmission on every frequency with its audio, transfers to other controllers, clearances.">
+                                    <i class="fas fa-timeline text-xs"></i>
+                                    <span>TIMELINE</span>
+                                </button>
+
+                                <button @click="$store.atc.showTimelineView = false; $store.atc.aircraftDetailsShowHistoryView = false; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView(); $store.atc.stopPhaseHistoryRefresh()"
+                                        :class="{ 'bg-black/50 border-highlight text-highlight': !$store.atc.showTimelineView && !$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showProximityView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': $store.atc.showTimelineView || $store.atc.aircraftDetailsShowHistoryView || $store.atc.showProximityView }"
                                         class="flex-1 py-1.5 px-3 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5">
                                     <i class="fas fa-info-circle text-xs"></i>
                                     <span>DETAILS</span>
                                 </button>
                                 
                                 <!-- Tracks Button (History + Future) -->
-                                <button @click="$store.atc.aircraftDetailsShowHistoryView = true; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView()"
-                                        :class="{ 'bg-black/50 border-highlight text-highlight': $store.atc.aircraftDetailsShowHistoryView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': !$store.atc.aircraftDetailsShowHistoryView }"
+                                <button @click="$store.atc.showTimelineView = false; $store.atc.aircraftDetailsShowHistoryView = true; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView()"
+                                        :class="{ 'bg-black/50 border-highlight text-highlight': $store.atc.aircraftDetailsShowHistoryView && !$store.atc.showTimelineView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': !$store.atc.aircraftDetailsShowHistoryView || $store.atc.showTimelineView }"
                                         class="flex-1 py-1.5 px-3 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5">
                                     <i class="fas fa-route text-xs"></i>
                                     <span>TRACKS</span>
@@ -1464,8 +1473,8 @@
                                 </button>
                                 
                                 <!-- Proximity Viewer Button -->
-                                <button @click="$store.atc.showProximityView = true; $store.atc.aircraftDetailsShowHistoryView = false; $store.atc.stopPhaseHistoryRefresh(); $store.atc.loadProximityData(); $store.atc.startProximityRefresh()"
-                                        :class="{ 'bg-black/50 border-amber-500 text-amber-400': $store.atc.showProximityView, 'bg-black/30 border-border/50 hover:border-amber-500/30 text-text/80 hover:text-amber-400/80': !$store.atc.showProximityView }"
+                                <button @click="$store.atc.showTimelineView = false; $store.atc.showProximityView = true; $store.atc.aircraftDetailsShowHistoryView = false; $store.atc.stopPhaseHistoryRefresh(); $store.atc.loadProximityData(); $store.atc.startProximityRefresh()"
+                                        :class="{ 'bg-black/50 border-amber-500 text-amber-400': $store.atc.showProximityView && !$store.atc.showTimelineView, 'bg-black/30 border-border/50 hover:border-amber-500/30 text-text/80 hover:text-amber-400/80': !$store.atc.showProximityView || $store.atc.showTimelineView }"
                                         class="flex-1 py-1.5 px-3 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5">
                                     <i class="fas fa-broadcast-tower text-xs"></i>
                                     <span>PROXIMITY</span>
@@ -1476,7 +1485,59 @@
                         <!-- Header removed entirely as it's redundant with flight strip -->
                         
                         <!-- History View -->
-                        <div x-show="$store.atc.aircraftDetailsShowHistoryView" class="mb-4">
+                        <!-- Timeline View: the flight's story -->
+                        <div x-show="$store.atc.showTimelineView" class="mb-4">
+                            <template x-if="$store.atc.aircraftRadio.loading && !$store.atc.aircraftRadio.transcriptions.length">
+                                <div class="text-[11px] text-text/50 mb-2">Loading the transmissions…</div>
+                            </template>
+                            <template x-if="!$store.atc.flightTimeline.length">
+                                <div class="p-4 text-center text-xs text-text/50">Nothing recorded on this aircraft yet.</div>
+                            </template>
+                            <ol class="relative border-l border-border/60 ml-2">
+                                <template x-for="(ev, i) in $store.atc.flightTimeline" :key="i + ev.kind + ev.at.getTime()">
+                                    <li class="ml-4 mb-2.5">
+                                        <span class="absolute -left-[9px] w-[18px] h-[18px] rounded-full bg-panel border border-border flex items-center justify-center"
+                                              :class="{
+                                                  'text-sky-300': ev.kind === 'transmission',
+                                                  'text-emerald-300': ev.kind === 'transfer',
+                                                  'text-amber-300': ev.kind === 'runway' || ev.kind === 'go_around' || ev.kind === 'clearance',
+                                                  'text-text/60': ev.kind === 'phase' || ev.kind === 'seen' || ev.kind === 'lost'
+                                              }">
+                                            <i class="fas text-[9px]" :class="ev.icon"></i>
+                                        </span>
+                                        <div class="flex items-baseline gap-2 text-[11px]">
+                                            <span class="font-mono text-text/50 shrink-0" x-text="$store.atc.timelineTime(ev.at)"></span>
+                                            <span class="text-text/90" :class="ev.help ? 'cursor-help' : ''" x-text="ev.text"
+                                                  data-help-title="Timeline" :data-help="ev.help || ''"></span>
+                                            <button x-show="ev.transmission && $store.atc.audioArchive.available"
+                                                    class="w-4 text-center hover:text-highlight shrink-0"
+                                                    :class="ev.transmission && $store.atc.clip.id === ev.transmission.id ? 'text-highlight' : 'text-text/60'"
+                                                    @click.stop="$store.atc.playClip(ev.transmission.id)"
+                                                    data-help-title="Listen again" :data-help="ev.transmission ? $store.atc.clipHelp(ev.transmission.id) : ''">
+                                                <i class="fas text-[10px]" :class="ev.transmission ? $store.atc.clipIcon(ev.transmission.id) : ''"></i>
+                                            </button>
+                                        </div>
+                                        <template x-if="ev.transmission">
+                                            <div class="text-xs text-text/80 leading-snug mt-0.5"
+                                                 x-html="$store.atc.transcriptHtml(ev.transmission.content_processed || ev.transmission.content, (ev.transmission.callsign_source !== 'fr' && ev.transmission.content_processed) ? ev.transmission.callsign_evidence : null)"></div>
+                                        </template>
+                                        <template x-if="ev.values && ev.values.length">
+                                            <div class="flex flex-wrap gap-1 mt-0.5">
+                                                <template x-for="v in ev.values" :key="v.id || (v.role + v.text)">
+                                                    <span class="text-[10px] font-mono px-1.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/25" x-text="v.text"></span>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <template x-if="ev.quote">
+                                            <div class="text-[11px] text-text/60 italic mt-0.5" x-text="'“' + ev.quote + '”'"></div>
+                                        </template>
+                                    </li>
+                                </template>
+                            </ol>
+                            <div class="text-[10px] text-text/40 mt-1">Transmissions: the last 50 matched to this callsign, on every frequency of the day.</div>
+                        </div>
+
+                        <div x-show="$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showTimelineView" class="mb-4">
                             
                             <!-- Mini-Map for Tracks -->
                             <div class="mb-4 bg-black/30 border border-border rounded-lg overflow-hidden">
@@ -1646,7 +1707,7 @@
                         </div>
                         
                         <!-- Regular Details View -->
-                        <div x-show="!$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showProximityView">
+                        <div x-show="!$store.atc.showTimelineView && !$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showProximityView">
                             <!-- Phase History Table at top of Details tab -->
                             <div class="mb-4 overflow-x-auto w-full">
                                 <div class="mb-2 text-sm font-semibold text-highlight border-b border-border pb-1">
@@ -1823,7 +1884,7 @@
                         </div>
 
                         <!-- Proximity View -->
-                        <div x-show="$store.atc.showProximityView" class="mb-4">
+                        <div x-show="$store.atc.showProximityView && !$store.atc.showTimelineView" class="mb-4">
                             
                             <!-- Distance Slider -->
                             <div class="mb-4 flex items-center">
@@ -2249,6 +2310,7 @@
     <!-- Sign-in overlay; does nothing when auth.enabled is false. -->
     <script src="login.js"></script>
     <script src="altitude/altitude-scale.js"></script>
+    <script src="timeline/flight-timeline.js"></script>
     <script src="altitude/altitude-filter.js"></script>
     <script src="events.js"></script>
     <script src="help-tips.js"></script>
