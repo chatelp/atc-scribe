@@ -1248,12 +1248,29 @@ func (s *AircraftStorage) GetFiltered(
 		}
 	}
 
-	// TODO: Add date filters using JOINs to phase_changes table for T/O and T/D phases
-	// For now, we'll ignore the date filters since they need to be implemented with the new phase_changes table
-	_ = tookOffAfter
-	_ = tookOffBefore
-	_ = landedAfter
-	_ = landedBefore
+	// Takeoff and landing windows: at least one T/O (T/D) inside the window,
+	// so an aircraft flying circuits is found by any of its takeoffs, not only
+	// its last one. phase_changes timestamps are written RFC3339 in UTC, so the
+	// bounds are too and compare as text (idx_phase_changes_hex_phase_timestamp).
+	for _, w := range []struct {
+		phase         string
+		after, before *time.Time
+	}{{"T/O", tookOffAfter, tookOffBefore}, {"T/D", landedAfter, landedBefore}} {
+		if w.after == nil && w.before == nil {
+			continue
+		}
+		query += " AND EXISTS (SELECT 1 FROM phase_changes pc WHERE pc.hex = aircraft.hex AND pc.phase = ?"
+		args = append(args, w.phase)
+		if w.after != nil {
+			query += " AND pc.timestamp > ?"
+			args = append(args, w.after.UTC().Format(time.RFC3339))
+		}
+		if w.before != nil {
+			query += " AND pc.timestamp < ?"
+			args = append(args, w.before.UTC().Format(time.RFC3339))
+		}
+		query += ")"
+	}
 
 	// Execute the query
 	rows, err := s.db.Query(query, args...)

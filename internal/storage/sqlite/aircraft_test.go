@@ -1,6 +1,8 @@
 package sqlite
 
 import (
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -423,5 +425,53 @@ func TestGroundStateAndStatusFilter(t *testing.T) {
 	}
 	if got := s.GetFiltered(0, 0, nil, nil, nil, nil, nil); len(got) != 1 || got[0].Hex != "ground" {
 		t.Errorf("at 0 ft: %d aircraft, want the one on the ground", len(got))
+	}
+}
+
+// The takeoff and landing windows of /aircraft: an aircraft qualifies by any
+// of its takeoffs (landings) inside the window, not only the last one.
+func TestTheTakeoffAndLandingWindowsSelectAircraft(t *testing.T) {
+	s := newAircraftStore(t)
+	for _, hex := range []string{"circuit", "arrival", "none"} {
+		s.Upsert(seen(hex, t0, report(hex, 48.80, 2.10, 1500)))
+	}
+	at := func(min int) time.Time { return t0.Add(time.Duration(min) * time.Minute) }
+	for _, p := range []struct {
+		hex, phase string
+		min        int
+	}{
+		{"circuit", "T/O", 0}, {"circuit", "T/D", 8}, {"circuit", "T/O", 10}, {"circuit", "T/D", 18},
+		{"arrival", "T/D", 60},
+	} {
+		if err := s.InsertPhaseChange(p.hex, p.hex, p.phase, at(p.min), nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hexes := func(after, before, landedAfter, landedBefore *time.Time) string {
+		var out []string
+		for _, a := range s.GetFiltered(0, 60000, nil, after, before, landedAfter, landedBefore) {
+			out = append(out, a.Hex)
+		}
+		sort.Strings(out)
+		return strings.Join(out, ",")
+	}
+	ptr := func(t time.Time) *time.Time { return &t }
+	paris := time.FixedZone("CEST", 2*3600)
+
+	for _, c := range []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"took off between 5 and 15 min, by its second takeoff", hexes(ptr(at(5)), ptr(at(15)), nil, nil), "circuit"},
+		{"took off after 30 min", hexes(ptr(at(30)), nil, nil, nil), ""},
+		{"landed after 30 min", hexes(nil, nil, ptr(at(30)), nil), "arrival"},
+		{"landed before 10 min", hexes(nil, nil, nil, ptr(at(10))), "circuit"},
+		{"a bound in another time zone", hexes(ptr(at(5).In(paris)), nil, nil, nil), "circuit"},
+		{"no window", hexes(nil, nil, nil, nil), "arrival,circuit,none"},
+	} {
+		if c.got != c.want {
+			t.Errorf("%s: %q, want %q", c.name, c.got, c.want)
+		}
 	}
 }
