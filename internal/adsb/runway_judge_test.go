@@ -126,7 +126,7 @@ func TestAGoAroundIsNotADeparture(t *testing.T) {
 	}
 	// Seen again climbing out: the moment is not moved.
 	j.Observe("ga1", cdgRefs(), pastEnd(t, "09L-27R", "09L", "27R", 2, 2000, t0.Add(4*time.Minute)))
-	if again := j.Get("ga1"); !again.GoAround.Since.Equal(t0.Add(3*time.Minute)) {
+	if again := j.Get("ga1"); !again.GoAround.Since.Equal(t0.Add(3 * time.Minute)) {
 		t.Errorf("go-around moved to %v", again.GoAround.Since)
 	}
 }

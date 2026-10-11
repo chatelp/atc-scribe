@@ -36,6 +36,17 @@ type TranscriptionRecord struct {
 	// They point into the text displayed for the reading callsign_source names --
 	// content_processed for the primary one, content_second for the French one.
 	CallsignEvidence [][2]int `json:"callsign_evidence,omitempty"`
+
+	// What the transmission says in plain words ("Descend to FL100"), from the
+	// phraseology grammar. Not stored: computed when served (internal/api).
+	Plain []PlainInstruction `json:"plain,omitempty"`
+}
+
+// PlainInstruction is one instruction of a transmission in plain words; its
+// role is the value's ("flight_level", "frequency"…) or "clearance".
+type PlainInstruction struct {
+	Role string `json:"role"`
+	Text string `json:"text"`
 }
 
 // TranscriptionStorage handles storage of transcription records

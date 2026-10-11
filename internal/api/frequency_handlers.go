@@ -25,6 +25,7 @@ func (h *Handler) GetAllFrequencies(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			if len(txns) > 0 {
+				explainTranscriptions(txns)
 				transcriptionsByFreq[freq.ID] = txns
 			}
 		}

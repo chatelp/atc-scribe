@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,6 +32,7 @@ func (h *Handler) GetAllTranscriptions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to retrieve transcriptions", http.StatusInternalServerError)
 		return
 	}
+	explainTranscriptions(transcriptions)
 
 	// Create response
 	response := map[string]interface{}{
@@ -62,6 +64,7 @@ func (h *Handler) GetTranscriptionsByFrequency(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Failed to retrieve transcriptions", http.StatusInternalServerError)
 		return
 	}
+	explainTranscriptions(transcriptions)
 
 	// Create response
 	response := map[string]interface{}{
@@ -94,6 +97,7 @@ func (h *Handler) GetTranscriptionsByTimeRange(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Failed to retrieve transcriptions", http.StatusInternalServerError)
 		return
 	}
+	explainTranscriptions(transcriptions)
 
 	// Create response
 	response := map[string]interface{}{
@@ -133,6 +137,7 @@ func (h *Handler) GetTranscriptionsBySpeaker(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Failed to retrieve transcriptions", http.StatusInternalServerError)
 		return
 	}
+	explainTranscriptions(transcriptions)
 
 	// Create response
 	response := map[string]interface{}{
@@ -165,6 +170,7 @@ func (h *Handler) GetTranscriptionsByCallsign(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Failed to retrieve transcriptions", http.StatusInternalServerError)
 		return
 	}
+	explainTranscriptions(transcriptions)
 
 	// Attach what the grammar recovered from each of them -- levels, headings,
 	// runways, squawks. One query for the page, not one per transcription.
@@ -236,4 +242,24 @@ func parseTimeRangeParams(r *http.Request) (time.Time, time.Time, error) {
 	}
 
 	return startTime, endTime, nil
+}
+
+// explainTranscriptions adds what each transmission says in plain words. The
+// grammar is deterministic and cheap -- 17 µs a transmission, measured on the
+// 5 512 of 04/10 -- so it is read again when served rather than stored.
+func explainTranscriptions(list []*sqlite.TranscriptionRecord) {
+	for _, t := range list {
+		if t == nil {
+			continue
+		}
+		t.Plain = plainOf(t.Content)
+	}
+}
+
+func plainOf(content string) []sqlite.PlainInstruction {
+	var out []sqlite.PlainInstruction
+	for _, in := range phraseology.Parse(content).Plain() {
+		out = append(out, sqlite.PlainInstruction{Role: in.Role, Text: in.Text})
+	}
+	return out
 }

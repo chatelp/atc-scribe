@@ -292,7 +292,7 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 
 	p.storeValues(record, result, callsign)
 	p.storeClearances(record, result, callsign)
-	p.broadcast(record, processed, speaker, callsign, source, evidence)
+	p.broadcast(record, processed, speaker, callsign, source, evidence, result.Plain())
 }
 
 // retryPending tries the transmissions left without an aircraft against the
@@ -330,7 +330,7 @@ func (p *GrammarProcessor) retryPending(sky []phraseology.Aircraft) {
 			}
 		}
 		p.storeClearances(pm.record, pm.result, callsign)
-		p.broadcast(pm.record, pm.processed, pm.speaker, callsign, source, evidence)
+		p.broadcast(pm.record, pm.processed, pm.speaker, callsign, source, evidence, pm.result.Plain())
 	}
 	for i := len(kept); i < len(p.pending); i++ {
 		p.pending[i] = pendingMatch{} // let the dropped records go
@@ -578,7 +578,9 @@ func (p *GrammarProcessor) storeClearances(record *sqlite.TranscriptionRecord, r
 // stopped sending it — it writes the processed record to a log file instead — so
 // the handler is currently dead code. Reviving it is what makes a match visible
 // without a page reload.
-func (p *GrammarProcessor) broadcast(record *sqlite.TranscriptionRecord, processed, speaker, callsign, source string, evidence [][2]int) {
+//
+// plain is what the transmission says in plain words, as the API serves it.
+func (p *GrammarProcessor) broadcast(record *sqlite.TranscriptionRecord, processed, speaker, callsign, source string, evidence [][2]int, plain []phraseology.Instruction) {
 	p.wsServer.Broadcast(&websocket.Message{
 		Type: "transcription_update",
 		Data: map[string]interface{}{
@@ -594,6 +596,7 @@ func (p *GrammarProcessor) broadcast(record *sqlite.TranscriptionRecord, process
 			"callsign_source":   source,
 			"callsign_evidence": evidence,
 			"content_second":    record.ContentSecond,
+			"plain":             plain,
 		},
 	})
 }
