@@ -24,16 +24,6 @@ func newAudioArchive(cfg *config.Config) *audioarchive.Archive {
 	return audioarchive.New(dir)
 }
 
-// GetAudioArchive says whether transmissions can be listened to again: an
-// archive is configured and its directory is there (an external disk may be
-// unplugged). The page shows its play buttons only then.
-func (h *Handler) GetAudioArchive(w http.ResponseWriter, r *http.Request) {
-	WriteJSON(w, http.StatusOK, map[string]bool{
-		"configured": h.audioArchive != nil,
-		"available":  h.audioArchive.Available(),
-	})
-}
-
 // GetTranscriptionAudio serves the clip of one transmission, as the sidecar
 // archived it (WAV, as received), or 404 when none was kept: archiving off,
 // the disk full or unplugged, or a transmission older than the archive.

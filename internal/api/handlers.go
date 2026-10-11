@@ -33,6 +33,7 @@ type Handler struct {
 	clearanceStorage     *sqlite.ClearanceStorage
 	valueStorage         *sqlite.PhraseologyStorage // what the grammar recovered, see docs-fr/19
 	audioArchive         *audioarchive.Archive      // the sidecar's clips, nil without one
+	status               statusCache                // the receiver as reported, the sidecar as last read
 
 	// Who is asking. See internal/auth and auth_handlers.go.
 	auth *auth.Service

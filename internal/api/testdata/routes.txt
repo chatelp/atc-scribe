@@ -8,7 +8,6 @@ GET /api/v1/aircraft/{id} (*Handler).GetAircraftByHex locked
 GET /api/v1/aircraft/{id}/tracks (*Handler).GetAircraftTracks locked
 GET /api/v1/airports (*Handler).GetAirports locked
 GET /api/v1/airports/{ident} (*Handler).GetAirportByIdent locked
-GET /api/v1/audio-archive (*Handler).GetAudioArchive locked
 GET /api/v1/auth/status (*Handler).GetAuthStatus open
 GET /api/v1/config (*Handler).GetConfig locked
 GET /api/v1/frequencies (*Handler).GetAllFrequencies locked
@@ -21,6 +20,7 @@ GET /api/v1/runways (*Handler).GetRunways locked
 GET /api/v1/server (*Handler).GetServerState locked
 GET /api/v1/setup/status (*Handler).GetSetupStatus open
 GET /api/v1/station (*Handler).GetStationConfig locked
+GET /api/v1/status (*Handler).GetStatus locked
 GET /api/v1/stream/{id} (*Handler).StreamAudio locked
 GET /api/v1/transcriptions (*Handler).GetAllTranscriptions locked
 GET /api/v1/transcriptions/callsign/{callsign} (*Handler).GetTranscriptionsByCallsign locked
@@ -42,6 +42,7 @@ POST /api/v1/station (*Handler).SetStationOverride locked
 PUT /* *api.StaticFileHandler open
 PUT /api/v1/access (*Handler).PutAccess locked
 PUT /api/v1/frequencies/{id}/label (*Handler).PutFrequencyLabel locked
+PUT /api/v1/receiver (*Handler).PutReceiver locked
 PUT /api/v1/server/settings (*Handler).PutServerSettings locked
 PUT /api/v1/sources/{id} (*Handler).PutSource locked
 TRACE /* *api.StaticFileHandler open

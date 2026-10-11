@@ -17,9 +17,11 @@ func TestATransmissionCanBeListenedToAgain(t *testing.T) {
 	s := newStack(t, stackOptions{})
 	s.signIn()
 
-	var state map[string]bool
-	s.get("/api/v1/audio-archive", &state)
-	if state["configured"] || state["available"] {
+	var state struct {
+		AudioArchive map[string]bool `json:"audio_archive"`
+	}
+	s.get("/api/v1/status", &state)
+	if state.AudioArchive["available"] {
 		t.Fatalf("without an archive: %v", state)
 	}
 
@@ -41,8 +43,8 @@ func TestATransmissionCanBeListenedToAgain(t *testing.T) {
 	kept := s.transcribe("124350", "air france one two three descend", "", at)
 	notKept := s.transcribe("124350", "roger", "", at.Add(5*time.Second))
 
-	s.get("/api/v1/audio-archive", &state)
-	if !state["configured"] || !state["available"] {
+	s.get("/api/v1/status", &state)
+	if !state.AudioArchive["available"] {
 		t.Fatalf("with an archive: %v", state)
 	}
 
@@ -75,8 +77,8 @@ func TestATransmissionCanBeListenedToAgain(t *testing.T) {
 	// An unplugged disk: the archive is configured but not there.
 	s.signIn()
 	s.handler.audioArchive = audioarchive.New(filepath.Join(root, "unplugged"))
-	s.get("/api/v1/audio-archive", &state)
-	if !state["configured"] || state["available"] {
+	s.get("/api/v1/status", &state)
+	if state.AudioArchive["available"] {
 		t.Errorf("unplugged: %v", state)
 	}
 	if rec := s.do("GET", fmt.Sprintf("/api/v1/transcriptions/%d/audio", kept), ""); rec.Code != http.StatusNotFound {
