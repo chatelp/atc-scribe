@@ -448,8 +448,15 @@ Intégrées dans `local` le 10/10 sans conflit ; `go vet` propre, 15 paquets ver
 - **F, tests de l'API** : couverture 10,9 % → 69,9 % ; 29 routes testées en 401 sans session.
   **Défaut** : `/aircraft` reçoit `min_altitude` et `max_altitude` et ne s'en sert pas ;
   aucun client du dépôt ne les envoie. *Tranché le 10/10 : corrigé plutôt que retiré, l'API les
-  documente (`docs/api_spec.md`) ; fait (`56c3404`).* Reste ignoré : les filtres de dates
-  (`took_off_after`…), même fonction, marqués TODO par l'amont.
+  documente (`docs/api_spec.md`) ; fait (`56c3404`).* Les filtres de dates (`took_off_after`,
+  `took_off_before`, `landed_after`, `landed_before`), même fonction, TODO de l'amont : **faits le
+  11/10** (`45001d9`) ; un avion compte par n'importe lequel de ses décollages ou atterrissages dans
+  la fenêtre (tours de piste), bornes dans tout fuseau.
+- **Observations de F traitées le 11/10** : une référence de proximité introuvable
+  (`distance_nm` + `ref_hex`/`ref_flight` inconnus) répond 404 au lieu de tout le ciel, et 400 sans
+  référence (`2344a7b`). Laissées : `Access-Control-Allow-Methods` sans `PUT`/`HEAD` (sans effet tant
+  qu'aucun client d'une autre origine n'appelle l'API), `transcriptions: null` (sans effet), hex
+  français sans indicatif (amont). Mesuré sur le Mac : `internal/api` 71,7 % de couverture, 11 s.
 - Instance d'essai démarrée sur cet état : santé et page en 200. Binaire de production
   reconstruit, ancien gardé (`runs/co-atc.avant-vague2`).
 - **La fiche E** (découpage de `main()` et de `handlers.go`) peut partir : D est intégrée. Elle
