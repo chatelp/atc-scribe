@@ -242,6 +242,11 @@ type LocalSTTFileConfig struct {
 	Command               []string `toml:"command"`
 	StartupTimeoutSeconds int      `toml:"startup_timeout_seconds"`
 
+	// Where the sidecar keeps the audio of each transmission (its --save-audio),
+	// so that a transmission can be listened to again from the page. Empty: the
+	// --save-audio of Command, if any. See internal/audioarchive.
+	AudioArchiveDir string `toml:"audio_archive_dir"`
+
 	// Where one transmission begins and ends. An SDR feed is digitally silent
 	// between transmissions, so these defaults suit it; a noisier source needs a
 	// higher silence_threshold and relies on segment_max_seconds as a backstop.

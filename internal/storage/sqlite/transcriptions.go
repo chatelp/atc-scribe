@@ -242,6 +242,20 @@ func (s *TranscriptionStorage) GetTranscriptions(limit, offset int) ([]*Transcri
 	return readTranscriptions(rows)
 }
 
+// GetTranscriptionByID returns one transmission, or nil when there is none.
+func (s *TranscriptionStorage) GetTranscriptionByID(id int64) (*TranscriptionRecord, error) {
+	rows, err := s.db.Query(`SELECT `+transcriptionColumns+` FROM transcriptions WHERE id = ?`, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query transcription: %w", err)
+	}
+	defer rows.Close()
+	list, err := readTranscriptions(rows)
+	if err != nil || len(list) == 0 {
+		return nil, err
+	}
+	return list[0], nil
+}
+
 // GetTranscriptionsByFrequency returns transcriptions for a specific frequency
 func (s *TranscriptionStorage) GetTranscriptionsByFrequency(frequencyID string, limit, offset int) ([]*TranscriptionRecord, error) {
 	// Query records

@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yegors/co-atc/internal/audioarchive"
 	"net/http"
 	"os"
 	"time"
@@ -31,6 +32,7 @@ type Handler struct {
 	transcriptionStorage *sqlite.TranscriptionStorage
 	clearanceStorage     *sqlite.ClearanceStorage
 	valueStorage         *sqlite.PhraseologyStorage // what the grammar recovered, see docs-fr/19
+	audioArchive         *audioarchive.Archive      // the sidecar's clips, nil without one
 
 	// Who is asking. See internal/auth and auth_handlers.go.
 	auth *auth.Service
@@ -104,6 +106,7 @@ func NewHandler(adsbService *adsb.Service, frequenciesService *frequencies.Servi
 		wsServer:             wsServer,
 		transcriptionStorage: transcriptionStorage,
 		clearanceStorage:     clearanceStorage,
+		audioArchive:         newAudioArchive(config),
 	}
 }
 

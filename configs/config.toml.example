@@ -112,8 +112,10 @@ command = []                                # empty: a sidecar you run yourself 
 # --second-opinion reads a transmission twice when French words appear (+8.5% true callsigns
 # at equal precision, Q29); --fr-detector <multilingual MLX Whisper> opens it on French the
 # English model turned into English (+8%, Q50); --save-audio <dir> keeps every transmission
-# (1-2 GB a day on two frequencies). Details in sidecar/README.md and docs-fr/05-decisions.md.
+# (1-2 GB a day on two frequencies), which the page then lets you listen to again, line by line.
+# Details in sidecar/README.md and docs-fr/05-decisions.md.
 # command = ["python3", "sidecar/whisper_server.py", "--preload", "--second-opinion"]
+# audio_archive_dir = ""                    # where those clips are; empty: the --save-audio of command
 #
 # Cutting the stream into transmissions: 600 ms of silence ends one, under 400 ms is dropped,
 # 30 s at most, 200 ms kept before speech, silence_threshold 0.005 -- an SDR feed sits at

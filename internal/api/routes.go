@@ -92,6 +92,8 @@ func (r *Router) Routes() http.Handler {
 			// Transcription routes
 			router.Get("/transcriptions", r.handler.GetAllTranscriptions)
 			router.Get("/transcriptions/frequency/{id}", r.handler.GetTranscriptionsByFrequency)
+			router.Get("/transcriptions/{id}/audio", r.handler.GetTranscriptionAudio)
+			router.Get("/audio-archive", r.handler.GetAudioArchive)
 			router.Get("/transcriptions/time-range", r.handler.GetTranscriptionsByTimeRange)
 			router.Get("/transcriptions/speaker/{type}", r.handler.GetTranscriptionsBySpeaker)
 			router.Get("/transcriptions/callsign/{callsign}", r.handler.GetTranscriptionsByCallsign)
