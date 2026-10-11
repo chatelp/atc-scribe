@@ -1787,7 +1787,8 @@
                                          }">
                                         <div class="flex items-center gap-2 mb-0.5">
                                             <span class="text-[10px] font-mono text-text/60" x-text="$store.atc.formatDate(t.created_at, true)"></span>
-                                            <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
+                                            <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded cursor-help"
+                                                  data-help-title="Who is speaking" :data-help="$store.atc.speakerHelp(t.speaker_type)"
                                                   :class="{
                                                       'bg-orange-400/20 text-orange-400': t.speaker_type === 'ATC',
                                                       'bg-green-400/20 text-green-400': t.speaker_type === 'PILOT',
@@ -1803,8 +1804,7 @@
                                         <div class="text-xs text-text/85 leading-snug"
                                              x-html="$store.atc.transcriptHtml(t.content_processed || t.content, (t.callsign_source !== 'fr' && t.content_processed) ? t.callsign_evidence : null)"></div>
                                         <div x-show="t.callsign_source === 'fr' && t.content_second" class="text-xs leading-snug mt-0.5">
-                                            <span class="text-[9px] text-text/40 mr-1"
-                                                  title="Second reading, by the French model. It is the one that named the aircraft.">FR</span>
+                                            <span class="text-[10px] text-text/40 mr-1 cursor-help" data-help-title="French reading" data-help="Every transmission is transcribed twice, by an English and a French model. This second, French reading is the one that named the aircraft; the words in bold are the ones that matched.">FR</span>
                                             <span class="text-text/70 italic"
                                                   x-html="$store.atc.transcriptHtml(t.content_second, t.callsign_evidence)"></span>
                                         </div>
@@ -1995,20 +1995,30 @@
                                                     'border-green-400': transcription.speaker_type === 'PILOT',
                                                     'border-gray-400': !transcription.speaker_type
                                                  }">
-                                                <div class="text-text/60 text-[9px] mb-0.5">
+                                                <!-- Who speaks, and the aircraft the transmission was matched to:
+                                                     on every matched line, the controller's too (audit 3.1). -->
+                                                <div class="text-text/60 text-[11px] mb-0.5 flex items-center gap-1.5 flex-wrap">
                                                     <span x-text="$store.atc.formatTimeAgo(transcription.timestamp)"></span>
-                                                    <!-- ATC speaker -->
-                                                    <span x-show="transcription.speaker_type === 'ATC'"
-                                                          class="text-orange-400 font-semibold">@ATC</span>
-                                                    <!-- PILOT speaker with clickable callsign -->
-                                                    <span x-show="transcription.speaker_type === 'PILOT' && transcription.callsign"
-                                                          @click="$store.atc.selectAircraftByCallsign(transcription.callsign)"
-                                                          class="text-green-400 font-semibold cursor-pointer hover:underline hover:text-green-300">@<span x-text="transcription.callsign"></span></span>
-                                                    <span x-show="transcription.speaker_type === 'PILOT' && !transcription.callsign"
-                                                          class="text-green-400 font-semibold">@PILOT</span>
-                                                    <!-- Other speaker types -->
-                                                    <span x-show="transcription.speaker_type && transcription.speaker_type !== 'ATC' && transcription.speaker_type !== 'PILOT'"
-                                                          class="text-gray-400 font-semibold">@<span x-text="transcription.speaker_type"></span></span>
+                                                    <span class="font-semibold cursor-help"
+                                                          :class="{
+                                                              'text-orange-400': transcription.speaker_type === 'ATC',
+                                                              'text-green-400': transcription.speaker_type === 'PILOT',
+                                                              'text-gray-400': transcription.speaker_type !== 'ATC' && transcription.speaker_type !== 'PILOT'
+                                                          }"
+                                                          x-text="transcription.speaker_type || '?'"
+                                                          data-help-title="Who is speaking" :data-help="$store.atc.speakerHelp(transcription.speaker_type)"></span>
+                                                    <template x-if="transcription.callsign">
+                                                        <span class="inline-flex items-center gap-1">
+                                                            <span x-show="transcription.speaker_type === 'ATC'" class="text-text/40">→</span>
+                                                            <span class="font-semibold px-1 rounded border"
+                                                                  :class="$store.atc.aircraftByCallsign(transcription.callsign)
+                                                                      ? 'text-sky-300 border-sky-400/40 bg-sky-400/10 cursor-pointer hover:bg-sky-400/20'
+                                                                      : 'text-text/50 border-border cursor-help'"
+                                                                  @click="$store.atc.aircraftByCallsign(transcription.callsign) && $store.atc.selectAircraftByCallsign(transcription.callsign)"
+                                                                  x-text="transcription.callsign"
+                                                                  data-help-title="Aircraft" :data-help="$store.atc.transcriptAircraftHelp(transcription)"></span>
+                                                        </span>
+                                                    </template>
                                                 </div>
                                                 <!-- Show processed content if available, otherwise show original.
                                                      The words that named the aircraft are in bold: kept when the
@@ -2027,8 +2037,7 @@
                                                      shown, or the highlight would have nowhere to go. -->
                                                 <div x-show="transcription.callsign_source === 'fr' && transcription.content_second"
                                                      class="mt-0.5 leading-tight">
-                                                    <span class="text-[9px] text-text/40 mr-1"
-                                                          title="Second reading, by the French model. It is the one that named the aircraft.">FR</span>
+                                                    <span class="text-[10px] text-text/40 mr-1 cursor-help" data-help-title="French reading" data-help="Every transmission is transcribed twice, by an English and a French model. This second, French reading is the one that named the aircraft; the words in bold are the ones that matched.">FR</span>
                                                     <span class="text-text/70 italic"
                                                           x-html="$store.atc.transcriptHtml(transcription.content_second, transcription.callsign_evidence)"></span>
                                                 </div>

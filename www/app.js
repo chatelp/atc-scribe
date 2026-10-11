@@ -3665,6 +3665,32 @@ async initAircraftDataSource() {
         },
 
         // Select an aircraft by callsign (for clicking on transcription callsigns)
+        // The aircraft in sight with this callsign, or null.
+        aircraftByCallsign(callsign) {
+            const cs = (callsign || '').trim().toUpperCase();
+            if (!cs) return null;
+            for (const a of Object.values(this.aircraft)) {
+                if ((a.flight || '').trim().toUpperCase() === cs) return a;
+            }
+            return null;
+        },
+
+        speakerHelp(type) {
+            if (type === 'ATC') return 'The controller is speaking. The aircraft named after the arrow is the one spoken to.';
+            if (type === 'PILOT') return 'A pilot is speaking, from the aircraft named next to it.';
+            return 'Who is speaking could not be told from this transmission.';
+        },
+
+        transcriptAircraftHelp(t) {
+            const how = t.callsign_source === 'fr'
+                ? 'It was recognised in the French reading of the transmission'
+                : 'It was recognised in the transmission';
+            const where = this.aircraftByCallsign(t.callsign)
+                ? 'Click to show it on the map and open its panel.'
+                : 'It is no longer in range of the receiver.';
+            return `${t.callsign}: the aircraft this transmission was matched to. ${how}; the words in bold are the ones that matched its callsign. ${where}`;
+        },
+
         selectAircraftByCallsign(callsign) {
             if (!callsign) return;
             
