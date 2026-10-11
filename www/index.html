@@ -91,8 +91,10 @@
         
         <!-- Main Content with Sidebar Layout -->
         <div class="flex flex-1 overflow-hidden">
-            <!-- Left Content Area (Settings, Map) -->
-            <div class="flex flex-col flex-1 relative">
+            <!-- Left Content Area (Settings, Map). On a phone (under 768 px) the
+                 map and the list take turns, chosen by the tabs above the radio bar
+                 (audit 4.2). -->
+            <div class="flex-col flex-1 relative min-w-0" :class="$store.atc.mobilePane === 'map' ? 'flex' : 'hidden md:flex'">
                 <!-- Main Content -->
                 <main class="flex flex-1 overflow-hidden relative">
                     <!-- Settings Panel -->
@@ -943,7 +945,8 @@
             <!-- End of left content area -->
             
             <!-- Right Sidebar -->
-            <aside class="w-120 min-w-120 bg-panel border-l border-border flex flex-col overflow-hidden z-50">
+            <aside class="w-full min-w-0 md:w-120 md:min-w-120 bg-panel md:border-l border-border flex-col overflow-hidden z-50"
+                   :class="$store.atc.mobilePane === 'list' ? 'flex' : 'hidden md:flex'">
                 <!-- Aircraft List - Only shown when no aircraft is selected -->
                 <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col p-3 bg-panel">
                     <div class="mb-3">
@@ -1300,8 +1303,8 @@
 
                                             <div class="w-px flight-strip-divider my-1.5"></div>
 
-                                            <!-- Heading cell -->
-                                            <div class="p-1.5 text-right w-[55px]">
+                                            <!-- Heading cell (not on a phone: too narrow) -->
+                                            <div class="p-1.5 text-right w-[55px] hidden md:block">
                                                 <div class="flex flex-col items-end">
                                                     <span class="text-sm" x-text="$store.atc.getHeadingDisplayText(aircraft)"></span>
                                                     <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType(aircraft).type)"
@@ -1311,8 +1314,8 @@
 
                                             <div class="w-px flight-strip-divider my-1.5"></div>
 
-                                            <!-- TAS cell -->
-                                            <div class="p-1.5 text-right w-[55px]">
+                                            <!-- TAS cell (not on a phone: too narrow) -->
+                                            <div class="p-1.5 text-right w-[55px] hidden md:block">
                                                 <div class="flex flex-col items-end">
                                                     <span class="text-sm" x-text="$store.atc.formatTrackSpeed(aircraft.adsb?.tas)"></span>
                                                     <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="True airspeed" data-help="TAS, true airspeed in knots: its speed through the air. It differs from the ground speed by the wind.">tas</span>
@@ -1352,6 +1355,11 @@
                 <!-- Aircraft Details - Takes full height when shown -->
                 <template x-if="$store.atc.selectedAircraft">
                     <div class="flex-1 min-h-0 p-3 overflow-y-auto bg-panel">
+                        <!-- Back to the list, on a phone (a click beside the aircraft does it on the map). -->
+                        <button class="md:hidden mb-2 px-3 py-1.5 rounded-md border border-border text-xs text-text/80 flex items-center gap-2"
+                                @click="$store.atc.closeAircraftPanel()">
+                            <i class="fas fa-arrow-left"></i> Back to the list
+                        </button>
                         <!-- Flight Strip at the top -->
                         <div class="mb-3">
                             <!-- Flight Strip at the top -->
@@ -1409,8 +1417,8 @@
                                 
                                 <div class="w-px flight-strip-divider my-2"></div>
 
-                                <!-- Heading cell -->
-                                <div class="px-2.5 py-2 text-right w-[55px]">
+                                <!-- Heading cell (not on a phone) -->
+                                <div class="px-2.5 py-2 text-right w-[55px] hidden md:block">
                                     <div class="flex flex-col items-end">
                                         <span class="text-sm" x-text="$store.atc.getHeadingDisplayText($store.atc.selectedAircraft)"></span>
                                         <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType($store.atc.selectedAircraft).type)"
@@ -1420,8 +1428,8 @@
 
                                 <div class="w-px flight-strip-divider my-2"></div>
 
-                                <!-- TAS cell -->
-                                <div class="px-2.5 py-2 text-right w-[55px]">
+                                <!-- TAS cell (not on a phone) -->
+                                <div class="px-2.5 py-2 text-right w-[55px] hidden md:block">
                                     <div class="flex flex-col items-end">
                                         <span class="text-sm" x-text="$store.atc.formatTrackSpeed($store.atc.selectedAircraft.adsb?.tas)"></span>
                                         <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="True airspeed" data-help="TAS, true airspeed in knots: its speed through the air. It differs from the ground speed by the wind.">tas</span>
@@ -1981,13 +1989,27 @@
             </aside>
         </div>
         
+        <!-- Phone: which pane is shown (audit 4.2). -->
+        <div class="md:hidden flex border-t border-border bg-panel text-xs" x-show="!$store.atc.settingsOpen">
+            <button class="flex-1 py-2 flex items-center justify-center gap-1.5"
+                    :class="$store.atc.mobilePane === 'map' && $store.atc.mainView === 'map' ? 'text-highlight bg-highlight/10' : 'text-text/60'"
+                    @click="$store.atc.showPane('map')"><i class="fas fa-map"></i> Map</button>
+            <button class="flex-1 py-2 flex items-center justify-center gap-1.5 border-l border-border"
+                    :class="$store.atc.mobilePane === 'map' && $store.atc.mainView === 'par' ? 'text-highlight bg-highlight/10' : 'text-text/60'"
+                    x-show="$store.atc.followedAirports.length"
+                    @click="$store.atc.showPane('par')"><i class="fas fa-plane-arrival"></i> PAR</button>
+            <button class="flex-1 py-2 flex items-center justify-center gap-1.5 border-l border-border"
+                    :class="$store.atc.mobilePane === 'list' ? 'text-highlight bg-highlight/10' : 'text-text/60'"
+                    @click="$store.atc.showPane('list')"><i class="fas fa-list"></i>
+                <span x-text="$store.atc.selectedAircraft ? 'Aircraft' : 'List'"></span></button>
+        </div>
         <!-- Radio Bar - Now positioned as footer spanning full width -->
         <template x-if="$store.atc">
-            <div id="radio-bar" class="h-20 bg-panel border-t border-border flex items-center z-[1001] relative overflow-visible shadow-[0_-5px_10px_rgba(0,0,0,0.3)]">
+            <div id="radio-bar" class="h-20 bg-panel border-t border-border flex items-center z-[1001] relative overflow-x-auto md:overflow-visible shadow-[0_-5px_10px_rgba(0,0,0,0.3)]">
                 <!-- Left side - the frequencies (audit 4.1): narrow tiles in a strip
                      that scrolls when there are more than fit, so that the runway in
                      use, the status and the clocks stay on screen at 1 440 px. -->
-                <div class="flex-1 min-w-0 h-full flex items-center pl-1 pr-2 gap-1.5">
+                <div class="flex-shrink-0 md:flex-1 md:min-w-0 h-full flex items-center pl-1 pr-2 gap-1.5">
                     <!-- Listen to all, or mute all. -->
                     <button x-show="$store.atc.audioFrequencies.length > 1"
                             class="flex-shrink-0 w-7 h-14 rounded-md border flex flex-col items-center justify-center gap-0.5 text-[10px] cursor-pointer"
@@ -1997,7 +2019,7 @@
                         <i class="fas" :class="$store.atc.anyUnmuted ? 'fa-volume-xmark' : 'fa-volume-high'"></i>
                         <span class="uppercase tracking-wider text-[8px]">all</span>
                     </button>
-                    <div class="radio-strip flex gap-1.5 items-stretch h-full py-2 min-w-0 flex-1 overflow-x-auto">
+                    <div class="radio-strip flex gap-1.5 items-stretch h-full py-2 md:min-w-0 md:flex-1 md:overflow-x-auto">
                         <template x-for="freq in $store.atc.audioFrequencies" :key="freq.id">
                             <div
                                 :class="{

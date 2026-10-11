@@ -1411,6 +1411,8 @@ document.addEventListener('alpine:init', () => {
         // Properties for Proximity View
         showProximityView: false,
         showTimelineView: false, // the flight's story, www/timeline/ (audit 3.3)
+        // On a phone the map and the list take turns (audit 4.2): 'map' or 'list'.
+        mobilePane: 'map',
         proximityDistance: 5, // Default to 5 NM
         proximityAircraft: [],
         proximityLoading: false,
@@ -3841,6 +3843,34 @@ async initAircraftDataSource() {
             return 'No heading received.';
         },
 
+        // Phone tabs: 'map', 'par' (the PAR view of the first airport followed,
+        // or the one last chosen) or 'list'.
+        showPane(which) {
+            if (which === 'list') { this.mobilePane = 'list'; return; }
+            this.mobilePane = 'map';
+            if (which === 'par') {
+                const apt = this.parAirport || (this.followedAirports[0] && this.followedAirports[0].code);
+                if (apt) this.setMainView('par', apt);
+            } else {
+                this.setMainView('map');
+            }
+            // The map was display:none: OpenLayers must measure it again.
+            setTimeout(() => {
+                const m = this.mapManager && this.mapManager.engine && this.mapManager.engine.map;
+                if (m && typeof m.updateSize === 'function') m.updateSize();
+            }, 50);
+        },
+
+        // Phone: back from the aircraft panel to the list.
+        closeAircraftPanel() {
+            this.selectedAircraft = null;
+            if (this.mapManager) {
+                if (typeof this.mapManager.removeProximityCircle === 'function') this.mapManager.removeProximityCircle();
+                if (typeof this.mapManager.removeProximityHighlighting === 'function') this.mapManager.removeProximityHighlighting();
+                if (typeof this.mapManager.applyFiltersAndRefreshView === 'function') this.mapManager.applyFiltersAndRefreshView({ immediate: true });
+            }
+        },
+
         // The aircraft in sight with this callsign, or null.
         aircraftByCallsign(callsign) {
             const cs = (callsign || '').trim().toUpperCase();
@@ -5055,6 +5085,13 @@ async initAircraftDataSource() {
     // The PAR view takes the map's place when chosen (docs-fr/31-vue-par.md)
     Alpine.store('atc').parView = window.ParView.create(document.getElementById('par-view'), Alpine.store('atc'));
     Alpine.store('atc').setMainView(Alpine.store('atc').mainView);
+
+    // On a phone, selecting an aircraft on the map opens its panel, which lives
+    // in the list pane (audit 4.2).
+    Alpine.effect(() => {
+        const store = Alpine.store('atc');
+        if (store.selectedAircraft && window.matchMedia('(max-width: 767px)').matches) store.mobilePane = 'list';
+    });
 
     // Watch for aircraft selection changes to clear pending requests and trails
     Alpine.effect(() => {

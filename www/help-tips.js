@@ -65,7 +65,37 @@
             place();
         }, DELAY_MS);
     });
-    document.addEventListener('mousedown', hide, true);
+    // On a touch screen there is no pointer to rest: a long press on an element
+    // shows its help, a tap elsewhere hides it.
+    let press = null;
+    document.addEventListener('pointerdown', (ev) => {
+        if (ev.pointerType !== 'touch') return;
+        const el = ev.target.closest && ev.target.closest('[data-help]');
+        if (!el) return;
+        clearTimeout(press);
+        press = setTimeout(() => {
+            x = ev.clientX;
+            y = ev.clientY;
+            const title = el.getAttribute('data-help-title') || '';
+            const body = el.getAttribute('data-help') || '';
+            if (!body) return;
+            if (!tip) {
+                tip = document.createElement('div');
+                tip.className = 'par-tip';
+                document.body.appendChild(tip);
+            }
+            key = title + '\n' + body;
+            tip.innerHTML = (title ? `<div class="par-tip-title">${esc(title)}</div>` : '') + `<div>${esc(body)}</div>`;
+            tip.style.display = 'block';
+            place();
+            el.addEventListener('contextmenu', (e) => e.preventDefault(), { once: true });
+        }, 450);
+    }, { passive: true });
+    const cancelPress = () => { clearTimeout(press); press = null; };
+    document.addEventListener('pointerup', cancelPress, true);
+    document.addEventListener('pointermove', (ev) => { if (ev.pointerType === 'touch') cancelPress(); }, { passive: true });
+    document.addEventListener('mousedown', (ev) => { if (!press) hide(); }, true);
+    document.addEventListener('touchstart', (ev) => { if (!(ev.target.closest && ev.target.closest('[data-help]'))) hide(); }, { passive: true, capture: true });
     document.addEventListener('scroll', hide, true);
     window.addEventListener('blur', hide);
 })();
