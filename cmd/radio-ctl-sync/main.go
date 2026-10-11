@@ -42,6 +42,9 @@ type stationState struct {
 	Airband  string `json:"airband"`
 	Version  int    `json:"version"`
 	Since    string `json:"depuis"`
+	Mode     string `json:"mode"`
+	Label    string `json:"libelle"`
+	Detail   string `json:"detail"`
 	Separate *struct {
 		Active  bool     `json:"actifs"`
 		Missing []string `json:"manquants"`
@@ -51,6 +54,33 @@ type stationState struct {
 		Title    string    `json:"titre"`
 		Channels []channel `json:"frequences"`
 	} `json:"selection"`
+}
+
+// receiverReport is what co-atc's PUT /api/v1/receiver takes: the station's
+// mode mapped onto co-atc's receiver states, its own words for the rest.
+type receiverReport struct {
+	State  string `json:"state"`
+	Label  string `json:"label,omitempty"`
+	Title  string `json:"title,omitempty"`
+	Since  string `json:"since,omitempty"`
+	Mode   string `json:"mode,omitempty"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// report maps radio-ctl's modes: "chaine" is the airband chain on the air,
+// "exploration" the receiver lent to SpyServer or rtl_tcp, "transition" a
+// switch under way, "arret" everything stopped.
+func report(st stationState) receiverReport {
+	state := map[string]string{
+		"chaine": "on_air", "exploration": "lent", "transition": "switching", "arret": "off",
+	}[st.Mode]
+	if state == "" {
+		state = "unknown"
+	}
+	return receiverReport{
+		State: state, Label: st.Label, Title: st.Selection.Title,
+		Since: st.Since, Mode: st.Mode, Detail: st.Detail,
+	}
 }
 
 type channel struct {
@@ -228,6 +258,25 @@ type syncer struct {
 	sent                                              map[string]source
 	lastVersion                                       int
 	lastErr                                           string
+	lastReportErr                                     string
+}
+
+// sendReport tells co-atc the receiver's state. Never in the way of the sources:
+// a co-atc without the endpoint, or a failure, is said once in the log.
+func (s *syncer) sendReport(rep receiverReport) {
+	err := s.coatcCall("PUT", "/api/v1/receiver", rep, nil)
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	if msg != s.lastReportErr {
+		if msg != "" {
+			log.Printf("receiver state not reported: %s", msg)
+		} else if s.lastReportErr != "" {
+			log.Printf("receiver state reported again")
+		}
+		s.lastReportErr = msg
+	}
 }
 
 func (s *syncer) getStation(path string, into any) error {
@@ -298,8 +347,10 @@ func (s *syncer) do(req *http.Request, into any) error {
 func (s *syncer) once() error {
 	var st stationState
 	if err := s.getStation("/radio/etat", &st); err != nil {
+		s.sendReport(receiverReport{State: "unknown", Detail: "station not reached: " + err.Error()})
 		return fmt.Errorf("station: %w", err) // leave co-atc as it is
 	}
+	s.sendReport(report(st))
 	var cat catalogue
 	if err := s.getStation("/radio/frequences", &cat); err != nil {
 		return fmt.Errorf("station catalogue: %w", err)

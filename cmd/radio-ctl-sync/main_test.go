@@ -139,3 +139,16 @@ func TestChannelsGetTheirSectorFromTheStationTable(t *testing.T) {
 		t.Errorf("%d channels with a sector, expected about 40 of 68", n)
 	}
 }
+
+func TestTheStationModesMapOntoReceiverStates(t *testing.T) {
+	for mode, want := range map[string]string{
+		"chaine": "on_air", "exploration": "lent", "transition": "switching", "arret": "off", "": "unknown", "autre": "unknown",
+	} {
+		st := stationState{Mode: mode, Label: "A l antenne", Since: "2026-10-09T11:35:15+02:00"}
+		st.Selection.Title = "Selection libre - 124,350 + 126,425"
+		got := report(st)
+		if got.State != want || got.Label != "A l antenne" || got.Title != st.Selection.Title || got.Since != st.Since {
+			t.Errorf("mode %q: %+v, want state %s", mode, got, want)
+		}
+	}
+}
