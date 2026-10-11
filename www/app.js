@@ -3022,6 +3022,8 @@ async initAircraftDataSource() {
                     callsign_evidence: data.callsign_evidence,
                     content_second: data.content_second,
                     plain: data.plain,
+                    match_score: data.match_score,
+                    match_reason: data.match_reason,
                     is_processed: true
                 };
                 
@@ -3048,6 +3050,8 @@ async initAircraftDataSource() {
                         callsign_evidence: data.callsign_evidence,
                         content_second: data.content_second,
                         plain: data.plain,
+                        match_score: data.match_score,
+                        match_reason: data.match_reason,
                         is_processed: true
                     };
                     
@@ -3071,6 +3075,8 @@ async initAircraftDataSource() {
                             callsign_evidence: data.callsign_evidence,
                             content_second: data.content_second,
                             plain: data.plain,
+                            match_score: data.match_score,
+                            match_reason: data.match_reason,
                             is_processed: true
                         };
                         
@@ -3843,7 +3849,59 @@ async initAircraftDataSource() {
             const where = this.aircraftByCallsign(t.callsign)
                 ? 'Click to show it on the map and open its panel.'
                 : 'It is no longer in range of the receiver.';
-            return `${t.callsign}: the aircraft this transmission was matched to. ${how}; the words in bold are the ones that matched its callsign. ${where}`;
+            return `${t.callsign}: the aircraft this transmission was matched to. ${how}; the words in bold are the ones that matched its callsign. ${this.matchProofText(t)} ${where}`;
+        },
+
+        // The proof of a match (D72), in plain words: why the matcher chose
+        // this aircraft, and how strong the clues are -- not a probability,
+        // none has been measured.
+        matchReasons(t) {
+            const said = {
+                'digits exact': 'its flight number was heard in full',
+                'digits suffix': 'the end of its flight number was heard',
+                'digits off by one': 'a number one digit away from its flight number was heard',
+                'first digits': 'the first digits of its flight number followed its airline\'s name',
+                'flight part exact': 'the number and letters of its callsign were heard',
+                'flight part, last letter missing': 'its callsign was heard, the last letter missing',
+                'last letters of an aircraft just heard': 'the last letters of an aircraft just spoken to on this frequency',
+                'only aircraft of the named airline just heard': 'the only aircraft of the named airline just spoken to here',
+                'last two digits of an aircraft just heard': 'the last two digits of an aircraft just spoken to here',
+                'digits repeated': 'the number was said more than once',
+                'letters': 'the letters of its callsign were heard',
+                'operator named': 'its airline was named',
+                'altitude agrees': 'the level said matches its ADS-B altitude, within 1,500 ft',
+                'altitude contradicts': 'the level said is far from its ADS-B altitude (counts against it)',
+                'cruising, not landing': 'a landing or approach clearance though it is cruising (counts against it)',
+                'airborne, not departing': 'a takeoff clearance though it is airborne (counts against it)',
+                'in sector': 'it was inside the area this frequency covers',
+            };
+            return (t.match_reason || '').split(' + ').map((r) => r.trim()).filter(Boolean).map((r) => said[r] || r);
+        },
+
+        matchStrength(t) {
+            if (!t || !t.match_reason) return null;
+            const r = new Set(t.match_reason.split(' + ').map((x) => x.trim()));
+            const exact = r.has('digits exact') || r.has('flight part exact');
+            const named = exact || ['digits suffix', 'digits off by one', 'first digits', 'flight part, last letter missing',
+                'last letters of an aircraft just heard', 'only aircraft of the named airline just heard',
+                'last two digits of an aircraft just heard'].some((x) => r.has(x));
+            // "in sector" holds for every match on a sectored frequency: listed, not counted.
+            const support = ['operator named', 'altitude agrees', 'digits repeated', 'letters'].filter((x) => r.has(x)).length;
+            const against = ['altitude contradicts', 'cruising, not landing', 'airborne, not departing'].some((x) => r.has(x));
+            if (exact && support > 0 && !against) return 'strong';
+            if ((exact || (named && support > 0)) && !against) return 'medium';
+            return 'weak';
+        },
+
+        matchProofText(t) {
+            const strength = this.matchStrength(t);
+            if (!strength) return 'Why it was chosen was not kept: matched before 11/10.';
+            const reasons = this.matchReasons(t);
+            const what = { strong: 'strong: an exact callsign and something else that agrees',
+                medium: 'medium: one clue, or a partial callsign with support',
+                weak: 'weak: a partial clue, or something against it' }[strength];
+            const score = typeof t.match_score === 'number' ? ` Score ${t.match_score.toFixed(2)}, 0.60 being the least accepted.` : '';
+            return `Chosen because ${reasons.join('; ')}. Clues ${what} -- a count of clues, not a measured probability.${score}`;
         },
 
         selectAircraftByCallsign(callsign) {

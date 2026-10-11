@@ -1509,6 +1509,14 @@
                                             <span class="font-mono text-text/50 shrink-0" x-text="$store.atc.timelineTime(ev.at)"></span>
                                             <span class="text-text/90" :class="ev.help ? 'cursor-help' : ''" x-text="ev.text"
                                                   data-help-title="Timeline" :data-help="ev.help || ''"></span>
+                                            <span x-show="ev.transmission && $store.atc.matchStrength(ev.transmission)" class="inline-flex items-end gap-px h-2.5 cursor-help shrink-0"
+                                                  data-help-title="Why this aircraft" :data-help="$store.atc.matchProofText(ev.transmission)">
+                                                <template x-for="n in 3" :key="n">
+                                                    <span class="w-[3px] rounded-sm"
+                                                          :style="'height:' + (n * 3 + 1) + 'px'"
+                                                          :class="n <= ({ weak: 1, medium: 2, strong: 3 })[$store.atc.matchStrength(ev.transmission)] ? ({ weak: 'bg-amber-400', medium: 'bg-sky-300', strong: 'bg-green-400' })[$store.atc.matchStrength(ev.transmission)] : 'bg-text/20'"></span>
+                                                </template>
+                                            </span>
                                             <button x-show="ev.transmission && $store.atc.audioArchive.available"
                                                     class="w-4 text-center hover:text-highlight shrink-0"
                                                     :class="ev.transmission && $store.atc.clip.id === ev.transmission.id ? 'text-highlight' : 'text-text/60'"
@@ -1868,6 +1876,14 @@
                                                       'bg-gray-500/20 text-gray-400': !t.speaker_type
                                                   }"
                                                   x-text="t.speaker_type || 'unknown'"></span>
+                                            <span x-show="$store.atc.matchStrength(t)" class="inline-flex items-end gap-px h-2.5 cursor-help shrink-0"
+                                                  data-help-title="Why this aircraft" :data-help="$store.atc.matchProofText(t)">
+                                                <template x-for="n in 3" :key="n">
+                                                    <span class="w-[3px] rounded-sm"
+                                                          :style="'height:' + (n * 3 + 1) + 'px'"
+                                                          :class="n <= ({ weak: 1, medium: 2, strong: 3 })[$store.atc.matchStrength(t)] ? ({ weak: 'bg-amber-400', medium: 'bg-sky-300', strong: 'bg-green-400' })[$store.atc.matchStrength(t)] : 'bg-text/20'"></span>
+                                                </template>
+                                            </span>
                                         </div>
                                         <div class="text-xs text-text/85 leading-snug"
                                              x-html="$store.atc.transcriptHtml(t.content_processed || t.content, (t.callsign_source !== 'fr' && t.content_processed) ? t.callsign_evidence : null)"></div>
@@ -2104,6 +2120,15 @@
                                                                   @click="$store.atc.aircraftByCallsign(transcription.callsign) && $store.atc.selectAircraftByCallsign(transcription.callsign)"
                                                                   x-text="transcription.callsign"
                                                                   data-help-title="Aircraft" :data-help="$store.atc.transcriptAircraftHelp(transcription)"></span>
+                                                            <!-- How strong the clues of the match are (D72). -->
+                                                            <span x-show="$store.atc.matchStrength(transcription)" class="inline-flex items-end gap-px h-2.5 cursor-help"
+                                                                  data-help-title="Match" :data-help="$store.atc.matchProofText(transcription)">
+                                                                <template x-for="n in 3" :key="n">
+                                                                    <span class="w-[3px] rounded-sm"
+                                                                          :style="'height:' + (n * 3 + 1) + 'px'"
+                                                                          :class="n <= ({ weak: 1, medium: 2, strong: 3 })[$store.atc.matchStrength(transcription)] ? ({ weak: 'bg-amber-400', medium: 'bg-sky-300', strong: 'bg-green-400' })[$store.atc.matchStrength(transcription)] : 'bg-text/20'"></span>
+                                                                </template>
+                                                            </span>
                                                         </span>
                                                     </template>
                                                 </div>
