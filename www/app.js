@@ -4056,8 +4056,10 @@ async initAircraftDataSource() {
                 
                 if (freqElement && viewer) {
                     const rect = freqElement.getBoundingClientRect();
-                    viewer.style.left = `${rect.left}px`;
-                    viewer.style.width = `${rect.width}px`;
+                    // Tiles are narrow (audit 4.1): the transcript keeps a readable width.
+                    const width = Math.max(rect.width, 320);
+                    viewer.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - width - 4))}px`;
+                    viewer.style.width = `${width}px`;
                     viewer.style.bottom = `${window.innerHeight - rect.top + 8}px`;
                     // Ensure no transitions or animations
                     viewer.style.transition = 'none';
@@ -4573,6 +4575,64 @@ async initAircraftDataSource() {
             if (!audioClient) { console.warn("audioClient not ready in toggleMute"); return; }
             audioClient.toggleMute(frequency);
             this.saveListening();
+        },
+
+        // Any frequency listened to: the "all" button then mutes every one.
+        get anyUnmuted() {
+            return this.audioFrequencies.some((f) => this.unmutedFrequencies.has(String(f.id)));
+        },
+
+        toggleAllListening() {
+            if (!audioClient) return;
+            audioClient.setAllMuted(this.anyUnmuted);
+            this.saveListening();
+        },
+
+        // The level of one frequency, 0 to 1, kept by this browser like the
+        // choice of what is listened to.
+        volumeOf(frequencyId) {
+            const id = String(frequencyId);
+            if (audioClient && audioClient.userSetVolumes[id] !== undefined) return audioClient.userSetVolumes[id];
+            const kept = this.rememberedVolume(id);
+            return kept === null ? 1 : kept;
+        },
+
+        setVolume(frequencyId, value) {
+            if (!audioClient) return;
+            const id = String(frequencyId);
+            audioClient.setVolume(id, value);
+            try {
+                const all = JSON.parse(localStorage.getItem('frequencyVolumes') || '{}');
+                all[id] = audioClient.userSetVolumes[id];
+                localStorage.setItem('frequencyVolumes', JSON.stringify(all));
+            } catch (e) { /* lasts the page */ }
+        },
+
+        rememberedVolume(frequencyId) {
+            try {
+                const v = JSON.parse(localStorage.getItem('frequencyVolumes') || '{}')[String(frequencyId)];
+                return typeof v === 'number' && v >= 0 && v <= 1 ? v : null;
+            } catch (e) {
+                return null;
+            }
+        },
+
+        // A tile is narrow: the name alone, and the frequency under it only when
+        // the name does not already start with it (the owner's station names
+        // its streams "124.350 Approche De Gaulle").
+        tileShowsMhz(freq) {
+            if (!(freq.frequency_mhz > 0)) return false;
+            const digits = String(freq.frequency_mhz).replace('.', '');
+            const name = String(freq.name || '').replace(/[.,\s]/g, '');
+            return !name.startsWith(digits);
+        },
+
+        tileHelp(freq) {
+            const state = this.isFrequencyFailed(freq.id) ? `Connection failed: ${this.getFrequencyError(freq.id) || 'unknown error'}.`
+                : this.isFrequencyConnecting(freq.id) ? 'Connecting…'
+                : this.isUnmuted(freq.id) ? 'Listening. Click to mute.' : 'Muted. Click to listen.';
+            const mhz = freq.frequency_mhz > 0 ? `${freq.frequency_mhz} MHz` : 'a mixed stream of several channels';
+            return `${freq.name} (${mhz}). ${state} The bar shows the sound level, the figure how long since the last transmission; the slider under it is this frequency's volume.`;
         },
 
         // Which frequencies are listened to, remembered by this browser like the

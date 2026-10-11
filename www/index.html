@@ -1984,43 +1984,49 @@
         <!-- Radio Bar - Now positioned as footer spanning full width -->
         <template x-if="$store.atc">
             <div id="radio-bar" class="h-20 bg-panel border-t border-border flex items-center z-[1001] relative overflow-visible shadow-[0_-5px_10px_rgba(0,0,0,0.3)]">
-                <!-- Left side - Frequencies (no scrollbar, always visible) -->
-                <div class="flex-shrink-0 h-full flex items-center pl-0 pr-2">
-                    <div class="flex space-x-2 items-center h-full py-3">
+                <!-- Left side - the frequencies (audit 4.1): narrow tiles in a strip
+                     that scrolls when there are more than fit, so that the runway in
+                     use, the status and the clocks stay on screen at 1 440 px. -->
+                <div class="flex-1 min-w-0 h-full flex items-center pl-1 pr-2 gap-1.5">
+                    <!-- Listen to all, or mute all. -->
+                    <button x-show="$store.atc.audioFrequencies.length > 1"
+                            class="flex-shrink-0 w-7 h-14 rounded-md border flex flex-col items-center justify-center gap-0.5 text-[10px] cursor-pointer"
+                            :class="$store.atc.anyUnmuted ? 'border-highlight/50 bg-highlight/10 text-highlight' : 'border-border bg-panel text-text/60 hover:text-text'"
+                            @click="$store.atc.toggleAllListening()"
+                            data-help-title="All frequencies" :data-help="$store.atc.anyUnmuted ? 'Mute every frequency.' : 'Listen to every frequency at once.'">
+                        <i class="fas" :class="$store.atc.anyUnmuted ? 'fa-volume-xmark' : 'fa-volume-high'"></i>
+                        <span class="uppercase tracking-wider text-[8px]">all</span>
+                    </button>
+                    <div class="radio-strip flex gap-1.5 items-stretch h-full py-2 min-w-0 flex-1 overflow-x-auto">
                         <template x-for="freq in $store.atc.audioFrequencies" :key="freq.id">
                             <div
                                 :class="{
-                                    'bg-highlight/10 border-highlight/50 text-highlight shadow-lg': $store.atc.isUnmuted(freq.id) && !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
+                                    'bg-highlight/10 border-highlight/50 text-highlight': $store.atc.isUnmuted(freq.id) && !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
                                     'bg-panel hover:bg-hover border-border text-text/80 hover:text-text': !$store.atc.isUnmuted(freq.id) && !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
-                                    'border-red-400/30 bg-red-950/30 text-red-300/60 opacity-80 cursor-not-allowed': $store.atc.isFrequencyFailed(freq.id),
-                                    'border-amber-600/30 bg-amber-950/20 text-amber-200/50 opacity-80 cursor-not-allowed': $store.atc.isFrequencyConnecting(freq.id)
+                                    'border-red-400/30 bg-red-950/30 text-red-300/60 opacity-80': $store.atc.isFrequencyFailed(freq.id),
+                                    'border-amber-600/30 bg-amber-950/20 text-amber-200/50 opacity-80': $store.atc.isFrequencyConnecting(freq.id)
                                 }"
-                                class="relative flex items-center justify-between px-3 py-1.5 border rounded-lg transition-all duration-200 h-full min-w-[260px] cursor-pointer"
-                                style="position: relative;"
+                                class="relative flex flex-col justify-between px-2 py-1 border rounded-lg transition-colors duration-200 w-[160px] flex-shrink-0 cursor-pointer select-none"
                                 :data-freq-id="freq.id"
-                                :title="$store.atc.isFrequencyFailed(freq.id) ? 'Connection failed: ' + ($store.atc.getFrequencyError(freq.id) || 'Unknown error') : ($store.atc.isFrequencyConnecting(freq.id) ? 'Connecting...' : '')">
-                                <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)" class="flex flex-col justify-center overflow-hidden flex-grow mr-2">
-                                    <!-- Muted or listening, said in so many words: upstream said it
-                                         only by the colour of the bars, and a silent page with text
-                                         arriving read as a fault. -->
-                                    <div class="font-semibold text-sm flex items-center gap-1.5 min-w-0">
-                                        <i class="fas text-xs flex-shrink-0"
-                                           :class="$store.atc.isUnmuted(freq.id) ? 'fa-volume-high' : 'fa-volume-xmark opacity-50'"
-                                           :title="$store.atc.isUnmuted(freq.id) ? 'Listening. Click to mute' : 'Muted. Click to listen'"></i>
-                                        <span class="truncate" x-text="freq.name" :title="freq.name"></span>
-                                    </div>
-                                    <div class="text-[11px] opacity-80 mt-0.5">
-                                        <!-- A mixed stream has no single frequency; showing one
-                                             would be a fiction. The name carries the meaning then. -->
-                                        <span x-show="freq.frequency_mhz > 0" x-text="freq.frequency_mhz + ' MHz'"></span>
-                                        <span x-show="!(freq.frequency_mhz > 0)" class="opacity-60">mixed</span>
-                                        <span x-show="$store.atc.isFrequencyFailed(freq.id)" class="ml-1 text-red-300/60">(Failed)</span>
-                                        <span x-show="$store.atc.isFrequencyConnecting(freq.id)" class="ml-1 text-amber-200/50">(Retry)</span>
-                                    </div>
+                                data-help-title="Frequency" :data-help="$store.atc.tileHelp(freq)">
+                                <!-- Muted or listening, said in so many words: upstream said it
+                                     only by the colour of the bars, and a silent page with text
+                                     arriving read as a fault. -->
+                                <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)"
+                                     class="font-semibold text-[12px] leading-tight flex items-center gap-1.5 min-w-0">
+                                    <i class="fas text-[11px] flex-shrink-0"
+                                       :class="$store.atc.isUnmuted(freq.id) ? 'fa-volume-high' : 'fa-volume-xmark opacity-50'"></i>
+                                    <span class="truncate" x-text="freq.name"></span>
                                 </div>
-                                <div class="flex items-center space-x-2 my-2">
-                                    <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)"
-                                         class="audio-visualizer-container w-20 h-4 flex items-center transition-all duration-200 relative bg-black/70 rounded-md border overflow-hidden"
+                                <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)"
+                                     class="flex items-center gap-1.5">
+                                    <!-- A mixed stream has no single frequency; showing one
+                                         would be a fiction. The name carries the meaning then. -->
+                                    <span class="text-[10px] opacity-70 flex-shrink-0" x-show="$store.atc.tileShowsMhz(freq)" x-text="freq.frequency_mhz + ' MHz'"></span>
+                                    <span class="text-[10px] opacity-50 flex-shrink-0" x-show="!(freq.frequency_mhz > 0)">mixed</span>
+                                    <span x-show="$store.atc.isFrequencyFailed(freq.id)" class="text-[10px] text-red-300/60 flex-shrink-0">failed</span>
+                                    <span x-show="$store.atc.isFrequencyConnecting(freq.id)" class="text-[10px] text-amber-200/50 flex-shrink-0">retry</span>
+                                    <div class="audio-visualizer-container flex-1 min-w-0 h-4 flex items-center relative bg-black/70 rounded-md border overflow-hidden"
                                          :class="{
                                              'border-highlight/50': !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
                                              'border-red-400/30': $store.atc.isFrequencyFailed(freq.id),
@@ -2033,15 +2039,15 @@
                                                  backgroundColor: $store.atc.isFrequencyFailed(freq.id) ? '#b45555' : ($store.atc.isUnmuted(freq.id) ? '#4CAF50' : '#888888')
                                              }"></div>
                                         <span x-text="$store.atc.isFrequencyFailed(freq.id) ? '!' : ($store.atc.secondsSinceLastAudio[freq.id] || '--s')"
-                                              class="absolute top-0 right-1 text-xs p-0.5"
+                                              class="absolute top-0 right-1 p-0.5"
                                               :class="$store.atc.isFrequencyFailed(freq.id) ? 'text-red-300/60 font-bold' : 'text-neutral-400'"
                                               style="font-size: 0.6rem; line-height: 1; pointer-events: none;">
                                         </span>
                                     </div>
                                     <button @click.stop="$store.atc.toggleTranscriptionViewer(freq.id)"
-                                            title="View Transcriptions"
+                                            data-help-title="Transcript" data-help="Open this frequency's transcript: what was said, who said it, and to which aircraft. The badge counts transmissions not read yet."
                                             x-show="freq.transcribe_audio !== false"
-                                            class="p-1 rounded-md w-7 h-7 flex items-center justify-center text-xs transition-colors focus:outline-none relative"
+                                            class="p-0.5 rounded w-6 h-5 flex items-center justify-center text-[11px] focus:outline-none relative flex-shrink-0"
                                             :class="$store.atc.transcriptionViewerVisible[freq.id] ? 'bg-highlight/80 hover:bg-highlight text-black' : 'bg-black/30 hover:bg-black/50 text-text/80 hover:text-text'">
                                         <i class="fas fa-comments"></i>
                                         <span x-text="$store.atc.getTranscriptionCount(freq.id)"
@@ -2049,6 +2055,11 @@
                                               class="absolute -top-1.5 -right-1.5 bg-danger text-white text-[8px] font-bold min-w-[14px] h-[14px] px-0.5 rounded-full flex items-center justify-center"></span>
                                     </button>
                                 </div>
+                                <!-- This frequency's volume, kept by the browser. -->
+                                <input type="range" class="vol-range" min="0" max="1" step="0.05"
+                                       :value="$store.atc.volumeOf(freq.id)"
+                                       aria-label="Volume" @click.stop
+                                       @input.stop="$store.atc.setVolume(freq.id, $event.target.value)">
 
                                 <!-- Transcription Viewer -->
                                 <div x-show="$store.atc.transcriptionViewerVisible[freq.id]"
@@ -2191,8 +2202,8 @@
                     </div>
                 </div>
                 
-                <!-- Middle section - Dynamic Weather Information (occupies remaining space) -->
-                <div class="flex-1 h-full flex items-center justify-center px-4">
+                <!-- Middle section - weather, kept to its own width. -->
+                <div class="flex-shrink-0 h-full flex items-center justify-center px-2">
                     <div class="font-mono text-xs flex items-center justify-center">
                         <div class="flex space-x-4">
                         <!-- METAR Display -->

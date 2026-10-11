@@ -78,7 +78,10 @@ class AudioClient {
         audioElement.preload = 'metadata';
         audioElement.playsInline = true;
 
-        this.userSetVolumes[frequencyId] = this.userSetVolumes[frequencyId] || this.defaultVolume;
+        if (this.userSetVolumes[frequencyId] === undefined) {
+            const kept = typeof this.store.rememberedVolume === 'function' ? this.store.rememberedVolume(frequencyId) : null;
+            this.userSetVolumes[frequencyId] = kept === null ? this.defaultVolume : kept;
+        }
 
         const streamUrl = this._buildStreamUrl(frequency);
         if (!streamUrl) {
@@ -249,6 +252,32 @@ class AudioClient {
      * Audio there is no gain node, and the element itself goes to 0.
      * @param {string} frequencyId
      */
+    /**
+     * The level of one frequency, 0 to 1, kept by the browser (audit 4.1).
+     * Applied through the element's own volume, which the Web Audio graph takes
+     * as its input; the gain node after it only mutes.
+     */
+    setVolume(frequencyId, volume) {
+        const id = this._normalizeFrequencyId(frequencyId);
+        if (!id) return;
+        this.userSetVolumes[id] = Math.max(0, Math.min(1, Number(volume) || 0));
+        this._applyMute(id);
+    }
+
+    /**
+     * Listen to every frequency, or mute every one. Starting the radios needs
+     * the click this is called from, like toggleMute.
+     */
+    setAllMuted(muted) {
+        if (!this.store.radiosStarted) this.startAllRadios();
+        for (const freq of this.store.audioFrequencies) {
+            const id = this._normalizeFrequencyId(freq.id);
+            if (!id) continue;
+            const unmuted = this.store.unmutedFrequencies.has(id);
+            if (muted === unmuted) this.toggleMute(freq);
+        }
+    }
+
     setDucked(on) {
         this.duckFactor = on ? 0.2 : 1;
         Object.keys(this.gainNodes).forEach((id) => this._applyMute(id));
@@ -262,7 +291,7 @@ class AudioClient {
         }
         const audioElement = this.audioElements[frequencyId]?.element;
         if (audioElement) {
-            const volume = this.userSetVolumes[frequencyId] || this.defaultVolume;
+            const volume = this.userSetVolumes[frequencyId] === undefined ? this.defaultVolume : this.userSetVolumes[frequencyId];
             audioElement.volume = (gainNode || unmuted) ? volume : 0;
         }
     }
