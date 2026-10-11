@@ -37,6 +37,12 @@ type TranscriptionRecord struct {
 	// content_processed for the primary one, content_second for the French one.
 	CallsignEvidence [][2]int `json:"callsign_evidence,omitempty"`
 
+	// Why the matcher chose that aircraft (D72): its score, from the 0.6 floor
+	// up, and its reasons, "digits exact + operator named + altitude agrees".
+	// Empty for transmissions matched before 11/10.
+	MatchScore  *float64 `json:"match_score,omitempty"`
+	MatchReason string   `json:"match_reason,omitempty"`
+
 	// What the transmission says in plain words ("Descend to FL100"), from the
 	// phraseology grammar. Not stored: computed when served (internal/api).
 	Plain []PlainInstruction `json:"plain,omitempty"`
@@ -103,6 +109,9 @@ func createTranscriptionsSchema(db execer) error {
 		"content_second":    "ALTER TABLE transcriptions ADD COLUMN content_second TEXT",
 		"callsign_source":   "ALTER TABLE transcriptions ADD COLUMN callsign_source TEXT",
 		"callsign_evidence": "ALTER TABLE transcriptions ADD COLUMN callsign_evidence TEXT",
+		// The matcher's score and reasons, kept with the match (D72).
+		"match_score":  "ALTER TABLE transcriptions ADD COLUMN match_score REAL",
+		"match_reason": "ALTER TABLE transcriptions ADD COLUMN match_reason TEXT",
 	} {
 		if _, err := db.Exec(ddl); err != nil &&
 			!strings.Contains(err.Error(), "duplicate column name") {
@@ -151,7 +160,8 @@ func createTranscriptionsSchema(db execer) error {
 // of them gained three columns in its SELECT and not in its Scan: every call
 // failed, and the aircraft card showed nothing for aircraft heard on the radio.
 const transcriptionColumns = "id, frequency_id, created_at, content, is_complete, is_processed, " +
-	"content_processed, speaker_type, callsign, language, content_second, callsign_source, callsign_evidence"
+	"content_processed, speaker_type, callsign, language, content_second, callsign_source, callsign_evidence, " +
+	"match_score, match_reason"
 
 // readTranscriptions scans every row of a query that selected transcriptionColumns.
 func readTranscriptions(rows *sql.Rows) ([]*TranscriptionRecord, error) {
@@ -159,7 +169,8 @@ func readTranscriptions(rows *sql.Rows) ([]*TranscriptionRecord, error) {
 	for rows.Next() {
 		var record TranscriptionRecord
 		var createdAt string
-		var contentProcessed, speakerType, callsign, language, contentSecond, callsignSource, evidence sql.NullString
+		var contentProcessed, speakerType, callsign, language, contentSecond, callsignSource, evidence, matchReason sql.NullString
+		var matchScore sql.NullFloat64
 		if err := rows.Scan(
 			&record.ID,
 			&record.FrequencyID,
@@ -174,6 +185,8 @@ func readTranscriptions(rows *sql.Rows) ([]*TranscriptionRecord, error) {
 			&contentSecond,
 			&callsignSource,
 			&evidence,
+			&matchScore,
+			&matchReason,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan transcription: %w", err)
 		}
@@ -189,6 +202,11 @@ func readTranscriptions(rows *sql.Rows) ([]*TranscriptionRecord, error) {
 		record.Language = language.String
 		record.ContentSecond = contentSecond.String
 		record.CallsignSource = callsignSource.String
+		if matchScore.Valid {
+			v := matchScore.Float64
+			record.MatchScore = &v
+		}
+		record.MatchReason = matchReason.String
 		if evidence.String != "" {
 			// A malformed highlight costs the highlight, not the transcription.
 			if err := json.Unmarshal([]byte(evidence.String), &record.CallsignEvidence); err != nil {
@@ -362,10 +380,17 @@ func (s *TranscriptionStorage) GetUnprocessedTranscriptions(batchSize int) ([]*T
 	return readTranscriptions(rows)
 }
 
+// MatchProof is why the matcher chose an aircraft (D72).
+type MatchProof struct {
+	Score  float64
+	Reason string
+}
+
 // UpdateMatchedTranscription is UpdateProcessedTranscription with the words that
-// named the aircraft, written in the same statement: a callsign stored without
-// its evidence, or the reverse, would highlight words that named nothing.
-func (s *TranscriptionStorage) UpdateMatchedTranscription(id int64, contentProcessed, speakerType, callsign, callsignSource string, evidence [][2]int) error {
+// named the aircraft and the proof of the match, written in the same statement: a
+// callsign stored without its evidence, or the reverse, would highlight words that
+// named nothing. proof is nil when no aircraft was found.
+func (s *TranscriptionStorage) UpdateMatchedTranscription(id int64, contentProcessed, speakerType, callsign, callsignSource string, evidence [][2]int, proof *MatchProof) error {
 	var ev sql.NullString
 	if len(evidence) > 0 {
 		b, err := json.Marshal(evidence)
@@ -375,19 +400,29 @@ func (s *TranscriptionStorage) UpdateMatchedTranscription(id int64, contentProce
 		ev = sql.NullString{String: string(b), Valid: true}
 	}
 
+	var score sql.NullFloat64
+	var reason sql.NullString
+	if proof != nil {
+		score = sql.NullFloat64{Float64: proof.Score, Valid: true}
+		reason = sql.NullString{String: proof.Reason, Valid: proof.Reason != ""}
+	}
+
 	lockSQLiteWrite()
 	defer unlockSQLiteWrite()
 
 	// Update record
 	_, err := s.db.Exec(
 		`UPDATE transcriptions
-		SET content_processed = ?, is_processed = 1, speaker_type = ?, callsign = ?, callsign_source = ?, callsign_evidence = ?
+		SET content_processed = ?, is_processed = 1, speaker_type = ?, callsign = ?, callsign_source = ?, callsign_evidence = ?,
+			match_score = ?, match_reason = ?
 		WHERE id = ?`,
 		contentProcessed,
 		speakerType,
 		callsign,
 		callsignSource,
 		ev,
+		score,
+		reason,
 		id,
 	)
 	if err != nil {

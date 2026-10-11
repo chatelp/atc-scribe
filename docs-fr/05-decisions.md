@@ -4851,6 +4851,22 @@ la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1
 La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
 validée contre `actual_runway_off`.
 
+### D72 — La preuve de l'appariement est gardée avec la transmission *(11/10)*
+
+**Validée par le propriétaire le 11/10** (audit 3.7, proposition A3). Jusqu'ici, de chaque
+appariement on ne gardait que l'indicatif, la lecture qui l'avait donné et les mots qui
+l'avaient nommé. Le score et les raisons calculés par le matcher (`Match.Score`,
+`Match.Reason` : « digits exact + operator named + altitude agrees ») partaient au journal.
+Deux colonnes s'ajoutent à `transcriptions` : **`match_score`** et **`match_reason`**,
+écrites au moment de l'appariement (premier essai ou rattrapage), migrées par `ALTER TABLE`
+à l'ouverture comme les précédentes. La page les montre au survol de l'indicatif, en clair.
+
+Ce que la page **ne** montre **pas** : une probabilité. Aucune précision n'a été mesurée par
+tranche de score ; l'indicateur dit la **force des indices** (combien d'indices indépendants :
+chiffres exacts, compagnie nommée, altitude concordante, lettres, répétition, secteur), pas
+une chance d'avoir raison. Mesurer la précision par niveau sur le jeu annoté du labo est la
+suite naturelle. Les transmissions antérieures n'ont pas de preuve : la page le dit.
+
 ### D71 — atc-scribe est un produit à part *(10/10)*
 
 **Demandé par le propriétaire le 09/10** (« on s'est suffisamment écarté de co-atc … pour

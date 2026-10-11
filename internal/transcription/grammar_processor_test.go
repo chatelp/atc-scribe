@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 	"unicode/utf16"
@@ -452,5 +453,32 @@ func TestNothingWaitsWithoutADSB(t *testing.T) {
 	}
 	if len(proc.pending) != 0 {
 		t.Errorf("%d transmissions waiting with no ADS-B", len(proc.pending))
+	}
+}
+
+// The proof of a match is kept with it (D72): the score and the reasons the
+// matcher gave, and nothing for a transmission no aircraft was found for.
+func TestTheProofOfAMatchIsKept(t *testing.T) {
+	proc, txStore, _ := newTestProcessor(t, fixedFleet{
+		{Callsign: "AFR1081", Hex: "39c1a2", AltitudeFt: 10000, Phase: "ARR"},
+		{Callsign: "BAW572", Hex: "400a1b", AltitudeFt: 37000, Phase: "CRZ"},
+	})
+	matched := store(t, txStore, "air france one zero eight one descend flight level one zero zero")
+	unmatched := store(t, txStore, "speedbird four four four contact one two four decimal three five")
+	if err := proc.processNextBatch(); err != nil {
+		t.Fatalf("processNextBatch: %v", err)
+	}
+
+	got := reread(t, txStore, matched)
+	if got.MatchScore == nil || *got.MatchScore < 0.6 {
+		t.Fatalf("score %v, want one from the 0.6 floor up", got.MatchScore)
+	}
+	for _, want := range []string{"digits exact", "operator named", "altitude agrees"} {
+		if !strings.Contains(got.MatchReason, want) {
+			t.Errorf("reason %q lacks %q", got.MatchReason, want)
+		}
+	}
+	if r := reread(t, txStore, unmatched); r.MatchScore != nil || r.MatchReason != "" {
+		t.Errorf("an unmatched transmission keeps a proof: %v %q", r.MatchScore, r.MatchReason)
 	}
 }

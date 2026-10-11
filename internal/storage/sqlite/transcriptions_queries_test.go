@@ -86,7 +86,7 @@ func TestTheUnprocessedQueueIsOldestFirstAndEmptiesAsItIsProcessed(t *testing.T)
 		t.Fatalf("queue %v, want [%d %d]", ids(queue), early, late)
 	}
 
-	if err := s.UpdateMatchedTranscription(early, "earlier, processed", "ATC", "AFR1081", "primary", nil); err != nil {
+	if err := s.UpdateMatchedTranscription(early, "earlier, processed", "ATC", "AFR1081", "primary", nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	queue, _ = s.GetUnprocessedTranscriptions(10)

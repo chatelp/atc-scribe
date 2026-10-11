@@ -42,7 +42,7 @@ func TestTranscriptionRoutes(t *testing.T) {
 	shared := newStack(t, stackOptions{})
 	shared.signIn()
 	unmatched := shared.transcribe("mix", "orly tower bonjour", "", t0)
-	if err := shared.tx.UpdateMatchedTranscription(unmatched, "Orly tower bonjour", "ATC", "", "", nil); err != nil {
+	if err := shared.tx.UpdateMatchedTranscription(unmatched, "Orly tower bonjour", "ATC", "", "", nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	shared.transcribe("mix", "ryanair four five descend", "RYR45", t1)

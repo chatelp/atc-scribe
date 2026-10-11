@@ -358,7 +358,7 @@ func (s *stack) transcribe(freq, content, callsign string, at time.Time) int64 {
 		s.t.Fatal(err)
 	}
 	if callsign != "" {
-		if err := s.tx.UpdateMatchedTranscription(id, content, "PILOT", callsign, "second", [][2]int{{0, 6}}); err != nil {
+		if err := s.tx.UpdateMatchedTranscription(id, content, "PILOT", callsign, "second", [][2]int{{0, 6}}, nil); err != nil {
 			s.t.Fatal(err)
 		}
 	}

@@ -274,7 +274,7 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 	match, callsign, source, evidence := p.match(record, result, sky)
 
 	if err := p.transcriptionStorage.UpdateMatchedTranscription(
-		record.ID, processed, speaker, callsign, source, evidence,
+		record.ID, processed, speaker, callsign, source, evidence, proofOf(match, callsign),
 	); err != nil {
 		p.logger.Error("Failed to update annotated transcription",
 			logger.Int64("id", record.ID), logger.Error(err))
@@ -292,7 +292,7 @@ func (p *GrammarProcessor) annotate(record *sqlite.TranscriptionRecord, sky []ph
 
 	p.storeValues(record, result, callsign)
 	p.storeClearances(record, result, callsign)
-	p.broadcast(record, processed, speaker, callsign, source, evidence, result.Plain())
+	p.broadcast(record, processed, speaker, callsign, source, evidence, result.Plain(), proofOf(match, callsign))
 }
 
 // retryPending tries the transmissions left without an aircraft against the
@@ -316,7 +316,7 @@ func (p *GrammarProcessor) retryPending(sky []phraseology.Aircraft) {
 			continue
 		}
 		if err := p.transcriptionStorage.UpdateMatchedTranscription(
-			pm.record.ID, pm.processed, pm.speaker, callsign, source, evidence,
+			pm.record.ID, pm.processed, pm.speaker, callsign, source, evidence, proofOf(match, callsign),
 		); err != nil {
 			p.logger.Error("Failed to update a late match",
 				logger.Int64("id", pm.record.ID), logger.Error(err))
@@ -330,7 +330,7 @@ func (p *GrammarProcessor) retryPending(sky []phraseology.Aircraft) {
 			}
 		}
 		p.storeClearances(pm.record, pm.result, callsign)
-		p.broadcast(pm.record, pm.processed, pm.speaker, callsign, source, evidence, pm.result.Plain())
+		p.broadcast(pm.record, pm.processed, pm.speaker, callsign, source, evidence, pm.result.Plain(), proofOf(match, callsign))
 	}
 	for i := len(kept); i < len(p.pending); i++ {
 		p.pending[i] = pendingMatch{} // let the dropped records go
@@ -373,8 +373,10 @@ func (p *GrammarProcessor) match(record *sqlite.TranscriptionRecord, result phra
 	// Only the aircraft this frequency can be talking to. With fewer
 	// candidates, a flight part missing its last letter ("seven uniform" for
 	// 7UE) is worth accepting: measured on 24/09 inside the approach sector.
+	inSector := false
 	if p.config.SectorOf != nil {
 		if sector, ok := p.config.SectorOf(record.FrequencyID); ok {
+			inSector = true
 			before := len(sky)
 			sky = sector.Within(sky)
 			p.logger.Debug("Sky cut to the frequency's sector",
@@ -440,7 +442,20 @@ func (p *GrammarProcessor) match(record *sqlite.TranscriptionRecord, result phra
 			evidence = secondResult.RawSpans(second.Words)
 		}
 	}
+	if callsign != "" && inSector {
+		// The candidates were only those inside the frequency's sector: part of
+		// the proof, though the matcher never saw the others.
+		match.Reason += " + in sector"
+	}
 	return match, callsign, source, evidence
+}
+
+// proofOf is what is kept of a match (D72), nothing when there is none.
+func proofOf(m phraseology.Match, callsign string) *sqlite.MatchProof {
+	if callsign == "" {
+		return nil
+	}
+	return &sqlite.MatchProof{Score: m.Score, Reason: m.Reason}
 }
 
 // recentlyHeard returns the aircraft named on this frequency in the last two
@@ -580,10 +595,17 @@ func (p *GrammarProcessor) storeClearances(record *sqlite.TranscriptionRecord, r
 // without a page reload.
 //
 // plain is what the transmission says in plain words, as the API serves it.
-func (p *GrammarProcessor) broadcast(record *sqlite.TranscriptionRecord, processed, speaker, callsign, source string, evidence [][2]int, plain []phraseology.Instruction) {
+func (p *GrammarProcessor) broadcast(record *sqlite.TranscriptionRecord, processed, speaker, callsign, source string, evidence [][2]int, plain []phraseology.Instruction, proof *sqlite.MatchProof) {
+	var score any
+	reason := ""
+	if proof != nil {
+		score, reason = proof.Score, proof.Reason
+	}
 	p.wsServer.Broadcast(&websocket.Message{
 		Type: "transcription_update",
 		Data: map[string]interface{}{
+			"match_score":       score,
+			"match_reason":      reason,
 			"id":                record.ID,
 			"frequency_id":      record.FrequencyID,
 			"text":              record.Content,

@@ -186,7 +186,7 @@ func TestEveryStorageCanWriteToTheFileRotationCreated(t *testing.T) {
 		t.Fatalf("the first transcription after midnight: %v", err)
 	}
 	if err := transcriptions.UpdateMatchedTranscription(id, "air france one zero eight one",
-		"ATC", "AFR1081", "en", [][2]int{{0, 10}}); err != nil {
+		"ATC", "AFR1081", "en", [][2]int{{0, 10}}, nil); err != nil {
 		t.Fatalf("the first match after midnight: %v", err)
 	}
 	if _, err := clearances.StoreClearance(&ClearanceRecord{
@@ -251,7 +251,7 @@ func TestRotationBringsAnOlderFileUpToDate(t *testing.T) {
 		t.Fatalf("storing into the older file after rotation: %v", err)
 	}
 	if err := transcriptions.UpdateMatchedTranscription(id, "bonjour", "ATC", "AFR1081", "fr",
-		[][2]int{{0, 7}}); err != nil {
+		[][2]int{{0, 7}}, nil); err != nil {
 		t.Fatalf("the columns added since should exist after rotation: %v", err)
 	}
 }

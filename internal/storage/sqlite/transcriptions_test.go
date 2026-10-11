@@ -79,7 +79,7 @@ func TestCallsignEvidenceIsReadBackByThePageReaders(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := [][2]int{{0, 10}, {11, 29}}
-	if err := s.UpdateMatchedTranscription(id, "air france one zero eight one", "ATC", "AFR1081", "en", want); err != nil {
+	if err := s.UpdateMatchedTranscription(id, "air france one zero eight one", "ATC", "AFR1081", "en", want, nil); err != nil {
 		t.Fatalf("UpdateMatchedTranscription: %v", err)
 	}
 	byCS, err := s.GetTranscriptionsByCallsign("AFR1081", 10, 0)
