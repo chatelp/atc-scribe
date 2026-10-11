@@ -52,9 +52,14 @@
                (!aircraft.on_ground && settings.showAirAircraft);
     }
 
-    function isVisibleByAltitude(aircraft, settings) {
-        return aircraft.on_ground ||
-            (aircraft.adsb && aircraft.adsb.alt_baro >= settings.minAltitude && aircraft.adsb.alt_baro <= settings.maxAltitude);
+    // The band is in the altitudes the list shows: feet on the QNH below the
+    // transition altitude, flight levels above (store.altitudeFt).
+    function isVisibleByAltitude(aircraft, settings, store) {
+        if (aircraft.on_ground) return true;
+        const ft = store && typeof store.altitudeFt === 'function'
+            ? store.altitudeFt(aircraft)
+            : aircraft.adsb && aircraft.adsb.alt_baro;
+        return typeof ft === 'number' && ft >= settings.minAltitude && ft <= settings.maxAltitude;
     }
 
     function isVisibleByPhase(aircraft, settings) {
@@ -76,7 +81,7 @@
     function shouldShowAircraftOnMap(aircraft, store, options) {
         const matches = matchesSearch(aircraft, options.searchTerm);
         const groundVisible = isVisibleByGroundState(aircraft, store.settings);
-        const altitudeVisible = isVisibleByAltitude(aircraft, store.settings);
+        const altitudeVisible = isVisibleByAltitude(aircraft, store.settings, store);
         const phaseVisible = isVisibleByPhase(aircraft, store.settings);
         const voiceVisible = isVisibleByVoice(aircraft, store.settings);
         const lastSeenVisible = options.lastSeenCutoff ? isVisibleByLastSeen(aircraft, options.lastSeenCutoff) : true;

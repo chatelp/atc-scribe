@@ -75,14 +75,31 @@ function altitudeFilter() {
             return centre >= this.lo && centre <= this.hi;
         },
 
+        // The altitudes as the list reads them: feet on the QNH below the
+        // transition altitude, pressure altitude (flight level) above.
         altitudes() {
+            const atc = this.$store.atc;
             const out = [];
-            for (const a of Object.values(this.$store.atc.aircraft || {})) {
+            for (const a of Object.values(atc.aircraft || {})) {
                 if (!a || a.on_ground || !a.adsb || a.status === 'signal_lost') continue;
-                const ft = Number(a.adsb.alt_baro);
+                const ft = atc.altitudeFt(a);
                 if (Number.isFinite(ft)) out.push(ft);
             }
             return out;
+        },
+
+        get bandHelp() {
+            const base = 'Only aircraft between the floor and the ceiling are listed and drawn on the map. ' +
+                'Drag either handle, or pick a preset below.';
+            return this.active ? `${base} Now: ${this.band}.` : `${base} Now every altitude is shown.`;
+        },
+
+        get qnhHelp() {
+            const a = this.$store.atc.altimetry;
+            const what = 'QNH is the air pressure at sea level here, which pilots set on their altimeter to read their height above the sea. ';
+            return a.estimated
+                ? `${what}${Math.round(a.qnh)} hPa is the setting ${a.count} aircraft near the station report by ADS-B; below the transition altitude the altitudes shown are corrected with it.`
+                : `${what}No aircraft nearby reports its setting yet, so the standard 1013 hPa is used and low altitudes may be off by about 27 ft per hPa of difference.`;
         },
 
         refresh() {

@@ -257,6 +257,10 @@ document.addEventListener('alpine:init', () => {
         wxApiUrl: `${API_BASE_URL}/wx`, // API URL for weather data
         adsbSourceApiUrl: `${API_BASE_URL}/adsb/source`,
         stationLatitude: null,
+        // How altitudes are read (www/altitude/altitude-scale.js): the QNH the
+        // crews around the station have set, from their ADS-B (nav_qnh), and the
+        // transition altitude. Standard 1013 until an aircraft sends its setting.
+        altimetry: { qnh: 1013.25, estimated: false, count: 0, ta: 5000 },
         stationLongitude: null,
         stationElevationFeet: null,
         stationCruiseAltitudeFt: 18000,
@@ -639,7 +643,7 @@ document.addEventListener('alpine:init', () => {
         _performFiltering() {
             // Create lightweight hash of current filter state (include ALL filter settings)
             const phaseFilterHash = this.settings.phaseFilters ? Object.entries(this.settings.phaseFilters).map(([k, v]) => `${k}:${v}`).join(',') : '';
-            const filterHash = `${this.settings.voiceOnly}|${this.searchTerm}|${this.settings.showGroundAircraft}|${this.settings.showAirAircraft}|${this.settings.minAltitude}|${this.settings.maxAltitude}|${this.settings.lastSeenMinutes}|${this.settings.listSort}|${phaseFilterHash}|${Object.keys(this.aircraft).length}|${this.selectedAircraft?.hex}|${this.sortColumn}|${this.sortDirection}`;
+            const filterHash = `${this.settings.voiceOnly}|${this.searchTerm}|${this.settings.showGroundAircraft}|${this.settings.showAirAircraft}|${this.settings.minAltitude}|${this.settings.maxAltitude}|${this.altimetry.qnh}|${this.settings.lastSeenMinutes}|${this.settings.listSort}|${phaseFilterHash}|${Object.keys(this.aircraft).length}|${this.selectedAircraft?.hex}|${this.sortColumn}|${this.sortDirection}`;
 
             // Return cached result if nothing changed (but always filter if no cache exists)
             if (this._lastFilterHash === filterHash && this._filteredAircraftCache) {
@@ -700,7 +704,8 @@ document.addEventListener('alpine:init', () => {
 
                 // Filter by altitude (client-side for immediate table update)
                 // Only apply altitude filter to aircraft in the air
-                if (!aircraft.on_ground && (!aircraft.adsb || aircraft.adsb.alt_baro < this.settings.minAltitude || aircraft.adsb.alt_baro > this.settings.maxAltitude)) {
+                const altFt = aircraft.on_ground ? null : this.altitudeFt(aircraft);
+                if (!aircraft.on_ground && (altFt == null || altFt < this.settings.minAltitude || altFt > this.settings.maxAltitude)) {
                     return false;
                 }
 
@@ -802,9 +807,7 @@ document.addEventListener('alpine:init', () => {
                 case 'phase':
                     return this.getCurrentPhase(aircraft);
                 case 'altitude':
-                    return (typeof aircraft.adsb?.alt_baro === 'number' && Number.isFinite(aircraft.adsb.alt_baro))
-                        ? aircraft.adsb.alt_baro
-                        : Number.NEGATIVE_INFINITY;
+                    return this.altitudeFt(aircraft) ?? Number.NEGATIVE_INFINITY;
                 case 'heading':
                     return this.getHeadingWithType(aircraft).value ?? -1;
                 case 'speed':
@@ -859,6 +862,72 @@ document.addEventListener('alpine:init', () => {
             return 'fas fa-arrows-alt-h'; // Level
         },
 
+        // The QNH of the moment, as the PAR view estimates it, within 40 NM of
+        // the station. Without any aircraft sending its setting, standard.
+        updateAltimetry() {
+            const G = window.ParGeometry;
+            if (!G || this.stationLatitude == null || this.stationLongitude == null) return;
+            const ta = (G.DEFAULTS && G.DEFAULTS.transitionAltitudeFt) || 5000;
+            const est = G.estimateQnh(Object.values(this.aircraft), this.stationLatitude, this.stationLongitude, { transitionAltitudeFt: ta });
+            const next = est
+                ? { qnh: Math.round(est.qnh * 10) / 10, estimated: true, count: est.count, ta }
+                : { qnh: G.STD_HPA || 1013.25, estimated: false, count: 0, ta };
+            const a = this.altimetry;
+            if (a.qnh !== next.qnh || a.estimated !== next.estimated || a.count !== next.count || a.ta !== next.ta) {
+                this.altimetry = next;
+                this._lastFilterHash = null;
+            }
+        },
+
+        // An aircraft's altitude as it is said: feet on the QNH below the
+        // transition altitude, flight level above (null without altitude).
+        altitudeReading(aircraft) {
+            return window.AltitudeScale.reading(aircraft?.adsb?.alt_baro, this.altimetry);
+        },
+
+        // The altitude the filters compare, in feet: on the QNH below the
+        // transition altitude, pressure altitude (the flight level) above.
+        altitudeFt(aircraft) {
+            const r = this.altitudeReading(aircraft);
+            return r ? r.ft : null;
+        },
+
+        // For the list and the aircraft panel: "2 900" (ft) or "FL120".
+        altitudeValueText(aircraft) {
+            const r = this.altitudeReading(aircraft);
+            if (!r) return '-';
+            if (r.kind !== 'ft') return window.AltitudeScale.readingText(r);
+            return String(Math.round(r.ft / 100) * 100);
+        },
+
+        // A past position's altitude, read the same way with today's QNH.
+        altitudeTextFromBaro(altBaro) {
+            const r = window.AltitudeScale.reading(altBaro, this.altimetry);
+            if (!r) return '-';
+            return r.kind !== 'ft' ? window.AltitudeScale.readingText(r) : String(Math.round(r.ft / 100) * 100);
+        },
+
+        // What the altitude means, for its help bubble.
+        altitudeHelp(aircraft) {
+            const r = this.altitudeReading(aircraft);
+            const a = this.altimetry;
+            const qnh = a.estimated
+                ? `QNH ${Math.round(a.qnh)} hPa, the setting ${a.count} aircraft near the station report`
+                : 'no aircraft nearby reports its QNH yet, so the standard 1013 hPa is used';
+            const ta = `${a.ta} ft`;
+            const raw = aircraft?.adsb?.alt_baro;
+            if (!r) return 'No altitude received.';
+            if (r.kind === 'gnd') return 'The aircraft reports that it is on the ground.';
+            if (r.kind === 'fl') {
+                return `Flight level ${r.fl}: ${raw} ft on the standard pressure setting (1013 hPa). ` +
+                    `Above the transition altitude (${ta}) every aircraft sets 1013 and is given a flight level, ` +
+                    'so all of them read the same scale whatever the weather.';
+            }
+            return `About ${Math.round(r.ft / 10) * 10} ft above sea level, on the local pressure setting (${qnh}). ` +
+                `Below the transition altitude (${ta}) altitudes are given in feet on the QNH. ` +
+                `The aircraft itself transmits ${raw} ft, measured on 1013 hPa.`;
+        },
+
         getAltitudeUnitLabel(aircraft) {
             const altitude = aircraft?.adsb?.alt_baro;
             if (typeof altitude !== 'number' || !Number.isFinite(altitude)) return '';
@@ -870,7 +939,7 @@ document.addEventListener('alpine:init', () => {
                 if (roundedRate < -100) return `${roundedRate} ft`;
             }
 
-            return 'ft';
+            return this.altitudeReading(aircraft)?.kind === 'ft' ? 'ft' : '';
         },
 
         getATCDerivedMetrics(aircraft) {
@@ -1071,7 +1140,9 @@ document.addEventListener('alpine:init', () => {
                     ['Latitude', adsbData.lat?.toFixed(6) || '-'],
                     ['Longitude', adsbData.lon?.toFixed(6) || '-'],
                     ['Distance (NM)', aircraft.distance ?? '-'],
-                    ['Altitude (Baro)', `${adsbData.alt_baro ?? '-'} ft`],
+                    ['Altitude', window.AltitudeScale.readingText(this.altitudeReading(aircraft), 10) +
+                        (this.altitudeReading(aircraft)?.kind === 'ft' ? ` (QNH ${Math.round(this.altimetry.qnh)}${this.altimetry.estimated ? '' : ', standard'})` : '')],
+                    ['Pressure altitude (1013)', `${adsbData.alt_baro ?? '-'} ft`],
                     ['Altitude (Geom)', `${adsbData.alt_geom ?? '-'} ft`],
                     ['Vertical Rate', `${adsbData.baro_rate ?? '-'} ft/min`]
                 ]],
@@ -1895,11 +1966,6 @@ document.addEventListener('alpine:init', () => {
             if (altDiff > 100) return isFuture ? 'text-green-400' : 'text-highlight';
             if (altDiff < -100) return isFuture ? 'text-red-400' : 'text-danger';
             return isFuture ? 'text-highlight/70' : 'text-text';
-        },
-
-        formatTrackAltitude(value) {
-            if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
-            return Math.round(value / 100) * 100;
         },
 
         formatTrackSpeed(value) {
@@ -3862,6 +3928,10 @@ async initAircraftDataSource() {
                 // Setup runway-in-use polling (60s) — separate from station refresh
                 if (!this.runwayInUseInterval) {
                     this.runwayInUseInterval = setInterval(() => this.fetchRunwayInUse(), 60000);
+                }
+                if (!this.altimetryInterval) {
+                    this.altimetryInterval = setInterval(() => this.updateAltimetry(), 30000);
+                    setTimeout(() => this.updateAltimetry(), 5000);
                 }
             } catch (error) {
                 console.error('Error fetching station data:', error);

@@ -10,10 +10,11 @@
  * by ten up to FL450, and a last stop for "no ceiling". About half the travel
  * is below the transition altitude.
  *
- * Altitudes are those the aircraft reports, barometric on the standard
- * setting (alt_baro): above the transition altitude that is exactly the
- * flight level; below it, in feet, it differs from the altitude on the local
- * QNH by about 28 ft per hPa.
+ * Altitudes are read the way the controller says them (reading()): an
+ * aircraft reports its pressure altitude on the standard 1013 hPa (alt_baro),
+ * which is its flight level; below the transition altitude it is given in
+ * feet on the local QNH instead, about 27 ft higher per hPa above standard.
+ * The filter compares those readings, so its feet are QNH feet too.
  */
 (function (root, factory) {
     const api = factory();
@@ -29,6 +30,34 @@
     const FLOOR = 0;
     const NO_CEILING = 60000;
     const DEFAULT_TA = 5000;
+    const STD_HPA = 1013.25;
+    // Height of one hPa near sea level, as in par/par-geometry.js.
+    const FT_PER_HPA = 27.3;
+
+    /**
+     * An altitude as it is said: {kind: 'ft', ft} on the QNH at or below the
+     * transition altitude, {kind: 'fl', ft, fl} above it, with ft the value
+     * the filter compares, or {kind: 'gnd', ft: 0} for an aircraft that reports
+ * the ground. ref: {qnh, ta}; a missing QNH is the standard one.
+     */
+    function reading(altBaro, ref) {
+        if (typeof altBaro !== 'number' || !Number.isFinite(altBaro)) return null;
+        const qnh = (ref && ref.qnh) || STD_HPA;
+        const ta = (ref && ref.ta) || DEFAULT_TA;
+        // ADS-B sends "ground" for an aircraft on the ground, read as 0.
+        if (altBaro <= 0) return { kind: 'gnd', ft: 0 };
+        const onQnh = altBaro + (qnh - STD_HPA) * FT_PER_HPA;
+        if (onQnh <= ta) return { kind: 'ft', ft: onQnh };
+        return { kind: 'fl', ft: altBaro, fl: Math.round(altBaro / 100) };
+    }
+
+    // "2 900 ft" or "FL120"; feet to the nearest `step`.
+    function readingText(r, step = 100) {
+        if (!r) return '-';
+        if (r.kind === 'gnd') return 'GND';
+        if (r.kind === 'fl') return 'FL' + String(r.fl).padStart(3, '0');
+        return `${thousands(Math.round(r.ft / step) * step)} ft`;
+    }
 
     function stops(transitionAltitudeFt = DEFAULT_TA) {
         const ta = Math.max(1000, Math.min(18000, Math.round(transitionAltitudeFt / 100) * 100));
@@ -105,5 +134,5 @@
         ];
     }
 
-    return { FLOOR, NO_CEILING, DEFAULT_TA, stops, indexOf, position, label, bandLabel, histogram, presets };
+    return { FLOOR, NO_CEILING, DEFAULT_TA, STD_HPA, FT_PER_HPA, reading, readingText, stops, indexOf, position, label, bandLabel, histogram, presets };
 });

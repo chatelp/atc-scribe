@@ -977,15 +977,20 @@
                     <div class="mb-2 select-none" x-data="altitudeFilter()">
                         <div class="flex items-baseline gap-2 text-xs mb-0.5">
                             <i class="fas fa-arrows-up-down text-text/50"></i>
-                            <span class="font-medium" :class="active ? 'text-highlight' : 'text-text/80'" x-text="band"></span>
+                            <span class="font-medium cursor-help" :class="active ? 'text-highlight' : 'text-text/80'" x-text="band"
+                                  data-help-title="Altitude band" :data-help="bandHelp"></span>
                             <span class="flex-1"></span>
-                            <span class="text-text/50 tabular-nums" :title="'Airborne aircraft in the band, of those seen now'"
+                            <span class="text-text/50 tabular-nums cursor-help" :data-help="qnhHelp" data-help-title="QNH"
+                                  x-text="$store.atc.altimetry.estimated ? 'QNH ' + Math.round($store.atc.altimetry.qnh) : 'QNH std'"></span>
+                            <span class="text-text/50 tabular-nums cursor-help" data-help-title="Aircraft in the band"
+                                  data-help="Airborne aircraft inside the band, of those seen now. Aircraft on the ground are shown or hidden by the Ground button, whatever the band."
                                   x-text="active ? inBand + ' of ' + airborne + ' airborne' : airborne + ' airborne'"></span>
                             <button x-show="active" class="text-text/50 hover:text-highlight" title="All altitudes"
                                     @click="choose(presets[0])"><i class="fas fa-times"></i></button>
                         </div>
                         <!-- The traffic of the moment, along the slider. -->
-                        <div class="alt-histogram" aria-hidden="true">
+                        <div class="alt-histogram" aria-hidden="true" data-help-title="Traffic by altitude"
+                             data-help="Each bar is the number of airborne aircraft at that height now, on the same scale as the slider under it; green bars are inside the band.">
                             <template x-for="(n, i) in counts" :key="i">
                                 <div class="alt-bin" :class="binInBand(i) ? 'alt-bin-in' : ''"
                                      :style="'height:' + (n ? Math.max(12, n / peak * 100) : 0) + '%'"></div>
@@ -994,15 +999,16 @@
                         <div class="alt-track-wrap">
                             <div class="alt-track"></div>
                             <div class="alt-track-band" :style="'left:calc(7px + (100% - 14px) * ' + loPct / 100 + ');right:calc(7px + (100% - 14px) * ' + (100 - hiPct) / 100 + ')'"></div>
-                            <div class="alt-ta" :style="'left:calc(7px + (100% - 14px) * ' + taPct / 100 + ')'" :title="'Transition altitude, ' + label(ta)"></div>
+                            <div class="alt-ta" :style="'left:calc(7px + (100% - 14px) * ' + taPct / 100 + ')'"></div>
                             <input type="range" class="alt-range" x-ref="lo" min="0" :max="last" step="1" :value="lo"
-                                   aria-label="Altitude floor" :aria-valuetext="label(min)" :title="'Floor: ' + label(min)"
+                                   aria-label="Altitude floor" :aria-valuetext="label(min)"
                                    @input="moveLo($event.target.value)" @change="save()">
                             <input type="range" class="alt-range" x-ref="hi" min="0" :max="last" step="1" :value="hi"
-                                   aria-label="Altitude ceiling" :aria-valuetext="label(max)" :title="'Ceiling: ' + label(max)"
+                                   aria-label="Altitude ceiling" :aria-valuetext="label(max)"
                                    @input="moveHi($event.target.value)" @change="save()">
                         </div>
-                        <div class="alt-marks" aria-hidden="true">
+                        <div class="alt-marks" aria-hidden="true" data-help-title="Scale"
+                             :data-help="'SFC is the surface. TA is the transition altitude (' + label(ta) + '): below it, altitudes are in feet on the local QNH; above it, in flight levels, hundreds of feet on the standard 1013 hPa (FL100 is 10 000 ft). The scale gives more room to low altitudes, where the traffic around airfields is. ∞ is no ceiling.'">
                             <template x-for="m in marks" :key="m.text">
                                 <span :style="'left:' + m.at + '%'" x-text="m.text"></span>
                             </template>
@@ -1011,7 +1017,7 @@
                             <template x-for="p in presets" :key="p.id">
                                 <button class="px-1.5 py-0.5 rounded border text-[11px] leading-4"
                                         :class="isPreset(p) ? 'border-highlight/60 bg-highlight/15 text-highlight' : 'border-border text-text/70 hover:text-text'"
-                                        :title="p.help" @click="choose(p)" x-text="p.label"></button>
+                                        :data-help="p.help" @click="choose(p)" x-text="p.label"></button>
                             </template>
                         </div>
                     </div>
@@ -1276,10 +1282,11 @@
                                             </div>
                                             
                                             <!-- Altitude cell -->
-                                            <div class="p-1.5 text-right w-[65px]">
+                                            <div class="p-1.5 text-right w-[65px]"
+                                                 data-help-title="Altitude" :data-help="$store.atc.altitudeHelp(aircraft)">
                                                 <div class="flex flex-col items-end">
                                                     <div class="flex items-center justify-end">
-                                                        <span class="text-sm" x-text="$store.atc.formatTrackAltitude(aircraft.adsb?.alt_baro)"></span>
+                                                        <span class="text-sm" x-text="$store.atc.altitudeValueText(aircraft)"></span>
                                                         <i :class="[$store.atc.getAltitudeTrendIcon(aircraft), $store.atc.getAltitudeTrendClasses(aircraft), 'ml-1']"
                                                            :title="aircraft.adsb && aircraft.adsb.baro_rate !== undefined ? Math.round(aircraft.adsb.baro_rate) + ' ft/min' : '-'"></i>
                                                     </div>
@@ -1382,10 +1389,11 @@
                                 </div>
                                 
                                 <!-- Altitude cell -->
-                                <div class="px-2.5 py-2 text-right w-[65px]">
+                                <div class="px-2.5 py-2 text-right w-[65px]"
+                                     data-help-title="Altitude" :data-help="$store.atc.altitudeHelp($store.atc.selectedAircraft)">
                                     <div class="flex flex-col items-end">
                                         <div class="flex items-center justify-end">
-                                            <span class="text-sm" x-text="$store.atc.formatTrackAltitude($store.atc.selectedAircraft.adsb?.alt_baro)"></span>
+                                            <span class="text-sm" x-text="$store.atc.altitudeValueText($store.atc.selectedAircraft)"></span>
                                             <i :class="[$store.atc.getAltitudeTrendIcon($store.atc.selectedAircraft), $store.atc.getAltitudeTrendClasses($store.atc.selectedAircraft), 'ml-1']"
                                                               :title="$store.atc.selectedAircraft.adsb && $store.atc.selectedAircraft.adsb.baro_rate !== undefined ? Math.round($store.atc.selectedAircraft.adsb.baro_rate) + ' ft/min' : '-'"></i>
                                         </div>
@@ -1517,7 +1525,8 @@
                                     <thead>
                                         <tr>
                                             <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[28%]">Time</th>
-                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">Alt</th>
+                                            <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%] cursor-help"
+                                                data-help-title="Altitude" data-help="Feet on the local QNH below the transition altitude, flight levels above, rounded to 100 ft. Past points are corrected with today's QNH.">Alt</th>
                                             <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">HDG</th>
                                             <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">TAS</th>
                                             <th class="p-1.5 text-right border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">GS</th>
@@ -1547,7 +1556,7 @@
                                                 </td>
                                                 <td class="p-1.5 text-right border-b border-border text-gray-400">
                                                     <div class="flex items-center justify-end">
-                                                        <span x-text="$store.atc.formatTrackAltitude(position.altitude)"></span>
+                                                        <span x-text="$store.atc.altitudeTextFromBaro(position.altitude)"></span>
                                                         <i class="fas fa-exclamation-triangle text-yellow-500 ml-1"
                                                            x-show="typeof position.altitude === 'number' && position.altitude < 0"></i>
                                                     </div>
@@ -1605,7 +1614,7 @@
                                                 <template x-if="item.type === 'row'">
                                                     <td class="p-1.5 text-right" :class="{ 'border-b border-border': !item.beforeDivider }">
                                                         <div class="flex items-center justify-end">
-                                                            <span x-text="$store.atc.formatTrackAltitude(item.position.altitude)"></span>
+                                                            <span x-text="$store.atc.altitudeTextFromBaro(item.position.altitude)"></span>
                                                             <i :class="[$store.atc.aircraftDetailsGetAltitudeTrend(item.position, item.originalIndex), $store.atc.aircraftDetailsGetAltitudeTrendClass(item.position, item.originalIndex), 'ml-1']"
                                                                    :title="typeof item.position.altitude === 'number' ? (item.position.altitude > 0 ? Math.round(item.position.altitude) + ' ft / ' + Math.round(item.position.altitude * 0.3048) + ' m' : Math.round(item.position.altitude) + ' ft') : '-'"></i>
                                                         </div>
@@ -2166,7 +2175,8 @@
                                           x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[0].runway_end)"></span>
                                 </div>
                                 <template x-if="$store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15">
-                                    <div class="flex flex-col items-center justify-center opacity-35 border-l border-border/20 pl-2.5">
+                                    <div class="flex flex-col items-center justify-center opacity-35 border-l border-border/20 pl-2.5 cursor-help"
+                                         data-help-title="Alternate runway" data-help="ALT is not an altitude here: it is the second most likely runway in use, judged from the same takeoffs and landings, shown while its likelihood stays above 15 %.">
                                         <span class="text-[7px] text-text/30 uppercase tracking-[0.2em] leading-none mb-0.5">ALT</span>
                                         <span class="font-mono text-xs text-text/50 leading-none tracking-wider"
                                               x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[1].runway_end)"></span>
@@ -2218,6 +2228,7 @@
     <script src="altitude/altitude-scale.js"></script>
     <script src="altitude/altitude-filter.js"></script>
     <script src="events.js"></script>
+    <script src="help-tips.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

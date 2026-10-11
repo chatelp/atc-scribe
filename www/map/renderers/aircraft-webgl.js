@@ -401,9 +401,14 @@
         const phaseText = phase ? `[${phase}] ` : '';
         const phaseColor = getPhaseLabelColor(phase || 'NEW');
         const shortType = getAircraftShortIcaoType(aircraft);
-        const altitude = Number.isFinite(aircraft?.adsb?.alt_baro)
-            ? (aircraft.adsb.alt_baro === 0 ? 'GND' : `${Math.round(aircraft.adsb.alt_baro)}ft`)
-            : '-';
+        // As the list says it: feet on the QNH below the transition altitude,
+        // flight level above (store.altitudeReading, www/altitude/).
+        const reading = store && typeof store.altitudeReading === 'function' ? store.altitudeReading(aircraft) : null;
+        const altitude = !Number.isFinite(aircraft?.adsb?.alt_baro)
+            ? '-'
+            : aircraft.adsb.alt_baro === 0 ? 'GND'
+            : reading && reading.kind === 'fl' ? 'FL' + String(reading.fl).padStart(3, '0')
+            : `${Math.round((reading ? reading.ft : aircraft.adsb.alt_baro) / 10) * 10}ft`;
         const trendArrow = getAltitudeTrendArrow(aircraft);
         const speed = Number.isFinite(aircraft?.adsb?.gs)
             ? `${Math.round(aircraft.adsb.gs)}kt`

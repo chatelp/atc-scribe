@@ -55,3 +55,17 @@ test('every preset falls exactly on stops', () => {
         assert.equal(list[S.indexOf(list, p.max)], p.max, `${p.id} max`);
     }
 });
+
+test('below the transition altitude, feet on the QNH; above, the flight level', () => {
+    const ref = { qnh: 1023.25, ta: 5000 };          // 10 hPa above standard: +273 ft
+    assert.deepEqual(S.reading(2000, ref), { kind: 'ft', ft: 2273 });
+    assert.equal(S.readingText(S.reading(2000, ref)), '2\u202f300 ft');
+    assert.equal(S.reading(4700, ref).kind, 'ft');   // 4 973 ft on the QNH
+    assert.deepEqual(S.reading(4800, ref), { kind: 'fl', ft: 4800, fl: 48 }); // 5 073 ft: above TA
+    assert.equal(S.readingText(S.reading(12000, ref)), 'FL120');
+    assert.deepEqual(S.reading(2000, { qnh: 1003.25 }), { kind: 'ft', ft: 1727 });
+    assert.deepEqual(S.reading(2000, null), { kind: 'ft', ft: 2000 });
+    assert.equal(S.reading(undefined, ref), null);
+    assert.deepEqual(S.reading(0, ref), { kind: 'gnd', ft: 0 });
+    assert.equal(S.readingText(S.reading(0, ref)), 'GND');
+});
