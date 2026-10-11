@@ -1017,7 +1017,7 @@
                             <template x-for="p in presets" :key="p.id">
                                 <button class="px-1.5 py-0.5 rounded border text-[11px] leading-4"
                                         :class="isPreset(p) ? 'border-highlight/60 bg-highlight/15 text-highlight' : 'border-border text-text/70 hover:text-text'"
-                                        :data-help="p.help" @click="choose(p)" x-text="p.label"></button>
+                                        data-help-title="Preset" :data-help="p.help" @click="choose(p)" x-text="p.label"></button>
                             </template>
                         </div>
                     </div>
@@ -1026,7 +1026,8 @@
                     <div class="flex mb-2 gap-1.5">
                         <!-- Air and Ground buttons side by side with equal width -->
                         <div class="flex gap-1.5 flex-1">
-                            <button @click="$store.atc.toggleAirAircraft()"
+                            <button @click="$store.atc.toggleAirAircraft()" data-help-title="In the air"
+                                    data-help="Show or hide the aircraft in flight. Active ones are those heard in the last moments; the total counts the day's."
                                     :class="{
                                         'filter-btn-active bg-highlight/15 border-highlight/40 text-highlight': $store.atc.settings.showAirAircraft,
                                         'filter-btn-inactive text-text/50': !$store.atc.settings.showAirAircraft
@@ -1035,7 +1036,8 @@
                                 <span class="w-1.5 h-1.5 rounded-full bg-highlight flex-shrink-0"></span>
                                 <span class="whitespace-nowrap"><strong>A</strong>ir (<span x-text="$store.atc.counts.air_active"></span>/<span x-text="$store.atc.counts.air_total"></span>)</span>
                             </button>
-                            <button @click="$store.atc.toggleGroundAircraft()"
+                            <button @click="$store.atc.toggleGroundAircraft()" data-help-title="On the ground"
+                                    data-help="Show or hide the aircraft on the ground: taxiing, parked, or just landed. The altitude band does not apply to them."
                                     :class="{
                                         'filter-btn-active bg-gray-400/15 border-gray-400/40 text-gray-400': $store.atc.settings.showGroundAircraft,
                                         'filter-btn-inactive text-text/50': !$store.atc.settings.showGroundAircraft
@@ -1054,7 +1056,7 @@
                                     'filter-btn-active bg-amber-400/15 border-amber-400/40 text-amber-400': $store.atc.settings.voiceOnly,
                                     'filter-btn-inactive text-text/50': !$store.atc.settings.voiceOnly
                                 }"
-                                title="Show only aircraft a transmission has been matched to"
+                                data-help-title="Heard on the radio" data-help="Show only the aircraft a transmission has been matched to: the ones talking or talked to on the frequencies listened to."
                                 class="flex-1 px-2 py-1.5 border rounded-md text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
                             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span>
                             <span class="whitespace-nowrap">Heard on the radio (<span x-text="$store.atc.voiceAircraftCount"></span>)</span>
@@ -1064,7 +1066,7 @@
                     <!-- Flight Phase Filter Buttons -->
                     <div class="mb-2">
                         <div class="grid grid-cols-10 gap-1">
-                            <button @click="$store.atc.togglePhaseFilter('NEW')"
+                            <button @click="$store.atc.togglePhaseFilter('NEW')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('NEW')"
                                     :class="{
                                         'filter-btn-active bg-gray-500/15 border-gray-500/40 text-gray-400': $store.atc.settings.phaseFilters?.NEW !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.NEW === false
@@ -1073,7 +1075,7 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">1</span>
                                 <span class="whitespace-nowrap">NEW</span>
                             </button>
-                            <button @click="$store.atc.togglePhaseFilter('TAX')"
+                            <button @click="$store.atc.togglePhaseFilter('TAX')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('TAX')"
                                     :class="{
                                         'filter-btn-active bg-purple-500/15 border-purple-500/40 text-purple-400': $store.atc.settings.phaseFilters?.TAX !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.TAX === false
@@ -1082,7 +1084,7 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">2</span>
                                 <span class="whitespace-nowrap">TAX</span>
                             </button>
-                            <button @click="$store.atc.togglePhaseFilter('T/O')"
+                            <button @click="$store.atc.togglePhaseFilter('T/O')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('T/O')"
                                     :class="{
                                         'filter-btn-active bg-orange-500/15 border-orange-500/40 text-orange-400': $store.atc.settings.phaseFilters?.['T/O'] !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.['T/O'] === false
@@ -1091,7 +1093,7 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">3</span>
                                 <span class="whitespace-nowrap">T/O</span>
                             </button>
-                            <button @click="$store.atc.togglePhaseFilter('CLB')"
+                            <button @click="$store.atc.togglePhaseFilter('CLB')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('CLB')"
                                     :class="{
                                         'filter-btn-active bg-lime-500/15 border-lime-500/40 text-lime-400': $store.atc.settings.phaseFilters?.CLB !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.CLB === false
@@ -1100,7 +1102,7 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">4</span>
                                 <span class="whitespace-nowrap">CLB</span>
                             </button>
-                            <button @click="$store.atc.togglePhaseFilter('DEP')"
+                            <button @click="$store.atc.togglePhaseFilter('DEP')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('DEP')"
                                     :class="{
                                         'filter-btn-active bg-green-500/15 border-green-500/40 text-green-400': $store.atc.settings.phaseFilters?.DEP !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.DEP === false
@@ -1109,7 +1111,7 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">5</span>
                                 <span class="whitespace-nowrap">DEP</span>
                             </button>
-                            <button @click="$store.atc.togglePhaseFilter('CRZ')"
+                            <button @click="$store.atc.togglePhaseFilter('CRZ')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('CRZ')"
                                     :class="{
                                         'filter-btn-active bg-blue-500/15 border-blue-500/40 text-blue-400': $store.atc.settings.phaseFilters?.CRZ !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.CRZ === false
@@ -1118,7 +1120,7 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">6</span>
                                 <span class="whitespace-nowrap">CRZ</span>
                             </button>
-                            <button @click="$store.atc.togglePhaseFilter('ARR')"
+                            <button @click="$store.atc.togglePhaseFilter('ARR')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('ARR')"
                                     :class="{
                                         'filter-btn-active bg-pink-400/10 border-pink-400/35 text-pink-300': $store.atc.settings.phaseFilters?.ARR !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.ARR === false
@@ -1127,7 +1129,7 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">7</span>
                                 <span class="whitespace-nowrap">ARR</span>
                             </button>
-                            <button @click="$store.atc.togglePhaseFilter('APP')"
+                            <button @click="$store.atc.togglePhaseFilter('APP')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('APP')"
                                     :class="{
                                         'filter-btn-active bg-yellow-500/15 border-yellow-500/40 text-yellow-400': $store.atc.settings.phaseFilters?.APP !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.APP === false
@@ -1136,7 +1138,7 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">8</span>
                                 <span class="whitespace-nowrap">APP</span>
                             </button>
-                            <button @click="$store.atc.togglePhaseFilter('T/D')"
+                            <button @click="$store.atc.togglePhaseFilter('T/D')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('T/D')"
                                     :class="{
                                         'filter-btn-active bg-teal-500/15 border-teal-500/40 text-teal-400': $store.atc.settings.phaseFilters?.['T/D'] !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.['T/D'] === false
@@ -1145,7 +1147,7 @@
                                 <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">9</span>
                                 <span class="whitespace-nowrap">T/D</span>
                             </button>
-                            <button @click="$store.atc.togglePhaseFilter('UNK')"
+                            <button @click="$store.atc.togglePhaseFilter('UNK')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('UNK')"
                                     :class="{
                                         'filter-btn-active bg-slate-500/10 border-slate-500/35 text-slate-400': $store.atc.settings.phaseFilters?.UNK !== false,
                                         'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.UNK === false
@@ -1160,12 +1162,14 @@
                     <!-- Sidebar Tabs and List Controls -->
                     <div class="mb-2 flex items-center justify-between gap-2">
                         <div class="inline-flex rounded-md border border-border/70 overflow-hidden">
-                            <button @click="$store.atc.setSidebarTab('active')"
+                            <button @click="$store.atc.setSidebarTab('active')" data-help-title="Active"
+                                    data-help="Aircraft the ADS-B receiver hears now."
                                     :class="$store.atc.sidebarTab === 'active' ? 'bg-highlight/15 text-highlight' : 'text-text/70 hover:text-text hover:bg-hover/40'"
                                     class="px-2.5 py-1 text-[10px] font-medium transition-colors cursor-pointer">
                                 Active (<span x-text="$store.atc.activeAircraftCount"></span>)
                             </button>
-                            <button @click="$store.atc.setSidebarTab('lost')"
+                            <button @click="$store.atc.setSidebarTab('lost')" data-help-title="Signal lost"
+                                    data-help="Aircraft no longer heard: out of range of the antenna, landed out of its sight, or switched off. They stay listed for a while, then go."
                                     :class="$store.atc.sidebarTab === 'lost' ? 'bg-gray-500/15 text-gray-300' : 'text-text/70 hover:text-text hover:bg-hover/40'"
                                     class="px-2.5 py-1 text-[10px] font-medium border-l border-border/70 transition-colors cursor-pointer">
                                 Signal Lost (<span x-text="$store.atc.lostAircraftCount"></span>)
@@ -1300,7 +1304,8 @@
                                             <div class="p-1.5 text-right w-[55px]">
                                                 <div class="flex flex-col items-end">
                                                     <span class="text-sm" x-text="$store.atc.getHeadingDisplayText(aircraft)"></span>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType(aircraft).type)"></span>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType(aircraft).type)"
+                                                          data-help-title="Heading" :data-help="$store.atc.headingHelp($store.atc.getHeadingWithType(aircraft).type)"></span>
                                                 </div>
                                             </div>
 
@@ -1310,7 +1315,7 @@
                                             <div class="p-1.5 text-right w-[55px]">
                                                 <div class="flex flex-col items-end">
                                                     <span class="text-sm" x-text="$store.atc.formatTrackSpeed(aircraft.adsb?.tas)"></span>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5">tas</span>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="True airspeed" data-help="TAS, true airspeed in knots: its speed through the air. It differs from the ground speed by the wind.">tas</span>
                                                 </div>
                                             </div>
 
@@ -1320,7 +1325,7 @@
                                             <div class="p-1.5 text-right w-[55px]">
                                                 <div class="flex flex-col items-end">
                                                     <span class="text-sm" x-text="$store.atc.formatTrackSpeed(aircraft.adsb?.gs)"></span>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5">gs</span>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="Ground speed" data-help="GS, ground speed in knots: its speed over the ground, what the map shows it moving at. Tailwind adds to it, headwind takes from it.">gs</span>
                                                 </div>
                                             </div>
 
@@ -1330,7 +1335,8 @@
                                             <div class="p-1.5 text-right w-[55px] pr-3">
                                                 <div class="flex flex-col items-end">
                                                     <span class="text-sm" x-text="aircraft.distance !== undefined && aircraft.distance !== null ? aircraft.distance : '-'"></span>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5" x-show="aircraft.distance !== undefined && aircraft.distance !== null">nm</span>
+                                                    <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-show="aircraft.distance !== undefined && aircraft.distance !== null"
+                                                          data-help-title="Distance" data-help="From the receiving station, in nautical miles (1 NM = 1.852 km).">nm</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1407,7 +1413,8 @@
                                 <div class="px-2.5 py-2 text-right w-[55px]">
                                     <div class="flex flex-col items-end">
                                         <span class="text-sm" x-text="$store.atc.getHeadingDisplayText($store.atc.selectedAircraft)"></span>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType($store.atc.selectedAircraft).type)"></span>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType($store.atc.selectedAircraft).type)"
+                                              data-help-title="Heading" :data-help="$store.atc.headingHelp($store.atc.getHeadingWithType($store.atc.selectedAircraft).type)"></span>
                                     </div>
                                 </div>
 
@@ -1417,7 +1424,7 @@
                                 <div class="px-2.5 py-2 text-right w-[55px]">
                                     <div class="flex flex-col items-end">
                                         <span class="text-sm" x-text="$store.atc.formatTrackSpeed($store.atc.selectedAircraft.adsb?.tas)"></span>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5">tas</span>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="True airspeed" data-help="TAS, true airspeed in knots: its speed through the air. It differs from the ground speed by the wind.">tas</span>
                                     </div>
                                 </div>
 
@@ -1427,7 +1434,7 @@
                                 <div class="px-2.5 py-2 text-right w-[55px]">
                                     <div class="flex flex-col items-end">
                                         <span class="text-sm" x-text="$store.atc.formatTrackSpeed($store.atc.selectedAircraft.adsb?.gs)"></span>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5">gs</span>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="Ground speed" data-help="GS, ground speed in knots: its speed over the ground, what the map shows it moving at. Tailwind adds to it, headwind takes from it.">gs</span>
                                     </div>
                                 </div>
 
@@ -1437,7 +1444,8 @@
                                 <div class="px-2.5 py-2 text-right w-[55px] pr-4">
                                     <div class="flex flex-col items-end">
                                         <span class="text-sm" x-text="$store.atc.selectedAircraft.distance !== undefined && $store.atc.selectedAircraft.distance !== null ? $store.atc.selectedAircraft.distance : '-'"></span>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5" x-show="$store.atc.selectedAircraft.distance !== undefined && $store.atc.selectedAircraft.distance !== null">nm</span>
+                                        <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-show="$store.atc.selectedAircraft.distance !== undefined && $store.atc.selectedAircraft.distance !== null"
+                                                          data-help-title="Distance" data-help="From the receiving station, in nautical miles (1 NM = 1.852 km).">nm</span>
                                     </div>
                                 </div>
                             </div>
@@ -2285,7 +2293,8 @@
                 </div>
                 
                 <!-- Runway In Use Indicator -->
-                <div class="flex-shrink-0 h-full flex items-center px-4 mr-2 border-l border-r border-border/30">
+                <div class="flex-shrink-0 h-full flex items-center px-4 mr-2 border-l border-r border-border/30 cursor-help"
+                     data-help-title="Runway in use" data-help="The runway each followed airport is using, judged from the takeoffs and landings of the last minutes. A runway is named by its direction: 27 is about 270 degrees, west; L and R tell parallel runways apart. Unknown until enough aircraft have used it.">
                     <div class="flex items-center space-x-2.5">
                         <!-- No data -->
                         <template x-if="!$store.atc.runwayInUse || $store.atc.runwayInUse.length === 0">

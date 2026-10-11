@@ -3826,6 +3826,21 @@ async initAircraftDataSource() {
             return `${who}, in plain words, as the phraseology grammar reads it from the transcript: green for a clearance, amber for a level, heading, speed, frequency or setting. A misheard word can make it wrong: listen again to check.`;
         },
 
+        phaseHelp(phase) {
+            const P = window.FlightTimeline && window.FlightTimeline.PHASES;
+            const [name, what] = (P && P[phase]) || [phase, ''];
+            const on = !(this.settings.phaseFilters && this.settings.phaseFilters[phase] === false);
+            return `${phase}, ${name}${what ? ': ' + what : ''}. Judged by the server from altitude, speed and position. ` +
+                `${on ? 'Shown' : 'Hidden'} now: click to ${on ? 'hide' : 'show'} the aircraft in this phase.`;
+        },
+
+        headingHelp(type) {
+            if (type === 'magnetic') return 'hdg(m): the heading the aircraft reports, where its nose points, from magnetic north -- the one controllers give.';
+            if (type === 'true') return 'hdg(t): where its nose points, from true north.';
+            if (type === 'track') return 'hdg(trk): no heading reported, so its track over the ground is shown instead; the wind makes the two differ by a few degrees.';
+            return 'No heading received.';
+        },
+
         // The aircraft in sight with this callsign, or null.
         aircraftByCallsign(callsign) {
             const cs = (callsign || '').trim().toUpperCase();
