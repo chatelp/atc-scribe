@@ -2735,8 +2735,9 @@ nettement : **l'amorce en phraséologie anglaise fait chuter le modèle françai
 **Seuls 2 des avions entendus par l'annotateur figurent dans les amorces**, alors que 20
 clips sur 42 contiennent un indicatif probable. Trois raisons, lisibles dans les exemples :
 
-1. **La phraséologie abrège.** Après le premier contact, F-HVAC devient *« fox alpha
-   charlie »*, et une compagnie est citée sans son numéro (*« … france soleil … »*). Une
+1. **La phraséologie abrège.** Après le premier contact, une immatriculation F-xxAC
+   devient *« fox alpha charlie »* (ses deux dernières lettres), et une compagnie est citée
+   sans son numéro (*« … france soleil … »*). Une
    liste d'indicatifs complets ne rejoint pas ce qui se dit.
 2. **Une bonne partie de l'aviation générale locale est probablement absente de l'ADS-B** :
    sur Chavenay, des indicatifs entendus (*« charly oscar »*, *« kilo papa »*) ne
