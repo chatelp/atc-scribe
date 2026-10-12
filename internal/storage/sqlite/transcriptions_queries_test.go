@@ -168,10 +168,11 @@ func TestHistoryPagesFilterAndPaginate(t *testing.T) {
 // last, and the last words -- ignoring the transmissions that named nobody.
 func TestVoiceSummariesCountAndKeepTheLastWords(t *testing.T) {
 	s := newTranscriptionStore(t)
+	var ids []int64
 	for i, cs := range []string{"AFR1081", "AFR1081", "", "  ", "EZY45AB"} {
 		r := heard("125825", t0.Add(time.Duration(i)*time.Minute), "words "+string(rune('a'+i)))
 		r.Callsign = cs
-		store(t, s, r)
+		ids = append(ids, store(t, s, r))
 	}
 
 	got, err := s.VoiceSummaries()
@@ -187,6 +188,10 @@ func TestVoiceSummariesCountAndKeepTheLastWords(t *testing.T) {
 	}
 	if ezy := got["EZY45AB"]; ezy.Transmissions != 1 || ezy.LastText != "words e" {
 		t.Errorf("EZY45AB: %+v", ezy)
+	}
+	// The last transmission itself, for the page to open the transcript at it.
+	if afr.LastID != ids[1] || afr.LastFrequencyID != "125825" {
+		t.Errorf("AFR1081 last transmission: id %d on %q, want %d on 125825", afr.LastID, afr.LastFrequencyID, ids[1])
 	}
 }
 

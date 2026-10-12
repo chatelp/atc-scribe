@@ -16,6 +16,9 @@ type VoiceSummary struct {
 	Transmissions int       `json:"transmissions"`
 	LastHeard     time.Time `json:"last_heard"`
 	LastText      string    `json:"last_text"`
+	// The last transmission itself, so the page can open the transcript at it.
+	LastID          int64  `json:"last_id"`
+	LastFrequencyID string `json:"last_frequency_id"`
 }
 
 // VoiceSummaries returns, per ADS-B callsign, what voice has attached to it.
@@ -55,21 +58,23 @@ func (s *TranscriptionStorage) VoiceSummaries() (map[string]VoiceSummary, error)
 	// The latest text, for the aircraft that have one. Fetched separately so the
 	// grouped count above stays a single scan of the index.
 	texts, err := s.db.Query(`
-		SELECT callsign, content, created_at FROM transcriptions
+		SELECT callsign, content, created_at, id, frequency_id FROM transcriptions
 		WHERE callsign IS NOT NULL AND TRIM(callsign) != ''
-		ORDER BY created_at ASC`)
+		ORDER BY created_at ASC, id ASC`)
 	if err != nil {
 		return out, nil // the counts alone are still useful
 	}
 	defer texts.Close()
 	for texts.Next() {
-		var callsign, content, at string
-		if err := texts.Scan(&callsign, &content, &at); err != nil {
+		var callsign, content, at, freq string
+		var id int64
+		if err := texts.Scan(&callsign, &content, &at, &id, &freq); err != nil {
 			break
 		}
 		callsign = strings.TrimSpace(callsign)
 		if v, ok := out[callsign]; ok {
 			v.LastText = content // rows are ascending, so the last write wins
+			v.LastID, v.LastFrequencyID = id, freq
 			out[callsign] = v
 		}
 	}

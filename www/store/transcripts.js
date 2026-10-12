@@ -162,7 +162,9 @@
                     target.voice = {
                         transmissions: previous + 1,
                         last_heard: data.timestamp,
-                        last_text: data.text
+                        last_text: data.text,
+                        last_id: data.id,
+                        last_frequency_id: data.frequency_id
                     };
                     this.applyFilters();
                 }
@@ -491,6 +493,27 @@
             // Every open transcript is laid out again: side by side, since the
             // tiles under them are narrower than a readable transcript.
             this.layoutTranscriptionViewers();
+        },
+
+        // Opens a frequency's transcript at one transmission: from a speech
+        // bubble on the map. The row is found by its id once the transcript is
+        // shown; a transmission older than the hundred the transcript holds
+        // only opens the transcript.
+        openTranscriptionAt(frequencyId, id) {
+            const fid = String(frequencyId || '');
+            if (!fid || !this.audioFrequencies.some((f) => String(f.id) === fid)) return;
+            if (!this.transcriptionViewerVisible[fid]) this.toggleTranscriptionViewer(fid);
+            const find = (left) => {
+                const row = document.getElementById('tx-' + id);
+                if (row) {
+                    row.scrollIntoView({ block: 'center' });
+                    row.classList.add('tx-flash');
+                    setTimeout(() => row.classList.remove('tx-flash'), 1800);
+                } else if (left > 0) {
+                    setTimeout(() => find(left - 1), 150);
+                }
+            };
+            setTimeout(() => find(10), 60);
         },
 
         // The open transcripts, left to right in the order of their tiles, each

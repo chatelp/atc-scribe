@@ -78,5 +78,6 @@ func (v *voiceIndex) VoiceFor(callsign string) *adsb.VoiceData {
 		Transmissions: s.Transmissions,
 		LastHeard:     s.LastHeard,
 		LastText:      s.LastText,
+		LastID:        s.LastID, LastFrequencyID: s.LastFrequencyID,
 	}
 }

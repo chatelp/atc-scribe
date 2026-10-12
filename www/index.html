@@ -42,6 +42,7 @@
     <!-- 5) Map feature modules (user interactions and contextual overlays) -->
     <script defer src="map/features/interactions-feature.js"></script>
     <script defer src="map/features/proximity-feature.js"></script>
+    <script defer src="map/features/voice-bubbles-feature.js"></script>
     <script defer src="map/features/minimap-feature.js"></script>
 
     <!-- 6) Map renderers (facades first, concrete aircraft renderer second) -->
@@ -268,6 +269,14 @@
                             <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">Display <small class="text-xs font-normal opacity-60">this browser</small></h2>
                             <div class="grid gap-4">
                                 <div class="grid gap-3">
+                                    <div class="flex items-center justify-between gap-2.5"
+                                         data-help-title="Speech bubbles" data-help="Over each aircraft the radio has named in the last ten minutes, its last transmission in a bubble; a click opens the transcript at it. Off, the map shows only the labels.">
+                                        <span class="text-sm">Speech bubbles on the map</span>
+                                        <label class="switch">
+                                            <input type="checkbox" x-model="$store.atc.settings.voiceBubbles" @change="$store.atc.toggleVoiceBubbles()">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
                                     <div class="flex items-center justify-between gap-2.5">
                                         <span class="text-sm">Smoothing Between Updates</span>
                                         <label class="switch">
@@ -2117,6 +2126,7 @@
                                                 <div class="flex-grow border-t border-border/30"></div>
                                             </div>
                                             <div class="text-xs p-1 rounded bg-background/30 border-l-2 mb-1"
+                                                 :id="transcription.id ? 'tx-' + transcription.id : null"
                                                  :class="{
                                                     'border-orange-400': transcription.speaker_type === 'ATC',
                                                     'border-green-400': transcription.speaker_type === 'PILOT',

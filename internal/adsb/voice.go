@@ -17,6 +17,9 @@ type VoiceData struct {
 	Transmissions int       `json:"transmissions"`
 	LastHeard     time.Time `json:"last_heard"`
 	LastText      string    `json:"last_text,omitempty"`
+	// The last transmission, for the page to open the transcript at it.
+	LastID          int64  `json:"last_id,omitempty"`
+	LastFrequencyID string `json:"last_frequency_id,omitempty"`
 }
 
 // VoiceIndex answers what voice has attached to a callsign. Keeping it an

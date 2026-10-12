@@ -146,6 +146,7 @@ document.addEventListener('alpine:init', () => {
                 return MAP_STYLES.includes(savedStyle) ? savedStyle : defaultMapStyle();
             })(),
             showLabels: JSON.parse(localStorage.getItem('showLabels')) ?? true,
+            voiceBubbles: JSON.parse(localStorage.getItem('voiceBubbles')) ?? true, // last transmission over each aircraft named
             showPaths: JSON.parse(localStorage.getItem('showPaths')) ?? true,
             showRings: JSON.parse(localStorage.getItem('showRings')) ?? true,
             showAirports: JSON.parse(localStorage.getItem('showAirports')) ?? true,
@@ -221,6 +222,7 @@ document.addEventListener('alpine:init', () => {
             // still follow the station's position.
             if (!this.mapStyleIsDefault) localStorage.setItem('mapStyle', this.settings.mapStyle);
             localStorage.setItem('showLabels', this.settings.showLabels);
+            localStorage.setItem('voiceBubbles', this.settings.voiceBubbles);
             localStorage.setItem('showPaths', this.settings.showPaths);
             localStorage.setItem('showRings', this.settings.showRings);
             localStorage.setItem('minAltitude', this.settings.minAltitude);
@@ -558,6 +560,11 @@ document.addEventListener('alpine:init', () => {
         toggleLabels() {
             this.saveSettings();
             if (this.mapManager) this.mapManager.applyFiltersAndRefreshView();
+        },
+
+        toggleVoiceBubbles() {
+            this.saveSettings();
+            if (this.mapManager && this.mapManager.voiceBubbles) this.mapManager.voiceBubbles.refresh();
         },
 
         togglePaths() {
