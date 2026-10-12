@@ -4852,6 +4852,20 @@ la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1
 La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
 validée contre `actual_runway_off`.
 
+### D74 — Le nom « atc-scribe » est abandonné ; le nouveau nom est à choisir *(12/10)*
+
+**Décision du propriétaire le 12/10**, sur un constat de la session « communauté », vérifié aux
+sources : la DSNA a un outil de transcription des communications ATC nommé **Scribe** (92 % de
+mots justes annoncés, 8 600 h de corpus), que le **SNCTA**, syndicat majoritaire des contrôleurs, a
+contesté en septembre 2025 (« SCRIBE et SLASH are watching you », préavis de grève suspendu après
+conciliation). Pour un contrôleur français, le mot désigne un outil de surveillance, et les
+contrôleurs, réels ou simulés, sont le premier public d'annotateurs visé. D20 (le nom `atc-scribe`)
+et la partie « nom » de D71 tombent. **La recherche du nom est confiée à la session « design »**
+(`docs-fr/design/00-nom.md` : cinq à huit propositions, disponibilité vérifiée), avec la
+question Q53 ; le propriétaire choisit, personne ne marque rien d'un nom avant. Le renommage se
+fera ensuite en une fois : dépôt GitHub, lanceur et dossier de configuration sur le Mac, titre de
+page (encore « Co-ATC »), documents, README.
+
 ### D73 — Trois préréglages d'appariement, le réglage actuel reste le défaut *(12/10)*
 
 **Valeurs validées par le propriétaire le 12/10**, après mesure sur les deux journées
@@ -4969,6 +4983,23 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 (`runs/son-test/`, ports 8020, 8023, 8024 ; le 8021 est pris par un service système) : flux des
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
+
+### Q53 — Un positionnement « espace aérien français » dans le nom, la marque et la présentation ? *(12/10 — ouverte, confiée à la session design)*
+
+**Constat du propriétaire le 12/10** : le projet se spécialise de fait sur l'espace aérien
+français (seconde lecture en français, phraséologie française, QNH sous la TA, PAR sur des pistes
+françaises, communauté visée française, Q52 et l'étude « communauté »), alors que le code reste
+générique (n'importe quel flux audio par l'API des sources, n'importe quel tar1090). **Question** :
+faut-il l'assumer dans le nom, la marque et la présentation GitHub (README, description,
+mots-clés), ou rester générique avec le français comme première langue servie ? À mesurer par la
+session design dans `docs-fr/design/00-nom.md`, avec des noms dans les deux positionnements, en
+s'appuyant sur ce que la session communauté établit des communautés françaises (`03-communautes.md`).
+Ce qui pèse : un terrain sans concurrent ouvert (session communauté, question 2 : rien d'ouvert,
+local et apparié n'existe ; voisins fermés Enhanced Radar et Scribe de la DSNA) contre une
+fermeture apparente aux autres pays. **À noter aussi, hors nom** : un brevet américain
+US12277862B1 (Aerlogics, 2025) couvre la corrélation transcription ATC / ADS-B pour vérifier la
+conformité ; aucun dépôt européen trouvé par la session communauté, revendications non lues —
+à faire lire par quelqu'un de compétent avant toute diffusion hors de France.
 
 ### Q52 — Audit produit : simplifier le code et refaire l'UX, maintenant qu'atc-scribe n'est plus co-atc *(09/10 — ouverte, étude en cours)*
 

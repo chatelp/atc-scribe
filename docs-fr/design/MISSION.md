@@ -87,7 +87,17 @@ liste et la PAR, le téléphone. Livrable : `docs-fr/design/02-principes.md`.
 
 ### 3. L'identité
 
-Le nom est **atc-scribe** (décidé, D20 et D71 dans `05-decisions.md`). Propose : une marque
+**Le nom change, et c'est à toi de le chercher** (ajouté le 12/10, après la décision du
+propriétaire) : « Scribe » est le nom de l'outil de transcription ATC de la DSNA, contesté par le
+SNCTA en septembre 2025 ; pour un contrôleur français, le mot évoque la surveillance, et c'est le
+public des annotateurs. Livrable préalable, `docs-fr/design/00-nom.md` : cinq à huit propositions
+(courtes, prononçables dans les deux langues, sans « scribe », sans aviation d'État ni
+surveillance, disponibilité vérifiée sur GitHub et dans l'écosystème), chacune avec sa
+justification et le signe graphique qu'elle permet ; et, dans le même document, **la pertinence
+d'un positionnement « espace aérien français »** dans le nom, la marque et la présentation du
+projet sur GitHub, avec des variantes de nom dans les deux cas (français assumé / générique avec
+le français comme première langue servie). Le propriétaire choisit ; rien n'est marqué d'un nom
+avant son choix, et la marque se conçoit comme un système applicable au nom retenu. Propose : une marque
 (typographie du nom, un signe simple qui tienne à 16 px dans un onglet et dans la barre de
 menus), un favicon, l'icône de la barre de menus (deux états : production arrêtée / en marche),
 la page de connexion, l'écran d'accueil (« Start Monitoring » aujourd'hui), et ce que montrerait
