@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Main screen — mock-up</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="base.css">
+<style>
+    body { background: #050505; }
+    .frame { width: 1440px; height: 900px; display: grid; grid-template-columns: 1fr 480px; grid-template-rows: 1fr 80px; position: relative; overflow: hidden; background: var(--color-surface-page); }
+    .map { position: relative; background: var(--color-surface-map); overflow: hidden; }
+    .map svg.sky { position: absolute; inset: 0; }
+    .map-top-left { position: absolute; top: var(--space-3); left: var(--space-3); display: flex; gap: var(--space-1); z-index: var(--z-map-overlay); }
+    .map-top-left .btn-icon { background: var(--color-surface-panel); border: 1px solid var(--color-border-default); width: 32px; height: 32px; position: relative; }
+    .map-top-left .counter { position: absolute; top: -6px; right: -6px; }
+    .map-top { position: absolute; top: var(--space-3); left: 50%; transform: translateX(-50%); z-index: var(--z-map-overlay); }
+    .map-bottom-right { position: absolute; right: var(--space-3); bottom: var(--space-3); z-index: var(--z-map-overlay); }
+    .ac-label { font: var(--font-size-caption)/14px var(--font-family-mono); }
+
+    /* list */
+    .list { grid-row: 1; grid-column: 2; display: flex; flex-direction: column; background: var(--color-surface-panel); border-left: 1px solid var(--color-border-default); min-height: 0; }
+    .list-tools { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); border-bottom: 1px solid var(--color-border-default); }
+    .alt-head { display: flex; align-items: baseline; justify-content: space-between; }
+    .histo { display: flex; align-items: flex-end; gap: 2px; height: 22px; padding: 0 2px; }
+    .histo i { flex: 1; background: var(--color-surface-hover); border-radius: 1px 1px 0 0; }
+    .histo i.in { background: var(--color-accent-default); opacity: .4; }
+    .alt-marks { display: flex; justify-content: space-between; margin-top: -2px; }
+    .row-of { display: flex; gap: var(--space-1-5); flex-wrap: wrap; align-items: center; }
+    .list-tabs { padding: 0 var(--space-3); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--color-border-default); }
+    .list-tabs .tabs { border-bottom: 0; }
+    .rows { flex: 1; overflow: hidden; padding: var(--space-1) 0; }
+    .strip { position: relative; height: var(--size-row-desk); margin: 0 var(--space-2) 2px; padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+        display: grid; grid-template-columns: 44px 1.35fr 1.1fr .7fr .8fr .7fr 56px; column-gap: var(--space-2); align-items: center;
+        border-radius: var(--radius-md); border-bottom: 1px solid var(--color-border-subtle); }
+    .strip::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; background: var(--fam); }
+    .strip:hover { background: var(--color-surface-hover); }
+    .strip.sel { background: var(--color-surface-selected); border-bottom-color: transparent; box-shadow: inset 0 0 0 1px var(--color-accent-default); }
+    .strip.lost .v { color: var(--color-text-tertiary); }
+    .strip .cell { display: flex; flex-direction: column; min-width: 0; }
+    .strip .v { font: var(--font-size-body)/18px var(--font-family-mono); color: var(--color-text-primary); white-space: nowrap; }
+    .strip .s { font-size: var(--font-size-caption); line-height: 14px; color: var(--color-text-tertiary); white-space: nowrap; }
+    .strip .cs { font-weight: var(--font-weight-strong); }
+    .strip .r { text-align: right; align-items: flex-end; }
+    .heard { display: inline-flex; align-items: center; gap: 3px; color: var(--color-accent-default); font: var(--font-size-caption)/14px var(--font-family-mono); }
+    .heard svg { width: 12px; height: 12px; }
+
+    /* radio bar */
+    .radio { grid-column: 1 / span 2; grid-row: 2; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); background: var(--color-surface-panel); border-top: 1px solid var(--color-border-default); }
+    .all { width: 44px; height: 56px; flex-direction: column; gap: 2px; border-color: var(--color-border-default); }
+    .tile { width: 160px; height: 64px; border: 1px solid var(--color-border-default); border-radius: var(--radius-md); padding: var(--space-1) var(--space-2); display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto 1fr; column-gap: var(--space-1); background: var(--color-surface-panel); position: relative; }
+    .tile.on { border-color: var(--color-accent-default); }
+    .tile.fail { border-color: var(--color-status-urgent); }
+    .tile .name { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+    .tile .name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tile .name svg { width: 13px; height: 13px; flex: none; }
+    .tile .meta { grid-column: 1 / span 2; display: flex; justify-content: space-between; align-items: center; }
+    .level { display: flex; gap: 2px; align-items: flex-end; height: 10px; }
+    .level i { width: 4px; background: var(--color-border-control); border-radius: 1px; }
+    .tile.on .level i.lit { background: var(--color-accent-default); }
+    .tile .vol { grid-column: 1 / span 2; }
+    .tile .vol .slider { height: 14px; }
+    .tile .thread { align-self: start; }
+    .tile .counter { position: absolute; top: -7px; right: -7px; }
+    .radio-right { margin-left: auto; display: flex; align-items: center; gap: var(--space-4); }
+    .rwy { display: flex; flex-direction: column; gap: 2px; }
+    .rwy .v { font: var(--font-weight-strong) var(--font-size-body)/18px var(--font-family-mono); }
+    .lights { display: grid; grid-template-columns: auto auto; column-gap: var(--space-3); row-gap: 2px; }
+    .clock { display: flex; flex-direction: column; align-items: flex-end; }
+
+    /* frequency thread popover */
+    .thread-pop { position: absolute; left: 68px; bottom: 88px; width: 320px; z-index: var(--z-popover); display: flex; flex-direction: column; max-height: 470px; }
+    .thread-pop .panel-head { background: transparent; }
+    .tx { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border-subtle); display: flex; flex-direction: column; gap: var(--space-1); }
+    .tx-head { display: flex; align-items: center; gap: var(--space-1-5); }
+    .tx-head .time { font: var(--font-size-caption)/14px var(--font-family-mono); color: var(--color-text-tertiary); }
+    .tx-head .play { margin-left: auto; }
+    .tx p { margin: 0; font-size: var(--font-size-body); line-height: var(--font-line-height-body); }
+    .tx .instr { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+    .tx.new { box-shadow: inset 2px 0 0 var(--color-accent-default); }
+    .sep-new { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3); }
+    .sep-new::before, .sep-new::after { content: ""; flex: 1; height: 1px; background: var(--color-border-default); }
+
+
+    /* states, chosen by the address: ?vue=par, ?fiche=timeline, ?journal */
+    .list-body { display: contents; }
+    .par-view, .card, .journal, .only-journal { display: none; }
+    .s-par .par-view { display: flex; }
+    .s-par .radar-on { background: transparent; color: var(--color-text-secondary); }
+    .s-par .par-on { background: var(--color-surface-selected); color: var(--color-accent-strong); }
+    .s-par .map svg.sky, .s-par .thread-pop, .s-par .map .note-pin.radar { display: none; }
+    .s-card .card { display: flex; }
+    .s-card .list-body { display: none; }
+    .s-journal .journal { display: flex; }
+    .s-journal .only-journal { display: grid; }
+    .only-journal-svg { display: none; }
+    .s-journal .only-journal-svg { display: inline; }
+    .s-journal .thread-pop { display: none; }
+    .s-journal .bell .counter { background: var(--color-status-urgent-fill); color: var(--color-text-on-urgent); box-shadow: 0 0 0 1px var(--color-status-urgent); }
+
+    .par-view { position: absolute; inset: 52px var(--space-3) var(--space-3); flex-direction: column; gap: var(--space-2); }
+    .par-head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+    .par-frame { border: 1px solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-surface-page); }
+    .par-frame-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1-5) var(--space-3); border-bottom: 1px solid var(--color-border-subtle); }
+    .tag { font: var(--font-weight-strong) var(--font-size-caption)/16px var(--font-family-mono); padding: 0 var(--space-1); border-radius: var(--radius-sm); border: 1px solid var(--color-accent-default); color: var(--color-accent-strong); background: var(--color-surface-selected); }
+    .seq { width: 100%; border-collapse: collapse; }
+    .seq th { text-align: left; font-weight: var(--font-weight-regular); padding: var(--space-1) var(--space-3); border-bottom: 1px solid var(--color-border-subtle); }
+    .seq td { padding: var(--space-1) var(--space-3); border-bottom: 1px solid var(--color-border-subtle); font: var(--font-size-small)/var(--font-line-height-small) var(--font-family-mono); }
+    .seq td.r, .seq th.r { text-align: right; }
+    .par-frame.folded .par-frame-head { border-bottom: 0; }
+
+    .card { flex-direction: column; min-height: 0; flex: 1; }
+    .card-head { padding: var(--space-3); border-bottom: 1px solid var(--color-border-default); display: flex; flex-direction: column; gap: var(--space-2); }
+    .card-title { display: flex; align-items: center; gap: var(--space-2); }
+    .card-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); }
+    .card-keys > div { display: flex; flex-direction: column; }
+    .card-keys .v { font: var(--font-size-body)/20px var(--font-family-mono); }
+    .card .tabs { padding: 0 var(--space-3); }
+    .tl { padding: var(--space-2) 0; overflow: hidden; }
+    .tl-item { display: grid; grid-template-columns: 64px 20px 1fr; column-gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border-subtle); }
+    .tl-item .time { font: var(--font-size-caption)/20px var(--font-family-mono); color: var(--color-text-tertiary); }
+    .tl-item svg { width: 14px; height: 14px; margin-top: 3px; color: var(--color-text-secondary); }
+    .tl-item .body { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+    .tl-item .body p { margin: 0; font-size: var(--font-size-body); line-height: var(--font-line-height-body); }
+    .tl-item .row { display: flex; align-items: center; gap: var(--space-1-5); flex-wrap: wrap; }
+
+    .journal { position: absolute; top: 52px; left: var(--space-3); width: 400px; flex-direction: column; z-index: var(--z-popover); }
+    .ev { display: grid; grid-template-columns: 64px 1fr; column-gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border-subtle); }
+    .ev .time { font: var(--font-size-caption)/20px var(--font-family-mono); color: var(--color-text-tertiary); }
+    .ev .body { display: flex; flex-direction: column; gap: var(--space-1); }
+    .ev p { margin: 0; font-size: var(--font-size-small); line-height: var(--font-line-height-small); }
+    .ev.urgent { background: var(--color-surface-urgent); box-shadow: inset 2px 0 0 var(--color-status-urgent); }
+    .strip.urgent { background: var(--color-surface-urgent); box-shadow: inset 0 0 0 1px var(--color-status-urgent); }
+
+    .notes { width: 1440px; padding: var(--space-6) 0; color: var(--color-text-secondary); font-size: var(--font-size-body); line-height: var(--font-line-height-body); }
+    .notes h2 { font-size: var(--font-size-title); color: var(--color-text-primary); }
+    .notes ol { padding-left: 1.4em; }
+    .notes li { margin-bottom: var(--space-2); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+    <symbol id="i-gear" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M4 11V7a4 4 0 0 1 8 0v4l1.5 1.5h-11L4 11ZM6.5 14h3"/></symbol>
+    <symbol id="i-spk" viewBox="0 0 16 16"><path fill="currentColor" d="M2 6h3l4-3v10L5 10H2z"/><path fill="none" stroke="currentColor" stroke-width="1.5" d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6 6 0 0 1 0 9"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 16 16"><path fill="currentColor" d="M2 6h3l4-3v10L5 10H2z"/><path fill="none" stroke="currentColor" stroke-width="1.5" d="m11 6 4 4m0-4-4 4"/></symbol>
+    <symbol id="i-thread" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></symbol>
+    <symbol id="i-play" viewBox="0 0 16 16"><path fill="currentColor" d="M5 3.5v9l7-4.5z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="m4 4 8 8m0-8-8 8"/></symbol>
+    <symbol id="i-radio" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M8 9.5v4M5.5 6.5a3.5 3.5 0 0 1 5 0M3.5 4.5a6.4 6.4 0 0 1 9 0"/><circle cx="8" cy="8.5" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-search" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M7 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Zm3.2 7.7 3.3 3.3"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="m4 10 4-4 4 4"/></symbol>
+    <defs><path id="i-plane" d="M0-7 1.3-2 6 0.5v1.6L1.3 1 0.9 4.6 2.6 6v1.2L0 6.4l-2.6.8V6l1.7-1.4-.4-3.6L-6 2.1V.5L-1.3-2Z"/></defs>
+</svg>
+
+<div class="frame" id="frame">
+    <!-- ======================================================== MAP -->
+    <div class="map">
+        <svg class="sky" viewBox="0 0 960 820" width="960" height="820">
+            <!-- range rings: tertiary, the map stays quiet -->
+            <g fill="none" stroke="var(--color-border-default)" stroke-width="1">
+                <circle cx="470" cy="420" r="110"/><circle cx="470" cy="420" r="220"/><circle cx="470" cy="420" r="380"/>
+            </g>
+            <g font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-tertiary)" text-anchor="middle">
+                <text x="470" y="304">5 NM</text><text x="470" y="194">10 NM</text><text x="470" y="34">20 NM</text>
+            </g>
+            <!-- schematic airfields (invented geometry) -->
+            <g stroke="var(--color-text-secondary)" stroke-width="3" stroke-linecap="round">
+                <line x1="432" y1="430" x2="508" y2="414"/>
+                <line x1="690" y1="170" x2="790" y2="150"/><line x1="696" y1="190" x2="796" y2="170"/>
+                <line x1="560" y1="660" x2="640" y2="630"/>
+            </g>
+            <g font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-secondary)">
+                <text x="512" y="436">LFPZ</text><text x="800" y="186">LFPG</text><text x="646" y="650">LFPO</text>
+            </g>
+            <!-- extended centreline of the runway in use at LFPG, dashed -->
+            <line x1="590" y1="190" x2="690" y2="170" stroke="var(--color-phase-arrival)" stroke-width="1" stroke-dasharray="4 4" opacity=".6"/>
+
+            <!-- aircraft: icon = altitude ramp (no hue), label = phase family -->
+            <!-- selected: AFR47KX, arrival, low -->
+            <g transform="translate(600 196) rotate(78)">
+                <circle r="13" fill="none" stroke="var(--color-accent-default)" stroke-width="2"/>
+                <use href="#i-plane" fill="var(--color-altitude-dark-low)"/>
+            </g>
+            <line x1="600" y1="196" x2="470" y2="222" stroke="var(--color-accent-default)" stroke-width="1.5" opacity=".7"/>
+            <g transform="translate(616 206)">
+                <rect width="138" height="34" rx="4" fill="#0a0a0ad9" stroke="var(--color-accent-default)"/>
+                <text class="ac-label" x="7" y="14"><tspan fill="var(--color-phase-arrival)" font-weight="600">APP</tspan><tspan fill="var(--color-text-primary)" font-weight="600"> AFR47KX</tspan><tspan fill="var(--color-text-secondary)"> A320</tspan></text>
+                <text class="ac-label" x="7" y="28" fill="var(--color-text-secondary)">2 400 ft ↓ · 158 kt</text>
+            </g>
+            <!-- arrival behind -->
+            <g transform="translate(470 252) rotate(80)"><use href="#i-plane" fill="var(--color-altitude-dark-mid)"/></g>
+            <g transform="translate(486 262)"><rect width="128" height="34" rx="4" fill="#0a0a0ad9"/>
+                <text class="ac-label" x="7" y="14"><tspan fill="var(--color-phase-arrival)" font-weight="600">ARR</tspan><tspan fill="var(--color-text-primary)"> EZY82QT</tspan><tspan fill="var(--color-text-secondary)"> A21N</tspan></text>
+                <text class="ac-label" x="7" y="28" fill="var(--color-text-secondary)">FL 070 ↓ · 241 kt</text></g>
+            <!-- departure from LFPO -->
+            <g transform="translate(560 560) rotate(-35)"><use href="#i-plane" fill="var(--color-altitude-dark-low)"/></g>
+            <g transform="translate(574 520)"><rect width="128" height="34" rx="4" fill="#0a0a0ad9"/>
+                <text class="ac-label" x="7" y="14"><tspan fill="var(--color-phase-departure)" font-weight="600">CLB</tspan><tspan fill="var(--color-text-primary)"> TVF61WB</tspan><tspan fill="var(--color-text-secondary)"> B738</tspan></text>
+                <text class="ac-label" x="7" y="28" fill="var(--color-text-secondary)">5 800 ft ↑ · 212 kt</text></g>
+            <!-- take-off right now: filled badge -->
+            <g transform="translate(628 640) rotate(-70)"><use href="#i-plane" fill="var(--color-altitude-dark-very-low)"/></g>
+            <g transform="translate(560 676)"><rect width="122" height="34" rx="4" fill="#0a0a0ad9"/>
+                <rect x="5" y="4" width="28" height="13" rx="2" fill="var(--color-phase-departure)"/>
+                <text class="ac-label" x="8" y="14"><tspan fill="var(--color-text-on-warn)" font-weight="600">T/O</tspan><tspan fill="var(--color-text-primary)" dx="6"> AFR19ME</tspan></text>
+                <text class="ac-label" x="7" y="28" fill="var(--color-text-secondary)">300 ft ↑ · 148 kt</text></g>
+            <!-- cruise overflights: dim icons, short labels -->
+            <g transform="translate(190 150) rotate(120)"><use href="#i-plane" fill="var(--color-altitude-dark-cruise)"/></g>
+            <g transform="translate(204 152)"><rect width="112" height="20" rx="4" fill="#0a0a0ad9"/>
+                <text class="ac-label" x="7" y="14"><tspan fill="var(--color-phase-cruise)" font-weight="600">CRZ</tspan><tspan fill="var(--color-text-secondary)"> DLH6TA FL370</tspan></text></g>
+            <g transform="translate(300 640) rotate(200)"><use href="#i-plane" fill="var(--color-altitude-dark-cruise)"/></g>
+            <g transform="translate(314 640)"><rect width="112" height="20" rx="4" fill="#0a0a0ad9"/>
+                <text class="ac-label" x="7" y="14"><tspan fill="var(--color-phase-cruise)" font-weight="600">CRZ</tspan><tspan fill="var(--color-text-secondary)"> RYR4QM FL390</tspan></text></g>
+            <g transform="translate(820 470) rotate(260)"><use href="#i-plane" fill="var(--color-altitude-dark-high)"/></g>
+            <g transform="translate(834 470)"><rect width="104" height="20" rx="4" fill="#0a0a0ad9"/>
+                <text class="ac-label" x="7" y="14"><tspan fill="var(--color-phase-departure)" font-weight="600">DEP</tspan><tspan fill="var(--color-text-secondary)"> BAW3HP FL210</tspan></text></g>
+            <!-- light aircraft near the reference field -->
+            <g transform="translate(400 380) rotate(30)"><use href="#i-plane" fill="var(--color-altitude-dark-very-low)" transform="scale(.8)"/></g>
+            <g transform="translate(330 352)"><rect width="104" height="20" rx="4" fill="#0a0a0ad9"/>
+                <text class="ac-label" x="7" y="14"><tspan fill="var(--color-phase-arrival)" font-weight="600">ARR</tspan><tspan fill="var(--color-text-primary)"> F-GXQA</tspan><tspan fill="var(--color-text-secondary)"> DR40</tspan></text></g>
+            <g transform="translate(452 440)"><use href="#i-plane" fill="var(--color-altitude-dark-very-low)" transform="scale(.8)"/></g>
+            <g transform="translate(372 452)"><rect width="74" height="20" rx="4" fill="#0a0a0ad9"/>
+                <text class="ac-label" x="7" y="14"><tspan fill="var(--color-phase-ground)" font-weight="600">TAX</tspan><tspan fill="var(--color-text-primary)"> F-HBZC</tspan></text></g>
+            <!-- emergency (?journal) -->
+            <g class="only-journal-svg">
+                <g transform="translate(760 70) rotate(204)"><circle r="12" fill="none" stroke="var(--color-status-urgent)" stroke-width="2"/><use href="#i-plane" fill="var(--color-altitude-dark-mid)"/></g>
+                <g transform="translate(776 80)"><rect width="150" height="34" rx="4" fill="#0a0a0ad9" stroke="var(--color-status-urgent)"/>
+                    <rect x="5" y="4" width="40" height="13" rx="2" fill="var(--color-status-urgent-fill)" stroke="var(--color-status-urgent)"/>
+                    <text class="ac-label" x="9" y="14"><tspan fill="var(--color-text-on-urgent)" font-weight="600">7700</tspan><tspan fill="var(--color-text-primary)" font-weight="600" dx="8">AFR6TZ</tspan></text>
+                    <text class="ac-label" x="7" y="28" fill="var(--color-text-secondary)">FL 110 ↓ · 286 kt</text></g>
+            </g>
+            <!-- no information yet -->
+            <g transform="translate(110 520) rotate(60)"><use href="#i-plane" fill="var(--color-altitude-dark-high)"/></g>
+            <g transform="translate(124 520)"><rect width="96" height="20" rx="4" fill="#0a0a0ad9"/>
+                <text class="ac-label" x="7" y="14"><tspan fill="var(--color-phase-unknown)" font-weight="600">NEW</tspan><tspan fill="var(--color-text-secondary)"> 3c4b21</tspan></text></g>
+        </svg>
+
+        <div class="map-top-left">
+            <button class="btn btn-icon" title="Settings"><svg><use href="#i-gear"/></svg></button>
+            <button class="btn btn-icon bell" title="Event log"><svg><use href="#i-bell"/></svg><span class="counter">2</span></button>
+        </div>
+        <div class="map-top">
+            <div class="seg">
+                <button class="on radar-on">Radar</button>
+                <span class="seg-sep"></span>
+                <span class="seg-title">PAR</span>
+                <button>LFPZ</button><button class="par-on">LFPG</button><button>LFPO</button>
+            </div>
+        </div>
+        <div class="map-bottom-right"><button class="btn btn-quiet">Map layers <svg width="12" height="12"><use href="#i-chev"/></svg></button></div>
+
+
+        <!-- ======================================================== PAR (?vue=par) -->
+        <div class="par-view">
+            <div class="par-head">
+                <span class="t-title"><span class="mono">LFPG</span> Charles de Gaulle</span>
+                <span class="t-small c2">Runway in use <span class="mono c1 strong">26L</span> <span class="c3">(judge, 100 %)</span></span>
+                <span class="t-small c2"><span class="help">QNH</span> <span class="mono c1">1018</span> <span class="c3">hPa, from ADS-B</span></span>
+                <span class="t-small c2"><span class="help">TA</span> <span class="mono c1">5000 ft</span> · <span class="help">TL</span> <span class="mono c1">FL 060</span></span>
+                <button class="btn" style="margin-left:auto">Approach chart</button>
+            </div>
+            <div class="par-frame">
+                <div class="par-frame-head"><span class="t-small strong mono">26L ← 08R</span><span class="tag">IN USE</span><span class="t-caption c3">3 arrivals · 1 departure</span><button class="btn btn-icon" style="margin-left:auto" title="Fold"><svg><use href="#i-chev"/></svg></button></div>
+                <svg viewBox="0 0 930 330" width="930" height="330" style="display:block">
+                    <!-- flight-level grid -->
+                    <g stroke="var(--color-border-subtle)" stroke-width="1">
+                        <line x1="60" y1="40" x2="910" y2="40"/><line x1="60" y1="84" x2="910" y2="84"/><line x1="60" y1="128" x2="910" y2="128"/><line x1="60" y1="172" x2="910" y2="172"/><line x1="60" y1="216" x2="910" y2="216"/>
+                    </g>
+                    <g font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-tertiary)" text-anchor="end">
+                        <text x="54" y="44">FL 120</text><text x="54" y="88">FL 100</text><text x="54" y="132">FL 080</text><text x="54" y="176">6000</text><text x="54" y="220">4000</text><text x="54" y="264">2000</text>
+                    </g>
+                    <!-- transition altitude -->
+                    <line x1="60" y1="194" x2="910" y2="194" stroke="var(--color-status-warn)" stroke-dasharray="6 4" opacity=".55"/>
+                    <text x="64" y="190" font-family="var(--font-family-mono)" font-size="11" fill="var(--color-status-warn)">TA 5000</text>
+                    <!-- glide path 3° and the 7° limit -->
+                    <line x1="680" y1="304" x2="80" y2="164" stroke="var(--color-accent-default)" stroke-width="1.5" stroke-dasharray="5 4"/>
+                    <text x="190" y="184" font-family="var(--font-family-mono)" font-size="11" fill="var(--color-accent-default)">3°</text>
+                    <line x1="680" y1="304" x2="380" y2="40" stroke="var(--color-border-default)" stroke-dasharray="2 4"/>
+                    <!-- ground and runway -->
+                    <line x1="60" y1="304" x2="910" y2="304" stroke="var(--color-border-control)"/>
+                    <rect x="680" y="300" width="44" height="8" fill="var(--color-text-secondary)"/>
+                    <g font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-tertiary)" text-anchor="middle">
+                        <text x="80" y="322">20 NM</text><text x="230" y="322">15</text><text x="380" y="322">10</text><text x="530" y="322">5</text><text x="680" y="322" fill="var(--color-text-primary)" font-weight="600">26L</text><text x="724" y="322" fill="var(--color-text-secondary)">08R</text><text x="874" y="322">5 NM</text>
+                    </g>
+                    <!-- aircraft: chevron in the family colour, label as on the map -->
+                    <g transform="translate(494 252)"><circle r="9" fill="none" stroke="var(--color-accent-default)" stroke-width="2"/><path d="M-5-4 5 0-5 4Z" fill="var(--color-phase-arrival)"/></g>
+                    <g transform="translate(470 214)"><rect width="134" height="30" rx="4" fill="#0a0a0ad9" stroke="var(--color-accent-default)"/>
+                        <text x="6" y="13" font-family="var(--font-family-mono)" font-size="11"><tspan fill="var(--color-phase-arrival)" font-weight="600">APP</tspan><tspan fill="var(--color-text-primary)" font-weight="600"> AFR47KX</tspan></text>
+                        <text x="6" y="26" font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-secondary)">2 400 ft ↓ · 6.2 NM</text></g>
+                    <g transform="translate(260 150)"><path d="M-5-4 5 0-5 4Z" fill="var(--color-phase-arrival)"/></g>
+                    <g transform="translate(232 112)"><rect width="134" height="30" rx="4" fill="#0a0a0ad9"/>
+                        <text x="6" y="13" font-family="var(--font-family-mono)" font-size="11"><tspan fill="var(--color-phase-arrival)" font-weight="600">ARR</tspan><tspan fill="var(--color-text-primary)"> EZY82QT</tspan></text>
+                        <text x="6" y="26" font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-secondary)">FL 070 ↓ → 4000</text></g>
+                    <g transform="translate(185 120)"><path d="M-5-4 5 0-5 4Z" fill="var(--color-phase-arrival)"/></g>
+                    <g transform="translate(100 74)"><rect width="122" height="30" rx="4" fill="#0a0a0ad9"/>
+                        <text x="6" y="13" font-family="var(--font-family-mono)" font-size="11"><tspan fill="var(--color-phase-arrival)" font-weight="600">ARR</tspan><tspan fill="var(--color-text-primary)"> DLH9KR</tspan></text>
+                        <text x="6" y="26" font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-secondary)">FL 085 ↓</text></g>
+                    <g transform="translate(812 238) rotate(-12)"><path d="M-5-4 5 0-5 4Z" fill="var(--color-phase-departure)"/></g>
+                    <g transform="translate(760 200)"><rect width="128" height="30" rx="4" fill="#0a0a0ad9"/>
+                        <text x="6" y="13" font-family="var(--font-family-mono)" font-size="11"><tspan fill="var(--color-phase-departure)" font-weight="600">CLB</tspan><tspan fill="var(--color-text-primary)"> AFR52PB</tspan></text>
+                        <text x="6" y="26" font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-secondary)">2 900 ft ↑</text></g>
+                </svg>
+                <svg viewBox="0 0 930 64" width="930" height="64" style="display:block; border-top: 1px solid var(--color-border-subtle)">
+                    <text x="54" y="36" font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-tertiary)" text-anchor="end">AZ</text>
+                    <line x1="60" y1="32" x2="910" y2="32" stroke="var(--color-accent-default)" stroke-dasharray="5 4" opacity=".7"/>
+                    <path d="M680 32 60 4M680 32 60 60" stroke="var(--color-border-default)" fill="none" stroke-dasharray="2 4"/>
+                    <rect x="680" y="29" width="44" height="6" fill="var(--color-text-secondary)"/>
+                    <g transform="translate(494 34)"><circle r="7" fill="none" stroke="var(--color-accent-default)" stroke-width="2"/><path d="M-4-3 4 0-4 3Z" fill="var(--color-phase-arrival)"/></g>
+                    <path transform="translate(260 22)" d="M-4-3 4 0-4 3Z" fill="var(--color-phase-arrival)"/>
+                    <path transform="translate(185 44)" d="M-4-3 4 0-4 3Z" fill="var(--color-phase-arrival)"/>
+                    <path transform="translate(812 26)" d="M-4-3 4 0-4 3Z" fill="var(--color-phase-departure)"/>
+                </svg>
+                <table class="seq">
+                    <thead><tr><th class="label">Arrivals to 26L</th><th class="label r">To threshold</th><th class="label r">Time · ETA</th><th class="label r">Behind the one ahead</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="c3">1</span> <span class="c1 strong">AFR47KX</span> <span class="c3">A320</span></td><td class="r">6.2 NM</td><td class="r">2:21 · 13:15:41Z</td><td class="r c3">first</td></tr>
+                        <tr><td><span class="c3">2</span> <span class="c1 strong">EZY82QT</span> <span class="c3">A21N</span></td><td class="r">14.0 NM</td><td class="r">3:29 · 13:16:49Z</td><td class="r">+7.8 NM · +1:08</td></tr>
+                        <tr><td><span class="c3">3</span> <span class="c1 strong">DLH9KR</span> <span class="c3">A20N</span></td><td class="r">16.5 NM</td><td class="r">4:32 · 13:17:52Z</td><td class="r c-warn">▲ +2.5 NM · +1:03</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="par-frame folded">
+                <div class="par-frame-head"><span class="t-small strong mono">27R ← 09L</span><span class="t-caption c3">1 arrival</span><button class="btn btn-icon" style="margin-left:auto; transform: rotate(180deg)" title="Unfold"><svg><use href="#i-chev"/></svg></button></div>
+            </div>
+            <span class="note-pin" style="left: 560px; top: 610px">5</span>
+        </div>
+
+        <!-- ======================================================== JOURNAL (?journal) -->
+        <div class="raised journal">
+            <div class="panel-head"><span class="t-small strong">Event log</span><span class="t-caption c3">5 · 2 unread</span><button class="btn btn-quiet" style="margin-left:auto">Sounds…</button><button class="btn btn-icon" title="Close"><svg><use href="#i-close"/></svg></button></div>
+            <div class="ev urgent"><span class="time">13:12:58</span><div class="body"><div class="row" style="display:flex;gap:6px;align-items:center"><span class="urgent-badge">■ 7700</span><span class="chip callsign">AFR6TZ</span></div><p><b>General emergency</b> squawked, FL 110, 18 NM north-east.</p><div><button class="btn">Show on the map</button></div></div></div>
+            <div class="ev" style="background: var(--color-surface-warn); box-shadow: inset 2px 0 0 var(--color-status-warn)"><span class="time">13:09:14</span><div class="body"><div style="display:flex;gap:6px;align-items:center"><span class="light warn" style="color: var(--color-status-warn)">go-around</span><span class="chip callsign">EZY14LM</span></div><p>Went around on runway 27R at LFPG, climbing through 1 800 ft.</p></div></div>
+            <div class="ev"><span class="time">13:05:40</span><div class="body"><span class="label">Runway change</span><p>LFPG lands on <span class="mono strong">26L</span> now (was 08R), judged on 4 arrivals.</p></div></div>
+            <div class="ev"><span class="time">12:58:02</span><div class="body"><span class="light warn">Transcription degraded</span><p>The French second reading is not answering; English lines still arrive.</p></div></div>
+            <div class="ev"><span class="time">12:40:11</span><div class="body"><span class="light ok">Station</span><p>On air: 124.350 + 126.425, chosen at the station.</p></div></div>
+            <span class="note-pin" style="right: -9px; top: 60px">6</span>
+        </div>
+
+        <!-- thread of 124.350, open -->
+        <div class="raised thread-pop">
+            <div class="panel-head">
+                <span class="t-small strong">124.350 Approche De Gaulle</span>
+                <span class="light ok" style="margin-left:auto">listening</span>
+                <button class="btn btn-icon" title="Close"><svg><use href="#i-close"/></svg></button>
+            </div>
+            <div style="padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border-subtle)">
+                <input class="input" placeholder="Search this frequency…">
+            </div>
+            <div style="overflow:hidden">
+                <div class="tx">
+                    <div class="tx-head"><span class="time">13:11:52</span><span class="chip atc">ATC</span><span class="c3">→</span><span class="chip callsign">EZY82QT</span><span class="strength s3" title="Strong clues"><i></i><i></i><i></i></span><button class="btn btn-icon play" title="Play"><svg><use href="#i-play"/></svg></button></div>
+                    <p>Easy eight two Quebec Tango, descend flight level seven zero, turn left heading two seven zero.</p>
+                    <div class="instr"><span class="chip instr">Descend to FL 070</span><span class="chip instr">Turn left heading 270</span></div>
+                </div>
+                <div class="tx">
+                    <div class="tx-head"><span class="time">13:12:04</span><span class="chip callsign">EZY82QT</span><span class="strength s3"><i></i><i></i><i></i></span><button class="btn btn-icon play" title="Play"><svg><use href="#i-play"/></svg></button></div>
+                    <p>Down to seven zero, left two seven zero, Easy eight two Quebec Tango.</p>
+                </div>
+                <div class="sep-new"><span class="label">new</span></div>
+                <div class="tx new" lang="fr">
+                    <div class="tx-head"><span class="time">13:12:31</span><span class="chip atc">ATC</span><span class="c3">→</span><span class="chip callsign">AFR47KX</span><span class="strength s2" title="Medium clues"><i></i><i></i><i></i></span><button class="btn btn-icon play" title="Play"><svg><use href="#i-play"/></svg></button></div>
+                    <p>Air France quatre sept Kilo X-ray, autorisé ILS piste deux six gauche, contactez la tour un deux zéro décimal six cinq.</p>
+                    <div class="instr"><span class="chip instr clr">Cleared ILS runway 26L</span><span class="chip instr">Contact 120.650</span></div>
+                </div>
+                <div class="tx new" lang="fr">
+                    <div class="tx-head"><span class="time">13:12:39</span><span class="chip callsign away" title="Out of range">AFR6TZ</span><span class="strength s1" title="Weak clues"><i></i><i></i><i></i></span><button class="btn btn-icon play" title="Play"><svg><use href="#i-play"/></svg></button></div>
+                    <p>Un deux zéro six cinq, Air France six Tango Zoulou, au revoir.</p>
+                </div>
+            </div>
+        </div>
+        <span class="note-pin radar" style="left: 380px; top: 640px">1</span>
+        <span class="note-pin radar" style="left: 640px; top: 250px">4</span>
+    </div>
+
+    <!-- ======================================================== LIST -->
+    <aside class="list">
+        <div class="list-body">
+        <div class="panel-head" style="background:transparent">
+            <span class="t-title">Traffic</span>
+            <span class="t-caption c3 num" style="margin-left:auto">107 airborne · 3 on the ground</span>
+        </div>
+        <div class="list-tools">
+            <div style="position:relative">
+                <input class="input" placeholder="Callsign, registration, type…" style="padding-left: 26px">
+                <svg width="14" height="14" style="position:absolute; left:7px; top:5px; color: var(--color-text-tertiary)"><use href="#i-search"/></svg>
+            </div>
+            <div>
+                <div class="alt-head"><span class="label">Altitude</span><span class="t-small num"><span class="help">SFC</span> – FL 195 <span class="c3">· 64 of 107</span></span></div>
+                <div class="histo">
+                    <i class="in" style="height:40%"></i><i class="in" style="height:70%"></i><i class="in" style="height:55%"></i><i class="in" style="height:30%"></i><i class="in" style="height:45%"></i><i class="in" style="height:60%"></i><i class="in" style="height:35%"></i><i class="in" style="height:50%"></i><i class="in" style="height:25%"></i><i style="height:40%"></i><i style="height:65%"></i><i style="height:90%"></i><i style="height:100%"></i><i style="height:75%"></i><i style="height:30%"></i><i style="height:10%"></i>
+                </div>
+                <div class="slider"><div class="rail"></div><div class="fill" style="left:0; width:56%"></div><div class="thumb" style="left:0%"></div><div class="thumb" style="left:56%"></div></div>
+                <div class="alt-marks t-caption c3 num"><span>SFC</span><span class="help">TA 5000</span><span>FL 100</span><span>FL 195</span><span>FL 300</span><span>∞</span></div>
+            </div>
+            <div class="row-of">
+                <button class="toggle on">Air <span class="count">107</span></button>
+                <button class="toggle on">Ground <span class="count">3</span></button>
+                <button class="toggle">Heard on the radio <span class="count">12</span></button>
+            </div>
+            <div class="row-of">
+                <button class="toggle on"><span class="dot gnd"></span>Ground <span class="count">3</span></button>
+                <button class="toggle on"><span class="dot dep"></span>Departure <span class="count">18</span></button>
+                <button class="toggle on"><span class="dot crz"></span>Cruise <span class="count">61</span></button>
+                <button class="toggle on"><span class="dot arr"></span>Arrival <span class="count">21</span></button>
+                <button class="toggle"><span class="dot unk"></span>Unknown <span class="count">7</span></button>
+            </div>
+        </div>
+        <div class="list-tabs">
+            <div class="tabs"><button class="on">Active <span class="c3 num">110</span></button><button>Signal lost <span class="c3 num">22</span></button></div>
+            <button class="btn btn-quiet">Sort: distance <svg width="12" height="12" style="transform:rotate(180deg)"><use href="#i-chev"/></svg></button>
+        </div>
+        <div class="rows">
+            <div class="strip urgent only-journal" style="--fam: var(--color-phase-arrival)">
+                <span class="phase arr">ARR</span>
+                <div class="cell"><span class="v cs">AFR6TZ</span><span class="s">A319 · Air France</span></div>
+                <div class="cell r"><span class="v">FL 110 ↓</span><span class="s">−2 400 ft/min</span></div>
+                <div class="cell r"><span class="v">204°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">286</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">18.0</span><span class="s">NM</span></div>
+                <span class="urgent-badge">7700</span>
+            </div>
+            <div class="strip sel" style="--fam: var(--color-phase-arrival)">
+                <span class="phase arr">APP</span>
+                <div class="cell"><span class="v cs">AFR47KX</span><span class="s">A320 · Air France</span></div>
+                <div class="cell r"><span class="v">2 400<span class="unit">ft</span> ↓</span><span class="s">−900 ft/min</span></div>
+                <div class="cell r"><span class="v">262°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">158</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">6.2</span><span class="s">NM</span></div>
+                <span class="heard"><svg><use href="#i-radio"/></svg>8 s</span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-departure)">
+                <span class="phase fill dep">T/O</span>
+                <div class="cell"><span class="v cs">AFR19ME</span><span class="s">A21N · Air France</span></div>
+                <div class="cell r"><span class="v">300<span class="unit">ft</span> ↑</span><span class="s">+2 100 ft/min</span></div>
+                <div class="cell r"><span class="v">062°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">148</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">9.8</span><span class="s">NM</span></div>
+                <span></span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-arrival)">
+                <span class="phase arr">ARR</span>
+                <div class="cell"><span class="v cs">F-GXQA</span><span class="s">DR40</span></div>
+                <div class="cell r"><span class="v">1 600<span class="unit">ft</span> ↔</span><span class="s">level</span></div>
+                <div class="cell r"><span class="v">208°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">92</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">2.4</span><span class="s">NM</span></div>
+                <span class="heard"><svg><use href="#i-radio"/></svg>41 s</span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-ground)">
+                <span class="phase gnd">TAX</span>
+                <div class="cell"><span class="v cs">F-HBZC</span><span class="s">C172</span></div>
+                <div class="cell r"><span class="v">GND</span><span class="s">LFPZ</span></div>
+                <div class="cell r"><span class="v">—</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">12</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">0.8</span><span class="s">NM</span></div>
+                <span></span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-arrival)">
+                <span class="phase arr">ARR</span>
+                <div class="cell"><span class="v cs">EZY82QT</span><span class="s">A21N · easyJet</span></div>
+                <div class="cell r"><span class="v">FL 070 ↓</span><span class="s">−1 500 ft/min</span></div>
+                <div class="cell r"><span class="v">270°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">241</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">14.0</span><span class="s">NM</span></div>
+                <span class="heard"><svg><use href="#i-radio"/></svg>27 s</span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-departure)">
+                <span class="phase dep">CLB</span>
+                <div class="cell"><span class="v cs">TVF61WB</span><span class="s">B738 · Transavia France</span></div>
+                <div class="cell r"><span class="v">5 800<span class="unit">ft</span> ↑</span><span class="s">+1 800 ft/min</span></div>
+                <div class="cell r"><span class="v">214°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">212</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">15.3</span><span class="s">NM</span></div>
+                <span></span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-departure)">
+                <span class="phase dep">DEP</span>
+                <div class="cell"><span class="v cs">BAW3HP</span><span class="s">A320 · British Airways</span></div>
+                <div class="cell r"><span class="v">FL 210 ↑</span><span class="s">+1 200 ft/min</span></div>
+                <div class="cell r"><span class="v">318°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">388</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">22.7</span><span class="s">NM</span></div>
+                <span></span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-unknown)">
+                <span class="phase unk">NEW</span>
+                <div class="cell"><span class="v cs">3c4b21</span><span class="s">no callsign yet</span></div>
+                <div class="cell r"><span class="v">FL 160</span><span class="s">—</span></div>
+                <div class="cell r"><span class="v">—</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">—</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">31.0</span><span class="s">NM</span></div>
+                <span></span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-cruise)">
+                <span class="phase crz">CRZ</span>
+                <div class="cell"><span class="v cs">DLH6TA</span><span class="s">A20N · Lufthansa</span></div>
+                <div class="cell r"><span class="v">FL 370 ↔</span><span class="s">level</span></div>
+                <div class="cell r"><span class="v">208°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">462</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">33.1</span><span class="s">NM</span></div>
+                <span></span>
+            </div>
+            <div class="strip lost" style="--fam: var(--color-phase-cruise)">
+                <span class="phase crz">CRZ</span>
+                <div class="cell"><span class="v cs">RYR4QM</span><span class="s">B38M · lost 2 min ago</span></div>
+                <div class="cell r"><span class="v">FL 390</span><span class="s">last</span></div>
+                <div class="cell r"><span class="v">151°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">451</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">48.6</span><span class="s">NM</span></div>
+                <span></span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-cruise)">
+                <span class="phase crz">CRZ</span>
+                <div class="cell"><span class="v cs">UAE73R</span><span class="s">A388 · Emirates</span></div>
+                <div class="cell r"><span class="v">FL 380 ↔</span><span class="s">level</span></div>
+                <div class="cell r"><span class="v">121°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">488</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">52.4</span><span class="s">NM</span></div>
+                <span></span>
+            </div>
+            <div class="strip" style="--fam: var(--color-phase-cruise)">
+                <span class="phase crz">CRZ</span>
+                <div class="cell"><span class="v cs">KLM58C</span><span class="s">B738 · KLM</span></div>
+                <div class="cell r"><span class="v">FL 350 ↔</span><span class="s">level</span></div>
+                <div class="cell r"><span class="v">012°</span><span class="s">hdg</span></div>
+                <div class="cell r"><span class="v">470</span><span class="s">kt</span></div>
+                <div class="cell r"><span class="v">57.9</span><span class="s">NM</span></div>
+                <span></span>
+            </div>
+        </div>
+        <span class="note-pin" style="right: 452px; top: 412px; position:absolute">2</span>
+        </div>
+        <!-- ======================================================== AIRCRAFT CARD (?fiche=timeline) -->
+        <div class="card">
+            <div class="card-head">
+                <div class="card-title">
+                    <span class="phase arr">APP</span>
+                    <span class="t-display mono">AFR47KX</span>
+                    <span class="t-small c2">A320 · Air France · F-HEPC</span>
+                    <button class="btn btn-quiet" style="margin-left:auto">Back to the list</button>
+                    <button class="btn btn-icon" title="Close (Esc)"><svg><use href="#i-close"/></svg></button>
+                </div>
+                <div class="card-keys">
+                    <div><span class="label">Altitude</span><span class="v">2 400<span class="unit">ft</span> ↓</span></div>
+                    <div><span class="label">Heading</span><span class="v">262°</span></div>
+                    <div><span class="label">Ground speed</span><span class="v">158<span class="unit">kt</span></span></div>
+                    <div><span class="label">To LFPG 26L</span><span class="v">6.2<span class="unit">NM</span></span></div>
+                </div>
+            </div>
+            <div class="tabs"><button class="on"><span class="help">Timeline</span></button><button>Details</button><button>Tracks <span class="c3 num">52</span></button></div>
+            <div style="position:relative">
+                <div class="bubble" style="left: 12px; top: 6px; width: 280px">
+                    <span class="label">Timeline</span>
+                    <p>This aircraft from first sight to now: its phases, the runways judged, and every transmission matched to its callsign today, on every frequency the station heard.</p>
+                </div>
+            </div>
+            <div class="tl" style="margin-top: 92px">
+                <div class="tl-item"><span class="time">12:51:07</span><svg><use href="#i-radio"/></svg><div class="body"><p class="c2">First seen by the receiver, FL 210, 61 NM north-east.</p></div></div>
+                <div class="tl-item"><span class="time">12:58:30</span><span class="dot arr" style="margin-top:6px"></span><div class="body"><div class="row"><span class="phase arr">ARR</span><span class="c2">Arrival, LFPG</span></div></div></div>
+                <div class="tl-item"><span class="time">13:04:12</span><svg><use href="#i-thread"/></svg><div class="body">
+                    <div class="row"><span class="chip atc">ATC</span><span class="c3">on</span><span class="mono c2">124.350</span><span class="strength s3"><i></i><i></i><i></i></span><button class="btn btn-icon" title="Play" style="margin-left:auto"><svg><use href="#i-play"/></svg></button></div>
+                    <p lang="fr">Air France quatre sept Kilo X-ray, descendez quatre mille pieds, QNH un zéro un huit.</p>
+                    <div class="row"><span class="chip instr">Descend to 4000 ft</span><span class="chip instr">QNH 1018</span></div></div></div>
+                <div class="tl-item"><span class="time">13:08:47</span><span class="dot arr" style="margin-top:6px"></span><div class="body"><div class="row"><span class="phase arr">APP</span><span class="c2">Approach, 12 NM from 26L</span></div></div></div>
+                <div class="tl-item"><span class="time">13:12:31</span><svg><use href="#i-thread"/></svg><div class="body">
+                    <div class="row"><span class="chip atc">ATC</span><span class="c3">on</span><span class="mono c2">124.350</span><span class="strength s2"><i></i><i></i><i></i></span><button class="btn btn-icon" title="Play" style="margin-left:auto"><svg><use href="#i-play"/></svg></button></div>
+                    <p lang="fr">Air France quatre sept Kilo X-ray, autorisé ILS piste deux six gauche, contactez la tour un deux zéro décimal six cinq.</p>
+                    <div class="row"><span class="chip instr clr">Cleared ILS runway 26L</span><span class="chip instr">Contact 120.650</span></div></div></div>
+                <div class="tl-item"><span class="time">13:12:31</span><span style="width:14px"></span><div class="body"><p class="c2">Handed to <span class="mono c1">120.650</span> Tour De Gaulle, <span class="c3">not heard by the station</span>.</p></div></div>
+            </div>
+            <span class="note-pin" style="right: 8px; top: 220px; position:absolute">7</span>
+        </div>
+    </aside>
+
+    <!-- ======================================================== RADIO BAR -->
+    <div class="radio">
+        <button class="btn all" title="Listen to all / mute all"><svg width="14" height="14"><use href="#i-spk"/></svg><span class="label" style="color:inherit">all</span></button>
+        <div class="tile on">
+            <div class="name"><svg class="c-accent"><use href="#i-spk"/></svg><span class="t-small strong">Approche De Gaulle</span></div>
+            <button class="btn btn-icon thread" title="Transcriptions" style="width:24px;height:24px"><svg><use href="#i-thread"/></svg></button>
+            <div class="meta"><span class="t-small num c2">124.350</span><span style="display:flex;gap:6px;align-items:center"><span class="t-caption num c3">8 s</span><span class="level"><i class="lit" style="height:4px"></i><i class="lit" style="height:7px"></i><i class="lit" style="height:10px"></i><i style="height:6px"></i></span></span></div>
+            <div class="vol"><div class="slider"><div class="rail"></div><div class="fill" style="left:0;width:70%"></div><div class="thumb" style="left:70%; width:10px; height:10px; margin-left:-5px"></div></div></div>
+            <span class="counter">2</span>
+        </div>
+        <div class="tile">
+            <div class="name"><svg class="c2"><use href="#i-mute"/></svg><span class="t-small c2">De Gaulle Approche (L)</span></div>
+            <button class="btn btn-icon thread" title="Transcriptions" style="width:24px;height:24px"><svg><use href="#i-thread"/></svg></button>
+            <div class="meta"><span class="t-small num c2">126.425</span><span style="display:flex;gap:6px;align-items:center"><span class="t-caption num c3">1 min</span><span class="level"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i><i style="height:6px"></i></span></span></div>
+            <div class="vol"><div class="slider"><div class="rail"></div><div class="fill" style="left:0;width:45%; background: var(--color-text-tertiary)"></div><div class="thumb" style="left:45%; width:10px; height:10px; margin-left:-5px; box-shadow:none; background: var(--color-text-secondary)"></div></div></div>
+        </div>
+        <div class="tile fail">
+            <div class="name"><svg class="c2"><use href="#i-mute"/></svg><span class="t-small c2">Orly Tour</span></div>
+            <span></span>
+            <div class="meta"><span class="t-small num c2">118.700</span><span class="light bad" style="color: var(--color-status-urgent)">failed</span></div>
+            <div class="vol" style="display:flex; justify-content:flex-end"><button class="btn" style="padding: 0 6px; font-size: var(--font-size-caption)">retry</button></div>
+        </div>
+
+        <div class="radio-right">
+            <div class="rwy"><span class="label">LFPG in use</span><span class="v">26L · 27R</span></div>
+            <div class="rwy"><span class="label">LFPO</span><span class="v">06</span></div>
+            <div class="lights">
+                <span class="light ok">Antenna: 124.350 + 126.425, 1 h 38</span>
+                <span class="light ok">Transcription</span>
+                <span class="light warn">ADS-B: 107, 41 msg/s</span>
+                <span class="light unknown">Weather</span>
+            </div>
+            <div class="clock"><span class="t-body num c-accent strong">13:13:20Z</span><span class="t-caption num c3">15:13 local</span></div>
+        </div>
+        <span class="note-pin" style="left: 520px; bottom: 54px">3</span>
+    </div>
+</div>
+
+<div class="notes" lang="fr">
+    <h2>À lire (hors interface)</h2>
+    <ol>
+        <li><b>Le fil d'une fréquence</b> : les transcriptions en police système à 14 px (ce sont des phrases), tout ce qui se compare en monospace (heure, indicatif, fréquence). Le locuteur se dit par la forme : « ATC » au trait, le pilote par la chip de son indicatif ; ni orange ni vert. Trois barres disent la force des indices, seule la force faible est ambre. Une ligne française porte <code>lang="fr"</code>. La clairance est la seule chip avec une coche et du gras.</li>
+        <li><b>La liste</b> : une ligne = 44 px, deux lignes de texte, valeurs à 14 px, unités à 11 px. La phase = un trait de 3 px et un badge de code, dans l'une des cinq couleurs de famille ; T/O et T/D en aplat. Choisi = surface verte opaque et contour vert, le même anneau vert que sur la carte. Signal perdu = valeurs en gris discret et les mots « lost 2 min ago », sans transparence. L'icône radio dit qui vient de parler. Cinq filtres de famille au lieu de dix boutons de phase.</li>
+        <li><b>La barre radio</b> : une fréquence écoutée a un contour et un niveau verts ; coupée, elle est grise ; en échec, elle le dit en rouge avec un carré et un mot, à pleine opacité, et propose de réessayer. Les voyants portent une forme et un mot en plus de la couleur. Les compteurs de non-lus sont verts ; ils ne passeraient au rouge que s'ils contenaient une urgence.</li>
+        <li><b>La carte</b> : la clarté de l'icône = l'altitude (près du sol = le plus clair), la couleur de l'étiquette = la famille de phase. Les survols en croisière sont sombres et courts. Cercles de distance et aérodromes en gris : la carte se tait, les avions parlent.</li>
+        <li><b>La vue PAR</b> (<code>?vue=par</code>) : mêmes couleurs de famille que la carte et la liste, même anneau vert pour l'avion choisi ; la pente de 3° en vert (c'est l'aide, la voix de l'outil), l'altitude de transition en ambre pointillé ; l'écart de moins de 3 NM avec l'avion précédent passe en ambre <b>avec</b> un triangle. Les sigles (QNH, TA, TL) portent leur bulle.</li>
+        <li><b>Le journal</b> (<code>?journal</code>) : l'urgence est la seule ligne en aplat rouge, avec carré, code et mot ; la cloche passe au rouge parce qu'elle contient une urgence ; dans la liste, la même ligne d'avion prend la surface d'urgence et le badge 7700. La remise des gaz est en ambre (attention), le reste se tait.</li>
+        <li><b>La fiche</b> (<code>?fiche=timeline</code>) : l'indicatif en grand, les quatre valeurs clés, puis la chronologie ; chaque transmission avec son locuteur, sa force d'indices, sa réécoute, son texte en police système et ses consignes en clair. Le texte d'explication de l'onglet est passé dans une bulle (montrée ouverte) ; il était à 10 px et 3,2:1.</li>
+    </ol>
+    <p class="c3">États : <a class="c-accent" href="?">radar</a> · <a class="c-accent" href="?vue=par">PAR</a> · <a class="c-accent" href="?fiche=timeline">fiche, Timeline</a> · <a class="c-accent" href="?journal">journal ouvert</a> · <a class="c-accent" href="?vue=par&amp;fiche=timeline">PAR et fiche</a>.</p>
+    <p class="c3">Construit uniquement avec <code>tokens.css</code> (produit depuis <code>jetons.json</code>) et <code>base.css</code>. Indicatifs, immatriculations et géométrie sont inventés.</p>
+</div>
+<script>
+    // The mock-up's states, from the address: ?vue=par, ?fiche=timeline, ?journal
+    const q = new URLSearchParams(location.search);
+    if (q.get('vue') === 'par') document.body.classList.add('s-par');
+    if (q.get('fiche')) document.body.classList.add('s-card');
+    if (q.has('journal')) document.body.classList.add('s-journal');
+    if (q.has('propre')) document.body.classList.add('mock-hidden-notes');
+</script>
+</body>
+</html>
