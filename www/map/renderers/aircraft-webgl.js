@@ -290,10 +290,18 @@
         return 'very-low';
     }
 
+    // The bright base maps are ign and osm; ign-dark, osm-dark and none (the aircraft
+    // on plain black, the default since 10/10) are dark. Testing "ends with dark" put
+    // the black background in the bright palette: cruise aircraft at 3.1:1 on black.
+    const BRIGHT_MAP_STYLES = ['ign', 'osm'];
+
+    function isBrightMapStyle(store) {
+        return BRIGHT_MAP_STYLES.includes((store?.settings?.mapStyle || 'none').toLowerCase());
+    }
+
     function getAltitudeBandColor(aircraft, store) {
         const band = getAltitudeColorBand(aircraft, store);
-        // ign-dark and osm-dark are dark maps; ign and osm are bright ones.
-        const isBrightMap = !(store?.settings?.mapStyle || 'dark').toLowerCase().endsWith('dark');
+        const isBrightMap = isBrightMapStyle(store);
 
         if (isBrightMap) {
             switch (band) {
@@ -512,20 +520,19 @@
             const isSelected = !!properties.selected;
             const isHovered = !!properties.hovered;
             const deemphasized = !!properties.deemphasized;
-            const currentMapStyle = (store?.settings?.mapStyle || 'dark').toLowerCase();
-            const isBrightMapStyle = !currentMapStyle.endsWith('dark');
+            const brightMap = isBrightMapStyle(store);
             const baseTextOpacity = deemphasized
-                ? (isBrightMapStyle ? 0.72 : 0.5)
-                : (isBrightMapStyle ? 1 : 0.9);
+                ? (brightMap ? 0.72 : 0.5)
+                : (brightMap ? 1 : 0.9);
             const textOpacity = baseTextOpacity * labelAgeFade;
             const labelLineOne = `${labelParts.phaseText || ''}${labelParts.callsignText || ''}${labelParts.typeText || ''}`;
             const labelLineTwo = `${labelParts.detailsText || ''}`;
             const longestLabelLineLength = Math.max(labelLineOne.length, labelLineTwo.length);
             const estimatedLabelWidthPx = Math.max(72, Math.round(longestLabelLineLength * 6.4) + 12);
-            const labelBorderColor = isBrightMapStyle
+            const labelBorderColor = brightMap
                 ? hexToRgba('#111827', (deemphasized ? 0.7 : 0.85) * labelAgeFade)
                 : hexToRgba('#9CA3AF', 0.45 * labelAgeFade);
-            const labelBackgroundColor = isBrightMapStyle
+            const labelBackgroundColor = brightMap
                 ? hexToRgba('#111827', (deemphasized ? 0.72 : 0.82) * labelAgeFade)
                 : hexToRgba('#000000', 0.45 * labelAgeFade);
 
