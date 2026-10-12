@@ -4851,6 +4851,28 @@ la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1
 La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
 validée contre `actual_runway_off`.
 
+### D73 — Trois préréglages d'appariement, le réglage actuel reste le défaut *(12/10)*
+
+**Valeurs validées par le propriétaire le 12/10**, après mesure sur les deux journées
+enregistrées (03/10 : 8 322 transmissions ; 04/10 : 5 512), dans les conditions de production
+(secteurs, seconde lecture, refus des ambigus, `-every`) et contre cinq ciels témoins tirés au
+hasard (`cmd/phraseology -db … -shuffle`). Implémentés dans la page des réglages (`b4cfab6`).
+
+| Préréglage | Règles | 03/10 : appariés · justes · précision | 04/10 : appariés · justes · précision |
+|---|---|---|---|
+| **Mesuré** (défaut, inchangé) | lettres, compagnie approximative, 3 chiffres, dernières lettres, deux derniers chiffres, secteurs | 2 557 · 2 420 · 95 % | 1 699 · 1 607 · 95 % |
+| **Prudent** = Mesuré + chiffres exacts exigés (seuil 0,9) | un appariement sur chiffres partiels ou abréviation seule est refusé | 1 866 · 1 809 · 97 % | 1 263 · 1 224 · 97 % |
+| **Expérimental** = Mesuré + compagnie seule + premiers chiffres | ce qui reste à juger à l'oreille | 3 207 · 3 055 · 95 % | 2 124 · 2 020 · 95 % |
+
+Ce que la mesure a écarté : un « prudent » qui retirerait la compagnie approximative et les deux
+derniers chiffres perd 3 % d'appariements **sans gagner en précision** (94 %) — ces deux règles
+n'apportent presque pas de hasard, elles restent partout. Partout aussi : 3 chiffres minimum, « un
+chiffre près » éteint (81 % de bruit, dossier 19), secteurs aux tailles du 26/09 (hors préréglage).
+Réserve sur l'Expérimental : le ciel témoin ne juge pas « compagnie seule » (deux avions d'une même
+compagnie sur la fréquence peuvent être confondus) ; `-context-swap`, qui le mesurerait, n'existe
+qu'en mode captation. Le seuil de score devient un réglage du panneau (`matching.min_score`),
+appliqué s'il dépasse `post_processing.min_score` du fichier.
+
 ### D72 — La preuve de l'appariement est gardée avec la transmission *(11/10)*
 
 **Validée par le propriétaire le 11/10** (audit 3.7, proposition A3). Jusqu'ici, de chaque
