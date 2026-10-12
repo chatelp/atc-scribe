@@ -4984,6 +4984,29 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
+### Q54 — Le portage du sidecar hors Apple Silicon : par quoi commencer ? *(12/10 — ouverte, instruite par la session communauté)*
+
+Le sidecar de transcription est écrit pour MLX, donc Apple Silicon seulement (D10). La
+session communauté a établi le 12/10, sources dans son dossier (`annexes/recherches/
+i-developpeurs-materiel.md`), ce que possèdent les publics visés : en France, Windows 77 %,
+macOS 17 %, Linux 4 % des postes (StatCounter, 09/2026) ; NVIDIA sur environ trois GPU sur
+quatre (Steam, biais joueurs) ; les 37 322 installations françaises de Home Assistant tournent
+pour moitié en x86 (VM, mini-PC) et pour moitié sur des cartes ARM (Pi 4, Pi 5). Ce que chaque
+matériel peut faire, d'après les mesures publiées : `large-v3-turbo` en int8 sous faster-whisper
+tient dans 1,5 Go de VRAM à 40 fois le temps réel ; un CPU 8 fils fait `small` en int8 à 0,13
+du temps réel ; un Pi 5 fait `tiny` ou `base` en direct, un Pi 4 rien. Pour l'affinage, la seule
+voie mûre est CUDA (LoRA int8 sur `large` sous 8 Go) ; MLX n'a aucun script d'entraînement
+Whisper officiel. Estimation de la session, hypothèses explicites : un quart à un tiers des
+postes principaux peuvent affiner, la moitié transcrire cinq canaux en direct, et la machine
+allumée en continu (le serveur domotique) ne peut rien transcrire une fois sur deux.
+**Recommandation de la session, à trancher par le propriétaire** : porter d'abord vers
+**Linux x86-64 + NVIDIA (faster-whisper / CTranslate2)**, avec repli CPU int8 dans la même
+pile ; le Pi reçoit et découpe, la transcription est déportée sur le modèle du protocole Wyoming
+de Home Assistant. Le format retenu doit permettre l'affinage (question 1 de la même étude).
+Piste signalée, à mesurer par le labo : Kyutai `stt-1b-en_fr`, transcription en flux bilingue
+anglais/français, CC-BY-4.0, versions MLX et candle (CUDA/Metal/CPU) ; pas un modèle ATC, qualité
+sur la VHF inconnue — transmis à la session Whisper-lab le 12/10.
+
 ### Q53 — Un positionnement « espace aérien français » dans le nom, la marque et la présentation ? *(12/10 — ouverte, confiée à la session design)*
 
 **Constat du propriétaire le 12/10** : le projet se spécialise de fait sur l'espace aérien
