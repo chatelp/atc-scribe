@@ -2403,6 +2403,17 @@
     <script defer src="altitude/altitude-filter.js"></script>
     <script defer src="events.js"></script>
     <script defer src="help-tips.js"></script>
+    <!-- The store 'atc' is assembled by app.js from these domains (docs-fr/32,
+         palier 5.1): each pushes its entries to window.AtcStore, so they come
+         before app.js; tile-cache.js defines what app.js reads at load. -->
+    <script defer src="tile-cache.js"></script>
+    <script defer src="store/audio.js"></script>
+    <script defer src="store/transcripts.js"></script>
+    <script defer src="store/station.js"></script>
+    <script defer src="store/aircraft-details.js"></script>
+    <script defer src="store/feed.js"></script>
+    <script defer src="store/sidebar.js"></script>
+    <script defer src="server-settings.js"></script>
     <script defer src="app.js"></script>
     <!-- Alpine starts after every script above has registered its stores and
          listeners (alpine:init): with every script deferred, document order is

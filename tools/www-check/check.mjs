@@ -79,11 +79,14 @@ function captureStore() {
         effect: noop,
     };
     const context = vm.createContext(sandbox);
-    vm.runInContext(appSource, context, { filename: 'www/app.js' });
-    // Scripts that define x-data factories of their own, besides app.js.
-    for (const f of ['altitude/altitude-filter.js']) {
+    // In the page's order: what app.js reads at load, the store's domains
+    // (each pushes to window.AtcStore), the x-data factories of their own, app.js.
+    const before = ['tile-cache.js', ...readdirSync(join(WWW, 'store')).filter((f) => f.endsWith('.js')).sort().map((f) => 'store/' + f),
+        'server-settings.js', 'altitude/altitude-filter.js'];
+    for (const f of before) {
         vm.runInContext(readFileSync(join(WWW, f), 'utf8'), context, { filename: `www/${f}` });
     }
+    vm.runInContext(appSource, context, { filename: 'www/app.js' });
     for (const cb of listeners['alpine:init'] || []) {
         try { cb(); } catch (e) { if (!(e instanceof StoreCaptured)) throw e; }
         if (store) break;
