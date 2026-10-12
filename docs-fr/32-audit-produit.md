@@ -492,6 +492,18 @@ sur la carte.
 
 ## État
 
+- 12/10 (soir) : **le garde-fou 3 était troué, et c'est la session design qui l'a vu** en
+  écrivant son plan de migration : le serveur sert `www` relatif au répertoire courant
+  (`routes.go`), et les lanceurs de production et d'essai se placent tous deux à la racine du
+  dépôt. **La production, quand elle tourne, servait les fichiers en cours d'édition** au
+  prochain rechargement de la page ; l'instance d'essai n'isolait rien. Correctif : un réglage
+  `server.static_dir` (vide : `www`, comme avant), et `runs/production.command` prend une
+  **copie figée de `www/` dans `runs/production/www`** à chaque démarrage (rsync, 3,2 Mo,
+  vérifiée identique), que la configuration de production désigne. L'instance d'essai continue
+  de lire `www/` en direct : c'est là qu'une modification se vérifie avant d'aller en
+  production, qui ne la verra qu'à son prochain lancement. Binaire `bin/co-atc` reconstruit ;
+  la production ne tourne pas, le prochain lancement prend le tout. Pour la migration du design,
+  la session design propose en plus de lancer l'instance d'essai depuis son arbre de travail.
 - 12/10 (fin d'après-midi) : **deux retours de l'inventaire de la session design**
   (`docs-fr/design/01-inventaire.md`, branche `design`), traités dans `www/` par cette session.
   (1) Avec le fond noir, le défaut, les avions étaient peints avec la palette prévue pour les

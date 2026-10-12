@@ -137,8 +137,12 @@ func (r *Router) Routes() http.Handler {
 		})
 	})
 
-	// Serve static files from the hardcoded web directory
-	staticHandler := NewStaticFileHandler("www", r.logger)
+	// The page, from server.static_dir, or www/ next to the working directory.
+	staticDir := "www"
+	if r.config != nil && r.config.Server.StaticDir != "" {
+		staticDir = r.config.Server.StaticDir
+	}
+	staticHandler := NewStaticFileHandler(staticDir, r.logger)
 	router.Handle("/*", staticHandler)
 
 	return router

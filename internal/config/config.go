@@ -68,6 +68,12 @@ type ServerConfig struct {
 	IdleTimeoutSecs  int    `toml:"idle_timeout_seconds"`  // Maximum duration to wait for the next request when keep-alives are enabled
 	AdditionalPorts  []int  `toml:"additional_ports"`      // Additional HTTP ports to listen on (useful for multiple interfaces)
 
+	// The directory the page is served from; "www" (relative to the working
+	// directory) when empty. Production points it at a snapshot its launcher takes
+	// at start, so that a file edited in the working tree is not in production at
+	// the next page reload (found on 12/10: it was).
+	StaticDir string `toml:"static_dir"`
+
 	// TLS served by co-atc itself. Leave both empty behind a reverse proxy that
 	// terminates TLS; fill them to serve HTTPS with no proxy at all. Neither shape
 	// is privileged: the standalone install must be as usable as the proxied one.
