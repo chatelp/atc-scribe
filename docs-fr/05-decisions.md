@@ -5003,9 +5003,13 @@ allumée en continu (le serveur domotique) ne peut rien transcrire une fois sur 
 **Linux x86-64 + NVIDIA (faster-whisper / CTranslate2)**, avec repli CPU int8 dans la même
 pile ; le Pi reçoit et découpe, la transcription est déportée sur le modèle du protocole Wyoming
 de Home Assistant. Le format retenu doit permettre l'affinage (question 1 de la même étude).
-Piste signalée, à mesurer par le labo : Kyutai `stt-1b-en_fr`, transcription en flux bilingue
-anglais/français, CC-BY-4.0, versions MLX et candle (CUDA/Metal/CPU) ; pas un modèle ATC, qualité
-sur la VHF inconnue — transmis à la session Whisper-lab le 12/10.
+Piste signalée par la session, Kyutai `stt-1b-en_fr` (flux bilingue anglais/français,
+CC-BY-4.0, versions MLX et candle) : **déjà mesurée et écartée par le labo le 28/09**
+(`whisper-lab/resultats/labo/2026-09-28-kyutai/echantillon-50.json`) : sur 50 transmissions
+du 27/09 tirées au hasard, 43 textes vides et une seule transmission avec un mot de phraséologie,
+contre 0 vide et 28 pour le Whisper anglais de production ; il lit la voix propre d'ATCOSIM mais
+pas la radio en bande étroite. Il ne pèse pas dans le choix du portage ; Whisper affiné puis
+converti en CTranslate2 reste la voie.
 
 ### Q53 — Un positionnement « espace aérien français » dans le nom, la marque et la présentation ? *(12/10 — ouverte, confiée à la session design)*
 
