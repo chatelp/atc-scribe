@@ -485,6 +485,12 @@ sur la carte.
 
 ## État
 
+- 12/10 : **première séance du propriétaire sur la version des paliers 0 à 4** (journal
+  d'événements, réglages, curseur d'altitude en QNH/FL, réécoute, fiche de vol, séquence
+  d'arrivée, consignes en clair, bandeau d'état, barre radio, bibliothèques locales) :
+  « une NETTE amélioration UX par rapport à co-atc de base ». Garde-fou 5 (validation à
+  l'usage) tenu pour ces paliers ; aucun défaut remonté à cette séance.
+
 - 09/10 : cadre posé ; trois études menées en parallèle (Sonnet), rapports dans
   `docs-fr/audit-2026-10-09/` ; jugement du propriétaire, propositions et **consolidation**
   inscrits. `atc_chat.enabled` passé à `false`. D19 et CLAUDE.md corrigés sur l'empreinte.
