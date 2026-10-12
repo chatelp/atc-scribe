@@ -17,14 +17,21 @@ Conséquences :
   de la page, sans recompiler ;
 - et l'instance d'essai ne l'isole pas.
 
-**Proposition (étape 0)** : pour la durée de la migration, l'instance d'essai se lance depuis un
-arbre de travail à part (`git worktree`, branche de l'étape en cours). Un `cd` différent dans
-`son-test.command`, ou une variante `son-test-design.command`, suffit. Ses données restent sous
-`runs/son-test/`.
+**Corrigé le jour même par la session atc-scribe** (sur `local`) :
+- un réglage `server.static_dir` (vide : `www`, comme avant) ;
+- `runs/production.command` prend à chaque lancement une copie figée de `www/` dans
+  `runs/production/www`, que la configuration de production désigne.
 
-- Le garde-fou 3 (« l'instance d'essai d'abord ») redevient vrai.
-- Le garde-fou 1 se simplifie : défaire une étape, c'est un `git revert` sur `local`. Le binaire
-  ne change pas, car aucune étape ne touche au Go.
+L'instance d'essai continue de lire `www/` en direct : elle vérifie une modification, que la
+production ne verra qu'à son prochain lancement.
+
+**Pour la migration (étape 0)** : l'instance d'essai lit le `www/` d'un arbre de travail à part
+(branche de l'étape en cours). Il suffit d'un second fichier de configuration dont `static_dir`
+désigne ce dossier, sans deuxième copie du serveur. Ses données restent sous `runs/son-test/`.
+
+- Le garde-fou 3 (« l'instance d'essai d'abord ») est tenu.
+- Le garde-fou 1 se simplifie : défaire une étape, c'est un `git revert` sur `local`, puis
+  relancer la production. Le binaire ne change pas, car aucune étape ne touche au Go.
 
 ## Les mesures qui jugent chaque étape
 
@@ -47,12 +54,12 @@ aucune décision. Les étapes marquées **(décision)** attendent un choix list�
 
 ### 0. Préparer : instance d'essai isolée, sonde rangée — 0,5 j
 
-- **Change** : `son-test` lancée depuis un arbre de travail. La sonde de rendu devient un script
+- **Change** : une configuration d'essai dont `static_dir` désigne le `www/` d'un arbre de travail. La sonde de rendu devient un script
   rejouable par l'outil de navigateur, sans copier-coller : un signet, ou une page de
   `tools/design/` qui l'injecte.
 - **Ne change pas** : rien à l'écran, rien en production.
 - **Vérifier** : la page de l'instance d'essai sert bien les fichiers de l'arbre de travail (un
-  commentaire témoin dans `index.html`).
+  commentaire témoin dans `index.html`), et la production sa copie figée.
 
 ### 1. Les jetons dans le code, à comportement identique — 1 j
 
