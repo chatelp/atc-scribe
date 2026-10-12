@@ -65,7 +65,7 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 | Migration du design | validation du système | non |
 | Installation sans la station du propriétaire (sources audio et ADS-B génériques documentées, configuration d'exemple, README) | question 4 | principe : oui (mission communauté) |
 | Version en/fr de l'interface | après le design (les textes bougent) | principe : oui (10/10) |
-| **Portage du sidecar : Linux x86-64 + NVIDIA** (faster-whisper / CTranslate2, repli processeur ; Pi qui reçoit, transcription déportée) ; **Windows au moins pour l'affinage** (les simmers) | question 4 ; format permettant l'affinage ; non-régression mesurée au labo | **cible : oui (12/10) ; pas dans l'immédiat** (Q54) |
+| **Portage du sidecar : Linux x86-64 + NVIDIA** (faster-whisper / CTranslate2, repli processeur ; Pi qui reçoit, transcription déportée) ; **Windows au moins pour l'affinage** (les simmers) ; sous-point pour un mode différé (Pi 5, dix minutes de retard) : apparier contre le ciel de l'instant de la transmission relu dans `adsb_targets`, comme le fait déjà l'outil de mesure, au lieu de la flotte vivante (modification bornée au point d'appariement) | question 4 ; format permettant l'affinage ; non-régression mesurée au labo | **cible : oui (12/10) ; pas dans l'immédiat** (Q54) |
 | Corpus simulé (VATSIM / IVAO, sessions dédiées, accord écrit) et annotation communautaire | cadre légal (audio réel exclu) ; premier pas décidé | non |
 | Affinage communautaire ou fédéré (modèle adapté au français) | corpus ; portage | non |
 | Premier pas public (quoi, où, quand) | question 5 ; renommage ; installable ailleurs | non |
