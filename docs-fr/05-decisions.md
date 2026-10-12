@@ -5027,7 +5027,15 @@ contre 0 vide et 28 pour le Whisper anglais de production ; il lit la voix propr
 pas la radio en bande étroite. Il ne pèse pas dans le choix du portage ; Whisper affiné puis
 converti en CTranslate2 reste la voie.
 
-### Q53 — Un positionnement « espace aérien français » dans le nom, la marque et la présentation ? *(12/10 — ouverte, confiée à la session design)*
+### Q53 — Un positionnement « espace aérien français » dans le nom, la marque et la présentation ? *(12/10 — propositions livrées, choix du propriétaire attendu)*
+
+> **Livré le 12/10 par la session design** : `docs-fr/design/00-nom.md` (branche `design`,
+> `be329e9`), **la référence pour trancher**. Positionnement recommandé : le français porté comme
+> une capacité, pas comme un territoire (même conclusion que l'étude communauté). Cinq noms
+> vérifiés en lecture seule (GitHub, web, whois) : **`5/5`** (« cinq sur cinq » / « five by
+> five », recommandé ; dépôt `five-by-five` en générique, `cinq-sur-cinq` en français assumé),
+> Entendu, En clair, Verticale, Lisible ; écartés à la vérification : Liaison, Accord, Party line,
+> Clair. Rien n'est marqué d'un nom avant le choix du propriétaire.
 
 **Constat du propriétaire le 12/10** : le projet se spécialise de fait sur l'espace aérien
 français (seconde lecture en français, phraséologie française, QNH sous la TA, PAR sur des pistes

@@ -29,7 +29,7 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 | **atc-scribe** (cette session) | le produit : code, mesures, documents, coordination | paliers 0 à 5 de l'audit faits ; bulles de dernière transmission ; retours de l'inventaire design traités (palette, 51 règles orphelines) | le renommage, dès le choix du nom | — |
 | **Whisper-lab** (`~/Dev/Aero/whisper-lab`, privé) | reconnaissance : modèles, corpus, mesures, GPU | précision par niveau d'indices mesurée (borne haute) ; Kyutai écarté (28/09) | tirage au hasard de la précision quand l'annotation aura avancé (jalon du labo) | la mesure de non-régression du modèle converti, le jour du portage |
 | **ATC-scribe communauté** (`~/Dev/Aero/atc-scribe-communaute`, privé) | cadre légal, existant, communautés françaises, prérequis, recommandation | questions 1, 2, 3 livrées | question 4 (prérequis techniques : Wyoming, Pi en différé, Windows pour l'affinage) puis 5 (le premier pas) et la synthèse | la liste hiérarchisée de ce que l'outil doit changer avant qu'on en parle à quiconque |
-| **ATC-scribe design** (branche `design`) | identité, nom, système de design, maquettes, plan de migration | inventaire mesuré livré (01) | `00-nom.md` (propositions de nom + positionnement), puis principes, système, maquettes, migration | le nom à choisir ; puis un système applicable par étapes sous les garde-fous |
+| **ATC-scribe design** (branche `design`) | identité, nom, système de design, maquettes, plan de migration | inventaire (01), **propositions de nom et positionnement (00, `be329e9`)**, principes (02) livrés | identité (marque, favicon, icône), système et jetons, maquettes, migration | **le choix du nom par le propriétaire** (recommandation : `5/5`, dépôt `five-by-five`, positionnement générique, README français à égalité) ; puis un système applicable par étapes sous les garde-fous |
 | **Station radio station** | la station : réception, chaîne VHF, captations | en veille ; `radio-ctl-sync` rapporte l'état au bandeau | — | prévenue à chaque bascule d'écoute |
 
 ## Les jalons
@@ -75,10 +75,13 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
 
 ## Les décisions attendues du propriétaire
 
-1. **Le nom**, sur les propositions de la session design (`docs-fr/design/00-nom.md`), avec le
-   positionnement français ou générique (Q53).
-2. **Le système de design**, quand la session design le présentera (principes, jetons,
-   maquettes).
+1. **Le nom** — propositions prêtes le 12/10 (`docs-fr/design/00-nom.md`, branche `design`) :
+   `5/5` (recommandé, générique, dépôt `five-by-five`), Entendu, En clair, Verticale, Lisible ;
+   positionnement recommandé : le français porté comme une capacité, pas comme un territoire
+   (même conclusion que l'étude communauté) (Q53).
+2. **Le système de design** — les principes sont livrés (`02-principes.md`) ; un point à trancher
+   dès maintenant, le principe 8 : monospace pour les nombres, police système pour les phrases
+   (mesuré : le monospace est 1,26 fois plus large à taille égale). Jetons et maquettes à venir.
 3. **Le premier pas communautaire**, sur la recommandation de l'étude (question 5).
 4. Le moment du **portage** (cible fixée, calendrier non).
 5. Le **tirage au hasard** de la précision d'appariement (jalon du labo, lié à l'annotation).
