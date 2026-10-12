@@ -1,6 +1,6 @@
 # Inventaire brut — généré par tools/design/inventory.mjs
 
-Sources lues : index.html (2448 l.), style.css (957 l.), 33 scripts hors vendor et tests ; CSS compilé : 514 classes.
+Sources lues : index.html (2446 l.), style.css (482 l.), 33 scripts hors vendor et tests ; CSS compilé : 514 classes.
 Utilisations de classes Tailwind reconnues : 3879 (3271 statiques dans class="", 608 conditionnelles : :class ou chaînes des scripts) ; classes distinctes : 507.
 
 ## Tailles de texte
@@ -9,17 +9,17 @@ Utilisations de classes Tailwind reconnues : 3879 (3271 statiques dans class="",
 |---|---:|---|
 | 7px | 15 | text-[7px] 15 |
 | 8px | 14 | text-[8px] 14 |
-| 9px | 30 | text-[9px] 25, style.css:510, style.css:533, style.css:544, style.css:555, style.css:891 |
-| 9.6px | 1 | index.html:2065 |
-| 10px | 62 | text-[10px] 54, style.css:409, style.css:489, style.css:586, style.css:837, map/core/layer-registry.js:110, map/openlayers-map-manager.js:563, map/openlayers-map-manager.js:950, map/renderers/aircraft-webgl.js:620 |
-| 11px | 23 | text-[11px] 13, style.css:573, style.css:580, style.css:805, style.css:845, style.css:847, style.css:897, style.css:921, map/openlayers-map-manager.js:76, map/renderers/aircraft-webgl.js:591, map/renderers/aircraft-webgl.js:605 |
+| 9px | 26 | text-[9px] 25, style.css:416 |
+| 9.6px | 1 | index.html:2063 |
+| 10px | 60 | text-[10px] 54, style.css:240, style.css:362, map/core/layer-registry.js:110, map/openlayers-map-manager.js:563, map/openlayers-map-manager.js:950, map/renderers/aircraft-webgl.js:620 |
+| 11px | 23 | text-[11px] 13, style.css:227, style.css:234, style.css:330, style.css:370, style.css:372, style.css:422, style.css:446, map/openlayers-map-manager.js:76, map/renderers/aircraft-webgl.js:591, map/renderers/aircraft-webgl.js:605 |
 | 11.2px | 2 | login.js:36, login.js:48 |
-| 12px | 100 | text-xs 94, text-[12px] 1, style.css:637, style.css:795, style.css:826, login.js:35, login.js:61 |
+| 12px | 100 | text-xs 94, text-[12px] 1, style.css:291, style.css:320, style.css:351, login.js:35, login.js:61 |
 | 12.8px | 1 | login.js:42 |
-| 13px | 2 | style.css:566, style.css:816 |
+| 13px | 2 | style.css:220, style.css:341 |
 | 13.6px | 2 | login.js:53, login.js:57 |
 | 14px | 61 | text-sm 61 |
-| 15px | 1 | style.css:804 |
+| 15px | 1 | style.css:329 |
 | 16px | 8 | text-base 7, login.js:34 |
 | 18px | 2 | text-lg 2 |
 | 20px | 3 | text-xl 3 |
@@ -32,31 +32,31 @@ Familles déclarées dans style.css et les scripts : monospace | inherit ; body 
 
 ## Couleurs
 
-Valeurs distinctes : 225 (dont 140 avec transparence) ; teintes opaques distinctes : 107.
+Valeurs distinctes : 215 (dont 131 avec transparence) ; teintes opaques distinctes : 105.
 Classes de couleur Tailwind distinctes : texte 35, fond 60, bordure 51, anneau 0, SVG 0.
-Valeurs en dur (hors Tailwind) : 319 occurrences, 130 valeurs distinctes ; par fichier : style.css 142, map/openlayers-map-manager.js 73, map/renderers/aircraft-webgl.js 39, par/par-view.js 26, login.js 19, map/features/minimap-feature.js 13, index.html 5, map/core/layer-registry.js 4, audio-client.js 2.
+Valeurs en dur (hors Tailwind) : 284 occurrences, 117 valeurs distinctes ; par fichier : style.css 107, map/openlayers-map-manager.js 73, map/renderers/aircraft-webgl.js 39, par/par-view.js 26, login.js 19, map/features/minimap-feature.js 13, index.html 5, map/core/layer-registry.js 4, audio-client.js 2.
 
 ### Par famille de teinte
 
 | Famille | Teintes distinctes | Utilisations |
 |---|---:|---:|
-| grey | 43 | 465 |
-| green | 8 | 274 |
+| grey | 42 | 444 |
+| green | 8 | 267 |
 | amber/yellow | 10 | 67 |
-| blue | 14 | 67 |
-| orange | 12 | 47 |
+| blue | 14 | 66 |
+| orange | 11 | 42 |
 | red | 8 | 35 |
 | teal/cyan | 4 | 21 |
-| violet | 4 | 20 |
+| violet | 4 | 19 |
 | lime | 2 | 15 |
 | pink | 2 | 15 |
 
 ### Regroupement des teintes voisines (ΔE76 < 5 : indiscernables à l'œil côte à côte)
 
-107 teintes opaques → 84 groupes. Groupes de plus d'une valeur :
+105 teintes opaques → 83 groupes. Groupes de plus d'une valeur :
 
 - #333333, #2a2a2a, #3a3a3a
-- #e0e0e0, #e5e7eb, #e8ecef, #e5e5e5, #e4e4e4
+- #e0e0e0, #e5e7eb, #e8ecef, #e4e4e4
 - #0a0a0a, #000000, #0b0b0b, #0b0f0d, #141414, #0f1512, #111111
 - #ffffff, #f9fafb, #f3f4f6, #f1f5f9
 - #888888, #8a8a8a
@@ -71,21 +71,21 @@ Valeurs en dur (hors Tailwind) : 319 occurrences, 130 valeurs distinctes ; par f
 
 | Couleur | Famille | Utilisations | Rôles (classe : n) | Fichiers |
 |---|---|---:|---|---|
-| `#4caf50` | green | 135 | text (text-highlight) 92 ; en dur 31 ; border (border-highlight) 7 ; bg (bg-highlight) 5 | index.html 102, style.css 18, map/openlayers-map-manager.js 5, map/renderers/aircraft-webgl.js 3 |
-| `#333333` | grey | 110 | border (border-border) 104 ; en dur 6 | index.html 104, style.css 6 |
+| `#4caf50` | green | 130 | text (text-highlight) 92 ; en dur 26 ; border (border-highlight) 7 ; bg (bg-highlight) 5 | index.html 102, style.css 13, map/openlayers-map-manager.js 5, map/renderers/aircraft-webgl.js 3 |
+| `#333333` | grey | 106 | border (border-border) 104 ; en dur 2 | index.html 104, style.css 2 |
 | `#9ca3af` | grey | 53 | text (text-gray-400) 31 ; en dur 19 ; bg (bg-gray-400) 2 ; border (border-gray-400) 1 | index.html 32, map/renderers/aircraft-webgl.js 8, map/openlayers-map-manager.js 7, style.css 3 |
 | `#e0e0e0` | grey | 43 | text (text-text) 38 ; en dur 5 | index.html 31, store/aircraft-details.js 5, style.css 4, store/sidebar.js 2 |
 | `#0a0a0a` | grey | 29 | bg (bg-background) 27 ; en dur 2 | index.html 27, style.css 1, par/par-view.js 1 |
 | `#4ade80` | green | 25 | text (text-green-400) 12 ; en dur 7 ; bg (bg-green-400) 4 ; border (border-green-400) 2 | index.html 16, login.js 5, store/aircraft-details.js 1, store/sidebar.js 1 |
-| `#000000@0.5` | grey | 18 | en dur 11 ; bg (bg-black/50) 7 | style.css 10, index.html 7, map/core/layer-registry.js 1 |
 | `#60a5fa` | blue | 17 | en dur 10 ; text (text-blue-400) 7 | map/openlayers-map-manager.js 8, index.html 6, store/sidebar.js 1, map/renderers/aircraft-webgl.js 1 |
 | `#1a1a1a` | grey | 17 | bg (bg-panel) 17 | index.html 17 |
 | `#2a2a2a` | grey | 16 | bg (bg-hover) 16 | index.html 16 |
 | `#f87171` | red | 15 | text (text-red-400) 12 ; border (border-red-400) 2 ; en dur 1 | index.html 10, events.js 1, store/aircraft-details.js 1, store/sidebar.js 1 |
 | `#ffffff` | grey | 15 | en dur 11 ; text (text-white) 4 | index.html 4, map/openlayers-map-manager.js 4, par/par-view.js 4, map/renderers/aircraft-webgl.js 2 |
 | `#fb923c` | orange | 14 | text (text-orange-400) 7 ; en dur 5 ; border (border-orange-400) 2 | index.html 8, map/openlayers-map-manager.js 3, store/sidebar.js 1, map/renderers/aircraft-webgl.js 1 |
-| `#4caf50@0.3` | green | 12 | en dur 7 ; border (border-highlight/30) 3 ; bg (bg-highlight/30) 2 | style.css 7, index.html 4, store/aircraft-details.js 1 |
+| `#000000@0.5` | grey | 13 | bg (bg-black/50) 7 ; en dur 6 | index.html 7, style.css 5, map/core/layer-registry.js 1 |
 | `#4caf50@0.15` | green | 11 | bg (bg-highlight/15) 9 ; en dur 2 | index.html 9, style.css 2 |
+| `#4caf50@0.3` | green | 11 | en dur 6 ; border (border-highlight/30) 3 ; bg (bg-highlight/30) 2 | style.css 6, index.html 4, store/aircraft-details.js 1 |
 | `#facc15` | amber/yellow | 10 | text (text-yellow-400) 8 ; en dur 2 | index.html 7, store/sidebar.js 1, map/renderers/aircraft-webgl.js 1, par/par-view.js 1 |
 | `#f44336` | red | 10 | text (text-danger) 5 ; en dur 3 ; bg (bg-danger) 2 | index.html 5, map/features/minimap-feature.js 2, store/aircraft-details.js 1, store/sidebar.js 1 |
 | `#4caf50@0.5` | green | 10 | en dur 5 ; border (border-highlight/50) 4 ; text (text-highlight/50) 1 | index.html 5, style.css 5 |
@@ -107,23 +107,22 @@ Valeurs en dur (hors Tailwind) : 319 occurrences, 130 valeurs distinctes ; par f
 | `#4caf50@0.7` | green | 6 | text (text-highlight/70) 6 | store/aircraft-details.js 6 |
 | `#22c55e@0.2` | green | 6 | bg (bg-green-500/20) 6 | index.html 6 |
 | `#000000@0.3` | grey | 6 | bg (bg-black/30) 6 | index.html 6 |
-| `#4caf50@0.1` | green | 6 | bg (bg-highlight/10) 5 ; en dur 1 | index.html 5, style.css 1 |
 | `#4caf50@0.8` | green | 5 | text (text-highlight/80) 4 ; bg (bg-highlight/80) 1 | index.html 5 |
 | `#6ee7b7` | green | 5 | text (text-emerald-300) 5 | index.html 4, events.js 1 |
 | `#eab308@0.2` | amber/yellow | 5 | bg (bg-yellow-500/20) 5 | index.html 5 |
 | `#2a2a2a@0.5` | grey | 5 | bg (bg-hover/50) 5 | index.html 5 |
+| `#4caf50@0.1` | green | 5 | bg (bg-highlight/10) 5 | index.html 5 |
 | `#22c55e@0.3` | green | 5 | border (border-green-500/30) 5 | index.html 5 |
 | `#eab308@0.3` | amber/yellow | 5 | border (border-yellow-500/30) 5 | index.html 5 |
-| `#000000@0.4` | grey | 5 | en dur 5 | style.css 5 |
 | `#000000` | grey | 4 | en dur 2 ; text (text-black) 1 ; bg (bg-black) 1 | index.html 2, map/openlayers-map-manager.js 1, map/renderers/aircraft-webgl.js 1 |
 | `#fbbf24@0.15` | amber/yellow | 4 | bg (bg-amber-400/15) 4 | index.html 4 |
 | `#3b82f6@0.2` | blue | 4 | bg (bg-blue-500/20) 4 | index.html 4 |
-| `#000000@0.7` | grey | 4 | en dur 3 ; bg (bg-black/70) 1 | style.css 3, index.html 1 |
 | `#333333@0.4` | grey | 4 | border (border-border/40) 4 | index.html 4 |
 | `#4caf50@0.4` | green | 4 | border (border-highlight/40) 4 | index.html 4 |
 | `#333333@0.7` | grey | 4 | border (border-border/70) 4 | index.html 4 |
 | `#3b82f6@0.3` | blue | 4 | border (border-blue-500/30) 4 | index.html 4 |
 | `#333333@0.5` | grey | 4 | border (border-border/50) 4 | index.html 4 |
+| `#000000@0.4` | grey | 4 | en dur 4 | style.css 4 |
 | `#444444` | grey | 4 | en dur 4 | style.css 4 |
 | `#818cf8` | blue | 4 | en dur 4 | map/openlayers-map-manager.js 4 |
 | `#d1d5db` | grey | 3 | en dur 2 ; text (text-gray-300) 1 | style.css 2, index.html 1 |
@@ -131,16 +130,17 @@ Valeurs en dur (hors Tailwind) : 319 occurrences, 130 valeurs distinctes ; par f
 | `#f472b6@0.15` | pink | 3 | bg (bg-pink-400/15) 3 | index.html 3 |
 | `#a855f7@0.2` | violet | 3 | bg (bg-purple-500/20) 3 | index.html 3 |
 | `#f97316@0.2` | orange | 3 | bg (bg-orange-500/20) 3 | index.html 3 |
+| `#84cc16@0.2` | lime | 3 | bg (bg-lime-500/20) 3 | index.html 3 |
 
 ### Couleurs en dur, détail par fichier
 
-**www/style.css** (142)
+**www/style.css** (107)
 
-`#4caf50` ×18 (l. 192, 206, 221, 232, 260, 272…) · `#000000@0.5` ×10 (l. 4, 88, 345, 489, 533, 544…) · `#4caf50@0.3` ×7 (l. 43, 82, 293, 304, 310, 316…) · `#000000@0.2` ×7 (l. 52, 288, 304, 310, 316, 326…) · `#333333` ×6 (l. 192, 206, 221, 232, 817, 881) · `#000000@0.4` ×5 (l. 37, 37, 43, 48, 510) · `#4caf50@0.5` ×5 (l. 299, 336, 824, 837, 890) · `#e0e0e0` ×4 (l. 795, 826, 847, 921) · `#444444` ×4 (l. 909, 911, 913, 914) · `#000000@0.7` ×3 (l. 4, 409, 500) · `#ffffff@0.05` ×3 (l. 15, 32, 903) · `#9ca3af` ×3 (l. 573, 593, 637) · `#4caf50@0.55` ×3 (l. 921, 937, 937) · `#ffffff@0.03` ×2 (l. 11, 57) · `#4caf50@0.18` ×2 (l. 20, 24) · `#ffffff@0.3` ×2 (l. 139, 350) · `#ffffff@0.4` ×2 (l. 355, 891) · `#000000@0.8` ×2 (l. 393, 510) · `#93c5fd` ×2 (l. 533, 610) · `#d1d5db` ×2 (l. 580, 601) · `#4caf50@0.15` ×2 (l. 813, 837) · `#8a8a8a` ×2 (l. 814, 816) · `#0b0b0b` ×2 (l. 888, 889) · `#999999` ×2 (l. 915, 916) · `#0a0a0a@0.88` ×2 (l. 921, 937) · `#000000@0.45` ×1 (l. 4) · `#c0ccbf` ×1 (l. 4) · `#ffffff@0.1` ×1 (l. 15) · `#b0b0b0` ×1 (l. 28) · `#000000@0.35` ×1 (l. 37) · `#ffffff@0.04` ×1 (l. 52) · `#4caf50@0.1` ×1 (l. 82) · `#4caf50@0.06` ×1 (l. 88) · `#4caf50@0.25` ×1 (l. 88) · `#e5e5e5` ×1 (l. 144) · `#ffffff@0.6` ×1 (l. 360) · `#eb8c00@0.6` ×1 (l. 400) · `#eb8c00@0.2` ×1 (l. 400) · `#ffffff@0.2` ×1 (l. 409) · `#ff9800@0.9` ×1 (l. 421) · `#ff9800@0.4` ×1 (l. 421) · `#ffffff@0.8` ×1 (l. 510) · `#fdba74` ×1 (l. 544) · `#c4b5fd` ×1 (l. 555) · `#f9fafb` ×1 (l. 566) · `#4b5563@0.4` ×1 (l. 593) · `#374151@0.3` ×1 (l. 606) · `#34d399` ×1 (l. 616) · `#111827@0.95` ×1 (l. 622) · `#e5e7eb` ×1 (l. 622) · `#4b5563@0.6` ×1 (l. 622) · `#f3f4f6` ×1 (l. 649) · `#0a0a0a` ×1 (l. 787) · `#555555` ×1 (l. 815) · `#141414` ×1 (l. 817) · `#4caf50@0.35` ×1 (l. 847) · `#000000@0.9` ×1 (l. 847) · `#ffffff@0.12` ×1 (l. 877) · `#4caf50@0.75` ×1 (l. 878) · `#38bdf8@0.8` ×1 (l. 883) · `#cccccc` ×1 (l. 897) · `#ffffff@0.45` ×1 (l. 900) · `#4caf50@0.12` ×1 (l. 904) · `#fbbf24` ×1 (l. 905) · `#ffffff` ×1 (l. 950)
+`#4caf50` ×13 (l. 118, 329, 330, 330, 362, 386…) · `#000000@0.2` ×7 (l. 52, 134, 150, 156, 162, 172…) · `#4caf50@0.3` ×6 (l. 43, 139, 150, 156, 162, 177) · `#000000@0.5` ×5 (l. 4, 72, 276, 372, 446) · `#4caf50@0.5` ×5 (l. 145, 182, 349, 362, 415) · `#000000@0.4` ×4 (l. 37, 37, 43, 48) · `#e0e0e0` ×4 (l. 320, 351, 372, 446) · `#444444` ×4 (l. 434, 436, 438, 439) · `#ffffff@0.05` ×3 (l. 15, 32, 428) · `#9ca3af` ×3 (l. 227, 247, 291) · `#4caf50@0.55` ×3 (l. 446, 462, 462) · `#ffffff@0.03` ×2 (l. 11, 57) · `#4caf50@0.18` ×2 (l. 20, 24) · `#d1d5db` ×2 (l. 234, 255) · `#4caf50@0.15` ×2 (l. 338, 362) · `#8a8a8a` ×2 (l. 339, 341) · `#333333` ×2 (l. 342, 406) · `#0b0b0b` ×2 (l. 413, 414) · `#999999` ×2 (l. 440, 441) · `#0a0a0a@0.88` ×2 (l. 446, 462) · `#000000@0.45` ×1 (l. 4) · `#000000@0.7` ×1 (l. 4) · `#c0ccbf` ×1 (l. 4) · `#ffffff@0.1` ×1 (l. 15) · `#b0b0b0` ×1 (l. 28) · `#000000@0.35` ×1 (l. 37) · `#ffffff@0.04` ×1 (l. 52) · `#4caf50@0.06` ×1 (l. 72) · `#4caf50@0.25` ×1 (l. 72) · `#f9fafb` ×1 (l. 220) · `#4b5563@0.4` ×1 (l. 247) · `#374151@0.3` ×1 (l. 260) · `#93c5fd` ×1 (l. 264) · `#34d399` ×1 (l. 270) · `#111827@0.95` ×1 (l. 276) · `#e5e7eb` ×1 (l. 276) · `#4b5563@0.6` ×1 (l. 276) · `#f3f4f6` ×1 (l. 303) · `#0a0a0a` ×1 (l. 312) · `#555555` ×1 (l. 340) · `#141414` ×1 (l. 342) · `#4caf50@0.35` ×1 (l. 372) · `#000000@0.9` ×1 (l. 372) · `#ffffff@0.12` ×1 (l. 402) · `#4caf50@0.75` ×1 (l. 403) · `#38bdf8@0.8` ×1 (l. 408) · `#ffffff@0.4` ×1 (l. 416) · `#cccccc` ×1 (l. 422) · `#ffffff@0.45` ×1 (l. 425) · `#4caf50@0.12` ×1 (l. 429) · `#fbbf24` ×1 (l. 430) · `#ffffff` ×1 (l. 475)
 
 **www/index.html** (5)
 
-`#888888` ×2 (l. 1600, 2060) · `#ffc107` ×1 (l. 1604) · `#b45555` ×1 (l. 2060) · `#4caf50` ×1 (l. 2060)
+`#888888` ×2 (l. 1600, 2058) · `#ffc107` ×1 (l. 1604) · `#b45555` ×1 (l. 2058) · `#4caf50` ×1 (l. 2058)
 
 **www/audio-client.js** (2)
 
@@ -253,7 +253,7 @@ Paires confondues (ΔE < 10) : 13.
 | `-.25rem` | 2 | -mt-1 2 |
 | `auto` | 1 | mx-auto 1 |
 
-Valeurs d'espacement distinctes : 14. En dur dans style.css : 27 valeurs distinctes sur 43 déclarations (2px ×5, 1px 3px ×4, 2px 4px ×3, 6px ×3, -6px ×2, 10px ×2, 0 7px ×2, 0 ×2, 1px 16px 1px 0 ×2, 2px 4px !important ×1, 4px ×1, 10px 10px 8px 10px ×1, 76px 16px 24px ×1, 4px 8px ×1, 0 5px ×1).
+Valeurs d'espacement distinctes : 14. En dur dans style.css : 24 valeurs distinctes sur 35 déclarations (2px ×5, 6px ×3, 2px 4px ×2, 10px ×2, 0 7px ×2, 0 ×2, 1px 16px 1px 0 ×2, 4px ×1, 10px 10px 8px 10px ×1, 76px 16px 24px ×1, 4px 8px ×1, 0 5px ×1, 24px ×1, 6px 0 2px ×1, 8px ×1).
 
 ## Rayons
 
@@ -266,7 +266,7 @@ Valeurs d'espacement distinctes : 14. En dur dans style.css : 27 valeurs distinc
 | `.5rem` | 8 | rounded-lg 8 |
 | `.125rem` | 4 | rounded-sm 3, rounded-r-sm 1 |
 
-En dur : 50% (input[type=range].dual-range-min::-webkit-slider-t) ; 50% (input[type=range].dual-range-max::-webkit-slider-t) ; 50% (input[type=range].dual-range-min::-moz-range-thumb) ; 50% (input[type=range].dual-range-max::-moz-range-thumb) ; 0 2px 2px 0 (.audio-visualizer-bar) ; 3px (::-webkit-scrollbar-track) ; 3px (::-webkit-scrollbar-thumb) ; 2px (.custom-scrollbar::-webkit-scrollbar-track) ; 2px (.custom-scrollbar::-webkit-scrollbar-thumb) ; 2px (.runway-label) ; 2px (.runway-distance-label) ; 2px (.airport-label) ; 2px (.heliport-label) ; 2px (.navaid-label) ; 6px (.ol-ref-popup) ; 3px (.par-vac) ; 6px (.par-frame) ; 3px (.par-badge) ; 4px (.par-tip) ; 1px 1px 0 0 (.alt-bin) ; 2px (.alt-track, .alt-track-band) ; 50% (.alt-range::-webkit-slider-thumb) ; 50% (.alt-range::-moz-range-thumb) ; 2px (.radio-strip::-webkit-scrollbar-thumb) ; 1px (.vol-range::-webkit-slider-runnable-track) ; 1px (.vol-range::-moz-range-track) ; 50% (.vol-range::-webkit-slider-thumb) ; 50% (.vol-range::-moz-range-thumb) ; 6px (.voice-bubble).
+En dur : 0 2px 2px 0 (.audio-visualizer-bar) ; 3px (::-webkit-scrollbar-track) ; 3px (::-webkit-scrollbar-thumb) ; 2px (.custom-scrollbar::-webkit-scrollbar-track) ; 2px (.custom-scrollbar::-webkit-scrollbar-thumb) ; 6px (.ol-ref-popup) ; 3px (.par-vac) ; 6px (.par-frame) ; 3px (.par-badge) ; 4px (.par-tip) ; 1px 1px 0 0 (.alt-bin) ; 2px (.alt-track, .alt-track-band) ; 50% (.alt-range::-webkit-slider-thumb) ; 50% (.alt-range::-moz-range-thumb) ; 2px (.radio-strip::-webkit-scrollbar-thumb) ; 1px (.vol-range::-webkit-slider-runnable-track) ; 1px (.vol-range::-moz-range-track) ; 50% (.vol-range::-webkit-slider-thumb) ; 50% (.vol-range::-moz-range-thumb) ; 6px (.voice-bubble).
 
 ## Ombres
 
@@ -280,7 +280,7 @@ En dur : 50% (input[type=range].dual-range-min::-webkit-slider-t) ; 50% (input[t
 | `0 1px 2px 0 rgba(0,0,0,.05)` | 1 | shadow-sm 1 |
 | `0 -5px 10px rgba(0,0,0,.3)` | 1 | shadow-[0_-5px_10px_rgba(0,0,0,0.3)] 1 |
 
-En dur : inset 0 2px 6px rgba(0, 0, 0, 0.7) (.flight-strip) ; inset 0 1px 3px rgba(0, 0, 0, 0.4) (.filter-input) ; inset 0 1px 3px rgba(0, 0, 0, 0.4) !important (.filter-input:focus) ; inset 0 1px 3px rgba(0, 0, 0, 0.4) (.filter-btn-active) ; inset 0 1px 3px rgba(0, 0, 0, 0.5) !important (.flight-card-map-hover) ; 0 0 8px theme('colors.highlight') (.audio-visualizer-bar) ; drop-shadow(0 0 2px rgba(0, 0, 0, 0.5)) (.history-point-marker) ; drop-shadow(0 0 3px rgba(255, 255, 255, 0.3)) (.history-point-marker:hover) ; drop-shadow(0 0 4px rgba(255, 255, 255, 0.4)) (.history-point-marker-last) ; drop-shadow(0 0 6px rgba(255, 255, 255, 0.6)) (.history-point-marker-last:hover) ; 0 0 2px rgba(0, 0, 0, 0.8) (.altitude-label) ; 0 0 10px rgba(235, 140, 0, 0.2) !important (.proximity-highlight) ; 0 0 12px rgba(255, 152, 0, 0.4) !important (.proximity-highlight-hover) ; 0 2px 8px rgba(0, 0, 0, 0.2) (#radio-bar .rounded-lg:hover) ; drop-shadow(0 0 2px rgba(0, 0, 0, 0.7)) (.runway-distance-marker) ; 0 0 2px rgba(0, 0, 0, 0.8) (.runway-distance-label) ; 0 4px 12px rgba(0, 0, 0, 0.5) (.ol-ref-popup) ; drop-shadow(0 0 10px currentColor) brightness(1.5) (.takeoff-landing-highlight) ; 0 4px 12px rgba(0, 0, 0, 0.5) (.par-tip) ; 0 0 0 1px #4CAF50 (.alt-range::-webkit-slider-thumb) ; 0 0 0 3px rgba(76, 175, 80, 0.5) (.alt-range:focus-visible::-webkit-slider-thumb) ; 0 2px 6px rgba(0, 0, 0, 0.5) (.voice-bubble).
+En dur : inset 0 2px 6px rgba(0, 0, 0, 0.7) (.flight-strip) ; inset 0 1px 3px rgba(0, 0, 0, 0.4) (.filter-input) ; inset 0 1px 3px rgba(0, 0, 0, 0.4) !important (.filter-input:focus) ; inset 0 1px 3px rgba(0, 0, 0, 0.4) (.filter-btn-active) ; inset 0 1px 3px rgba(0, 0, 0, 0.5) !important (.flight-card-map-hover) ; 0 0 8px theme('colors.highlight') (.audio-visualizer-bar) ; 0 2px 8px rgba(0, 0, 0, 0.2) (#radio-bar .rounded-lg:hover) ; 0 4px 12px rgba(0, 0, 0, 0.5) (.ol-ref-popup) ; 0 4px 12px rgba(0, 0, 0, 0.5) (.par-tip) ; 0 0 0 1px #4CAF50 (.alt-range::-webkit-slider-thumb) ; 0 0 0 3px rgba(76, 175, 80, 0.5) (.alt-range:focus-visible::-webkit-slider-thumb) ; 0 2px 6px rgba(0, 0, 0, 0.5) (.voice-bubble).
 
 ## Épaisseurs de bordure
 
@@ -318,8 +318,7 @@ En dur : inset 0 2px 6px rgba(0, 0, 0, 0.7) (.flight-strip) ; inset 0 1px 3px rg
 | `1000` | 1 | z-[1000] 1 |
 | `1001` | 1 | z-[1001] 1 |
 
-En dur : 2 (input[type=range].dual-range-min::-webkit-slider-t) ; 1 (input[type=range].dual-range-max::-webkit-slider-t) ; 2 (input[type=range].dual-range-min::-moz-range-thumb) ; 1 (input[type=range].dual-range-max::-moz-range-thumb) ; 1 !important (.altitude-label-container) ; 1500 !important (.proximity-highlight) ; 400 !important (.history-tooltip) ; 1 !important (.runway-label-container) ; 1 !important (.runway-distance-label-container) ; 1 !important (.airport-label-container,
-.heliport-label-containe) ; 1200 (.ol-ref-popup) ; 9000 (#par-view) ; 20000 (.par-tip) ; 10000 (x).
+En dur : 1200 (.ol-ref-popup) ; 9000 (#par-view) ; 20000 (.par-tip) ; 10000 (x).
 
 ## Mouvement (transitions, animations)
 
@@ -333,7 +332,7 @@ En dur : 2 (input[type=range].dual-range-min::-webkit-slider-t) ; 1 (input[type=
 | `0s` | 1 | duration-0 1 |
 | `.3s` | 1 | duration-300 1 |
 
-En dur : 14 déclarations ; @keyframes : subtle-pulse, proximityPulse, takeoffLandingGlow, takeoffLandingLabelPulse, tx-flash ; prefers-reduced-motion : non.
+En dur : 5 déclarations ; @keyframes : tx-flash ; prefers-reduced-motion : non.
 
 ## États
 
@@ -347,7 +346,7 @@ Variantes Tailwind (préfixes) :
 | focus: | 2 | outline-none 2 |
 | first: | 1 | mt-0 1 |
 
-Sélecteurs d'état dans style.css : hover 15, focus 4, checked 2, active 1, focus-visible 1, first-child 1, last-child 1.
+Sélecteurs d'état dans style.css : hover 13, focus 2, checked 2, active 1, focus-visible 1, first-child 1, last-child 1.
 
 ## Icônes
 
@@ -373,18 +372,17 @@ SVG dans www/assets : a0.svg, a1.svg, a2.svg, a3.svg, a4.svg, a5.svg, a6.svg, a7
 - <input> : 43
 - <select> : 5
 - focus/focus-visible variants (Tailwind) : 2
-- :focus rules (style.css) : 5
+- :focus rules (style.css) : 3
 - @media in style.css : 0
 - prefers-reduced-motion : no
 - @media de style.css : aucune
 
 ## style.css : règles orphelines
 
-Sélecteurs de classe ou d'identifiant définis : 123 ; sans aucune occurrence dans index.html ni les scripts : 51.
+Sélecteurs de classe ou d'identifiant définis : 70 ; sans aucune occurrence dans index.html ni les scripts : 0.
 
-`.aircraft-entering` (l. 66) · `.aircraft-leaving` (l. 71) · `.aircraft-label-table-hover` (l. 82) · `.aircraft-marker` (l. 108) · `.label-hover` (l. 122) · `.aircraft-label` (l. 126) · `.aircraft-label-inactive` (l. 130) · `.aircraft-label-signal-lost` (l. 134) · `.aircraft-label-age-stale` (l. 139) · `.trend-climbing` (l. 149) · `.trend-descending` (l. 150) · `.trend-level` (l. 151) · `.dual-range-min` (l. 178) · `.dual-range-max` (l. 178) · `.history-trail` (l. 341) · `.history-point-marker` (l. 345) · `.history-point-marker-last` (l. 355) · `.history-tooltip` (l. 366) · `.history-tooltip-content` (l. 370) · `.history-time` (l. 375) · `.altitude-label-container` (l. 380) · `.altitude-label` (l. 393) · `.proximity-highlight` (l. 400) · `.proximity-circle-normal` (l. 428) · `.proximity-circle-alert` (l. 428) · `.runway-line` (l. 475) · `.runway-extension-line` (l. 479) · `.runway-label-container` (l. 483) · `.runway-label` (l. 489) · `.runway-distance-marker` (l. 500) · `.runway-distance-label-container` (l. 504) · `.runway-distance-label` (l. 510) · `.airport-label-container` (l. 527) · `.heliport-label-container` (l. 527) · `.heliport-icon-container` (l. 527) · `.navaid-label-container` (l. 527) · `.navaid-icon-container` (l. 527) · `.airport-label` (l. 533) · `.heliport-label` (l. 544) · `.navaid-label` (l. 555) · `.proximity-circle-animated` (l. 665) · `.takeoff-landing-pulse` (l. 670) · `.takeoff-landing-highlight` (l. 675) · `.takeoff-landing-label-highlight` (l. 681) · `.aircraft-icon-container` (l. 721) · `.altitude-band-cruise` (l. 756) · `.altitude-band-high` (l. 760) · `.altitude-band-mid` (l. 764) · `.altitude-band-low` (l. 768) · `.altitude-band-very-low` (l. 772) · `.no-transition` (l. 778)
 
-`!important` dans style.css : 65 ; classes Tailwind préfixées par ! : 0.
+`!important` dans style.css : 18 ; classes Tailwind préfixées par ! : 0.
 
 ## Identité de la page
 

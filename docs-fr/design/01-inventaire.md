@@ -5,6 +5,12 @@ proposition. Branche `design`, sources au commit `6976f04` (= `local` du 12/10, 
 faites une heure plus tôt sur `bf5c094` ; entre les deux, seules les bulles vocales de la carte et
 le correctif de palette (point 5) ont changé.*
 
+> **Mise à jour, même jour (`e701201`).** La session atc-scribe a retiré les 51 sélecteurs orphelins
+> de `style.css` et les trois animations qu'eux seuls appelaient (§ 10) : 957 → 482 lignes, 65 → 18
+> `!important`, couleurs en dur 319 → 284 (`style.css` 142 → 107), 225 → 215 valeurs distinctes.
+> Ce document décrit l'état de départ ; le brut, régénéré, décrit l'état présent. Rien d'autre ne
+> change à l'écran.
+
 ## Méthode
 
 Deux mesures complémentaires, rejouables :
@@ -55,8 +61,8 @@ Captures de référence « avant » : `captures/avant-*.jpg` (1 440 × 900 rédu
 7. **Téléphone** : 35 cibles tactiles sur 41 sous 44 px dans la liste, 17 sous 24 px.
 8. **Identité** : le titre dit `Co-ATC`, aucun favicon, aucun manifeste ; la page de connexion a
    sa propre palette (7 couleurs que rien d'autre n'emploie).
-9. **Dette CSS** : 51 des 123 sélecteurs de `style.css` ne servent plus (le rendu des avions en
-   DOM, remplacé par WebGL) ; 65 `!important`.
+9. **Dette CSS** : 51 des 123 sélecteurs de `style.css` ne servaient plus (le rendu des avions en
+   DOM, remplacé par WebGL) ; 65 `!important`. **Retirés le jour même** (`e701201`).
 
 Ce qui est **juste** et doit rester : le noir et le vert, la page des réglages (96 % du texte à 12
 et 14 px, 3 % sous AA), la cohérence des phases entre les trois vues, une échelle d'espacement
@@ -254,7 +260,8 @@ d'avions dans `www/assets/` (a0 à a7). Aucun signe propre à l'outil.
 Transitions : 150 ms (69 emplois), 200 ms (13), 300 et 500 ms (2). Animations : `animate-spin`,
 `animate-pulse` (« Connection Lost » clignote en 36 px rouge), 4 `@keyframes` dans `style.css`
 (`subtle-pulse`, `proximityPulse`, `takeoffLandingGlow`, `takeoffLandingLabelPulse`), dont les
-trois dernières ne sont plus appelées. Les avions bougent par `requestAnimationFrame` (moteur
+trois dernières n'étaient plus appelées (retirées depuis ; `tx-flash` est arrivée avec les
+bulles vocales de la carte). Les avions bougent par `requestAnimationFrame` (moteur
 d'animation, 30 i/s). **`prefers-reduced-motion` : absent.**
 
 ## 8. Accessibilité
@@ -293,9 +300,11 @@ minimum sans alourdir.
 - **51 sélecteurs orphelins sur 123** dans `style.css` (42 %) : étiquettes, traînées, pistes,
   survols et bandes d'altitude de l'ancien rendu des avions en DOM, remplacé par WebGL ; aucune
   occurrence dans le HTML ni les scripts, y compris construite par concaténation (vérifié par
-  `grep` sur les racines). Liste dans le brut.
-- **65 `!important`** dans `style.css`, nécessaires parce que Tailwind compilé passe après lui
-  (ordre voulu le 11/10 pour reproduire le CDN).
+  `grep` sur les racines). **Retirés le 12/10 par la session atc-scribe (`e701201`)**, avec les
+  trois `@keyframes` qu'ils appelaient : il reste 70 sélecteurs, tous employés.
+- **65 `!important`** dans `style.css` au départ, **18** après ce retrait ; ceux qui restent tiennent
+  à l'ordre des feuilles (Tailwind compilé passe après `style.css`, voulu le 11/10 pour reproduire
+  le CDN).
 - `:root { --highlight-color: #4CAF50; }` : la seule variable CSS de couleur, que rien n'utilise.
 
 ## Ce qui est incohérent, ce qui est juste
