@@ -331,7 +331,7 @@ func startFrequencies(ctx context.Context, cfg *config.Config, adsbService *adsb
 		return phraseology.Rules{Letters: m.Letters, ApproxOperators: m.ApproxOperators,
 			MinDigits: m.MinDigits, OneDigitOff: m.OneDigitOff,
 			ContextLetters: m.ContextLetters, ContextDigits: m.ContextDigits, ContextNames: m.ContextNames,
-			PrefixDigits: m.PrefixDigits}
+			PrefixDigits: m.PrefixDigits, MinScore: m.MinScore}
 	})
 
 	// Start frequencies service

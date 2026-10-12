@@ -82,6 +82,12 @@ type MatchingRules struct {
 	// 91% -> 96% (docs-fr/05-decisions.md, D59).
 	Sectors bool                  `json:"sectors"`
 	Sector  map[string]SectorSize `json:"sector"`
+
+	// MinScore refuses a match below this score; 0 keeps the matcher's own
+	// floor (0.6). 0.9 requires the exact flight number: measured on 03 and
+	// 04/10, precision 95% -> 97% for 27% fewer matches (D73, the "cautious"
+	// preset). The file's post_processing.min_score still applies if higher.
+	MinScore float64 `json:"min_score"`
 }
 
 // SectorSize is how far and how high a kind of frequency reaches.
@@ -115,6 +121,9 @@ func DefaultMatchingRules(minDigits int) MatchingRules {
 func (m MatchingRules) validate() error {
 	if m.MinDigits < 2 || m.MinDigits > 4 {
 		return fmt.Errorf("matching.min_digits must be 2, 3 or 4, got %d", m.MinDigits)
+	}
+	if m.MinScore < 0 || m.MinScore > 2 {
+		return fmt.Errorf("matching.min_score must be between 0 and 2, got %g", m.MinScore)
 	}
 	for kind, size := range m.Sector {
 		if !SectorKinds[kind] {

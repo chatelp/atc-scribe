@@ -132,6 +132,7 @@ type Rules struct {
 	ContextDigits   bool
 	ContextNames    bool
 	PrefixDigits    bool
+	MinScore        float64 // refuse a match below this; 0 keeps the configured floor
 }
 
 // WithRules returns a copy of the matcher applying r. The copy shares the

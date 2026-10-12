@@ -12,8 +12,44 @@
 // database retention. The rest is reported and not editable, because changing it
 // means reopening the log file or the audio pipeline. A panel that silently
 // fails to apply half of what it shows is worse than one that says which half.
+// The three matching presets (D73, 12/10), measured on the 03 and 04/10
+// databases against shuffled skies: 'measured' is the default in force since
+// 26/09 (95% precision); 'cautious' asks for the exact flight number (97%,
+// 27% fewer matches); 'experimental' adds the two rules the owner has yet to
+// judge by ear (+25% matches, 95% by the shuffle, which cannot see an airline
+// named alone). Sector sizes are not part of a preset.
+const MATCHING_PRESETS = (() => {
+    const measured = { letters: true, approx_operators: true, min_digits: 3, one_digit_off: false,
+        context_letters: true, context_digits: true, context_names: false, prefix_digits: false,
+        sectors: true, min_score: 0 };
+    return {
+        measured,
+        cautious: { ...measured, min_score: 0.9 },
+        experimental: { ...measured, context_names: true, prefix_digits: true },
+    };
+})();
+
 function serverSettings() {
     return {
+        presets: MATCHING_PRESETS,
+
+        // The preset the rules match, or null when they match none.
+        activePreset() {
+            const m = this.draft.matching;
+            if (!m) return null;
+            for (const [name, preset] of Object.entries(MATCHING_PRESETS)) {
+                if (Object.keys(preset).every((k) => (m[k] ?? (k === 'min_score' ? 0 : undefined)) === preset[k])) return name;
+            }
+            return null;
+        },
+
+        applyPreset(name) {
+            const preset = MATCHING_PRESETS[name];
+            if (!preset || !this.draft.matching) return;
+            Object.assign(this.draft.matching, preset);
+            this.save();
+        },
+
         state: null,
         draft: { log_level: 'info', db_retention_gb: 20, reference_airport: '', also_airports: [], matching: null },
         newAccount: null, // { username, password } while the first account is being typed

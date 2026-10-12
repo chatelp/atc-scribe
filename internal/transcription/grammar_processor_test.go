@@ -482,3 +482,30 @@ func TestTheProofOfAMatchIsKept(t *testing.T) {
 		t.Errorf("an unmatched transmission keeps a proof: %v %q", r.MatchScore, r.MatchReason)
 	}
 }
+
+// The panel's score floor (D73): at 0.9 only an exact flight number names an
+// aircraft; a number that merely ends with it ("two one zero eight one" for
+// 1081, the digits suffix rule, 0.6, the matcher's own floor) no longer does.
+func TestThePanelsScoreFloorRefusesPartialMatches(t *testing.T) {
+	for _, c := range []struct {
+		floor float64
+		want  string
+	}{{0, "AFR1081"}, {0.9, ""}} {
+		proc, txStore, _ := newTestProcessor(t, fixedFleet{
+			{Callsign: "AFR1081", Hex: "39c1a2", AltitudeFt: 10000, Phase: "ARR"},
+		})
+		proc.config.Rules = func() phraseology.Rules { return phraseology.Rules{MinDigits: 3, MinScore: c.floor} }
+		// No level said: a level agreeing with the aircraft's would add 0.4.
+		suffix := store(t, txStore, "two one zero eight one contact one one nine decimal two five five")
+		exact := store(t, txStore, "one zero eight one contact one one nine decimal two five five")
+		if err := proc.processNextBatch(); err != nil {
+			t.Fatalf("processNextBatch: %v", err)
+		}
+		if got := reread(t, txStore, suffix).Callsign; got != c.want {
+			t.Errorf("floor %g, suffix only: callsign %q, want %q", c.floor, got, c.want)
+		}
+		if got := reread(t, txStore, exact).Callsign; got != "AFR1081" {
+			t.Errorf("floor %g, exact digits: callsign %q, want AFR1081", c.floor, got)
+		}
+	}
+}

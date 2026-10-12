@@ -367,8 +367,14 @@ func (p *GrammarProcessor) match(record *sqlite.TranscriptionRecord, result phra
 	// reading that named it -- the processed primary text, or the second reading.
 	var evidence [][2]int
 	matcher := p.matcher
+	minScore := p.config.MinScore
 	if p.config.Rules != nil {
-		matcher = p.matcher.WithRules(p.config.Rules())
+		rules := p.config.Rules()
+		matcher = p.matcher.WithRules(rules)
+		// The panel's floor, when it asks for more than the file's (D73).
+		if rules.MinScore > minScore {
+			minScore = rules.MinScore
+		}
 	}
 	// Only the aircraft this frequency can be talking to. With fewer
 	// candidates, a flight part missing its last letter ("seven uniform" for
@@ -403,7 +409,7 @@ func (p *GrammarProcessor) match(record *sqlite.TranscriptionRecord, result phra
 					logger.Float64("score", m.Score))
 				return m, false
 			}
-			return m, m.Score >= p.config.MinScore
+			return m, m.Score >= minScore
 		}
 
 		primary, okPrimary := try(result, record.Content)

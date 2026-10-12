@@ -173,6 +173,16 @@
                                         <template x-if="draft.matching">
                                             <div class="grid gap-1.5 min-w-0">
                                                 <span class="text-sm">Callsign matching</span>
+                                                <!-- Three presets (D73), measured on 03 and 04/10; the boxes below stay
+                                                     free to change, and "custom" says when they match no preset. -->
+                                                <div class="flex flex-wrap items-center gap-1.5 text-xs mb-1">
+                                                    <template x-for="p in [['measured', 'Measured', 'The rules in force since 26/09, each measured against shuffled skies: letters in flight numbers, the airline heard roughly, three digits at least, the last letters and the last two digits of an aircraft just heard, the frequency\'s sector. Measured on 03 and 04/10: 2 557 and 1 699 matches, 95 % right. The default.'], ['cautious', 'Cautious', 'Measured, plus the exact flight number required (score 0.9): a number heard in part, or an abbreviation alone, no longer names an aircraft. Measured on 03 and 04/10: 97 % right, for 27 % fewer matches. For when a wrong aircraft costs more than a missing one.'], ['experimental', 'Experimental', 'Measured, plus the two rules the shuffled sky cannot judge: an airline named alone when one aircraft of it was just heard, and the first digits after the airline\'s name. Measured on 03 and 04/10: 25 % more matches, 95 % right by the shuffle -- but two aircraft of one airline on the frequency can be confused, which only an ear can tell. To try, and judge.']]" :key="p[0]">
+                                                        <button class="px-2 py-1 rounded border cursor-pointer"
+                                                                :class="activePreset() === p[0] ? 'border-highlight/60 bg-highlight/15 text-highlight' : 'border-border text-text/70 hover:text-text'"
+                                                                :disabled="busy" @click="applyPreset(p[0])" data-help-title="Preset" :data-help="p[2]" x-text="p[1]"></button>
+                                                    </template>
+                                                    <span class="text-text/50" x-show="!activePreset()" data-help-title="Custom" data-help="The boxes below match none of the three presets: your own mix of rules.">custom</span>
+                                                </div>
                                                 <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
                                                     <input type="checkbox" x-model="draft.matching.letters" @change="save()" :disabled="busy" class="mt-0.5">
                                                     <span><span class="text-highlight">Letters in flight numbers</span>: "seven uniform echo" read as 7UE.
@@ -233,6 +243,11 @@
                                                         </template>
                                                     </div>
                                                 </template>
+                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
+                                                    <input type="checkbox" :checked="(draft.matching.min_score || 0) >= 0.9" @change="draft.matching.min_score = $event.target.checked ? 0.9 : 0; save()" :disabled="busy" class="mt-0.5">
+                                                    <span><span class="text-highlight">Exact flight number required</span> (score 0.9): a number heard in part, or an abbreviation
+                                                    alone, no longer names an aircraft. Measured on 03 and 04/10: 95 % to 97 % right, 27 % fewer matches.</span>
+                                                </label>
                                                 <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
                                                     <input type="checkbox" x-model="draft.matching.prefix_digits" @change="save()" :disabled="busy" class="mt-0.5">
                                                     <span><span class="text-highlight">First two digits, airline named</span>: "Air France Five One" for AFR511,
