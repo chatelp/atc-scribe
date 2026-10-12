@@ -485,6 +485,15 @@ sur la carte.
 
 ## État
 
+- 12/10 (après-midi) : **bulles de dernière transmission sur la carte** (`9809277`), demande du
+  propriétaire hors plan : au-dessus de chaque avion nommé par la radio dans les dix dernières
+  minutes, sa dernière transmission (coupée à 64 caractères, texte complet dans la bulle d'aide) ;
+  un clic ouvre le fil de la fréquence à cette transmission. Interrupteur dans Affichage.
+  Vérifié sur l'instance d'essai (bulle, suivi de l'avion animé, clic → fil ouvert et ligne
+  visible). Trois sessions en parallèle depuis le 12/10 : labo (précision par indices),
+  communauté (`~/Dev/Aero/atc-scribe-communaute`, cadre légal fait ; **le nom change**, décision
+  de Pierre : la DSNA a un outil « Scribe » et le nom est contesté par le SNCTA), design
+  (`docs-fr/design/MISSION.md`, branche `design`).
 - 12/10 : **première séance du propriétaire sur la version des paliers 0 à 4** (journal
   d'événements, réglages, curseur d'altitude en QNH/FL, réécoute, fiche de vol, séquence
   d'arrivée, consignes en clair, bandeau d'état, barre radio, bibliothèques locales) :
