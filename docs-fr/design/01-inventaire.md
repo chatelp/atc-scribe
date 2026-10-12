@@ -43,7 +43,8 @@ Captures de référence « avant » : `captures/avant-*.jpg` (1 440 × 900 rédu
    sous 11 px (7, 8, 9, 9,6 et 10 px) ; à 7 et 8 px : 12 %. **Quinze tailles** coexistent dans le
    code, neuf à l'écran en même temps.
 2. **Le gris fait le travail de la hiérarchie, et il le fait mal.** 134 emplois de `text-text/xx`
-   (dix opacités du même gris, de /25 à /90) et 46 `opacity-*` sur du texte : c'est l'essentiel
+   (dix opacités du même gris, de /25 à /90), plus des `opacity-*` posés sur des blocs de texte
+   (53 emplois d'`opacity-*` en tout, non triés) : c'est l'essentiel
    des 18 % de caractères sous le seuil AA à l'écran principal (35 % sur la Timeline).
 3. **225 couleurs distinctes** (107 teintes opaques, 140 variantes transparentes), dont **319
    occurrences en dur** hors Tailwind, dans neuf fichiers. 23 teintes en doublon d'une autre à
@@ -154,7 +155,7 @@ du thème (`#0a0a0a`, `#1a1a1a`, `#2a2a2a`, `#333`, `#e0e0e0`) et une quinzaine 
 
 | | Où | Rôle |
 |---|---|---|
-| `#4CAF50` (`highlight`) | 92 `text-highlight`, 30 en dur, 23 variantes transparentes (/10 à /95) | marque, actif, sélection, heure |
+| `#4CAF50` (`highlight`) | 92 `text-highlight`, 31 en dur, 17 variantes transparentes (/6 à /95, 83 emplois) | marque, actif, sélection, heure |
 | `#4ADE80` (`green-400`) | connexion (5), voyant « ok », locuteur PILOT, indice « strong » | succès, pilote |
 | `#22C55E` (`green-500`) | fonds /20, bordures /30 | badges |
 | `#6EE7B7` (`emerald-300`), `#34D399` | consigne en clair « clairance » | clairance |
@@ -223,7 +224,7 @@ l'a affinée au cas par cas. `style.css` en ajoute 25 valeurs en dur (`1px 3px`,
 puis 6 px (17), plein (15), 8 px (8), 2 px (4) ; `style.css` ajoute 1, 2, 3 et 6 px.
 
 **Bordures** : 1 px partout (195), 2 px pour les accents (9). Couleur dominante `border-border`
-`#333` (104), puis 9 variantes transparentes du même gris et 23 bordures colorées.
+`#333` (104), puis 6 variantes transparentes du même gris et 48 classes de bordure colorée.
 
 **Ombres** : 7 valeurs Tailwind (dont 4 arbitraires) et 21 en dur, dont des `drop-shadow`
 d'éléments qui n'existent plus. Sur fond noir une ombre portée ne se voit pas ; ce qui sépare un

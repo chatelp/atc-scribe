@@ -40,8 +40,8 @@ du nom (D74) : la marque viendra après le choix du propriétaire, sur les même
 | `surface.warn` | `#2e2410` | ligne d'attention |
 | `scrim` | noir à 70 % | derrière la page des réglages |
 
-La sélection devient **un vert opaque** au lieu des neuf transparences de vert d'aujourd'hui
-(`/10` à `/95`). Sa valeur ne dépend plus de ce qu'il y a derrière, donc le contraste du texte
+La sélection devient **un vert opaque** au lieu des dix-sept transparences de vert
+d'aujourd'hui (`/6` à `/95`, 83 emplois). Sa valeur ne dépend plus de ce qu'il y a derrière, donc le contraste du texte
 non plus (principe 3).
 
 ### Texte : trois niveaux nommés

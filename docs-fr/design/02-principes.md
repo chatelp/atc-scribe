@@ -43,7 +43,8 @@ sur chaque fond où il peut apparaître.** La transparence est réservée aux fo
 
 *Pourquoi* : baisser l'opacité du texte principal pour faire du secondaire produit des gris qui
 dépendent du fond et tombent sous le seuil. *Mesure* : dix opacités du même gris (`text-text/25` à
-`/90`, 134 emplois) et 46 `opacity-*` sur du texte ; c'est la cause de presque tous les échecs :
+`/90`, 134 emplois), plus des `opacity-*` sur des blocs de texte (53 emplois d'`opacity-*` en tout) ;
+c'est la cause de presque tous les échecs :
 18 % des caractères de l'écran principal sous AA, 35 % sur la Timeline. Les couleurs pleines,
 elles, passent toutes (6,3 à 17,4:1).
 
@@ -56,7 +57,7 @@ trois-là pour autre chose.
 
 *Pourquoi* : quand une couleur dit tout, elle ne dit plus rien ; le novice apprend un code, il
 doit être stable. *Mesure* : le vert porte aujourd'hui cinq sens (marque, actif, succès, pilote,
-clairance), en deux verts de marque différents (`#4CAF50`, `#4ADE80`) et 23 variantes
+clairance), en deux verts de marque différents (`#4CAF50`, `#4ADE80`) et 17 variantes
 transparentes ; 225 couleurs au total, dont 319 écrites hors du thème.
 
 ## 5. Ce qui crie est rare
