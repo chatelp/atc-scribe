@@ -4984,7 +4984,23 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
-### Q54 — Le portage du sidecar hors Apple Silicon : par quoi commencer ? *(12/10 — ouverte, instruite par la session communauté)*
+### Q54 — Le portage du sidecar hors Apple Silicon : par quoi commencer ? *(12/10 — cible tranchée, jalon à venir, pas immédiat)*
+
+> **Décision du propriétaire le 12/10** : la cible est celle que la session communauté
+> recommande, **Linux x86-64 + NVIDIA (faster-whisper / CTranslate2)**, et le portage entre dans
+> les jalons à venir du chantier (`32-audit-produit.md`, « Plus tard »), **pas dans l'immédiat**.
+> Ce qui passe avant : la fin des trois études en cours (nom et design, communautés et
+> prérequis), puis ce qu'elles imposent à l'outil avant qu'on en parle à quiconque. Les mesures
+> ci-dessous restent la base de l'instruction le jour venu.
+>
+> **Nuance apportée par la question 3 de la même étude (12/10, après la décision)** : ceux qui
+> ont des récepteurs n'ont pas de GPU (contributeurs ADS-B sur Pi), ceux qui ont des GPU n'ont
+> pas de récepteurs : ce sont les simmers, et ils sont sous **Windows** (données Navigraph 2026,
+> 321 simmers français sur VATSIM ou IVAO : 75 % ont une NVIDIA RTX de 8 Go ou plus, 96 % sous
+> Windows, 2 % sur Mac). La pile ne change pas (faster-whisper et CTranslate2 tournent sous
+> Windows avec CUDA), mais une cible « Linux + Docker seulement » servirait les récepteurs et les
+> serveurs, pas les contributeurs de l'affinage : **prévoir Windows au moins pour l'affinage**.
+> La question 4 de l'étude le précisera.
 
 Le sidecar de transcription est écrit pour MLX, donc Apple Silicon seulement (D10). La
 session communauté a établi le 12/10, sources dans son dossier (`annexes/recherches/

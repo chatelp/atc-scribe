@@ -368,6 +368,13 @@ indiqué en fin de ligne quand il a bougé ; chaque ligne se fait sous les sept 
 en plan (B4), procédures du SIA (B5), les fréquences comme un pupitre (C5, ça bascule l'antenne),
 programmation d'écoute par plage horaire (E2).
 
+**Plus tard, tranché (12/10)** : le **portage du sidecar vers Linux x86-64 + NVIDIA**
+(faster-whisper / CTranslate2, repli processeur dans la même pile ; le Pi reçoit, la
+transcription se déporte), cible fixée par le propriétaire sur l'étude de la session communauté
+(Q54), **jalon à venir, pas dans l'immédiat** : après les trois études en cours et ce qu'elles
+imposent à l'outil ; le format devra permettre l'affinage, et la non-régression se mesurera au
+labo sur le modèle converti.
+
 ### Ce que le propriétaire doit trancher
 
 | # | Arbitrage | État |
