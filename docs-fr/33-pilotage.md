@@ -83,8 +83,14 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
    dès maintenant, le principe 8 : monospace pour les nombres, police système pour les phrases
    (mesuré : le monospace est 1,26 fois plus large à taille égale). Jetons et maquettes à venir.
 3. **Le premier pas communautaire**, sur la recommandation de l'étude (question 5).
-4. Le moment du **portage** (cible fixée, calendrier non).
-5. Le **tirage au hasard** de la précision d'appariement (jalon du labo, lié à l'annotation).
+4. **La position de la station dans le dépôt public** (alerte de la session communauté,
+   12/10) : D11 (15/09) la garde à 5 décimales, soit le mètre, parce qu'elle est publique via
+   FlightAware ; vue d'un projet communautaire, c'est une adresse. Présente dans cinq fichiers
+   suivis (01-station, D11, une fiche cloud, un test Go, un script d'outil) depuis le premier
+   commit du 15/09, 483 commits, aucun fork ni étoile. À trancher : arrondir (à combien), retirer
+   IP privées et nom d'hôte des documents publics, réécrire l'historique ou non.
+5. Le moment du **portage** (cible fixée, calendrier non).
+6. Le **tirage au hasard** de la précision d'appariement (jalon du labo, lié à l'annotation).
 
 ## Les risques suivis
 
