@@ -42,6 +42,10 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
   préréglages d'appariement mesurés (D73), preuve d'appariement (D72). Validé à l'usage par le
   propriétaire le 12/10 (« nette amélioration UX »).
 - Bulles de dernière transmission sur la carte (12/10).
+- **D75** (12/10) : position de la station à deux décimales, adresses du réseau domestique
+  génériques, **historique git réécrit** (499 commits, quatre branches, poussé de force) ;
+  sauvegarde complète d'avant sur le Mac ; reste la purge côté GitHub, à demander par le
+  propriétaire.
 - Garde-fou 3 rebouché (12/10, trouvé par la session design) : la production sert une copie
   figée de `www/` prise à son lancement (`server.static_dir`), plus les fichiers en cours
   d'édition ; l'instance d'essai reste la vérification en direct.
@@ -91,17 +95,12 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
    `prefers-reduced-motion` ; (6) la validation d'ensemble, maquettes à l'appui, qui ouvre la
    migration.
 3. **Le premier pas communautaire**, sur la recommandation de l'étude (question 5).
-4. **La position de la station dans le dépôt public** (alerte de la session communauté,
-   12/10) : D11 (15/09) la garde à 5 décimales, soit le mètre, parce qu'elle est publique via
-   FlightAware ; vue d'un projet communautaire, c'est une adresse. Présente dans cinq fichiers
-   suivis (01-station, D11, une fiche cloud, un test Go, un script d'outil) depuis le premier
-   commit du 15/09, 483 commits, aucun fork ni étoile. L'usage de l'écosystème, vérifié dans
-   les sources le 12/10 : dump1090-fa arrondit à **2 décimales** en mode approximatif (« for
-   privacy reasons »), mlat-server à 1/20 de degré avec décalage aléatoire, ADS-B Exchange à une
-   grille de 5 milles ; FlightAware a un réglage de précision de la carte de couverture, que seul
-   le propriétaire peut vérifier dans « My ADS-B » ; aucun outil ne publie à 5 décimales par
-   défaut. À trancher : arrondir à 2 décimales, retirer IP privées et nom d'hôte des documents
-   publics, réécrire l'historique ou non.
+4. **Demander à GitHub la purge des anciens objets** (après D75, faite le 12/10 : position
+   arrondie, adresses génériques, historique réécrit et poussé de force sur les quatre
+   branches, sauvegarde `~/Dev/Aero/atc-scribe-sauvegarde-2026-10-12.git`) : les commits
+   d'avant restent servis par GitHub par leur identifiant jusqu'à une demande au support, que
+   seul le propriétaire peut faire (texte fourni le 12/10). À vérifier aussi : le réglage de
+   précision de la carte de couverture sur FlightAware (« My ADS-B »).
 5. Le moment du **portage** (cible fixée, calendrier non).
 6. Le **tirage au hasard** de la précision d'appariement (jalon du labo, lié à l'annotation).
 
