@@ -87,8 +87,13 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
    12/10) : D11 (15/09) la garde à 5 décimales, soit le mètre, parce qu'elle est publique via
    FlightAware ; vue d'un projet communautaire, c'est une adresse. Présente dans cinq fichiers
    suivis (01-station, D11, une fiche cloud, un test Go, un script d'outil) depuis le premier
-   commit du 15/09, 483 commits, aucun fork ni étoile. À trancher : arrondir (à combien), retirer
-   IP privées et nom d'hôte des documents publics, réécrire l'historique ou non.
+   commit du 15/09, 483 commits, aucun fork ni étoile. L'usage de l'écosystème, vérifié dans
+   les sources le 12/10 : dump1090-fa arrondit à **2 décimales** en mode approximatif (« for
+   privacy reasons »), mlat-server à 1/20 de degré avec décalage aléatoire, ADS-B Exchange à une
+   grille de 5 milles ; FlightAware a un réglage de précision de la carte de couverture, que seul
+   le propriétaire peut vérifier dans « My ADS-B » ; aucun outil ne publie à 5 décimales par
+   défaut. À trancher : arrondir à 2 décimales, retirer IP privées et nom d'hôte des documents
+   publics, réécrire l'historique ou non.
 5. Le moment du **portage** (cible fixée, calendrier non).
 6. Le **tirage au hasard** de la précision d'appariement (jalon du labo, lié à l'annotation).
 
