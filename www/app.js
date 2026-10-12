@@ -4078,26 +4078,43 @@ async initAircraftDataSource() {
                 this.fetchTranscriptionsForFrequency(frequencyId);
             }
             
-            // Position the transcription viewer correctly if it's being opened
-            if (this.transcriptionViewerVisible[frequencyId]) {
-                // Execute immediately with no delay
-                const freqElement = document.querySelector(`[data-freq-id="${frequencyId}"]`);
-                const viewer = document.querySelector(`[data-viewer-id="${frequencyId}"]`);
-                
-                if (freqElement && viewer) {
-                    const rect = freqElement.getBoundingClientRect();
-                    // Tiles are narrow (audit 4.1): the transcript keeps a readable width.
-                    const width = Math.max(rect.width, 320);
-                    viewer.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - width - 4))}px`;
-                    viewer.style.width = `${width}px`;
-                    viewer.style.bottom = `${window.innerHeight - rect.top + 8}px`;
-                    // Ensure no transitions or animations
-                    viewer.style.transition = 'none';
-                    viewer.style.transform = 'none';
-                }
+            // Every open transcript is laid out again: side by side, since the
+            // tiles under them are narrower than a readable transcript.
+            this.layoutTranscriptionViewers();
+        },
+
+        // The open transcripts, left to right in the order of their tiles, each
+        // 320 px wide and never over its neighbour: a transcript starts at its
+        // tile, or right after the previous transcript when that is further.
+        // The last ones are pushed back onto the screen if they would leave it
+        // (audit 4.1: tiles are 160 px, transcripts 320).
+        layoutTranscriptionViewers() {
+            const width = 320;
+            const gap = 8;
+            let nextLeft = 4;
+            const placed = [];
+            for (const freq of this.audioFrequencies) {
+                if (!this.transcriptionViewerVisible[freq.id]) continue;
+                const tile = document.querySelector(`[data-freq-id="${freq.id}"]`);
+                const viewer = document.querySelector(`[data-viewer-id="${freq.id}"]`);
+                if (!tile || !viewer) continue;
+                const rect = tile.getBoundingClientRect();
+                const left = Math.max(nextLeft, rect.left);
+                placed.push({ viewer, left, top: rect.top });
+                nextLeft = left + width + gap;
+            }
+            // Past the right edge: shift the row back, keeping the order.
+            const overflow = nextLeft - gap + 4 - window.innerWidth;
+            const shift = overflow > 0 ? overflow : 0;
+            for (const p of placed) {
+                p.viewer.style.left = `${Math.max(4, p.left - shift)}px`;
+                p.viewer.style.width = `${width}px`;
+                p.viewer.style.bottom = `${window.innerHeight - p.top + 8}px`;
+                p.viewer.style.transition = 'none';
+                p.viewer.style.transform = 'none';
             }
         },
-        
+
         // Fetch transcriptions for a specific frequency
         async fetchTranscriptionsForFrequency(frequencyId) {
             try {
@@ -5085,6 +5102,11 @@ async initAircraftDataSource() {
     // The PAR view takes the map's place when chosen (docs-fr/31-vue-par.md)
     Alpine.store('atc').parView = window.ParView.create(document.getElementById('par-view'), Alpine.store('atc'));
     Alpine.store('atc').setMainView(Alpine.store('atc').mainView);
+
+    // The open transcripts follow their tiles when the window changes or the
+    // strip of tiles scrolls.
+    window.addEventListener('resize', () => Alpine.store('atc').layoutTranscriptionViewers());
+    document.querySelector('.radio-strip')?.addEventListener('scroll', () => Alpine.store('atc').layoutTranscriptionViewers(), { passive: true });
 
     // On a phone, selecting an aircraft on the map opens its panel, which lives
     // in the list pane (audit 4.2).
