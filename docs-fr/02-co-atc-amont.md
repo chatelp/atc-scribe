@@ -52,7 +52,7 @@ Cinq modes, confirmés dans `configs/config.toml.example` : `tar1090`, `readsb-a
 `readsb-file`, `external-rapidapi`, `external-opensky`.
 
 **Le mode `tar1090` fonctionne sur notre station sans rien adapter.** Mesuré le 15/09 :
-`tar1090_base_url = "http://192.0.2.10:8080/data/"`, validation réussie au démarrage,
+`tar1090_base_url = "http://station.lan:8080/data/"`, validation réussie au démarrage,
 128 avions suivis dont 96 positionnés.
 
 À noter : **`external-opensky` en mode anonyme ne demande aucune clé** et fonctionne.

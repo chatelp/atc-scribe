@@ -30,7 +30,7 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 | **Whisper-lab** (`~/Dev/Aero/whisper-lab`, privé) | reconnaissance : modèles, corpus, mesures, GPU | précision par niveau d'indices mesurée (borne haute) ; Kyutai écarté (28/09) | tirage au hasard de la précision quand l'annotation aura avancé (jalon du labo) | la mesure de non-régression du modèle converti, le jour du portage |
 | **ATC-scribe communauté** (`~/Dev/Aero/atc-scribe-communaute`, privé) | cadre légal, existant, communautés françaises, prérequis, recommandation | questions 1, 2, 3 livrées | question 4 (prérequis techniques : Wyoming, Pi en différé, Windows pour l'affinage) puis 5 (le premier pas) et la synthèse | la liste hiérarchisée de ce que l'outil doit changer avant qu'on en parle à quiconque |
 | **ATC-scribe design** (branche `design`, index `docs-fr/design/README.md`) | identité, nom, système de design, maquettes, plan de migration | **tout est livré sauf la marque** : inventaire (01), nom et positionnement (00), principes (02), système et 91 jetons (03, `jetons.json`), maquettes HTML, plan de migration (04, ≈ 13 j, par étapes vérifiables) | identité (marque, favicon, icône), dès le choix du nom | **les choix du propriétaire** : le nom, puis les six points du système listés ci-dessous ; après validation, la migration étape par étape avec cette session |
-| **Station radio station** | la station : réception, chaîne VHF, captations | en veille ; `radio-ctl-sync` rapporte l'état au bandeau | — | prévenue à chaque bascule d'écoute |
+| **Station radio** (session de la station) | la station : réception, chaîne VHF, captations | en veille ; `radio-ctl-sync` rapporte l'état au bandeau | — | prévenue à chaque bascule d'écoute |
 
 ## Les jalons
 

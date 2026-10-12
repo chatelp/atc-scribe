@@ -6,11 +6,11 @@ atc-scribe a besoin.*
 
 ## Machine
 
-**`station`, 192.0.2.10** — Mac mini 2014, Intel i5-4278U (Haswell, 2 cœurs /
+**`station`, station.lan** — Mac mini 2014, Intel i5-4278U (Haswell, 2 cœurs /
 4 fils, AVX2), 7,6 Gio de RAM, disque 219 Go rempli à 21 %. **Fedora Linux 44**, sans
-écran, en fonctionnement continu. Accès `ssh pierre@192.0.2.10` sans mot de passe.
+écran, en fonctionnement continu. Accès `ssh pierre@station.lan` sans mot de passe.
 
-**Position : 48.81 / 2.05, antenne à 152 m** (sol IGN 139,0 m + 13 m au-dessus du
+**Position : 48.81 / 2.05 (à deux décimales dans les documents publics, D75 ; la valeur exacte est dans la configuration locale), antenne à 152 m** (sol IGN 139,0 m + 13 m au-dessus du
 sol). Fontenay-le-Fleury, Yvelines.
 
 Ces trois valeurs sont celles à mettre dans `[station]` de la configuration Co-ATC.
@@ -49,10 +49,10 @@ fonctionnent ; depuis un conteneur ou une machine tierce, utiliser l'IP.**
 
 | Ce dont Co-ATC a besoin | Où le prendre |
 |---|---|
-| **ADS-B temps réel** | `http://192.0.2.10:8080/data/aircraft.json` — c'est un tar1090/readsb standard, avec `receiver.json` et `stats.json` à côté |
+| **ADS-B temps réel** | `http://station.lan:8080/data/aircraft.json` — c'est un tar1090/readsb standard, avec `receiver.json` et `stats.json` à côté |
 | **Carte tar1090** | `http://adsb.lan/` |
 | **Audio VHF** | Icecast, `http://audio.lan/aero.mp3` (brut) et `/aero-clair.mp3` (filtré voix) — **voir la réserve majeure plus bas** |
-| **État de la chaîne VHF** | `http://192.0.2.10/radio/etat` **avec l'en-tête `Host: station.lan`** |
+| **État de la chaîne VHF** | `http://station.lan/radio/etat` **avec l'en-tête `Host: station.lan`** |
 
 > ⚠️ **Piège vérifié** : la route `/radio/*` n'est déclarée que dans le bloc
 > `http://station.lan` du Caddyfile. Une requête sur l'IP renvoie **200 avec un

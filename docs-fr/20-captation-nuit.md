@@ -132,13 +132,13 @@ failli annuler la session en silence.
 
 **Le binaire Co-ATC compte lui aussi comme auditeur.** Pendant la préparation, il
 tournait sur le M4 et tirait le flux via un `ffmpeg` (`192.0.2.28:64296 →
-192.0.2.10:80`), en plus de sa connexion à tar1090 sur le port 8080. C'est visible
+station.lan:80`), en plus de sa connexion à tar1090 sur le port 8080. C'est visible
 depuis la station avec `docker exec caddy netstat -tn`.
 
 ## Contexte réseau de la nuit
 
 Dix chutes du lien Ethernet entre 22 h et 8 h 45, toutes suivies d'un retour en 4 à
-5 secondes, et **le bail `192.0.2.10` a été repris à chaque fois** — la station
+5 secondes, et **le bail `station.lan` a été repris à chaque fois** — la station
 n'est jamais repassée en Wi-Fi. Le redémarrage complet du mesh Linksys de la veille a
 réparé le pontage, pas le battement.
 

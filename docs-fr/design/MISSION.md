@@ -31,7 +31,7 @@ téléphone), `docs-fr/audit-2026-10-09/ux.md` (le jugement UX de départ, mesur
 Puis **regarde l'interface tourner** : `runs/son-test/son-test.command` lance une instance d'essai
 sur http://127.0.0.1:8020 (compte dans `runs/son-test/compte-essai.json`, à ne jamais recopier
 dans un document) avec du trafic réel ; les deux fréquences se remettent par
-`runs/son-test/radio-ctl-sync -station http://192.0.2.10 -station-host station.lan
+`runs/son-test/radio-ctl-sync -station http://station.lan -station-host station.lan
 -streams http://audio.lan -coatc http://127.0.0.1:8020 -user essai -once` (mot de passe dans
 `COATC_PASSWORD`). Arrête l'instance en partant : rien ne doit tourner en permanence sur le Mac.
 

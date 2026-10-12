@@ -81,10 +81,14 @@ et il a dû le rappeler.
 
 ## Commandes utiles
 
+`station.lan` est un nom générique : l'adresse réelle de la station et son nom d'hôte sont
+hors du dépôt depuis le 12/10 (D75), dans la mémoire privée de la session (`adresses-station-privees`)
+et dans `configs/config.toml`, non suivi.
+
 ```bash
-ssh pierre@192.0.2.10                       # la station, sans mot de passe
-curl http://192.0.2.10:8080/data/aircraft.json    # ADS-B temps reel
-curl -H 'Host: station.lan' http://192.0.2.10/radio/etat   # etat de la chaine VHF
+ssh pierre@station.lan                       # la station, sans mot de passe
+curl http://station.lan:8080/data/aircraft.json    # ADS-B temps reel
+curl -H 'Host: station.lan' http://station.lan/radio/etat   # etat de la chaine VHF
 ```
 
 Aucun sudo n'est requis sur la station pour `/opt/adsb`, les conteneurs et les

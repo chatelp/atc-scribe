@@ -15,10 +15,10 @@ motif. Une question qui se pose s'ajoute à la seconde.*
 | D5 | **Le service reste sur le réseau local**, jamais exposé | 15/09 | Co-ATC n'a aucune authentification et son auteur déconseille l'exposition. |
 | D6 | **La licence amont est MIT — le fork est publiable** | 15/09 | Vérifié le 15/09 dans `LICENSE` sur la branche `main` du dépôt amont : « MIT License — Copyright (c) 2025 Yegor S ». MIT autorise la modification et la redistribution sans réciprocité et sans autorisation préalable. **Seule obligation : conserver la notice de copyright et le texte de la licence dans toute copie.** Concrètement : garder le fichier `LICENSE` amont tel quel, et signaler le fork dans le README. |
 | D7 | **Le fork est publié sous licence MIT**, comme l'amont | 15/09 | Décision du propriétaire. Un fork MIT d'un projet MIT n'ajoute aucune friction pour qui voudrait reprendre le travail et garde ouverte la possibilité de renvoyer des morceaux en amont (consigne « le fork reste rebasable »). Le fichier `LICENSE` amont est conservé tel quel ; la notice du fork s'ajoute, elle ne remplace pas. |
-| D8 | **La source ADS-B de la station fonctionne sans adaptation** — mode `tar1090` de l'amont, tel quel | 15/09 | Mesuré le 15/09 : `tar1090_base_url = "http://192.0.2.10:8080/data/"`, validation réussie au démarrage, **128 avions suivis dont 96 positionnés**, phases détectées (68 CRZ, 17 ARR, 9 DEP, 1 T/O). Aucune ligne de Go écrite. La moitié du produit est acquise. |
+| D8 | **La source ADS-B de la station fonctionne sans adaptation** — mode `tar1090` de l'amont, tel quel | 15/09 | Mesuré le 15/09 : `tar1090_base_url = "http://station.lan:8080/data/"`, validation réussie au démarrage, **128 avions suivis dont 96 positionnés**, phases détectées (68 CRZ, 17 ARR, 9 DEP, 1 T/O). Aucune ligne de Go écrite. La moitié du produit est acquise. |
 | D9 | **Les données de référence sont déjà mondiales — rien à fournir pour l'Île-de-France** | 15/09 | `assets/` est livré peuplé dans le dépôt amont (OurAirports + tar1090-db + OpenFlights). Les sept terrains (LFPG, LFPO, LFPB, LFPZ, LFPX, LFPN, LFPV) sont présents avec leurs pistes. Au démarrage : 307 aérodromes, 67 pistes et 43 balises dans les 100 NM. L'affirmation contraire de `02-co-atc-amont.md` était fausse et a été corrigée. |
 | D10 | **Le moteur d'exécution est mlx-whisper** | 15/09 | Q2 tranchée par la mesure (`08-premiere-mesure.md`) : le modèle affiné de jacktol se convertit en 10,5 s et se charge. Mesuré sur 16 transmissions réelles, **× 8,5 le temps réel en médiane contre × 1,4 pour `large-v3-turbo`**. Et le moteur que l'amont recommande, faster-whisper, n'a pas d'accélération Metal. Décision révisable si l'affinage maison (stratégie C) impose un autre format. |
-| D11 | **Passe de confidentialité sur les documents publiables** — les coordonnées de la station restent, le reste part | 15/09 | `CLAUDE.md` demande « pas d'adresse exacte » tout en notant que la position est déjà publique via FlightAware. Arbitrage du propriétaire : **on garde la position** (48.81 / 2.05 / 152 m), sans laquelle aucune mesure de portée ou de propagation n'a de sens, et **on retire de `01-station.md` l'étage, l'orientation de la prise d'antenne et les identifiants de compte FlightAware et Flightradar24** — aucune valeur technique, et ensemble ils désignaient un logement plutôt qu'une station. Fait avant le premier commit : **rien de tout cela n'est entré dans l'historique git**. |
+| D11 | **Passe de confidentialité sur les documents publiables** — les coordonnées de la station restent, le reste part — ***révisée le 12/10 par D75 : position arrondie à deux décimales, adresses du réseau retirées, historique réécrit*** | 15/09 | `CLAUDE.md` demande « pas d'adresse exacte » tout en notant que la position est déjà publique via FlightAware. Arbitrage du propriétaire : **on garde la position** (48.81 / 2.05 / 152 m), sans laquelle aucune mesure de portée ou de propagation n'a de sens, et **on retire de `01-station.md` l'étage, l'orientation de la prise d'antenne et les identifiants de compte FlightAware et Flightradar24** — aucune valeur technique, et ensemble ils désignaient un logement plutôt qu'une station. Fait avant le premier commit : **rien de tout cela n'est entré dans l'historique git**. |
 | D12 | **Le modèle anglais est `large-v3-atco2` multilingue, pas `jacktol medium.en`** | 16/09 | Départagé par l'ADS-B, pas par un accord entre modèles : sur 1 468 transmissions de la captation du 15/09, le multilingue affiné ATC produit **94 appariements vrais contre 62,6**, et gagne sur les cinq fréquences sans exception. Sur 124,625 le modèle anglais tombe **au niveau du hasard**. `03-transcription.md` désignait le mauvais candidat ; c'est corrigé. Détail dans `18-nuit-du-15.md`. |
 | D13 | **La base SQLite ne s'efface jamais** — *amendée le 21/09, voir D29* | 15/09 | Un `rm -rf data/` a détruit l'historique ADS-B d'une fenêtre de captation. Récupéré depuis `globe_history` de readsb, mais la règle tient : cette base est la seule trace locale du croisement radio/ADS-B, et elle ne se reconstitue pas toute seule. |
 
@@ -623,8 +623,8 @@ sur 192.168.1.0/24**, `en0` Ethernet en `.28` et `en1` Wi-Fi en `.48`, et le cac
 contient la station **sur les deux interfaces**.
 
 ```
-? (192.0.2.10) at <mac de la station> on en0 ifscope [ethernet]
-? (192.0.2.10) at <mac de la station> on en1 ifscope [ethernet]
+? (station.lan) at <mac de la station> on en0 ifscope [ethernet]
+? (station.lan) at <mac de la station> on en1 ifscope [ethernet]
 ```
 
 *(La même adresse matérielle sur les deux lignes — c'est le fait ; l'adresse
@@ -4851,6 +4851,29 @@ la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1
 
 La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
 validée contre `actual_runway_off`.
+
+### D75 — La position de la station à deux décimales, le réseau domestique hors du dépôt, l'historique réécrit *(12/10)*
+
+**Décision du propriétaire le 12/10**, sur l'alerte de la session « communauté » (fiche 04) : le
+dépôt public donnait la position de la station à cinq décimales, soit le mètre, dans cinq
+fichiers depuis le premier commit du 15/09 (D11 la gardait, au motif qu'elle est publique via
+FlightAware — ce qui n'est vrai que si la page du site y est réglée sur « exact », et vu d'un
+projet communautaire, cinq décimales désignent un logement). L'usage de l'écosystème, vérifié
+dans les sources : dump1090-fa arrondit à **2 décimales** en mode approximatif (« for privacy
+reasons »), mlat-server à 1/20 de degré, ADS-B Exchange à une grille de 5 milles ; aucun outil
+ne publie à cinq décimales. **Trois mesures, toutes appliquées le 12/10** : (1) la position est
+arrondie à deux décimales (environ un kilomètre) dans les documents, le test Go et le script
+qui la citaient ; la valeur exacte reste dans `configs/config.toml`, non suivi, et dans
+`~/Dev/Aero/station` ; les calculs de portée ne changent pas. (2) Les adresses du réseau
+domestique (192.168.x, nom d'hôte de la station) sont remplacées dans les documents publics par
+des noms génériques (`station.lan`) ; l'adresse d'exemple de l'amont dans `config.toml.example`
+reste, c'est un exemple. (3) **L'historique git est réécrit** (`git filter-repo`, remplacement
+de texte sur toutes les versions, toutes les branches), poussé de force sur GitHub, avec une
+sauvegarde complète du dépôt d'avant sur le Mac ; GitHub garde les anciens objets en cache
+jusqu'à une demande de purge au support, que seul le propriétaire peut faire. Les identifiants
+de commits cités dans les documents d'avant le 12/10 ne correspondent plus : ils datent, ils ne
+sont pas réécrits. Coût mesuré : ni fork ni étoile sur le dépôt, 483 commits, aucune copie
+connue ailleurs.
 
 ### D74 — Le nom « atc-scribe » est abandonné ; le nouveau nom est à choisir *(12/10)*
 

@@ -8,7 +8,7 @@
 // transcribe -- one per channel, which is worth four times the matched callsigns
 // of the mixed stream (docs-fr/28-gros-porteurs-par-canal.md).
 //
-//	go run ./cmd/radio-ctl-sync -station http://192.0.2.10 -station-host station.lan \
+//	go run ./cmd/radio-ctl-sync -station http://station.lan -station-host station.lan \
 //	    -streams http://audio.lan -coatc http://127.0.0.1:8000 [-mix-id aero-melange]
 //
 // It only reads the station, and never switches it. With -mix-id, the label of
@@ -404,7 +404,7 @@ func (s *syncer) once() error {
 
 func main() {
 	var s syncer
-	flag.StringVar(&s.station, "station", "http://192.0.2.10", "radio-ctl base URL")
+	flag.StringVar(&s.station, "station", "http://station.lan", "radio-ctl base URL")
 	flag.StringVar(&s.stationHost, "station-host", "", "Host header radio-ctl expects, if any")
 	flag.StringVar(&s.streams, "streams", "http://audio.lan", "base URL of the station's Icecast mounts")
 	flag.StringVar(&s.coatc, "coatc", "http://127.0.0.1:8000", "co-atc base URL")

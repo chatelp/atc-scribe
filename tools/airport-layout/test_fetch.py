@@ -70,7 +70,7 @@ class Features(unittest.TestCase):
 class Query(unittest.TestCase):
     def test_radius_and_values(self):
         q = fetch.overpass_query(48.81, 2.05, 35 * fetch.METRES_PER_NM)
-        self.assertIn("around:64820,48.810,2.050", q)
+        self.assertIn("around:64820,48.810000,2.050000", q)
         self.assertIn('"aeroway"~"^(runway|taxiway|apron|terminal|helipad)$"', q)
         self.assertIn('relation["type"="multipolygon"]', q)
         self.assertIn("out geom;", q)
@@ -116,7 +116,7 @@ class Main(unittest.TestCase):
 
             with mock.patch.object(fetch, "fetch", fake_fetch), mock.patch("sys.stdout", io.StringIO()):
                 fetch.main(["--config", config, "--radius-nm", "10", "--output", out])
-            self.assertIn("around:18520,48.810,2.050", seen["query"])
+            self.assertIn("around:18520,48.810000,2.050000", seen["query"])
             text = open(out).read()
             self.assertNotIn(" ", text)
             self.assertEqual(json.loads(text)["features"][0]["properties"]["ref"], "09/27")
