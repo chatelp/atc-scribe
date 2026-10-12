@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquettes du système de design</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="base.css">
+<style>
+    body { padding: var(--space-8) var(--space-4); }
+    main { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-6); font-size: var(--font-size-body); line-height: var(--font-line-height-body); }
+    h1 { margin: 0; }
+    a { color: var(--color-accent-strong); }
+    ul { margin: 0; padding-left: 1.2em; }
+    li { margin-bottom: var(--space-1); }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: var(--space-1-5) var(--space-2); border-bottom: 1px solid var(--color-border-subtle); }
+    th { font-weight: var(--font-weight-regular); }
+    td.n, th.n { text-align: right; font-family: var(--font-family-mono); }
+    p { margin: 0; color: var(--color-text-secondary); }
+</style>
+</head>
+<body>
+<main>
+    <h1 class="t-display">Maquettes du système de design</h1>
+    <p>Pages HTML statiques construites uniquement avec <code>tokens.css</code> (produit par <code>tools/design/tokens.mjs</code> depuis <code>jetons.json</code>) et <code>base.css</code>. Elles s'ouvrent à côté de l'instance d'essai pour comparer. Textes de l'interface en anglais, notes de lecture en français ; indicatifs, immatriculations et géométrie inventés. Servir le dossier <code>docs-fr/design/</code> (par exemple <code>python3 -m http.server</code>) pour que les feuilles de style se chargent.</p>
+    <section>
+        <h2 class="t-title">Écrans</h2>
+        <ul>
+            <li><a href="principal.html">Écran principal</a>, 1 440 × 900 : carte, liste, barre radio, fil d'une fréquence ouvert</li>
+            <li><a href="principal.html?vue=par">… avec la vue PAR</a> (LFPG, séquence d'arrivée)</li>
+            <li><a href="principal.html?fiche=timeline">… avec la fiche d'un avion</a>, onglet Timeline, bulle d'aide ouverte</li>
+            <li><a href="principal.html?journal">… avec le journal d'événements ouvert</a> et une urgence (squawk 7700)</li>
+            <li><a href="reglages.html">Page des réglages</a></li>
+            <li><a href="telephone.html">Téléphone</a>, 375 × 812 : carte, liste, fiche</li>
+            <li><a href="connexion.html">Page de connexion</a> (<a href="connexion.html?erreur">avec erreur</a>) ; la marque attend le nom</li>
+        </ul>
+    </section>
+    <section>
+        <h2 class="t-title">Mesures, avant et après</h2>
+        <p style="margin-bottom: var(--space-2)">Même sonde (<code>tools/design/contrast-probe.js</code>) sur l'interface vivante le 12/10 et sur les maquettes : texte visible au premier plan, pondéré par caractère.</p>
+        <table>
+            <thead><tr><th class="label">Écran</th><th class="label n">sous 11 px, avant</th><th class="label n">après</th><th class="label n">sous AA, avant</th><th class="label n">après</th></tr></thead>
+            <tbody>
+                <tr><td>Principal, 1 440</td><td class="n">45 %</td><td class="n">0 %</td><td class="n">18 %</td><td class="n">0 %</td></tr>
+                <tr><td>Fiche, Timeline</td><td class="n">37 %</td><td class="n">0 %</td><td class="n">35 %</td><td class="n">0 %</td></tr>
+                <tr><td>Vue PAR</td><td class="n">32 %</td><td class="n">0 %</td><td class="n">13 %</td><td class="n">0 %</td></tr>
+                <tr><td>Journal ouvert</td><td class="n">38 %</td><td class="n">0 %</td><td class="n">30 %</td><td class="n">0 %</td></tr>
+                <tr><td>Réglages</td><td class="n">4 %</td><td class="n">0 %</td><td class="n">3 %</td><td class="n">0 %</td></tr>
+                <tr><td>Téléphone, liste</td><td class="n">41 %</td><td class="n">0 %</td><td class="n">18 %</td><td class="n">0 %</td></tr>
+            </tbody>
+        </table>
+        <p style="margin-top: var(--space-2)">Cibles : au téléphone, 35 sur 41 sous 44 px avant, 0 après ; au bureau, 22 sur 55 sous 24 px avant, 0 après. La sonde signale un seul faux échec (le texte « T/O » sur son aplat orange, qu'elle mesure sur le noir de la carte ; réel : 7,8:1). Ce que les maquettes ne mesurent pas : le confort à l'usage, qui se juge sur une soirée d'écoute.</p>
+    </section>
+</main>
+</body>
+</html>
