@@ -786,13 +786,3 @@ func (c *Client) setAircraftError(err error) {
 	status.UpdatedAt = &now
 	c.sourceStatus = status
 }
-
-// UpdateStationCoords updates the station coordinates used for external API calls.
-func (c *Client) UpdateStationCoords(lat, lon float64) {
-	c.stationLat = lat
-	c.stationLon = lon
-
-	c.logger.Debug("Station coordinates updated",
-		logger.Float64("latitude", lat),
-		logger.Float64("longitude", lon))
-}

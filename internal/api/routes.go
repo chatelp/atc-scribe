@@ -122,8 +122,7 @@ func (r *Router) Routes() http.Handler {
 			router.Get("/adsb/source", r.handler.GetADSBSourceStatus)
 
 			// Station Configuration
-			router.Get("/station", r.handler.GetStationConfig)    // New route for station config
-			router.Post("/station", r.handler.SetStationOverride) // New route for station override
+			router.Get("/station", r.handler.GetStationConfig) // New route for station config
 
 			// Weather Data
 			router.Get("/wx", r.handler.GetWeatherData)

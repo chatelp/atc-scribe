@@ -1,12 +1,10 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/yegors/co-atc/internal/adsb"
 	"github.com/yegors/co-atc/internal/reference"
-	"github.com/yegors/co-atc/pkg/logger"
 )
 
 // GetADSBSourceStatus returns ADS-B source mode, health, and optional receiver/stats payloads.
@@ -17,9 +15,6 @@ func (h *Handler) GetADSBSourceStatus(w http.ResponseWriter, r *http.Request) {
 
 // GetStationConfig returns the station configuration (latitude, longitude, elevation)
 func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
-	// Get effective coordinates (override if set, otherwise config)
-	effectiveLat, effectiveLon := h.adsbService.GetEffectiveStationCoords()
-
 	stationCfg := struct {
 		Latitude         float64            `json:"latitude"`
 		Longitude        float64            `json:"longitude"`
@@ -36,20 +31,17 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 		FetchMETAR  bool `json:"fetch_metar"`
 		FetchTAF    bool `json:"fetch_taf"`
 		FetchNOTAMs bool `json:"fetch_notams"`
-		// Station override information
-		OverrideActive bool `json:"override_active"`
 	}{
-		Latitude:         effectiveLat,
-		Longitude:        effectiveLon,
+		Latitude:         h.config.Station.Latitude,
+		Longitude:        h.config.Station.Longitude,
 		ElevationFeet:    h.config.Station.ElevationFeet,
 		CruiseAltitudeFt: h.config.FlightPhases.CruiseAltitudeFt,
 		// The reference airport in force, which the settings panel can change;
 		// [station] airport_code is only where it starts.
-		AirportCode:    h.adsbService.PhaseReference().Airport,
-		FetchMETAR:     h.config.Weather.FetchMETAR,
-		FetchTAF:       h.config.Weather.FetchTAF,
-		FetchNOTAMs:    h.config.Weather.FetchNOTAMs,
-		OverrideActive: effectiveLat != h.config.Station.Latitude || effectiveLon != h.config.Station.Longitude,
+		AirportCode: h.adsbService.PhaseReference().Airport,
+		FetchMETAR:  h.config.Weather.FetchMETAR,
+		FetchTAF:    h.config.Weather.FetchTAF,
+		FetchNOTAMs: h.config.Weather.FetchNOTAMs,
 	}
 
 	// Track if we have any data fetch failures
@@ -75,73 +67,6 @@ func (h *Handler) GetStationConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	WriteJSON(w, http.StatusOK, stationCfg)
-}
-
-// SetStationOverride sets or clears station coordinate override
-func (h *Handler) SetStationOverride(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req struct {
-		Latitude  *float64 `json:"latitude"`  // nil to clear override
-		Longitude *float64 `json:"longitude"` // nil to clear override
-	}
-
-	// Parse request body
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Error("Failed to parse station override request", logger.Error(err))
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	// Validate coordinates if provided
-	if req.Latitude != nil && req.Longitude != nil {
-		lat, lon := *req.Latitude, *req.Longitude
-
-		// Basic coordinate validation
-		if lat < -90 || lat > 90 {
-			http.Error(w, "Invalid latitude: must be between -90 and 90", http.StatusBadRequest)
-			return
-		}
-		if lon < -180 || lon > 180 {
-			http.Error(w, "Invalid longitude: must be between -180 and 180", http.StatusBadRequest)
-			return
-		}
-
-		// Set override coordinates
-		h.adsbService.SetStationOverride(lat, lon)
-		h.logger.Info("Station override coordinates set via API",
-			logger.Float64("latitude", lat),
-			logger.Float64("longitude", lon))
-
-		response := struct {
-			Success   bool    `json:"success"`
-			Message   string  `json:"message"`
-			Latitude  float64 `json:"latitude"`
-			Longitude float64 `json:"longitude"`
-		}{
-			Success:   true,
-			Message:   "Station override coordinates set successfully",
-			Latitude:  lat,
-			Longitude: lon,
-		}
-		WriteJSON(w, http.StatusOK, response)
-	} else {
-		// Clear override coordinates
-		h.adsbService.ClearStationOverride()
-		h.logger.Info("Station override coordinates cleared via API")
-
-		response := struct {
-			Success bool   `json:"success"`
-			Message string `json:"message"`
-		}{
-			Success: true,
-			Message: "Station override coordinates cleared successfully",
-		}
-		WriteJSON(w, http.StatusOK, response)
-	}
 }
 
 // stationAirport is one followed airport as the map draws it.

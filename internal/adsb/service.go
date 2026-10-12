@@ -212,9 +212,6 @@ type Service struct {
 	stationLat         float64                   // Station latitude from config
 	stationLon         float64                   // Station longitude from config
 	stationElevFeet    float64                   // Station elevation in feet
-	overrideLat        *float64                  // Override station latitude (nil = use config)
-	overrideLon        *float64                  // Override station longitude (nil = use config)
-	overrideMutex      sync.RWMutex              // Protect override coordinates
 	wsServer           WebSocketServer           // WebSocket server for broadcasting events
 	signalLostTimeout  time.Duration             // Time after which aircraft is marked as signal_lost
 	ref                *phaseRef                 // Airport phases are judged against; see PhaseReference
@@ -1176,54 +1173,6 @@ func (s *Service) setFetchStatus(status bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lastFetchStatus = status
-}
-
-// SetStationOverride sets override coordinates for station location
-func (s *Service) SetStationOverride(lat, lon float64) {
-	s.overrideMutex.Lock()
-	defer s.overrideMutex.Unlock()
-
-	s.overrideLat = &lat
-	s.overrideLon = &lon
-
-	// Update the client with new coordinates
-	if s.client != nil {
-		s.client.UpdateStationCoords(lat, lon)
-	}
-
-	s.logger.Info("Station override coordinates set",
-		logger.Float64("latitude", lat),
-		logger.Float64("longitude", lon))
-}
-
-// ClearStationOverride removes override coordinates, reverting to config values
-func (s *Service) ClearStationOverride() {
-	s.overrideMutex.Lock()
-	defer s.overrideMutex.Unlock()
-
-	s.overrideLat = nil
-	s.overrideLon = nil
-
-	// Restore client to original config coordinates
-	if s.client != nil {
-		s.client.UpdateStationCoords(s.stationLat, s.stationLon)
-	}
-
-	s.logger.Info("Station override coordinates cleared, using config values",
-		logger.Float64("config_latitude", s.stationLat),
-		logger.Float64("config_longitude", s.stationLon))
-}
-
-// GetEffectiveStationCoords returns the current effective station coordinates (override or config)
-func (s *Service) GetEffectiveStationCoords() (lat, lon float64) {
-	s.overrideMutex.RLock()
-	defer s.overrideMutex.RUnlock()
-
-	if s.overrideLat != nil && s.overrideLon != nil {
-		return *s.overrideLat, *s.overrideLon
-	}
-
-	return s.stationLat, s.stationLon
 }
 
 // updateAircraftStatus updates the status of aircraft that are no longer active.

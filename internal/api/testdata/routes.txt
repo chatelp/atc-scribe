@@ -38,7 +38,6 @@ POST /* *api.StaticFileHandler open
 POST /api/v1/auth/login (*Handler).PostLogin open
 POST /api/v1/auth/logout (*Handler).PostLogout open
 POST /api/v1/setup (*Handler).PostSetup open
-POST /api/v1/station (*Handler).SetStationOverride locked
 PUT /* *api.StaticFileHandler open
 PUT /api/v1/access (*Handler).PutAccess locked
 PUT /api/v1/frequencies/{id}/label (*Handler).PutFrequencyLabel locked

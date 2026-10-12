@@ -7,7 +7,6 @@
  * Key responsibilities:
  * - Handle aircraft selection, deselection, and hover state updates.
  * - Route clicks to reference-feature handlers when appropriate.
- * - Support station-override map click mode for quick station repositioning.
  *
  * Quirks / contracts:
  * - Pointer hit-testing is throttled to reduce expensive per-frame feature queries.
@@ -100,17 +99,6 @@
                 if (handled) {
                     return;
                 }
-            }
-
-            if (store.stationOverride?.mapClickMode) {
-                const lonLat = window.ol.proj.toLonLat(event.coordinate);
-                store.stationOverride.latitude = lonLat[1];
-                store.stationOverride.longitude = lonLat[0];
-                store.stationOverride.mapClickMode = false;
-                if (typeof store.hideMapClickIndicator === 'function') {
-                    store.hideMapClickIndicator();
-                }
-                return;
             }
 
             if (store.selectedAircraft) {

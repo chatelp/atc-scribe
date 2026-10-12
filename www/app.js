@@ -272,17 +272,6 @@ document.addEventListener('alpine:init', () => {
         stationElevationFeet: null,
         stationCruiseAltitudeFt: 18000,
         stationAirportCode: null,
-        // Station override state
-        stationOverride: {
-            latitude: null,
-            longitude: null,
-            active: false,
-            mapClickMode: false,
-            autoUpdate: false,
-            updateInterval: 60, // seconds
-            geolocationStatus: null,
-            geolocationWatchId: null
-        },
         // Weather configuration flags from station config
         stationFetchMETAR: false,
         stationFetchTAF: false,
@@ -2381,226 +2370,10 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        // Station override methods
-        setStationFromMap() {
-            this.stationOverride.mapClickMode = true;
-            this.showMapClickIndicator();
-        },
-
-        async applyStationOverride() {
-            if (!this.stationOverride.latitude || !this.stationOverride.longitude) {
-                alert('Please enter valid coordinates');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/v1/station', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        latitude: this.stationOverride.latitude,
-                        longitude: this.stationOverride.longitude
-                    })
-                });
-
-                if (response.ok) {
-                    this.stationOverride.active = true;
-                    this.updateStationRings();
-                    if (this.mapManager) {
-                        this.mapManager.centerOnStation();
-                    }
-                    console.log('Station override applied');
-                } else {
-                    const error = await response.text();
-                    alert('Failed to apply station override: ' + error);
-                }
-            } catch (error) {
-                console.error('Failed to apply station override:', error);
-                alert('Failed to apply station override: ' + error.message);
-            }
-        },
-
-        async clearStationOverride() {
-            try {
-                const response = await fetch('/api/v1/station', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        latitude: null,
-                        longitude: null
-                    })
-                });
-
-                if (response.ok) {
-                    this.stationOverride.latitude = null;
-                    this.stationOverride.longitude = null;
-                    this.stationOverride.active = false;
-                    this.stationOverride.autoUpdate = false;
-                    this.stopGeolocationWatch();
-                    this.updateStationRings();
-                    if (this.mapManager) {
-                        this.mapManager.centerOnStation();
-                    }
-                    console.log('Station override cleared');
-                } else {
-                    const error = await response.text();
-                    alert('Failed to clear station override: ' + error);
-                }
-            } catch (error) {
-                console.error('Failed to clear station override:', error);
-                alert('Failed to clear station override: ' + error.message);
-            }
-        },
-
+        // Range rings around the station: addRangeRings() reads the station's
+        // coordinates from the store.
         updateStationRings() {
-            if (this.mapManager) {
-                // Update store coordinates for range rings
-                if (this.stationOverride.active) {
-                    // Use override coordinates temporarily for range rings display
-                    // (but don't overwrite the original station coordinates)
-                } else {
-                    // Use the original station coordinates (already fetched from API)
-                    // No need to refetch - just use current stationLatitude/stationLongitude
-                }
-
-                // Trigger range rings update - addRangeRings() will use the correct coordinates
-                this.mapManager.addRangeRings();
-            }
-        },
-
-        showMapClickIndicator() {
-            // Change cursor, show instruction overlay
-            const mapElement = document.getElementById('map');
-            if (mapElement) {
-                mapElement.style.cursor = 'crosshair';
-            }
-        },
-
-        hideMapClickIndicator() {
-            const mapElement = document.getElementById('map');
-            if (mapElement) {
-                mapElement.style.cursor = '';
-            }
-        },
-
-        // Geolocation methods
-        useGeolocation() {
-            if (!navigator.geolocation) {
-                alert('Geolocation is not supported by this browser');
-                return;
-            }
-
-            this.stationOverride.geolocationStatus = 'Getting location...';
-            
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    this.stationOverride.latitude = position.coords.latitude;
-                    this.stationOverride.longitude = position.coords.longitude;
-                    this.stationOverride.geolocationStatus = `Location acquired (±${Math.round(position.coords.accuracy)}m)`;
-                    console.log('Geolocation acquired:', position.coords);
-                },
-                (error) => {
-                    let errorMessage = 'Location access denied';
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            errorMessage = 'Location access denied';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errorMessage = 'Location unavailable';
-                            break;
-                        case error.TIMEOUT:
-                            errorMessage = 'Location request timeout';
-                            break;
-                    }
-                    this.stationOverride.geolocationStatus = errorMessage;
-                    console.error('Geolocation error:', error);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 60000
-                }
-            );
-        },
-
-        toggleGeolocationAutoUpdate() {
-            if (this.stationOverride.autoUpdate) {
-                this.startGeolocationWatch();
-            } else {
-                this.stopGeolocationWatch();
-            }
-        },
-
-        startGeolocationWatch() {
-            if (!navigator.geolocation) {
-                this.stationOverride.autoUpdate = false;
-                alert('Geolocation is not supported by this browser');
-                return;
-            }
-
-            this.stopGeolocationWatch(); // Clear any existing watch
-
-            this.stationOverride.geolocationStatus = 'Starting location tracking...';
-            
-            this.stationOverride.geolocationWatchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    const newLat = position.coords.latitude;
-                    const newLon = position.coords.longitude;
-                    
-                    // Only update if coordinates have changed significantly (>10m)
-                    if (!this.stationOverride.latitude || !this.stationOverride.longitude ||
-                        Math.abs(newLat - this.stationOverride.latitude) > 0.0001 ||
-                        Math.abs(newLon - this.stationOverride.longitude) > 0.0001) {
-                        
-                        this.stationOverride.latitude = newLat;
-                        this.stationOverride.longitude = newLon;
-                        
-                        // Auto-apply if override is already active
-                        if (this.stationOverride.active) {
-                            this.applyStationOverride();
-                        }
-                    }
-                    
-                    this.stationOverride.geolocationStatus = `Tracking location (±${Math.round(position.coords.accuracy)}m)`;
-                },
-                (error) => {
-                    let errorMessage = 'Location tracking failed';
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            errorMessage = 'Location access denied';
-                            this.stationOverride.autoUpdate = false;
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errorMessage = 'Location unavailable';
-                            break;
-                        case error.TIMEOUT:
-                            errorMessage = 'Location request timeout';
-                            break;
-                    }
-                    this.stationOverride.geolocationStatus = errorMessage;
-                    console.error('Geolocation watch error:', error);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 15000,
-                    maximumAge: this.stationOverride.updateInterval * 1000
-                }
-            );
-        },
-
-        stopGeolocationWatch() {
-            if (this.stationOverride.geolocationWatchId) {
-                navigator.geolocation.clearWatch(this.stationOverride.geolocationWatchId);
-                this.stationOverride.geolocationWatchId = null;
-                this.stationOverride.geolocationStatus = 'Location tracking stopped';
-            }
-        },
-
-        updateGeolocationInterval() {
-            if (this.stationOverride.autoUpdate) {
-                // Restart watch with new interval
-                this.startGeolocationWatch();
-            }
+            if (this.mapManager) this.mapManager.addRangeRings();
         },
 
         // Poll map performance stats from MapManager
@@ -4160,33 +3933,12 @@ async initAircraftDataSource() {
                 this.stationCruiseAltitudeFt = Number.isFinite(data.cruise_altitude_ft) ? data.cruise_altitude_ft : 18000;
                 this.stationAirportCode = data.airport_code;
                 
-                // Check if station override is active and restore state
-                if (data.override_active) {
-                    this.stationOverride.latitude = data.latitude;
-                    this.stationOverride.longitude = data.longitude;
-                    this.stationOverride.active = true;
-                    console.log('Station override restored from server:', {
-                        lat: data.latitude,
-                        lon: data.longitude
-                    });
-                    
-                    // Update station rings to the override coordinates
-                    if (this.mapManager) {
-                        this.updateStationRings();
-                    }
-                } else {
-                    // Ensure override state is cleared if not active
-                    this.stationOverride.active = false;
-                    this.stationOverride.latitude = null;
-                    this.stationOverride.longitude = null;
-                    
-                    // Update station rings to use the new coordinates from API
-                    if (this.mapManager && this.mapManager.map) {
-                        this.updateStationRings();
-                        this.applyMapDisplaySettings();
-                    }
+                // Range rings and layers follow the coordinates just fetched.
+                if (this.mapManager && this.mapManager.map) {
+                    this.updateStationRings();
+                    this.applyMapDisplaySettings();
                 }
-                
+
                 // Store weather configuration flags
                 this.stationFetchMETAR = data.fetch_metar;
                 this.stationFetchTAF = data.fetch_taf;

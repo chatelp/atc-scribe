@@ -41,7 +41,6 @@ func lockedRoutes(s *stack) []route {
 		{"PUT", "/api/v1/access", `{}`, 400}, // a malformed switch, past the lock
 		{"GET", "/api/v1/adsb/source", "", 200},
 		{"GET", "/api/v1/station", "", 200},
-		{"POST", "/api/v1/station", `{}`, 200},
 		{"GET", "/api/v1/wx", "", 200},
 		{"GET", "/api/v1/airports", "", 200},
 		{"GET", "/api/v1/airports/LFPG", "", 404}, // no reference data on this stack

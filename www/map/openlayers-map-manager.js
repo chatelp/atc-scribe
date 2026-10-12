@@ -801,12 +801,8 @@
             this._rangeRingLayerState.source.clear();
             if (!this._isRangeRingVisible()) return;
 
-            const centerLat = this.store?.stationOverride?.active
-                ? (this.store.stationOverride.latitude || this.store.stationLatitude || 0)
-                : (this.store?.stationLatitude || 0);
-            const centerLon = this.store?.stationOverride?.active
-                ? (this.store.stationOverride.longitude || this.store.stationLongitude || 0)
-                : (this.store?.stationLongitude || 0);
+            const centerLat = this.store?.stationLatitude || 0;
+            const centerLon = this.store?.stationLongitude || 0;
             if (!Number.isFinite(centerLat) || !Number.isFinite(centerLon)) return;
 
             const center = this._toMapCoordinate(centerLat, centerLon);
@@ -1080,12 +1076,8 @@
         }
 
         _getInitialCenter() {
-            const lat = this.store?.stationOverride?.active
-                ? (this.store.stationOverride.latitude || this.store.stationLatitude || 43.6777)
-                : (this.store?.stationLatitude || 43.6777);
-            const lon = this.store?.stationOverride?.active
-                ? (this.store.stationOverride.longitude || this.store.stationLongitude || -79.6248)
-                : (this.store?.stationLongitude || -79.6248);
+            const lat = this.store?.stationLatitude || 43.6777;
+            const lon = this.store?.stationLongitude || -79.6248;
             return { lat, lon };
         }
 
