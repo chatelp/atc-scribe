@@ -45,6 +45,7 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `audit-2026-10-09/` | **rapports bruts** de l'audit du 09/10 (UX, serveur Go, code de l'interface), copiés dans le dépôt le 10/10 pour que les sessions cloud les lisent |
 | `fiches-cloud/` | **fiches autonomes pour les sessions cloud** (crédit jusqu'au 5/11) : règles communes, marche à suivre pour le propriétaire, une fiche par tâche ; les rapports des sessions y reviennent |
 | `fiches-labo/` | **fiches pour l'agent du laboratoire** (session « Whisper-lab », D63) : une tâche chacune, lancée par le propriétaire ; la première, la précision de l'appariement par niveau d'indices (12/10) |
+| `design/` | **l'identité et le système de design** (12/10) : la mission de l'agent dédié (`MISSION.md`), puis son inventaire, ses principes, le système, les maquettes et le plan de migration |
 | `CLAUDE-amont.md` | copie des instructions amont, conservées telles quelles |
 
 > Le document 20 arrive numéroté 15 par l'agent de la station, qui ne pouvait pas
