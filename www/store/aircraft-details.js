@@ -757,42 +757,6 @@
             this.proximityHighlightedAircraft.clear();
         },
         
-        // Methods for handling hover effects on proximity aircraft
-        highlightProximityAircraftOnHover(hex) {
-            if (!this.mapManager) return;
-            
-            // Find the aircraft label element
-            const markers = this.mapManager.markers[hex];
-            if (!markers || !markers.label) return;
-            
-            const labelElement = markers.label.getElement();
-            if (!labelElement) return;
-            
-            const labelDiv = labelElement.querySelector('div');
-            if (!labelDiv) return;
-            
-            // Add the hover class
-            labelDiv.classList.add('proximity-highlight-hover');
-        },
-        
-        unhighlightProximityAircraftOnHover() {
-            if (!this.mapManager) return;
-            
-            // Remove hover class from all aircraft labels
-            Object.keys(this.mapManager.markers).forEach(hex => {
-                const markers = this.mapManager.markers[hex];
-                if (!markers || !markers.label) return;
-                
-                const labelElement = markers.label.getElement();
-                if (!labelElement) return;
-                
-                const labelDiv = labelElement.querySelector('div');
-                if (!labelDiv) return;
-                
-                // Remove the hover class but keep the proximity highlight class
-                labelDiv.classList.remove('proximity-highlight-hover');
-            });
-        },
 
         drawProximityCircle() {
             if (!this.mapManager || !this.selectedAircraft || !this.selectedAircraft.adsb) return;

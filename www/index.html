@@ -1961,8 +1961,6 @@
                                         </template>
                                         <template x-for="aircraft in $store.atc.proximityAircraft" :key="aircraft.hex">
                                             <tr @click="$store.atc.selectedAircraft = aircraft; $store.atc.showProximityView = false; $store.atc.clearProximityView()"
-                                                @mouseenter="$store.atc.highlightProximityAircraftOnHover(aircraft.hex)"
-                                                @mouseleave="$store.atc.unhighlightProximityAircraftOnHover()"
                                                 class="hover:bg-hover/50 transition-colors cursor-pointer">
                                                 <td class="p-1.5 text-left border-b border-border" x-text="aircraft.flight || aircraft.hex"></td>
                                                 <td class="p-1.5 text-right border-b border-border">

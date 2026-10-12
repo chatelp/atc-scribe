@@ -485,6 +485,20 @@ sur la carte.
 
 ## État
 
+- 12/10 (fin d'après-midi) : **deux retours de l'inventaire de la session design**
+  (`docs-fr/design/01-inventaire.md`, branche `design`), traités dans `www/` par cette session.
+  (1) Avec le fond noir, le défaut, les avions étaient peints avec la palette prévue pour les
+  cartes claires (test « le nom du fond finit par dark », faux pour `none`) : croisière
+  `#1D4ED8` sur noir à 3,1:1 au lieu de `#E8ECEF` à 17,7:1 ; les fonds clairs sont nommés
+  (`46dc425`). (2) **51 des 123 sélecteurs de `style.css` n'avaient plus aucune occurrence** :
+  l'ancien rendu des avions en DOM (marqueurs, étiquettes, traînées, cercles de proximité,
+  étiquettes de pistes et de balises, bandes d'altitude par filtre CSS, double curseur de
+  l'amont) et quatre `@keyframes` qu'eux seuls appelaient ; retirés après vérification
+  (grep par sélecteur hors `vendor/`, puis ce qui restait : seules `ol-attribution` et `ol-zoom`,
+  générées par OpenLayers), avec le survol de la vue de proximité qui cherchait un marqueur DOM
+  dans une table toujours vide. `style.css` passe de 957 à 482 lignes, le CSS compilé ne change
+  que d'empreinte, filet OK, page vérifiée sur l'instance d'essai. Le nom et le positionnement
+  « espace aérien français » sont confiés à la session design (D74, Q53).
 - 12/10 (après-midi) : **bulles de dernière transmission sur la carte** (`9809277`), demande du
   propriétaire hors plan : au-dessus de chaque avion nommé par la radio dans les dix dernières
   minutes, sa dernière transmission (coupée à 64 caractères, texte complet dans la bulle d'aide) ;
