@@ -108,6 +108,12 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
   choisi.
 - **Secrets et données** : jamais de clé, de mot de passe, d'audio ni de base dans un dépôt ou
   dans le cloud (règles permanentes).
+- **Dettes à solder avant toute installation ailleurs** (vérifiées dans les sources le 12/10 pour
+  la fiche 04 de l'étude communauté) : CORS renvoie toute origine avec les identifiants, le
+  WebSocket accepte toute origine, aucun rôle (tout compte connecté réécoute l'audio) ; l'archive
+  audio et les journaux bruts n'ont pas de purge ; Docker est mort (compile un seul fichier) ;
+  pas de compilation Windows (trois sites). Sans gravité tant que D5 tient (réseau local
+  seulement) ; bloquants le jour où quelqu'un expose le serveur.
 
 ## Comment ce document se tient
 
