@@ -1771,6 +1771,18 @@ func (s *Service) sendPhaseChangeAlerts(phaseChanges []PhaseChangeInsert, curren
 // sendImmediateGroundTransitionAlerts sends immediate WebSocket alerts for ground state transitions
 func (s *Service) sendImmediateGroundTransitionAlerts(phaseChanges []PhaseChangeInsert) {
 	for _, change := range phaseChanges {
+		// The two branches only ever differed by the line they logged (fiche E,
+		// step 4, merged 12/10 under a test).
+		var event string
+		switch change.Phase {
+		case "T/O":
+			event = "Aircraft TOOK OFF (IMMEDIATE)"
+		case "T/D":
+			event = "Aircraft LANDED (IMMEDIATE)"
+		default:
+			continue
+		}
+
 		aircraft, found := s.storage.GetByHex(change.Hex)
 		if !found || aircraft == nil {
 			continue
@@ -1784,68 +1796,30 @@ func (s *Service) sendImmediateGroundTransitionAlerts(phaseChanges []PhaseChange
 			previousPhase = phaseHistory[1].Phase
 		}
 
-		if change.Phase == "T/O" {
-			s.logger.Info("Aircraft TOOK OFF (IMMEDIATE)",
-				logger.String("hex", aircraft.Hex),
-				logger.String("flight", aircraft.Flight),
-				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
-				logger.String("timestamp", change.Timestamp.Format(time.RFC3339)),
-			)
+		s.logger.Info(event,
+			logger.String("hex", aircraft.Hex),
+			logger.String("flight", aircraft.Flight),
+			logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
+			logger.String("timestamp", change.Timestamp.Format(time.RFC3339)),
+		)
 
-			// Send phase change message first
-			if s.wsServer != nil {
-				// Send phase_change message
-				phaseData := map[string]interface{}{
-					"hex":        aircraft.Hex,
-					"flight":     aircraft.Flight,
-					"phase":      change.Phase,
-					"prev_phase": previousPhase,
-					"transition": previousPhase + " → " + change.Phase,
-					"airport":    change.Airport,
-					"altitude":   aircraft.ADSB.AltBaro.Float64(),
-					"on_ground":  aircraft.OnGround,
-					"timestamp":  change.Timestamp.Format(time.RFC3339),
-				}
-
-				s.wsServer.Broadcast(&websocket.Message{
-					Type: "phase_change",
-					Data: phaseData,
-				})
-
-				// T/O phase change message already sent above
-			}
-
-		} else if change.Phase == "T/D" {
-			s.logger.Info("Aircraft LANDED (IMMEDIATE)",
-				logger.String("hex", aircraft.Hex),
-				logger.String("flight", aircraft.Flight),
-				logger.Float64("altitude", aircraft.ADSB.AltBaro.Float64()),
-				logger.String("timestamp", change.Timestamp.Format(time.RFC3339)),
-			)
-
-			// Send phase change message first
-			if s.wsServer != nil {
-				// Send phase_change message
-				phaseData := map[string]interface{}{
-					"hex":        aircraft.Hex,
-					"flight":     aircraft.Flight,
-					"phase":      change.Phase,
-					"prev_phase": previousPhase,
-					"transition": previousPhase + " → " + change.Phase,
-					"airport":    change.Airport,
-					"altitude":   aircraft.ADSB.AltBaro.Float64(),
-					"on_ground":  aircraft.OnGround,
-					"timestamp":  change.Timestamp.Format(time.RFC3339),
-				}
-
-				s.wsServer.Broadcast(&websocket.Message{
-					Type: "phase_change",
-					Data: phaseData,
-				})
-
-				// T/D phase change message already sent above
-			}
+		if s.wsServer == nil {
+			continue
 		}
+		s.wsServer.Broadcast(&websocket.Message{
+			Type: "phase_change",
+			Data: map[string]interface{}{
+				"hex":        aircraft.Hex,
+				"flight":     aircraft.Flight,
+				"phase":      change.Phase,
+				"prev_phase": previousPhase,
+				"transition": previousPhase + " → " + change.Phase,
+				"airport":    change.Airport,
+				"altitude":   aircraft.ADSB.AltBaro.Float64(),
+				"on_ground":  aircraft.OnGround,
+				"timestamp":  change.Timestamp.Format(time.RFC3339),
+			},
+		})
 	}
 }
 
