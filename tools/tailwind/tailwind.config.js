@@ -4,13 +4,13 @@
 // class names, Alpine's :class objects included. Build with ./build.sh.
 module.exports = {
     darkMode: 'class',
+    // Every script under www/ but the vendored libraries: a folder added later
+    // (www/store/ on 12/10 went unlisted for a day, and eight classes of the
+    // aircraft sheet went uncompiled) is scanned without anyone remembering to.
     content: [
         '../../www/index.html',
-        '../../www/*.js',
-        '../../www/map/**/*.js',
-        '../../www/par/*.js',
-        '../../www/altitude/*.js',
-        '../../www/timeline/*.js',
+        '../../www/**/*.js',
+        '!../../www/vendor/**',
     ],
     theme: {
         extend: {
