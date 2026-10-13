@@ -148,6 +148,23 @@ class AircraftAnimationEngine {
         const previousRendered = state.lastRendered || previousReal;
         let effectiveSnapshot = snapshot;
 
+        // A real update whose position is the one already known is not a new
+        // fix: the receiver decoded no position since the last sample, only the
+        // altitude, the speed or a heading moved. Taking the old fix for a fresh
+        // observation (timestamp now) drags the aircraft back to it, then the
+        // prediction runs ahead again: measured on 13/10/2026 against a receiver
+        // giving a position every ~1.7 s, polled every second, 30 % of the
+        // rendered steps went backwards. Keep extrapolating from the fix as it
+        // was dated; the new figures only refresh the velocity and the heading.
+        if (snapshot.source !== 'predicted' && state.lastRealFix &&
+            Math.abs(state.lastRealFix.lat - snapshot.lat) < 1e-7 &&
+            Math.abs(state.lastRealFix.lon - snapshot.lon) < 1e-7) {
+            state.lastSeenAt = Date.now();
+            state.status = aircraft.status || 'active';
+            this._refreshFromRepeatedFix(state, snapshot);
+            return;
+        }
+
         if (previousReal && snapshot.source === 'predicted') {
             effectiveSnapshot = this._blendPredictedSnapshot(previousReal, snapshot);
         }
@@ -214,9 +231,35 @@ class AircraftAnimationEngine {
         }
 
         state.lastReal = effectiveSnapshot;
+        if (snapshot.source !== 'predicted') {
+            state.lastRealFix = { lat: snapshot.lat, lon: snapshot.lon };
+        }
 
         if (!state.lastRendered) {
             state.lastRendered = { ...effectiveSnapshot };
+        }
+    }
+
+    // The sample repeats the known fix: its speed, track and vertical rate are
+    // current even though the position is not, so the velocity follows them
+    // (an aircraft that has stopped must stop) and the heading is smoothed as
+    // for any real sample.
+    _refreshFromRepeatedFix(state, snapshot) {
+        if (Number.isFinite(snapshot.speedKts) && Number.isFinite(snapshot.track)) {
+            const speedMps = snapshot.speedKts * 0.514444;
+            const trackRad = (snapshot.track * Math.PI) / 180;
+            state.velocity = this._blendVelocity(state.velocity, {
+                eastMps: speedMps * Math.sin(trackRad),
+                northMps: speedMps * Math.cos(trackRad),
+                verticalMps: Number.isFinite(snapshot.baroRate) ? snapshot.baroRate * 0.00508 : 0,
+                headingDeg: snapshot.track
+            });
+        }
+        if (Number.isFinite(snapshot.heading)) {
+            const baseAlpha = Number.isFinite(this.config.headingSmoothingAlpha)
+                ? this.config.headingSmoothingAlpha
+                : 0.22;
+            state.displayHeading = this._lerpAngleDeg(state.displayHeading, snapshot.heading, Math.min(0.45, baseAlpha * 1.35));
         }
     }
 
@@ -612,6 +655,7 @@ class AircraftAnimationEngine {
             status: 'active',
             lastSeenAt: Date.now(),
             lastReal: null,
+            lastRealFix: null,
             lastRendered: null,
             displayHeading: null,
             velocity: null,
@@ -692,4 +736,9 @@ class AircraftAnimationEngine {
     }
 }
 
-window.AircraftAnimationEngine = AircraftAnimationEngine;
+if (typeof window !== 'undefined') {
+    window.AircraftAnimationEngine = AircraftAnimationEngine;
+}
+if (typeof module === 'object' && module.exports) {
+    module.exports = AircraftAnimationEngine;
+}

@@ -221,7 +221,9 @@ func computeForecast(at *AircraftTrajectory, derived *DerivedState) {
 	accelFactor := math.Max(0.5, 1.0-math.Abs(gsAccel)*0.1)
 
 	points := make([]PredictionPoint, forecastSteps)
-	now := time.Now().UTC()
+	// The forecast starts where and when the position was decoded, not at the
+	// poll that repeated it: the live prediction interpolates from that fix.
+	now := latest.PositionTime()
 
 	for i := 0; i < forecastSteps; i++ {
 		step := float64(i + 1)

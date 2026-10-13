@@ -45,26 +45,33 @@ const maxLivePredictionAge = 60 * time.Second
 // and a validity flag. Invalid snapshots (no position data) are stored but excluded
 // from derived state computations.
 type TrajectorySnapshot struct {
-	Timestamp   time.Time // UTC wall-clock time when this observation was ingested
-	Lat         float64   // Latitude (degrees)
-	Lon         float64   // Longitude (degrees)
-	AltBaro     float64   // Barometric altitude (feet)
-	AltGeom     float64   // Geometric altitude (feet)
-	GS          float64   // Ground speed (knots)
-	TAS         float64   // True airspeed (knots)
-	IAS         float64   // Indicated airspeed (knots)
-	Track       float64   // Track angle (degrees, 0-360)
-	MagHeading  float64   // Magnetic heading (degrees)
-	TrueHeading float64   // True heading (degrees)
-	BaroRate    float64   // Barometric vertical rate (feet per minute)
-	GeomRate    float64   // Geometric vertical rate (feet per minute)
-	Roll        float64   // Roll angle (degrees)
-	TrackRate   float64   // Rate of change of track (degrees per second)
-	OnGround    bool      // Whether the aircraft is on the ground
-	NavAltMCP   float64   // MCP (Mode Control Panel) altitude setting (feet)
-	NavAltFMS   float64   // FMS (Flight Management System) altitude setting (feet)
-	Seen        float64   // Seconds since last ADS-B message (data freshness)
-	Valid       bool      // False if key fields are missing (no position)
+	Timestamp time.Time // UTC wall-clock time when this observation was ingested
+	// PosTimestamp is when the receiver last decoded the position (Timestamp
+	// minus seen_pos), zero when the source does not say. A poll repeats the
+	// previous fix whenever no position was decoded since -- about half the
+	// polls at one per second against a receiver giving a position every ~1.7 s
+	// (measured 13/10/2026) -- so the live prediction extrapolates from this
+	// time, not from the time of the poll, or it stays anchored on the old fix.
+	PosTimestamp time.Time
+	Lat          float64 // Latitude (degrees)
+	Lon          float64 // Longitude (degrees)
+	AltBaro      float64 // Barometric altitude (feet)
+	AltGeom      float64 // Geometric altitude (feet)
+	GS           float64 // Ground speed (knots)
+	TAS          float64 // True airspeed (knots)
+	IAS          float64 // Indicated airspeed (knots)
+	Track        float64 // Track angle (degrees, 0-360)
+	MagHeading   float64 // Magnetic heading (degrees)
+	TrueHeading  float64 // True heading (degrees)
+	BaroRate     float64 // Barometric vertical rate (feet per minute)
+	GeomRate     float64 // Geometric vertical rate (feet per minute)
+	Roll         float64 // Roll angle (degrees)
+	TrackRate    float64 // Rate of change of track (degrees per second)
+	OnGround     bool    // Whether the aircraft is on the ground
+	NavAltMCP    float64 // MCP (Mode Control Panel) altitude setting (feet)
+	NavAltFMS    float64 // FMS (Flight Management System) altitude setting (feet)
+	Seen         float64 // Seconds since last ADS-B message (data freshness)
+	Valid        bool    // False if key fields are missing (no position)
 }
 
 // TrajectorySnapshotFromADSB converts an ADSBTarget and ground state into a
@@ -75,28 +82,42 @@ func TrajectorySnapshotFromADSB(adsb *ADSBTarget, onGround bool, ts time.Time) T
 		return TrajectorySnapshot{Timestamp: ts, Valid: false}
 	}
 	lat, lon, hasPosition := adsb.Position()
-	return TrajectorySnapshot{
-		Timestamp:   ts,
-		Lat:         lat,
-		Lon:         lon,
-		AltBaro:     adsb.AltBaro.Float64(),
-		AltGeom:     adsb.AltGeom.Float64(),
-		GS:          NumberOrZero(adsb.GS),
-		TAS:         NumberOrZero(adsb.TAS),
-		IAS:         NumberOrZero(adsb.IAS),
-		Track:       NumberOrZero(adsb.Track),
-		MagHeading:  NumberOrZero(adsb.MagHeading),
-		TrueHeading: NumberOrZero(adsb.TrueHeading),
-		BaroRate:    NumberOrZero(adsb.BaroRate),
-		GeomRate:    NumberOrZero(adsb.GeomRate),
-		Roll:        NumberOrZero(adsb.Roll),
-		TrackRate:   NumberOrZero(adsb.TrackRate),
-		OnGround:    onGround,
-		NavAltMCP:   NumberOrZero(adsb.NavAltitudeMCP),
-		NavAltFMS:   NumberOrZero(adsb.NavAltitudeFMS),
-		Seen:        NumberOrZero(adsb.Seen),
-		Valid:       hasPosition,
+	posTs := ts
+	if hasPosition && adsb.SeenPos != nil && *adsb.SeenPos > 0 {
+		posTs = ts.Add(-time.Duration(*adsb.SeenPos * float64(time.Second)))
 	}
+	return TrajectorySnapshot{
+		Timestamp:    ts,
+		PosTimestamp: posTs,
+		Lat:          lat,
+		Lon:          lon,
+		AltBaro:      adsb.AltBaro.Float64(),
+		AltGeom:      adsb.AltGeom.Float64(),
+		GS:           NumberOrZero(adsb.GS),
+		TAS:          NumberOrZero(adsb.TAS),
+		IAS:          NumberOrZero(adsb.IAS),
+		Track:        NumberOrZero(adsb.Track),
+		MagHeading:   NumberOrZero(adsb.MagHeading),
+		TrueHeading:  NumberOrZero(adsb.TrueHeading),
+		BaroRate:     NumberOrZero(adsb.BaroRate),
+		GeomRate:     NumberOrZero(adsb.GeomRate),
+		Roll:         NumberOrZero(adsb.Roll),
+		TrackRate:    NumberOrZero(adsb.TrackRate),
+		OnGround:     onGround,
+		NavAltMCP:    NumberOrZero(adsb.NavAltitudeMCP),
+		NavAltFMS:    NumberOrZero(adsb.NavAltitudeFMS),
+		Seen:         NumberOrZero(adsb.Seen),
+		Valid:        hasPosition,
+	}
+}
+
+// PositionTime is when the snapshot's position was decoded: PosTimestamp when
+// the source gave it, else the time of the poll.
+func (s *TrajectorySnapshot) PositionTime() time.Time {
+	if !s.PosTimestamp.IsZero() {
+		return s.PosTimestamp
+	}
+	return s.Timestamp
 }
 
 // ─── Derived State ────────────────────────────────────────────────────────────
@@ -520,7 +541,7 @@ func (tt *TrajectoryTracker) GetLivePredictionsAt(t time.Time) []LivePrediction 
 		if latest == nil || !latest.Valid {
 			continue
 		}
-		if t.Sub(latest.Timestamp) > maxLivePredictionAge {
+		if t.Sub(latest.PositionTime()) > maxLivePredictionAge {
 			continue
 		}
 
@@ -558,7 +579,7 @@ func interpolateLivePredictionFromForecast(latest *TrajectorySnapshot, forecast 
 	}
 
 	if atTime.Before(first.Timestamp) {
-		start := latest.Timestamp
+		start := latest.PositionTime()
 		end := first.Timestamp
 		if !end.After(start) {
 			return LivePrediction{
