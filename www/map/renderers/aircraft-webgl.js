@@ -332,6 +332,25 @@
         return ramp[band] || ramp.cruise;
     }
 
+    // The text colours of the design system (color.text.primary / tertiary),
+    // read once from the page's variables, the tokens' hex as fallbacks.
+    const TEXT_COLORS = { primary: '#e0e0e0', secondary: '#b8b8b8', tertiary: '#949494' };
+    let textColorCache = null;
+
+    function labelTextColor(level) {
+        if (!textColorCache) {
+            textColorCache = { ...TEXT_COLORS };
+            if (typeof document !== 'undefined' && document.documentElement) {
+                const cs = getComputedStyle(document.documentElement);
+                for (const k of Object.keys(textColorCache)) {
+                    const v = cs.getPropertyValue(`--color-text-${k}`).trim();
+                    if (v) textColorCache[k] = v;
+                }
+            }
+        }
+        return textColorCache[level] || textColorCache.primary;
+    }
+
     function getAircraftSymbolColor(aircraft, visualState, store) {
         return getAltitudeBandColor(aircraft, store);
     }
@@ -511,8 +530,12 @@
                 ? { callsignText: '', typeText: '', detailsText: '', ageText: '', voiceText: '' }
                 : getAircraftLabelParts(aircraft, store);
 
+            // The label's text reads in the page's primary text colour, tertiary
+            // once the signal is lost (design system, migration step 2): green is
+            // the tool's own voice, chosen or just heard, never "active". The phase
+            // prefix alone carries its family's colour; the rings carry the green.
             const isActiveAircraft = aircraft?.status === 'active';
-            let labelColor = isActiveAircraft ? '#4CAF50' : '#FFFFFF';
+            let labelColor = labelTextColor(isActiveAircraft ? 'primary' : 'tertiary');
             let staleAgeSeconds = 0;
             let staleAgeFromStore = false;
             if (store && typeof store.getSecondsSinceLastSeen === 'function') {
