@@ -492,6 +492,14 @@ sur la carte.
 
 ## État
 
+- 13/10 (soir) : **étape 1 versée dans `local`** (907b719) après relecture conforme de la session
+  design : le système dans `www/` à comportement identique (copies vérifiées par le filet,
+  jetons comme utilitaires Tailwind à côté des huit noms d'origine gardés, pas de surcharge
+  des rayons). Mesuré : 305 signatures balise + classes, 25 propriétés calculées, 304 identiques,
+  la seule différence une pastille d'état ; CSS compilé identique règle par règle. **Étape 2
+  livrée sur `migration`** (6aa293d, cinq familles de phase et rampe de clarté, une source
+  `www/phase/phase-families.js`, badges pleins pour T/O et T/D) : relecture design, puis soirée
+  d'écoute du propriétaire avant versement.
 - 13/10 (soir) : **la migration du design commence — étape 0 livrée** (plan validé par le
   propriétaire, `docs-fr/design/04-migration.md` ; référence figée `design-reference-2026-10-13` ;
   étude versée dans `local`, 1febe52 et e786aeb). Étape 0 : branche `migration` dans un arbre de
