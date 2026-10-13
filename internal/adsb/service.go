@@ -534,7 +534,8 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 
 		// Feed corrected data into trajectory tracker for phase analysis
 		if s.trajectoryTracker != nil && a.ADSB != nil {
-			snap := TrajectorySnapshotFromADSB(a.ADSB, a.OnGround, s.now())
+			polled := s.now()
+			snap := TrajectorySnapshotFromADSB(a.ADSB, a.OnGround, polled, ReceiverTime(rawData, a.ADSB.SourceType, polled))
 			s.trajectoryTracker.Ingest(a.Hex, snap)
 		}
 		if a.ADSB != nil {
@@ -1829,7 +1830,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 			Airline:        airlineName,
 			AirlineCountry: airlineCountry,
 			Status:         aircraftStatus,
-			LastSeen:       now.Add(-time.Duration(NumberOrZero(raw.Seen)) * time.Second),
+			LastSeen:       ReceiverTime(rawData, raw.SourceType, now).Add(-time.Duration(NumberOrZero(raw.Seen)) * time.Second),
 			ADSB:           &raw,
 		}
 
@@ -1848,7 +1849,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 		// No forecast from the tracker (a first poll, or no tracker at all):
 		// the same model from this one sample, dated when it was decoded.
 		if len(a.Future) == 0 {
-			posAt := now.Add(-time.Duration(NumberOrZero(raw.SeenPos) * float64(time.Second)))
+			posAt := ReceiverTime(rawData, raw.SourceType, now).Add(-time.Duration(NumberOrZero(raw.SeenPos) * float64(time.Second)))
 			a.Future = PredictionPointsToPositions(ForecastFromTarget(&raw, posAt))
 		}
 

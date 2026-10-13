@@ -74,15 +74,20 @@ type TrajectorySnapshot struct {
 
 // TrajectorySnapshotFromADSB converts an ADSBTarget and ground state into a
 // TrajectorySnapshot suitable for the ring buffer. The snapshot is marked invalid
-// when both lat and lon are zero (no position data available).
-func TrajectorySnapshotFromADSB(adsb *ADSBTarget, onGround bool, ts time.Time) TrajectorySnapshot {
+// when both lat and lon are zero (no position data available). ts is when the
+// server ingested it; dataAt is the time the source's seen_pos counts from
+// (ReceiverTime), ts when the source does not say.
+func TrajectorySnapshotFromADSB(adsb *ADSBTarget, onGround bool, ts, dataAt time.Time) TrajectorySnapshot {
 	if adsb == nil {
 		return TrajectorySnapshot{Timestamp: ts, Valid: false}
 	}
 	lat, lon, hasPosition := adsb.Position()
-	posTs := ts
+	if dataAt.IsZero() {
+		dataAt = ts
+	}
+	posTs := dataAt
 	if hasPosition && adsb.SeenPos != nil && *adsb.SeenPos > 0 {
-		posTs = ts.Add(-time.Duration(*adsb.SeenPos * float64(time.Second)))
+		posTs = dataAt.Add(-time.Duration(*adsb.SeenPos * float64(time.Second)))
 	}
 	return TrajectorySnapshot{
 		Timestamp:    ts,
@@ -107,6 +112,28 @@ func TrajectorySnapshotFromADSB(adsb *ADSBTarget, onGround bool, ts time.Time) T
 		Seen:         NumberOrZero(adsb.Seen),
 		Valid:        hasPosition,
 	}
+}
+
+// ReceiverTime is the time a target's seen and seen_pos count from: the
+// "now" of the aircraft.json a receiver writes itself (tar1090, readsb),
+// which it writes once a second and the server reads up to a second later;
+// else, and never later than, the server's own now. Counted from the server's
+// now, every position was dated up to a second too recent, and drawn that
+// much behind (replay bench, 0.5 s: 115 m in cruise).
+func ReceiverTime(raw *RawAircraftData, sourceType string, serverNow time.Time) time.Time {
+	switch sourceType {
+	case SourceTypeTar1090, SourceTypeReadsbAPI, SourceTypeReadsbFile:
+	default:
+		return serverNow // the external sources set "now" to the server's own second
+	}
+	if raw == nil || raw.Now <= 0 {
+		return serverNow
+	}
+	at := time.Unix(0, int64(raw.Now*float64(time.Second))).UTC()
+	if at.After(serverNow) {
+		return serverNow
+	}
+	return at
 }
 
 // PositionTime is when the snapshot's position was decoded: PosTimestamp when

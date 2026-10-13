@@ -68,11 +68,11 @@ func TestLivePredictionExtrapolatesFromPositionTime(t *testing.T) {
 func TestSnapshotPositionTimeFromSeenPos(t *testing.T) {
 	now := time.Now().UTC()
 	lat, lon, seenPos := 48.5, 2.0, 2.4
-	snap := TrajectorySnapshotFromADSB(&ADSBTarget{Lat: &lat, Lon: &lon, SeenPos: &seenPos}, false, now)
+	snap := TrajectorySnapshotFromADSB(&ADSBTarget{Lat: &lat, Lon: &lon, SeenPos: &seenPos}, false, now, time.Time{})
 	if got, want := snap.PositionTime(), now.Add(-2400*time.Millisecond); !got.Equal(want) {
 		t.Errorf("position time %v, want %v", got, want)
 	}
-	plain := TrajectorySnapshotFromADSB(&ADSBTarget{Lat: &lat, Lon: &lon}, false, now)
+	plain := TrajectorySnapshotFromADSB(&ADSBTarget{Lat: &lat, Lon: &lon}, false, now, time.Time{})
 	if !plain.PositionTime().Equal(now) {
 		t.Errorf("without seen_pos the position time is the poll's: got %v", plain.PositionTime())
 	}
@@ -220,4 +220,36 @@ func TestLivePredictionFollowsTheTurn(t *testing.T) {
 		return
 	}
 	t.Fatal("no live prediction in the turn")
+}
+
+// seen_pos counts from when the receiver wrote aircraft.json, not from when
+// the server read it: a tar1090 or readsb file read half a second after it
+// was written dates the position half a second earlier; another source, or a
+// receiver clock ahead of the server's, keeps the server's time.
+func TestReceiverTimeDatesTheFile(t *testing.T) {
+	read := time.Date(2026, 10, 13, 12, 0, 10, 500_000_000, time.UTC)
+	written := float64(read.Add(-500*time.Millisecond).UnixNano()) / 1e9
+	raw := &RawAircraftData{Now: written}
+	if got := ReceiverTime(raw, SourceTypeReadsbFile, read); got.Sub(read) != -500*time.Millisecond {
+		t.Errorf("readsb file: %v, want 0.5 s before the read", got.Sub(read))
+	}
+	if got := ReceiverTime(raw, SourceTypeExternalAPI, read); !got.Equal(read) {
+		t.Errorf("external source: %v, want the server's time", got)
+	}
+	ahead := &RawAircraftData{Now: float64(read.Add(2 * time.Second).Unix())}
+	if got := ReceiverTime(ahead, SourceTypeTar1090, read); !got.Equal(read) {
+		t.Errorf("receiver clock ahead: %v, want the server's time", got)
+	}
+	if got := ReceiverTime(&RawAircraftData{}, SourceTypeTar1090, read); !got.Equal(read) {
+		t.Errorf("no now: %v, want the server's time", got)
+	}
+
+	lat, lon, seenPos := 48.5, 2.0, 1.2
+	snap := TrajectorySnapshotFromADSB(&ADSBTarget{Lat: &lat, Lon: &lon, SeenPos: &seenPos}, false, read, ReceiverTime(raw, SourceTypeTar1090, read))
+	if got, want := snap.PositionTime(), read.Add(-1700*time.Millisecond); !got.Equal(want) {
+		t.Errorf("position time %v, want %v (file time less seen_pos)", got, want)
+	}
+	if !snap.Timestamp.Equal(read) {
+		t.Errorf("the snapshot is still ingested at the read: %v", snap.Timestamp)
+	}
 }
