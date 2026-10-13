@@ -174,6 +174,10 @@ export function analyse(data, truth, { from, to, scenario }) {
         const x = motion(m);
         return [k, [x.meanErrorM, x.backwardsPct, x.slowPct, x.jumpsPct, x.speedStdPct]];
     }));
+    // The three steps drawn fastest against the true speed.
+    extra.fastest = [...per.values()].flatMap((acc) => acc.steps.filter((x) => x.trueSpeed > 1)
+        .map((x) => [acc.hex, Math.round(x.t - from), r1(x.dt), r1(x.m), r1(x.speed / x.trueSpeed)]))
+        .sort((a, b) => b[4] - a[4]).slice(0, 3);
     // The five aircraft drawn furthest from the truth, on average.
     extra.worst = [...per.values()].map((acc) => {
         const x = motion(new Map([[acc.hex, acc]]));

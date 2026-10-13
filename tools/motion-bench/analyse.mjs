@@ -11,6 +11,6 @@ for (const file of process.argv.slice(2)) {
     const m = analyse(data, truth, { from: t0, to: t1, scenario });
     console.log(path.basename(file), JSON.stringify(m.summary));
     console.log('  by kind', JSON.stringify(m.extra.byKind));
-    for (const k of ['afterShown', 'longGap', 'worst']) if (m.extra[k]) console.log(' ', k, JSON.stringify(m.extra[k]));
+    for (const k of ['afterShown', 'longGap', 'worst', 'fastest']) if (m.extra[k]) console.log(' ', k, JSON.stringify(m.extra[k]));
     if (m.extra.bySecond) console.log('  by second', m.extra.bySecond.slice(0, 15).map((x) => x.join('/')).join(' '));
 }
