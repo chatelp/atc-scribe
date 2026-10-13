@@ -338,8 +338,8 @@ def column_follow(tab='Story'):
 <tr><td>12:51:03</td><td><span class="cl-phase cl-phase--crz cl-phase--small">CRZ</span></td><td class="is-num is-dim">#1</td></tr></tbody></table></div>
 <div class="cl-section"><button class="cl-disclosure" aria-expanded="true">Instructions heard</button>
 <table class="cl-table"><thead><tr><th>Time</th><th>Instruction</th><th>Then</th></tr></thead><tbody>
-<tr><td>13:12:31</td><td>Cleared ILS 26L</td><td class="is-dim">on the glide path</td></tr>
-<tr><td>13:04:10</td><td>Descend 4000 ft</td><td class="is-dim">level at 4000 ft</td></tr></tbody></table></div>
+<tr><td>13:12:31</td><td>Cleared ILS 26L</td><td class="is-dim">—</td></tr>
+<tr><td>13:04:10</td><td>Descend to 4 000 ft</td><td class="is-dim">level at 4 000 ft, 3 min later</td></tr></tbody></table></div>
 <div class="cl-section"><button class="cl-disclosure" aria-expanded="true">Basic info</button>
 <dl class="cl-kv"><dt>Hex</dt><dd>39a4c1</dd><dt>Registration</dt><dd>F-HEPA</dd><dt>Squawk</dt><dd>4231</dd><dt>First seen</dt><dd>12:51:03</dd><dt>Operator</dt><dd>Air France</dd></dl></div>
 <div class="cl-section"><button class="cl-disclosure" aria-expanded="false">Position</button></div>
