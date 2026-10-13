@@ -55,19 +55,19 @@ la page, **S** travail serveur, **X** pas aujourd'hui.
 | | Élément | Source, ou travail |
 |---|---|---|
 | D | piste en service par aérodrome suivi, depuis quand | juge de piste du serveur (`/api/v1/station`, `runway_in_use`) |
-| P | séquence d'arrivée hors de la PAR | les calculs de la PAR (`buildFrames`, `placeInFrame`) passent de `par-view.js` au store : ≈ ½ j page, rien au serveur |
+| D | séquence d'arrivée hors de la PAR | depuis le 13/10 à 13 h 02 (`1cfa887`) : `store.arrivals[code]` pour chaque aérodrome suivi, recalculé toutes les 5 s, PAR ouverte ou non, et `store.nextTouchdown` ; la PAR dessine depuis le même calcul (`par-arrivals.js`) |
 | D | « Worth knowing » | journal de la page gardé dans le navigateur depuis le 13/10 à 12 h 43 (`986354f`, `localStorage`, 100 événements) ; `events.recent(30)` donne les 30 dernières minutes ; une route serveur seulement pour partager l'historique entre navigateurs |
 | D | compteurs en vol, au sol, entendus | filtres du store, `voiceAircraftCount` |
 | P | phrase de synthèse | gabarits, rien de génératif ; **elle dit qu'elle vient de l'ADS-B** |
 | D | antenne : à l'antenne, choisi où, depuis quand | `/api/v1/status` → `antenna` |
 | D | messages ADS-B par seconde | non exposé lors de la réponse, puis **ajouté le 13/10 à 12 h 47** (`131ba7b`, `messages_per_second` dans `/api/v1/status`) : déjà dans la barre d'état de l'outil (« 84 · 703/s ») |
-| P | explication en français sous l'échange | un gabarit par rôle de consigne de `Plain`, page ou `explain.go` (≈ ½ j) ; la tour n'est nommée que si sa fréquence est connue (`/frequencies`) |
+| D | explication en français sous l'échange | depuis `1cfa887` : chaque consigne porte `text_fr` (« Descendez au niveau 100 »), et `store.plainFrench(t)` en fait une phrase qui nomme la fréquence quand c'est une source écoutée |
 | P | « someone is speaking » | niveau audio de chaque fréquence, avec un seuil ; **« transcription dans 2 s » : X, retiré** |
 | P | avion suivi : première détection, transferts, écart au plan de 3°, toucher estimé | `created_at` du serveur ; le reste dans la page, même déplacement que la séquence |
 | D | onglet Traffic | existe dans l'outil, réorganisé |
 
-En somme, toute la colonne tient avec l'existant ; le seul vrai déplacement de code est celui de
-la séquence d'arrivée.
+En somme, tout ce que montrent A, B et C existe dans le code depuis le 13/10, sauf « transcription
+dans 2 s », retiré.
 
 ## Corrections faites aux esquisses le 13/10
 
