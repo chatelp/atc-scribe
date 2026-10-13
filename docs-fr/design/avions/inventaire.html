@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avions — inventaire</title>
+<link rel="stylesheet" href="../maquettes/tokens.css">
+<link rel="stylesheet" href="../maquettes/base.css">
+<style>
+    /* Served from the repository root (python3 -m http.server), so that the
+       interface's own drawings in www/assets/ load as they are. */
+    body { padding: var(--space-8) var(--space-4); }
+    main { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-8); }
+    h1, h2 { margin: 0; }
+    h2 { font-size: var(--font-size-title); line-height: var(--font-line-height-title); margin-bottom: var(--space-2); }
+    p { margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-body); line-height: var(--font-line-height-body); max-width: 78ch; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
+    .cell { background: var(--color-surface-map); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+    .cell.none { border-style: dashed; }
+    .pics { display: flex; align-items: center; justify-content: space-between; height: 80px; }
+    .ico { display: block; background: var(--c, #cfcfcf); -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; }
+    .name { font: var(--font-weight-strong) var(--font-size-small)/16px var(--font-family-mono); color: var(--color-text-primary); }
+    .meta { font-size: var(--font-size-caption); line-height: 14px; color: var(--color-text-tertiary); }
+    .count { font: var(--font-weight-strong) var(--font-size-caption)/14px var(--font-family-mono); color: var(--color-accent-strong); }
+    .count.zero { color: var(--color-text-tertiary); font-weight: 400; }
+    table { border-collapse: collapse; width: 100%; margin-top: var(--space-3); }
+    th, td { text-align: left; padding: var(--space-1-5) var(--space-2); border-bottom: 1px solid var(--color-border-subtle); font-size: var(--font-size-small); vertical-align: top; }
+    th { font-weight: 400; }
+    .flag { color: var(--color-status-warn); }
+    .mapdemo { position: relative; height: 220px; background: var(--color-surface-map); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); margin-top: var(--space-3); overflow: hidden; }
+    .mapdemo .ico { position: absolute; }
+</style>
+</head>
+<body>
+<main>
+    <header>
+        <h1 class="t-display">Les avions dans l'interface — inventaire</h1>
+        <p style="margin-top: var(--space-2)">13/10/2026. Chaque dessin tel que la carte l'affiche (à sa taille réelle, teinté comme un avion bas ou en croisière), puis agrandi. Nombre d'avions : cinq relevés du flux ADS-B de la station à 30 s d'intervalle, 94 avions distincts, avec les règles de choix de <code>www/map/renderers/aircraft-webgl.js</code>. Lecture : <code>06-avions.md</code>.</p>
+    </header>
+
+    <section>
+        <h2>Sur la carte : 63 % des avions sont deux dessins</h2>
+        <p>Sur 94 avions : A320 (37) et B737 (22) font 59 icônes. 74 avions reçoivent une silhouette par type, 11 l'icône de leur catégorie ADS-B, 9 l'icône « inconnu ». Ce que l'œil voit à 24 px :</p>
+        <div class="mapdemo" id="demo"></div>
+    </section>
+
+    <section>
+        <h2>Silhouettes par type (20 fichiers, <code>www/assets/aircraft/</code>)</h2>
+        <p>Choisies sur le nom long du type (base <code>aircraft.csv</code>). Tracés vectorisés depuis des images, sans origine connue. Taille sur la carte : 27 px.</p>
+        <div class="grid" id="types"></div>
+    </section>
+
+    <section>
+        <h2>Icônes par catégorie ADS-B (8 fichiers, <code>www/assets/a0–a7.svg</code>)</h2>
+        <p>Quand le type ne correspond à aucune silhouette. Identifiant <code>Thin-L</code> dans chaque fichier : celui des modèles d'export des symboles SF d'Apple. Tailles sur la carte : 21 à 31 px.</p>
+        <div class="grid" id="cats"></div>
+    </section>
+
+    <section>
+        <h2>Ce qui n'a pas de dessin</h2>
+        <p>Types relevés qui tombent sur une icône de catégorie, ou sur « inconnu » quand l'avion n'émet pas de catégorie (26 sur 94).</p>
+        <table>
+            <thead><tr><th class="label">Type relevé</th><th class="label">Ce que c'est</th><th class="label">Ce que la carte montre</th></tr></thead>
+            <tbody>
+                <tr><td class="mono">DR40 ×2</td><td>Robin DR400, monomoteur à aile basse, l'avion d'aéroclub français</td><td class="flag">catégorie A1 ou « inconnu »</td></tr>
+                <tr><td class="mono">SIRA ×2</td><td>Tecnam P2002 Sierra, biplace d'école</td><td class="flag">catégorie A1 ou « inconnu »</td></tr>
+                <tr><td class="mono">DA40, M20P</td><td>Diamond DA40, Mooney M20 : monomoteurs légers</td><td class="flag">catégorie A1 ou « inconnu »</td></tr>
+                <tr><td class="mono">BCS3 ×2</td><td>Airbus A220-300, biréacteur régional</td><td class="flag">catégorie A3</td></tr>
+                <tr><td class="mono">A359, A35K</td><td>Airbus A350, gros-porteur biréacteur</td><td class="flag">catégorie A5</td></tr>
+                <tr><td class="mono">GLEX, GLF6, F2TH</td><td>Global, Gulfstream G650, Falcon 2000 : jets d'affaires</td><td class="flag">catégorie A2 ou A3</td></tr>
+                <tr><td class="mono">BE20, PC12</td><td>King Air, Pilatus PC-12 : turbopropulseurs</td><td class="flag">catégorie A1 ou A2</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2>Ailleurs</h2>
+        <table>
+            <thead><tr><th class="label">Où</th><th class="label">Ce qui représente l'avion</th><th class="label">Note</th></tr></thead>
+            <tbody>
+                <tr><td>Vue PAR</td><td><svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><polygon points="13,6 3,2 3,10" fill="#4c9ce8"/></svg> triangle de 10 px, plus un point dans la bande d'azimut</td><td>pointe dans le sens de la marche ; cible de clic élargie à 11 px</td></tr>
+                <tr><td>Avion choisi, survolé</td><td>cercle blanc (choisi) ou gris (survolé) autour de l'icône</td><td>rayon = taille de l'icône</td></tr>
+                <tr><td>Onglet PAR du téléphone</td><td>Font Awesome <code>fa-plane-arrival</code></td><td>un avion de Font Awesome, dessin différent de la carte</td></tr>
+                <tr><td>Chronologie (fiche)</td><td><code>fa-plane-departure</code>, <code>fa-plane-arrival</code></td><td>T/O et T/D seulement</td></tr>
+                <tr><td>Liste</td><td>aucun : le badge de phase en tient lieu</td><td><code>getPhaseIconClass</code> (six icônes Font Awesome par phase, <code>store/sidebar.js:466</code>) n'est appelé nulle part : code mort</td></tr>
+                <tr><td>Barre de menus</td><td>aucun avion : symboles SF d'ondes radio</td><td>à remplacer par la marque</td></tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+<script>
+    const A = '../../../www/assets/';
+    // measured on 13/10, 94 aircraft
+    const types = [['a320', 37, 'A318–A321, A20N, A21N'], ['b737', 22, 'B737, B38M'], ['b787', 4, 'B788, B789'], ['a330', 3, 'A332, A333'], ['erj', 2, 'E170–E190'], ['b777', 2, ''], ['cessna', 2, 'C152, C172, C208'], ['b767', 1, ''], ['b747', 1, ''], ['a340', 0, ''], ['a380', 0, ''], ['c130', 0, 'Hercules'], ['crjx', 0, 'CRJ'], ['dh8a', 0, 'Dash 8, Q400'], ['e195', 0, ''], ['f100', 0, 'Fokker 100'], ['fa7x', 0, 'Falcon 7X'], ['glf5', 0, 'Gulfstream V'], ['learjet', 0, ''], ['md11', 0, '']];
+    const cats = [['a0', 9, 'inconnu (pas de catégorie)', 24], ['a1', 2, 'léger, < 7 t', 21], ['a2', 1, 'petit, 7–34 t', 24], ['a3', 6, 'gros, 34–136 t', 27], ['a4', 0, 'fort sillage (B757)', 29], ['a5', 2, 'lourd, > 136 t', 31], ['a6', 0, 'haute performance', 25], ['a7', 0, 'giravion', 25]];
+    const cell = (src, size, name, n, meta) => `<div class="cell"><div class="pics"><span class="ico" style="--src:url(${src});--c:#cfcfcf;width:${size}px;height:${size}px"></span><span class="ico" style="--src:url(${src});--c:#6b6b6b;width:${size}px;height:${size}px"></span><span class="ico" style="--src:url(${src});--c:#e0e0e0;width:72px;height:72px"></span></div><span class="name">${name}</span><span class="count ${n ? '' : 'zero'}">${n} avion${n > 1 ? 's' : ''}</span><span class="meta">${meta}</span></div>`;
+    document.getElementById('types').innerHTML = types.map(([k, n, m]) => cell(`${A}aircraft/${k}.svg`, 27, k, n, m)).join('');
+    document.getElementById('cats').innerHTML = cats.map(([k, n, m, s]) => cell(`${A}${k}.svg`, s, k, n, m + ` · ${s} px`)).join('');
+    // a patch of sky as the map draws it: 24-27 px, rotated by heading
+    const demo = [['aircraft/a320', 60, 40, 30, '#cfcfcf'], ['aircraft/b737', 160, 110, 250, '#a8a8a8'], ['aircraft/a320', 270, 60, 80, '#6b6b6b'], ['aircraft/a320', 360, 150, 200, '#858585'], ['aircraft/b737', 470, 50, 120, '#6b6b6b'], ['a0', 560, 120, 300, '#a8a8a8'], ['aircraft/cessna', 650, 70, 45, '#f5f5f5'], ['a1', 720, 160, 210, '#f5f5f5'], ['aircraft/b787', 820, 90, 260, '#6b6b6b'], ['a3', 930, 40, 15, '#858585'], ['aircraft/a320', 1000, 150, 170, '#cfcfcf']];
+    document.getElementById('demo').innerHTML = demo.map(([k, x, y, r, c]) => `<span class="ico" style="--src:url(${A}${k}.svg);--c:${c};width:26px;height:26px;left:${x}px;top:${y}px;transform:rotate(${r}deg)"></span>`).join('');
+</script>
+</body>
+</html>
