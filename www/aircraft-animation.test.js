@@ -211,3 +211,19 @@ test('a gap the glide cannot close without outrunning the aircraft relocates it 
     ({ state } = at(2.0028 - 800 / metresPerDeg));
     assert.ok(state.relocation, '800 m behind: relocated');
 });
+
+test('strategy B draws the aircraft in the past, between two observed fixes (fiche M, step 3)', () => {
+    const { e } = engine();
+    e.updateConfig({ strategy: 'B', renderDelayMs: 1000 });
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 2000, now));
+    e.observe('abc123', fix(2.0028, now - 1000, now));
+    e.observe('abc123', fix(2.0056, now, now));
+    const state = e.aircraftStates.get('abc123');
+    e.estimate('abc123', { lat: 48.5, lon: 2.01, gs: 400, track: 90, alt: 30000, confidence: 0.9, at: now, sentAt: now, basedOn: now });
+    assert.equal(state.lastSampleSource, 'real', 'estimates are left out');
+    const p = e._pastPose(state, performance.now() - 500, null);
+    // 1.5 s ago: half-way between the first two fixes.
+    assert.ok(Math.abs(p.lon - 2.0014) < 0.0002, `drawn at ${p.lon.toFixed(5)}, want about 2.0014`);
+    assert.equal(new AircraftAnimationEngine({}, {}).config.strategy, 'A', 'A stays the default');
+});

@@ -13,6 +13,9 @@
 //
 //     REPLAY_UPDATE_REFERENCE=1 node --test www/aircraft-replay.test.js
 //
+// REPLAY_ENGINE='{"strategy":"B"}' plays it with another engine config and
+// prints the metrics only (fiche M, step 3).
+//
 // and never worse at all than those of the upstream engine with the D79
 // fixes, measured before fiche L changed anything (step1.json, fixed).
 const test = require('node:test');
@@ -99,6 +102,9 @@ function loadPage(clock, station) {
         _performFiltering() {},
     });
     const engine = new Engine(mapManager, store);
+    // Another engine config, to compare (fiche M, step 3): the metrics are
+    // printed, not compared with the reference.
+    if (process.env.REPLAY_ENGINE) engine.updateConfig(JSON.parse(process.env.REPLAY_ENGINE));
     store.animationEngine = engine;
     return { store, engine, drawn, timers };
 }
@@ -272,6 +278,7 @@ test('the replayed motion is no worse than the reference', () => {
     const m = replay();
     console.log('replay metrics', JSON.stringify(m).replace(/,"(?=[a-zA-Z])/g, ',\n "'));
     const refPath = path.join(DATA, 'reference.json');
+    if (process.env.REPLAY_ENGINE) return;
     if (process.env.REPLAY_UPDATE_REFERENCE === '1') {
         fs.writeFileSync(refPath, JSON.stringify(m, null, 2) + '\n');
         return;
@@ -282,7 +289,7 @@ test('the replayed motion is no worse than the reference', () => {
     }
 });
 
-test('the replayed motion is no worse than before fiche L', () => {
+test('the replayed motion is no worse than before fiche L', { skip: !!process.env.REPLAY_ENGINE }, () => {
     const m = replay();
     const before = JSON.parse(fs.readFileSync(path.join(DATA, 'step1.json'), 'utf8'));
     for (const k of Object.keys(GUARDED)) {

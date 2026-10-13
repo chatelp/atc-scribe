@@ -104,7 +104,21 @@ class AircraftAnimationEngine {
             // bench, scenario b); those over 200 m come from positions lost
             // for seconds.
             relocateMinM: 200,
-            relocateFadeMs: 150
+            relocateFadeMs: 150,
+            // How the pose is drawn (fiche M, step 3; the default is the
+            // owner's to choose, docs-fr/fiches-cloud/M-rapport.md):
+            // 'A' carries the last sample, observed or estimated, forward to
+            // now, and fades the gap each new sample opens;
+            // 'B' and 'C' draw the aircraft renderDelayMs in the past, between
+            // the two observed fixes around that time, the server's estimates
+            // left out; carried forward from the last fix when none is that
+            // recent. B waits long enough to be between two fixes nearly
+            // always (5.6 s, the 95th percentile of the interval between two
+            // fixes on the bench's generator); C waits one second, a little
+            // more than a fix takes to reach the page (0.9 s median), and
+            // extrapolates over less than A does.
+            strategy: 'A',
+            renderDelayMs: null // ms; null: 5600 for B, 1000 for C
         };
 
         this.aircraftStates = new Map();
@@ -229,6 +243,7 @@ class AircraftAnimationEngine {
     // minEstimateIntervalMs of the last one applied.
     estimate(hex, sample) {
         if (!this.config.enabled || !hex || !sample) return;
+        if (this._drawsPast()) return;
         if (!this._hasPosition(sample)) return;
         if (Number.isFinite(sample.confidence) && sample.confidence < this.config.minEstimateConfidence) return;
 
@@ -418,6 +433,10 @@ class AircraftAnimationEngine {
         state.lastReal = snapshot;
         if (snapshot.source !== 'predicted') {
             state.lastRealFix = { lat: snapshot.lat, lon: snapshot.lon };
+            state.fixes.push(snapshot);
+            while (state.fixes.length > 2 && (state.fixes.length > 12 || state.fixes[0].timestamp < now - 30000)) {
+                state.fixes.shift();
+            }
         }
 
         // The correction: the gap between where the aircraft is drawn now and
@@ -425,7 +444,9 @@ class AircraftAnimationEngine {
         // progress goes on: its fade-in already shows the new samples.
         state.correction = null;
         if (previousReal && previousRendered && !state.relocation) {
-            const fresh = this._predictedPose(state, snapshot, now, null);
+            const fresh = this._drawsPast()
+                ? (this._pastPose(state, now, null) || this._predictedPose(state, snapshot, now, null))
+                : this._predictedPose(state, snapshot, now, null);
             // Every gap fades, however small: below a threshold (30 m for
             // a real sample, 7 m for a predicted one, before) the aircraft
             // jumped to the sample in one frame, backwards as often as
@@ -636,7 +657,7 @@ class AircraftAnimationEngine {
                         ? state.velocity.headingDeg
                         : null)));
 
-        const pose = this._predictedPose(state, real, now, heading);
+        const pose = (this._drawsPast() && this._pastPose(state, now, heading)) || this._predictedPose(state, real, now, heading);
         if (state.velocity) this._secPredictedCount++;
 
         // A relocation: out where it was drawn, then in where it is.
@@ -703,6 +724,46 @@ class AircraftAnimationEngine {
         const alt = real.alt + (state.velocity.verticalMps * horizon * 3.28084);
 
         return { lat, lon, alt, heading };
+    }
+
+    _drawsPast() {
+        return this.config.strategy === 'B' || this.config.strategy === 'C';
+    }
+
+    _renderDelayMs() {
+        if (Number.isFinite(this.config.renderDelayMs)) return this.config.renderDelayMs;
+        return this.config.strategy === 'B' ? 5600 : 1000;
+    }
+
+    // Strategies B and C: where the aircraft was renderDelayMs ago, between
+    // the two observed fixes around that time, its heading turned between
+    // theirs; carried forward from the last fix when none is that recent;
+    // the first fix held when the time is before it. null without a fix.
+    _pastPose(state, now, heading) {
+        const fixes = state.fixes;
+        if (!fixes.length) return null;
+        const t = now - this._renderDelayMs();
+        let i = fixes.length - 1;
+        while (i >= 0 && fixes[i].timestamp > t) i--;
+        if (i < 0) {
+            const a = fixes[0];
+            return { lat: a.lat, lon: a.lon, alt: a.alt, heading: Number.isFinite(a.heading) ? a.heading : heading };
+        }
+        const a = fixes[i];
+        if (i === fixes.length - 1) {
+            return this._predictedPose(state, a, t, Number.isFinite(a.heading) ? a.heading : heading);
+        }
+        const b = fixes[i + 1];
+        const u = Math.min(1, Math.max(0, (t - a.timestamp) / Math.max(1, b.timestamp - a.timestamp)));
+        const turned = Number.isFinite(a.heading) && Number.isFinite(b.heading)
+            ? this._normalizeHeadingDeg(a.heading + this._angleDiffDeg(b.heading, a.heading) * u)
+            : heading;
+        return {
+            lat: a.lat + (b.lat - a.lat) * u,
+            lon: a.lon + (b.lon - a.lon) * u,
+            alt: a.alt + (b.alt - a.alt) * u,
+            heading: turned
+        };
     }
 
     _applyPose(hex, pose, state) {
@@ -899,6 +960,9 @@ class AircraftAnimationEngine {
             // pose it fades out from; lastFade, the opacity last drawn.
             relocation: null,
             lastFade: null,
+            // The observed fixes of the last 30 s (at most 12), for the
+            // strategies that draw in the past.
+            fixes: [],
             // The last observation, its server send time (ms), and the time
             // of the last estimate applied (ms).
             lastObserved: null,
