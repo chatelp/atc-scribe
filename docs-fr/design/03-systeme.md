@@ -115,6 +115,26 @@ vert) : ΔE 18,4 sous les quatre visions. S'y ajoute toujours une forme (■, �
 
 ### Altitude des avions sur la carte : une rampe de clarté, sans teinte
 
+> **Refusée à l'usage le 13/10** (soirée d'écoute de l'étape 2) : « le dégradé de gris ne marche
+> pas, trop difficile de distinguer les uns des autres ». **Remplacée le même jour par la palette F,
+> du chaud au froid**, choisie par le propriétaire sur une scène de 34 avions entre quatre palettes
+> mesurées (`tools/design/altitude.mjs`) :
+>
+> | Bande | Fond sombre | Fond clair (IGN, OSM) |
+> |---|---|---|
+> | très basse | `#fff59a` jaune pâle (18,8:1) | `#33311f` olive sombre (13,1:1) |
+> | basse | `#e68cba` rose (8,8:1) | `#452a38` prune (12,8:1) |
+> | moyenne | `#c2a3ff` violet (10,0:1) | `#746299` violet (5,3:1) |
+> | haute | `#61c9e3` cyan (11,0:1) | `#27505b` sarcelle (8,8:1) |
+> | croisière | `#6e7b8f` ardoise (4,9:1) | `#6e7b8f` ardoise (4,3:1) |
+>
+> Mesuré sur toutes les paires de bandes, fond sombre : ΔE 34,1 en vision normale (palette d'avant
+> 21,6, gris 10,3) et 13,6 au pire daltonisme (d'avant 10,9, gris 10,3) ; au rouge d'urgence 29,0
+> (d'avant 8,6 : son « très bas » rouge criait à l'urgence) ; à une famille de phase 5,8 (d'avant
+> 1,6 : son orange « bas » était celui des départs). Fond clair : 22,4 et 12,7 (série bleu / orange
+> d'avant : 13,8 et 1,1). Le plus bas reste le plus visible, la croisière la plus discrète.
+> `tokens.mjs` tient ces exigences. Ce qui suit est la proposition d'origine, gardée pour mémoire.
+
 | Bande | Fond sombre | Fond clair (IGN, OSM) |
 |---|---|---|
 | très basse | `#f5f5f5` (19,3:1) | `#141414` |
@@ -498,7 +518,8 @@ la page de connexion faite des mêmes surfaces et du même vert que l'outil (la 
 Tranchés le 13/10, tous selon la proposition :
 1. la police du système pour les phrases, le monospace pour ce qui se compare (principe 8) ;
 2. les cinq familles de phase à la place des dix couleurs, sur la carte, la liste et la PAR ;
-3. la rampe de clarté sans teinte pour l'altitude des avions ;
+3. la rampe de clarté sans teinte pour l'altitude des avions (**refusée à l'usage le 13/10** : les
+   gris se distinguent mal ; remplacée le même jour par la palette F, du chaud au froid, ci-dessus) ;
 4. J / K (et ↓ / ↑ quand la liste a le focus) au lieu de Tab pour passer d'un avion à l'autre.
 
 Reste ouvert, sans effet sur le dessin : 5. l'interpolation des avions gardée sous

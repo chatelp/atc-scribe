@@ -115,6 +115,10 @@ Indépendante de la disposition, elle passe en premier.
     `getPhaseColorClass` (`store/sidebar.js`) : cinq familles ; badges pleins pour T/O et T/D ;
   - `getAltitudeBandColor` : la rampe de clarté (`color-altitude-dark-*` ; `-light-*` sur les fonds
     IGN et OSM, dont la palette corrigée le 12/10, `46dc425`, est gardée).
+  - le texte des étiquettes de la carte : `color-text-primary`, `color-text-tertiary` au signal
+    perdu ; seul le préfixe de phase prend la couleur de sa famille ; le vert ne reste qu'aux
+    anneaux de l'avion choisi et de celui qui vient de parler (`MapLabel` ; écart relevé à la
+    relecture du 13/10 : `aircraft-webgl.js` peignait en vert toute étiquette d'avion actif).
 - **Ne change pas** : les dix filtres de phase et leurs raccourcis 1 à 0, la clé `phaseFilters` ;
   les seuils des bandes d'altitude ; la géométrie de la PAR.
 - **Référence** : `par.html`, la carte de `a-maintenant.html`.

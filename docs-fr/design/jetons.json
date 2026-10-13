@@ -49,20 +49,20 @@
       "unknown": { "$value": "#969696", "$description": "NEW, UNK. Grey: nothing known yet." }
     },
     "altitude": {
-      "$description": "Aircraft icon on the map, by altitude band: a lightness ramp without hue, so it never competes with the phase hue of the label and survives every colour-vision deficiency. Near the ground = brightest (what matters to a local listener).",
+      "$description": "Aircraft icon on the map, by altitude band: a ramp of hue from warm and bright near the ground to cool and quiet at cruise (palette F, chosen by the owner on 13/10 after the grey ramp was refused in use: too hard to tell apart). Every pair of bands stays apart under the four visions, none looks like the urgent red, none like a phase family; near the ground = most visible, cruise = least (tools/design/altitude.mjs).",
       "dark": {
-        "very-low": { "$value": "#f5f5f5" },
-        "low": { "$value": "#cfcfcf" },
-        "mid": { "$value": "#a8a8a8" },
-        "high": { "$value": "#858585" },
-        "cruise": { "$value": "#6b6b6b" }
+        "very-low": { "$value": "#fff59a", "$description": "Very low, near the ground: pale yellow, the most visible." },
+        "low": { "$value": "#e68cba", "$description": "Low: pink." },
+        "mid": { "$value": "#c2a3ff", "$description": "Mid: violet." },
+        "high": { "$value": "#61c9e3", "$description": "High: cyan." },
+        "cruise": { "$value": "#6e7b8f", "$description": "Cruise: slate, the quietest: the most numerous and the least relevant to a local listener." }
       },
       "light": {
-        "very-low": { "$value": "#141414" },
-        "low": { "$value": "#333333" },
-        "mid": { "$value": "#4d4d4d" },
-        "high": { "$value": "#666666" },
-        "cruise": { "$value": "#808080" }
+        "very-low": { "$value": "#33311f", "$description": "Very low on a light base map (IGN, OSM): dark olive, the most visible." },
+        "low": { "$value": "#452a38", "$description": "Low: dark plum." },
+        "mid": { "$value": "#746299", "$description": "Mid: violet." },
+        "high": { "$value": "#27505b", "$description": "High: dark teal." },
+        "cruise": { "$value": "#6e7b8f", "$description": "Cruise: slate, the quietest." }
       }
     },
     "scrim": { "$value": "#000000b3", "$description": "Behind a full page (settings) over the map: black at 70 %." }
