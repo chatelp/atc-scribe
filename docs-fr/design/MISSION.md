@@ -1,6 +1,6 @@
-# Mission de l'agent « design » — une identité et un système de design pour atc-scribe
+# Mission de l'agent « design » — une identité et un système de design pour Clairance
 
-*Écrite le 12/10/2026 par la session atc-scribe (« Co-ATC local fork adaptation (fork) »), à la
+*Écrite le 12/10/2026 par la session Clairance (« Co-ATC local fork adaptation (fork) »), à la
 demande du propriétaire (Pierre). À lire en premier. Tout ce qui s'adresse au propriétaire est en
 français ; le code, ses commentaires et les commits sont en anglais.*
 
@@ -17,7 +17,7 @@ Le propriétaire, le 12/10 :
 qui découvre l'outil) et le système de design (couleurs, typographie, espacements, composants,
 états, mouvement, accessibilité), avec des maquettes des écrans principaux et un plan de
 migration. **Tu n'implémentes pas dans l'interface vivante** : tu produis l'étude, le système et
-les maquettes ; la mise en œuvre se fera ensuite, par étapes, avec la session atc-scribe, sous ses
+les maquettes ; la mise en œuvre se fera ensuite, par étapes, avec la session Clairance, sous ses
 garde-fous. Tu peux coder des maquettes HTML statiques, pas toucher à `www/` en production.
 
 ## Ce qu'est l'outil, et pour qui
@@ -150,9 +150,9 @@ comparaison des styles calculés comme au 4.3, une capture avant / après). Esti
 ## Les règles
 
 - **Rien dans `www/` ni dans `tools/tailwind/`** pendant cette mission : tes fichiers vont dans
-  `docs-fr/design/` et `tools/design/`. La mise en œuvre viendra après, avec la session atc-scribe.
+  `docs-fr/design/` et `tools/design/`. La mise en œuvre viendra après, avec la session Clairance.
 - **Une branche à toi** : `design`, depuis `local`, dans un arbre de travail séparé pour ne pas
-  gêner la session atc-scribe qui commite sur `local`. Commits en anglais, signés comme les
+  gêner la session Clairance qui commite sur `local`. Commits en anglais, signés comme les
   autres (`Co-Authored-By: Claude <modèle> <noreply@anthropic.com>`). Pas de push sur `main` : le
   propriétaire décide quand l'étude entre dans le dépôt public ; d'ici là, la branche reste
   locale ou poussée sous son nom.
@@ -164,7 +164,7 @@ comparaison des styles calculés comme au 4.3, une capture avant / après). Esti
   viendra) ; les maquettes aussi, sauf les interprétations de communications françaises.
 - Pas de secret, pas de mot de passe, pas de coordonnées exactes de la station dans les
   documents ni les maquettes ; les indicatifs des maquettes sont inventés.
-- **Parle à la session atc-scribe** (« Co-ATC local fork adaptation (fork) », par SendMessage)
+- **Parle à la session Clairance** (« Co-ATC local fork adaptation (fork) », par SendMessage)
   pour toute question sur ce que fait l'outil ou sur un chiffre ; elle te répondra en français.
   Quand le système et les maquettes sont prêts, dis-le au propriétaire : c'est lui qui valide, et
   c'est après sa validation que la migration commence.

@@ -1,37 +1,37 @@
 #!/bin/sh
-# Build the menu bar launcher into tools/menubar/build/atc-scribe.app.
+# Build the menu bar launcher into tools/menubar/build/Clairance.app.
 # With --install, also copy it to ~/Applications.
 #
 # Needs the Xcode command line tools (swiftc) and macOS 13 or later.
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../.." && pwd)
-app="$here/build/atc-scribe.app"
+app="$here/build/Clairance.app"
 
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-sed "s|@REPO@|$repo|" "$here/AtcScribe.swift" > "$here/build/AtcScribe.swift"
+sed "s|@REPO@|$repo|" "$here/Clairance.swift" > "$here/build/Clairance.swift"
 swiftc -O -parse-as-library -target "$(uname -m)-apple-macos13.0" \
-	-o "$app/Contents/MacOS/atc-scribe" "$here/build/AtcScribe.swift"
+	-o "$app/Contents/MacOS/clairance" "$here/build/Clairance.swift"
 cat > "$app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key><string>atc-scribe</string>
-	<key>CFBundleIdentifier</key><string>dev.atc-scribe.launcher</string>
-	<key>CFBundleExecutable</key><string>atc-scribe</string>
+	<key>CFBundleName</key><string>Clairance</string>
+	<key>CFBundleIdentifier</key><string>dev.clairance.launcher</string>
+	<key>CFBundleExecutable</key><string>clairance</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>1.0</string>
 	<key>LSMinimumSystemVersion</key><string>13.0</string>
 	<key>LSUIElement</key><true/>
 	<!-- Plain HTTP: the launcher only calls the addresses of its own settings,
-	     all on the local network or the VPN (co-atc, the sidecar, radio-ctl), and
+	     all on the local network or the VPN (the server, the sidecar, radio-ctl), and
 	     a name like station.lan is not among the local names ATS allows. -->
 	<key>NSAppTransportSecurity</key>
 	<dict><key>NSAllowsArbitraryLoads</key><true/></dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>co-atc, started from here, reads the receiving station's streams on the local network.</string>
+	<string>Clairance, started from here, reads the receiving station's streams on the local network.</string>
 </dict>
 </plist>
 EOF
@@ -40,7 +40,7 @@ echo "built $app"
 
 if [ "$1" = "--install" ]; then
 	mkdir -p "$HOME/Applications"
-	rm -rf "$HOME/Applications/atc-scribe.app"
+	rm -rf "$HOME/Applications/Clairance.app"
 	cp -R "$app" "$HOME/Applications/"
-	echo "installed $HOME/Applications/atc-scribe.app"
+	echo "installed $HOME/Applications/Clairance.app"
 fi

@@ -76,7 +76,7 @@ et des plans d'aéroport bien visibles**. Trois étapes, un commit chacune au mo
      (3.11+, `tomllib`, `urllib`) : il lit la position de la station dans le `config.toml` donné
      (`--config`, section `[station]`), interroge **Overpass** (miroir
      `https://overpass.openstreetmap.fr/api/interpreter` d'abord, `https://overpass-api.de/api/interpreter`
-     ensuite ; un `User-Agent` qui nomme atc-scribe) pour les `aeroway` `runway`, `taxiway`,
+     ensuite ; un `User-Agent` qui nomme Clairance) pour les `aeroway` `runway`, `taxiway`,
      `apron`, `terminal`, `helipad` (pas les hangars) dans un rayon donné (`--radius-nm`,
      35 par défaut), ways et relations multipolygones, et écrit un GeoJSON compact (coordonnées
      à 6 décimales, propriétés : `aeroway`, `ref`, `name`, `width`, `surface`) dans

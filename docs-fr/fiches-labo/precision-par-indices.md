@@ -1,8 +1,8 @@
 # Fiche labo — La précision de l'appariement par niveau d'indices
 
-*De la session atc-scribe pour l'agent du laboratoire (session « Whisper-lab »). Écrite le 12/10
+*De la session Clairance pour l'agent du laboratoire (session « Whisper-lab »). Écrite le 12/10
 à la demande du propriétaire ; c'est lui qui la lance. Aucun GPU, aucun audio : des secondes de
-calcul sur des textes et des bases. Rien à committer dans atc-scribe ; ton script et ton résultat
+calcul sur des textes et des bases. Rien à committer dans Clairance ; ton script et ton résultat
 vont chez toi (`scripts/labo/`, `resultats/labo/`).*
 
 ## Pourquoi
@@ -23,10 +23,10 @@ justes à chaque niveau. C'est ce qui manque, et seule une oreille peut le fourn
   sidecar (`20261003/124350/t_….wav`), et porte le texte corrigé, ses `tokens`, leurs `etats`, et
   `mots_indicatif`. **Le jeu n'est pas fini : le propriétaire continue d'annoter.** La fiche est donc
   écrite pour être **relancée** ; le premier résultat sera préliminaire, et dira combien il manque.
-- **Les bases co-atc** de ces journées : `atc-scribe/data/co-atc-2026-09-30.db` à `…-10-04.db`,
+- **Les bases co-atc** de ces journées : `Clairance/data/co-atc-2026-09-30.db` à `…-10-04.db`,
   en lecture seule (ne jamais les ouvrir en écriture : `?mode=ro`). Les transmissions de ces jours
   n'ont **pas** de `match_score`/`match_reason` (antérieures au 11/10) : la preuve se **recalcule**.
-- **L'outil** : `atc-scribe/cmd/phraseology` (construis-le depuis atc-scribe à `1e3f12a` ou plus
+- **L'outil** : `Clairance/cmd/phraseology` (construis-le depuis Clairance à `1e3f12a` ou plus
   récent : `go build -o /chemin/phr ./cmd/phraseology`). En mode `-db … -json sortie.jsonl`, il
   écrit une ligne par transmission avec `id`, `frequency_id`, `created_at`, et `match` :
   `flight`, `hex`, `score`, `reason` (ex. `digits exact + operator named + altitude agrees`),
@@ -96,9 +96,9 @@ est. Si des cas **faux** se concentrent sur une raison (par exemple « two last 
 
 ## Les garde-fous
 
-- Lecture seule sur `atc-scribe/data/*.db` et sur l'archive ; pas de commit dans atc-scribe ; pas
+- Lecture seule sur `Clairance/data/*.db` et sur l'archive ; pas de commit dans Clairance ; pas
   d'audio envoyé nulle part (les textes de `corrections.json` sont déjà dans ton dépôt privé).
 - Pas de GPU ni de séance à inscrire : si ton script dépasse la minute, c'est qu'il refait quelque
   chose d'inutile.
-- Le résultat revient par un fichier dans `echanges-atc-scribe/` (« whisper-lab → atc-scribe »),
+- Le résultat revient par un fichier dans `echanges-atc-scribe/` (« whisper-lab → Clairance »),
   comme le 30/09, avec le chemin du fichier de résultat et une ligne par niveau.

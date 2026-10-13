@@ -4875,7 +4875,24 @@ de commits cités dans les documents d'avant le 12/10 ne correspondent plus : il
 sont pas réécrits. Coût mesuré : ni fork ni étoile sur le dépôt, 483 commits, aucune copie
 connue ailleurs.
 
-### D74 — Le nom « atc-scribe » est abandonné ; le nouveau nom est à choisir *(12/10)*
+### D74 — Le nom « atc-scribe » est abandonné ; le nouveau nom est **Clairance** *(12/10, choisi le 13/10)*
+
+> **Choisi par le propriétaire le 13/10 : « Clairance »**, le mot de la phraséologie pour ce que
+> l'outil fait, mettre les consignes en clair, lisible sans traduction dans les deux langues.
+> Écartés avant lui : `5/5` (pas assez original), les noms d'histoire (Galène, pris par un serveur
+> de visioconférence libre). Vérifications de la session design (`docs-fr/design/00-nom.md`
+> § 4) : aucune marque active sur le seul mot (trois expirées ; « Clairance Avocats » en classes
+> de services juridiques), aucun paquet logiciel, `.org` / `.app` / `.dev` libres, `.fr` et `.io`
+> pris, `.com` pris depuis 2011 par un cabinet d'avocats, quatre dépôts GitHub homonymes, tous
+> médicaux. Rien de réservé. **Renommage fait le 13/10** : dépôt `chatelp/clairance` (l'ancien
+> nom redirige), titre de page, écrans de connexion et d'installation, journal du serveur,
+> lanceur de barre de menus `Clairance.app`, dossier de configuration `~/.config/clairance`,
+> documents, README. **Non renommés, à dessein** : le dossier local `~/Dev/Aero/atc-scribe`
+> (trois sessions et deux arbres de travail y sont attachés ; à déplacer quand tout est fermé),
+> le module Go `github.com/yegors/co-atc` et le binaire `bin/co-atc` (internes, lignée du fork),
+> le dépôt privé `atc-scribe-communaute`, les noms des sessions, et les mentions datées de ce
+> journal. Q53 est close par le même choix : un mot français, porté comme une capacité, pas
+> comme un territoire.
 
 **Décision du propriétaire le 12/10**, sur un constat de la session « communauté », vérifié aux
 sources : la DSNA a un outil de transcription des communications ATC nommé **Scribe** (92 % de

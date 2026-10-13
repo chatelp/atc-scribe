@@ -1,4 +1,4 @@
-// atc-scribe menu bar launcher.
+// Clairance menu bar launcher.
 //
 // An icon in the menu bar that says whether production runs, starts and stops
 // it, and opens the page. It does not run production itself: it runs the same
@@ -8,8 +8,8 @@
 // clean stop of co-atc, its sidecar and the station link. Nothing starts on its
 // own: production runs only when asked (owner's choice, 10/10).
 //
-// Settings, all optional, in ~/.config/atc-scribe/launcher.json:
-//   repo                the atc-scribe checkout (default: where it was built)
+// Settings, all optional, in ~/.config/clairance/launcher.json:
+//   repo                the Clairance checkout (default: where it was built)
 //   production_command  relative to repo (default: runs/production.command)
 //   station_status_url  radio-ctl's /radio/etat, for the line "On air"
 //   tailscale_url       copied by "Copy remote address"
@@ -70,7 +70,7 @@ final class Production: ObservableObject {
 
     init() {
         let path = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/atc-scribe/launcher.json")
+            .appendingPathComponent(".config/clairance/launcher.json")
         if let data = try? Data(contentsOf: path),
            let c = try? JSONDecoder().decode(LauncherConfig.self, from: data) {
             cfg = c
@@ -191,7 +191,7 @@ final class Production: ObservableObject {
             let f = DateFormatter()
             f.locale = Locale(identifier: "fr_FR")
             f.dateFormat = "dd/MM 'à' HH:mm"
-            lines.insert("| depuis le \(f.string(from: Date())), durée ouverte \(planningMarker) | atc-scribe | **co-atc en production** | oui, en continu (trois modèles, ~8 Go) |", at: sep + 1)
+            lines.insert("| depuis le \(f.string(from: Date())), durée ouverte \(planningMarker) | Clairance | **co-atc en production** | oui, en continu (trois modèles, ~8 Go) |", at: sep + 1)
         }
         text = lines.joined(separator: "\n")
         try? text.write(toFile: path, atomically: true, encoding: .utf8)
@@ -199,7 +199,7 @@ final class Production: ObservableObject {
 }
 
 // The same actions without the menu, for a terminal or a Shortcut:
-//   atc-scribe --status | --start | --stop
+//   Clairance --status | --start | --stop
 // They go through the very code the menu's buttons run.
 @main
 enum Entry {
@@ -209,7 +209,7 @@ enum Entry {
             MainActor.assumeIsolated { cli(cmd) }
             return
         }
-        AtcScribeLauncher.main()
+        ClairanceLauncher.main()
     }
 
     @MainActor static func cli(_ cmd: String) {
@@ -239,7 +239,7 @@ enum Entry {
     }
 }
 
-struct AtcScribeLauncher: App {
+struct ClairanceLauncher: App {
     @StateObject private var p = Production()
 
     var body: some Scene {

@@ -1,4 +1,4 @@
-# atc-scribe
+# Clairance
 
 *A fork of [Co-ATC](https://github.com/yegors/co-atc) that does the listening on
 your own machine.*
@@ -47,7 +47,7 @@ working notes that produced them are in [`docs-fr/`](docs-fr/) (in French).
 
 ## What is different from upstream
 
-| | upstream | atc-scribe |
+| | upstream | Clairance |
 |---|---|---|
 | Speech to text | OpenAI `gpt-4o-transcribe` | local Whisper via [MLX](https://github.com/ml-explore/mlx) in a Python sidecar |
 | Transcript post-processing | GPT-4o with a 90-line prompt | a closed-vocabulary **phraseology grammar**, no model |
@@ -62,7 +62,7 @@ working notes that produced them are in [`docs-fr/`](docs-fr/) (in French).
 
 Upstream's map, ADS-B ingestion and flight-phase detection are the larger half of this
 program and stay close to what they are. The interface started as upstream's and is
-becoming this project's own. **Since October 2026, atc-scribe is developed as a product
+becoming this project's own. **Since October 2026, Clairance is developed as a product
 in its own right, not as a fork that tracks upstream**: nothing is rebased, what has no
 role here is removed rather than left dormant, and what would be useful upstream is kept
 as self-contained commits that can be offered as they are. The reasoning, with the
@@ -133,7 +133,7 @@ What does not work yet, and is known:
 ## How it works
 
 Two diagrams: from the radio to the text, then from the text to the aircraft.
-**●** marks a component written for atc-scribe, **○** an upstream Co-ATC component
+**●** marks a component written for Clairance, **○** an upstream Co-ATC component
 it adapts; unmarked boxes are third-party software, models, or the receiving station.
 
 ```mermaid
@@ -288,8 +288,8 @@ adds enough to make that a choice rather than a fact.
 ## Getting started
 
 ```bash
-git clone https://github.com/<you>/atc-scribe.git
-cd atc-scribe
+git clone https://github.com/<you>/clairance.git
+cd clairance
 cp configs/config.toml.example configs/config.toml
 go build -o bin/co-atc ./cmd/server
 ```

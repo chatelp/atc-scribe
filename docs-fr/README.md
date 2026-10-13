@@ -1,6 +1,6 @@
 # `docs-fr/` — le dossier de chantier
 
-Ce dossier est **la documentation de travail du fork `atc-scribe`**, en français.
+Ce dossier est **la documentation de travail du fork `clairance`**, en français.
 Ce n'est pas une traduction de `docs/` : `docs/` appartient au projet amont et reste
 tel quel, y compris `LOCAL-STT.md`, qui nous sert de référence.
 
@@ -41,7 +41,7 @@ documents de chantier et échanges avec le propriétaire de la station en franç
 | `29-approches-reconnaissance.md` | **référence** : améliorer la transcription — le modèle de langage, la chaîne et la réception : ce qui est mesuré, adopté, écarté, et ce qui reste à tester — sans jargon |
 | `30-association-regles-et-reglages.md` | **référence** : relier une transmission à un avion — chaque règle, son réglage dans co-atc (panneau, `runtime-settings.json`, `config.toml`), sa valeur par défaut, ce qu'elle rapporte |
 | `31-vue-par.md` | **conception et suivi** : la vue PAR, le ciel de profil piste par piste (D67) — décisions, sources des données, questions ouvertes, étapes d'implémentation et leur vérification |
-| `32-audit-produit.md` | **étude** : atc-scribe n'est plus co-atc (Q52) — mesure de l'écart avec l'amont, trois audits parallèles (UX, serveur Go, code de l'interface), consolidation et arbitrage avant tout chantier |
+| `32-audit-produit.md` | **étude** : Clairance n'est plus co-atc (Q52) — mesure de l'écart avec l'amont, trois audits parallèles (UX, serveur Go, code de l'interface), consolidation et arbitrage avant tout chantier |
 | `33-pilotage.md` | **pilotage** (12/10) : la stratégie en cinq lignes, les sessions parallèles et leur état, les jalons faits / en cours / à venir avec leurs dépendances, les décisions attendues du propriétaire, les risques — tenu à chaque livraison et décision ; « où en est-on ? » se répond ici |
 | `audit-2026-10-09/` | **rapports bruts** de l'audit du 09/10 (UX, serveur Go, code de l'interface), copiés dans le dépôt le 10/10 pour que les sessions cloud les lisent |
 | `fiches-cloud/` | **fiches autonomes pour les sessions cloud** (crédit jusqu'au 5/11) : règles communes, marche à suivre pour le propriétaire, une fiche par tâche ; les rapports des sessions y reviennent |

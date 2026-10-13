@@ -1,13 +1,13 @@
 # Pilotage — stratégie, chantiers, jalons, décisions attendues
 
-*Le document du chef d'orchestre. Tenu par la session atc-scribe, mis à jour à chaque livraison
+*Le document du chef d'orchestre. Tenu par la session Clairance, mis à jour à chaque livraison
 d'une session, à chaque décision du propriétaire et à chaque jalon franchi. Ouvert le 12/10/2026
 à la demande du propriétaire. Le journal détaillé reste dans `32-audit-produit.md` (« État ») et
 la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, courte, à jour.*
 
 ## La stratégie, en cinq lignes
 
-1. **atc-scribe est un produit à part** (D71, 10/10) : plus un fork qu'on rebase, une interface
+1. **Clairance est un produit à part** (D71, 10/10) : plus un fork qu'on rebase, une interface
    à nous, ce qui ne sert pas se retire, ce qui est contribuable reste identifiable.
 2. **Ce qu'il fait que les autres ne font pas** : lier ce qui se dit à ce qui vole, en local,
    sans service, avec le français en seconde lecture. Mesuré (95 % de précision d'appariement,
@@ -26,7 +26,7 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 
 | Session | Mission | État au 12/10 | Prochain livrable | Ce que j'en attends |
 |---|---|---|---|---|
-| **atc-scribe** (cette session) | le produit : code, mesures, documents, coordination | paliers 0 à 5 de l'audit faits ; bulles de dernière transmission ; retours de l'inventaire design traités (palette, 51 règles orphelines) | le renommage, dès le choix du nom | — |
+| **Clairance** (cette session) | le produit : code, mesures, documents, coordination | paliers 0 à 5 de l'audit faits ; bulles de dernière transmission ; retours de l'inventaire design traités (palette, 51 règles orphelines) | le renommage, dès le choix du nom | — |
 | **Whisper-lab** (`~/Dev/Aero/whisper-lab`, privé) | reconnaissance : modèles, corpus, mesures, GPU | précision par niveau d'indices mesurée (borne haute) ; Kyutai écarté (28/09) | tirage au hasard de la précision quand l'annotation aura avancé (jalon du labo) | la mesure de non-régression du modèle converti, le jour du portage |
 | **ATC-scribe communauté** (`~/Dev/Aero/atc-scribe-communaute`, privé, dépôt `chatelp/atc-scribe-communaute`) | cadre légal, existant, communautés françaises, prérequis, recommandation | **étude livrée le 12/10** : `SYNTHESE.md` et fiches 01 à 05 | — (session en veille ; reprend sur question de Pierre) | la décision de Pierre sur le premier pas (consultation d'avocat) ; le P0 de la fiche 04 entre dans le jalon « installable ailleurs » |
 | **ATC-scribe design** (branche `design`, index `docs-fr/design/README.md`) | identité, nom, système de design, maquettes, plan de migration | **tout est livré sauf la marque** : inventaire (01), nom et positionnement (00), principes (02), système et 91 jetons (03, `jetons.json`), maquettes HTML, plan de migration (04, ≈ 13 j, par étapes vérifiables) | identité (marque, favicon, icône), dès le choix du nom | **les choix du propriétaire** : le nom, puis les six points du système listés ci-dessous ; après validation, la migration étape par étape avec cette session |
@@ -84,15 +84,11 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
 
 ## Les décisions attendues du propriétaire
 
-1. **Le nom** — propositions du 12/10 (`docs-fr/design/00-nom.md`, branche `design`) ; le
-   propriétaire a écarté `5/5` (pas assez original) et les noms d'histoire (Galène, pris par un
-   serveur de visioconférence libre) ; au 13/10 il retient **« Clairance »**, vérifié par la
-   session design (§ 4 du document) : aucune marque active seule, aucun paquet, `.org` / `.app`
-   / `.dev` libres, `.com` pris par un cabinet d'avocats depuis 2011, quatre dépôts GitHub
-   médicaux homonymes. **Décision à confirmer par lui** ; dès son mot, D74 se complète, le dépôt
-   devient `chatelp/clairance`, et le renommage se fait en une fois (dépôt, lanceur et dossier
-   de configuration sur le Mac, titre de page, documents, README, sessions). Positionnement :
-   le français porté comme une capacité, pas comme un territoire (Q53).
+1. ~~Le nom~~ — **décidé le 13/10 : Clairance** (D74 complétée, Q53 close), renommage fait le
+   même jour : dépôt `chatelp/clairance`, page, lanceur `Clairance.app`, dossier de configuration
+   `~/.config/clairance`, documents. Reste à faire par le propriétaire, quand toutes les sessions
+   seront fermées : déplacer le dossier local `~/Dev/Aero/atc-scribe` (commande fournie le 13/10)
+   et, s'il le souhaite, renommer le dépôt privé `atc-scribe-communaute` et les sessions.
 2. **Le système de design** — tout est livré (`docs-fr/design/`, branche `design` : principes,
    système, jetons, maquettes, plan de migration ≈ 13 j). Six choix à trancher avant la
    migration : (1) monospace pour les phrases ou police du système (principe 8 ; le monospace
@@ -121,7 +117,7 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
   diffusion hors de France (Q53).
 - **Cadre légal** : audio réel non partageable ; corpus simulé seulement avec sessions dédiées et
   accord écrit (les règles de VATSIM et d'IVAO ne valent pas consentement RGPD).
-- **Le nom** : rien de public sous « atc-scribe » au-delà de l'existant tant que le nom n'est pas
+- **Le nom** : rien de public sous « Clairance » au-delà de l'existant tant que le nom n'est pas
   choisi.
 - **Secrets et données** : jamais de clé, de mot de passe, d'audio ni de base dans un dépôt ou
   dans le cloud (règles permanentes).

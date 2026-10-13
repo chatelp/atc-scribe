@@ -67,7 +67,7 @@ func (c *Client) StreamAudio(ctx context.Context, opts StreamOptions) (io.ReadCl
 	// Set essential headers for HTTP audio streams
 	req.Header.Set("Accept", "*/*")
 	req.Header.Set("Connection", "keep-alive") // Keep connection alive for streaming
-	req.Header.Set("User-Agent", "Co-ATC/1.0") // Generic user agent
+	req.Header.Set("User-Agent", "Clairance/1.0") // Generic user agent
 
 	// Execute the request
 	c.logger.Debug("Connecting to audio stream",

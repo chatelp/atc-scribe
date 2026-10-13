@@ -1,7 +1,7 @@
 # 25 — L'ATIS de Saint-Cyr (131,025) au gain
 
 *Session du 16 septembre 2026, 22h15–22h45, sur `station`. Demandée par l'agent
-d'atc-scribe. Accord du propriétaire donné pour le changement de gain, sur ce seul canal.
+d'Clairance. Accord du propriétaire donné pour le changement de gain, sur ce seul canal.
 La chaîne ADS-B n'a pas été approchée. Gabarit d'origine restauré, `accord: true` vérifié.*
 
 ## Ce qui a été fait

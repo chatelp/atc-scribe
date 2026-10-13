@@ -8,11 +8,11 @@ seule.*
 ## Pour le propriétaire : lancer une fiche
 
 1. Ouvrir une **session cloud** (claude.ai/code, ou l'application en choisissant
-   l'environnement cloud) sur le dépôt **`chatelp/atc-scribe`**, branche `main`, modèle Opus.
+   l'environnement cloud) sur le dépôt **`chatelp/clairance`**, branche `main`, modèle Opus.
 2. Coller le prompt de la fiche, tel qu'il est écrit dans le tableau ci-dessous.
 3. Laisser travailler. La session pousse une branche `cloud/…` et écrit son rapport.
    **Elle ne touche jamais `main`.**
-4. Le dire à la session atc-scribe du Mac, qui relit la branche, la vérifie (instance
+4. Le dire à la session Clairance du Mac, qui relit la branche, la vérifie (instance
    d'essai, navigateur, garde-fous) et l'intègre.
 
 | Fiche | Vague | Prompt à coller | Branche | Parallèle avec |

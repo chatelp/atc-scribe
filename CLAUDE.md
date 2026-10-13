@@ -1,4 +1,4 @@
-# atc-scribe — instructions permanentes
+# Clairance — instructions permanentes
 
 > **Langue, avant tout le reste : tout ce qui s'adresse au propriétaire est en français**, y
 > compris chaque courte note d'avancement entre deux commandes pendant un long travail. Seuls le
@@ -9,10 +9,16 @@
 > est celui de l'amont, qui reste accessible via le remote `upstream`. Le travail se fait
 > sur la branche `local`.
 >
-> Publié depuis le 20/09 : **https://github.com/chatelp/atc-scribe**, public. La branche
+> Publié depuis le 20/09 : **https://github.com/chatelp/clairance**, public. La branche
 > `local` pousse vers `origin/main` — `main` est ce que voit un visiteur, `local` est le
-> nom de travail. Attention en lançant `gh` : sans `-R chatelp/atc-scribe` il résout
+> nom de travail. Attention en lançant `gh` : sans `-R chatelp/clairance` il résout
 > parfois sur le remote `upstream` et échoue en 404.
+>
+> **Le projet s'appelle Clairance depuis le 13/10 (D74)** ; il s'appelait `atc-scribe` du 16/09
+> au 13/10 et `co-atc-local` avant. Le dossier local garde son ancien nom
+> (`~/Dev/Aero/atc-scribe`) tant que les sessions et les arbres de travail y sont attachés ;
+> le module Go et le binaire gardent `co-atc`, lignée du fork. Les documents datés d'avant le
+> 13/10 gardent l'ancien nom : on ne réécrit pas une lettre après coup.
 >
 > - `docs/` appartient à l'amont — **on n'y touche pas**. `docs/LOCAL-STT.md` en particulier
 >   est le plan de transcription locale écrit par l'auteur amont, et il nous sert de référence.
@@ -70,7 +76,7 @@ et il a dû le rappeler.
   `internal/adsb/service.go`), vaut aujourd'hui 8,8 % et 9 %, et 263 commits d'avance.
   **Modifie un fichier amont quand c'est la façon la plus simple d'écrire la chose** ;
   n'ajoute pas d'accesseur pour contourner une signature. **Depuis le 10/10 (D71, validée),
-  atc-scribe est un produit à part** : on ne rebase plus, ce qui n'a pas de rôle ici se
+  Clairance est un produit à part** : on ne rebase plus, ce qui n'a pas de rôle ici se
   retire au lieu de dormir, l'interface est la nôtre, et **ce qui est contribuable reste
   identifiable — un correctif contribuable = un commit autonome**, qui ne dépend d'aucun
   de nos retraits (liste dans D71). L'audit et son plan : `docs-fr/32-audit-produit.md`.

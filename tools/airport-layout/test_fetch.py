@@ -90,7 +90,7 @@ class Mirrors(unittest.TestCase):
             answer, url = fetch.fetch("q")
         self.assertEqual(answer, {"elements": []})
         self.assertEqual([c[0] for c in calls], list(fetch.MIRRORS))
-        self.assertIn("atc-scribe", calls[0][1])
+        self.assertIn("Clairance", calls[0][1])
 
     def test_no_mirror_is_an_error(self):
         def urlopen(request, timeout):

@@ -11,11 +11,11 @@ which that script's trap turns into a clean stop of co-atc, its sidecar and the
 station link. A script started from Terminal is stopped the same way.
 
 ```sh
-tools/menubar/build.sh --install   # builds atc-scribe.app, copies it to ~/Applications
+tools/menubar/build.sh --install   # builds Clairance.app, copies it to ~/Applications
 ```
 
 Needs Xcode's command line tools and macOS 13 or later. Optional settings in
-`~/.config/atc-scribe/launcher.json` (outside the repository):
+`~/.config/clairance/launcher.json` (outside the repository):
 
 ```json
 {
@@ -30,5 +30,5 @@ Needs Xcode's command line tools and macOS 13 or later. Optional settings in
 The same actions from a terminal or a Shortcut, through the same code:
 
 ```sh
-~/Applications/atc-scribe.app/Contents/MacOS/atc-scribe --status   # or --start, --stop
+~/Applications/Clairance.app/Contents/MacOS/atc-scribe --status   # or --start, --stop
 ```

@@ -499,9 +499,9 @@ leur axe par le côté et traversent d'abord celui de la piste parallèle voisin
 la piste d'un avion une fois établi en finale, les ferait disparaître.
 
 **30/09 — OpenSky Network comme vérité indépendante (V7) : ce qu'on a appris.** Le propriétaire a
-créé un compte gratuit ; les identifiants de l'API sont dans `~/.config/atc-scribe/opensky.json`,
+créé un compte gratuit ; les identifiants de l'API sont dans `~/.config/clairance/opensky.json`,
 hors du dépôt, et n'ont jamais été affichés. Script : `tools/runway-check/opensky_compare.py`
-(cache des réponses dans `~/.cache/atc-scribe/opensky/`, hors du dépôt : ce sont les données
+(cache des réponses dans `~/.cache/clairance/opensky/`, hors du dépôt : ce sont les données
 d'OpenSky, seuls des décomptes sont publiés).
 
 - **Ça marche pour un vol ancien** : la trajectoire d'un Istanbul–De Gaulle du 28/09 revient en
@@ -519,8 +519,8 @@ d'OpenSky, seuls des décomptes sont publiés).
   reste la voie la plus rapide.
 
 **30/09 — la validation indépendante (V7) : FlightAware confirme la règle.** Clé AeroAPI du
-propriétaire dans `~/.config/atc-scribe/aeroapi.key`, hors du dépôt, jamais affichée ; réponses en
-cache dans `~/.cache/atc-scribe/aeroapi/`, hors du dépôt (licence Personal : usage personnel, seuls
+propriétaire dans `~/.config/clairance/aeroapi.key`, hors du dépôt, jamais affichée ; réponses en
+cache dans `~/.cache/clairance/aeroapi/`, hors du dépôt (licence Personal : usage personnel, seuls
 des décomptes sont publiés). Script : `tools/runway-check/aeroapi_compare.py`. Coût : 196 pages,
 **0,98 $**. FlightAware donne `actual_runway_on`, la piste d'atterrissage réelle, pour chaque vol :
 il voit le toucher, pas nous.

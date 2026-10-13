@@ -61,7 +61,7 @@
             #coatc-login .err { font-size: .75rem; color: #f87171; min-height: 1.1rem; margin: .5rem 0 0; }
           </style>
           <form autocomplete="on">
-            <h1>Co-ATC</h1>
+            <h1>Clairance</h1>
             <p>This receiver requires a sign-in.</p>
             <label for="coatc-user">User</label>
             <input id="coatc-user" name="username" autocomplete="username" autofocus required>
@@ -128,7 +128,7 @@
         const local = state.local_allowed !== false;
         const el = overlay();
         el.querySelector('form').innerHTML = `
-          <h1>Set up co-atc</h1>
+          <h1>Set up Clairance</h1>
           <p>No account exists yet. Choose how this server should be reached.</p>
 
           <div class="choice">

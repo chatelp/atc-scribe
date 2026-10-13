@@ -1,4 +1,4 @@
-# atc-scribe configuration. Every key below does something. A key left out takes
+# Clairance configuration. Every key below does something. A key left out takes
 # the default written in internal/config/defaults.go; a key this version no longer
 # reads is named at startup and ignored, never refused. Values that were measured
 # keep their reason in one line; the measurements themselves are in docs-fr/.

@@ -5,7 +5,7 @@
 
 ## Le but
 
-Retirer du serveur Go le code amont qui ne sert pas dans atc-scribe et ne servira pas, sans
+Retirer du serveur Go le code amont qui ne sert pas dans Clairance et ne servira pas, sans
 rien changer à ce qui tourne. Estimation de l'audit : environ 5 500 lignes. Carte détaillée :
 `docs-fr/audit-2026-10-09/backend.md`, sections 1 et 3.
 

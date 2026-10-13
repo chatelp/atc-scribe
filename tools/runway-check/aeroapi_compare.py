@@ -10,8 +10,8 @@ Arrivals lists go back 10 days. The Personal tier bills $0.005 per page of 15
 flights and allows 10 pages a minute: the script waits accordingly and stops at
 a page budget.
 
-Key: ~/.config/atc-scribe/aeroapi.key or $AEROAPI_KEY_FILE -- never in the
-repository. Answers are cached in ~/.cache/atc-scribe/aeroapi/, also outside
+Key: ~/.config/clairance/aeroapi.key or $AEROAPI_KEY_FILE -- never in the
+repository. Answers are cached in ~/.cache/clairance/aeroapi/, also outside
 it: the Personal licence allows personal use only, and only counts are
 published.
 
@@ -30,10 +30,10 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import validate as V  # noqa: E402
 
-KEY_FILE = os.environ.get('AEROAPI_KEY_FILE', os.path.expanduser('~/.config/atc-scribe/aeroapi.key'))
-CACHE = os.path.expanduser('~/.cache/atc-scribe/aeroapi')
+KEY_FILE = os.environ.get('AEROAPI_KEY_FILE', os.path.expanduser('~/.config/clairance/aeroapi.key'))
+CACHE = os.path.expanduser('~/.cache/clairance/aeroapi')
 BASE = 'https://aeroapi.flightaware.com/aeroapi'
-UA = 'atc-scribe/runway-check'
+UA = 'Clairance/runway-check'
 PAGES_PER_MINUTE = 10
 CHUNK = timedelta(hours=3)
 

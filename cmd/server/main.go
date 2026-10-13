@@ -37,7 +37,7 @@ func main() {
 	log := newLogger(cfg)
 	defer log.Sync()
 
-	log.Info("Starting Co-ATC server",
+	log.Info("Starting Clairance server",
 		logger.String("version", "0.1.0"),
 		logger.String("config_path", resolvedConfigPath),
 	)

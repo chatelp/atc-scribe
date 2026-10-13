@@ -28,7 +28,7 @@ MIRRORS = (
     "https://overpass.openstreetmap.fr/api/interpreter",
     "https://overpass-api.de/api/interpreter",
 )
-USER_AGENT = "atc-scribe airport-layout/1.0 (+https://github.com/chatelp/atc-scribe)"
+USER_AGENT = "Clairance airport-layout/1.0 (+https://github.com/chatelp/clairance)"
 AEROWAYS = ("runway", "taxiway", "apron", "terminal", "helipad")
 AREA_AEROWAYS = ("apron", "terminal", "helipad")  # a closed way of these is an area
 PROPERTIES = ("aeroway", "ref", "name", "width", "surface")

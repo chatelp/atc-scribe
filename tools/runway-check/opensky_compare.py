@@ -10,8 +10,8 @@ OpenSky counts credits by the age of the data: a track under 24 hours old
 costs 4, two days old 180. Run it on the day's database.
 
 Credentials: an OpenSky API client, {"clientId", "clientSecret"}, in
-~/.config/atc-scribe/opensky.json or $OPENSKY_CREDENTIALS -- never in the
-repository. OpenSky's answers are cached in ~/.cache/atc-scribe/opensky/, also
+~/.config/clairance/opensky.json or $OPENSKY_CREDENTIALS -- never in the
+repository. OpenSky's answers are cached in ~/.cache/clairance/opensky/, also
 outside it: they are OpenSky's data, and only counts are published.
 
 Usage: python3 tools/runway-check/opensky_compare.py data/co-atc-2026-09-30.db [max_requests]
@@ -28,9 +28,9 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import validate as V  # noqa: E402
 
-CREDS = os.environ.get('OPENSKY_CREDENTIALS', os.path.expanduser('~/.config/atc-scribe/opensky.json'))
-CACHE = os.path.expanduser('~/.cache/atc-scribe/opensky')
-UA = 'atc-scribe/runway-check'
+CREDS = os.environ.get('OPENSKY_CREDENTIALS', os.path.expanduser('~/.config/clairance/opensky.json'))
+CACHE = os.path.expanduser('~/.cache/clairance/opensky')
+UA = 'Clairance/runway-check'
 FLOOR = 100          # stop before the day's credits run out entirely
 
 

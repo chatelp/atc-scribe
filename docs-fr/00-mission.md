@@ -8,7 +8,7 @@ un **produit public pour une station de réception**, né d'un fork de
 [Co-ATC](https://github.com/yegors/co-atc).
 
 > **Révision du 10/10 (D71).** La phrase d'origine disait « adapter Co-ATC … et en faire
-> un dépôt public réutilisable ». Après 263 commits, atc-scribe est devenu un produit à
+> un dépôt public réutilisable ». Après 263 commits, Clairance est devenu un produit à
 > part : on ne rebase plus, ce qui n'a pas de rôle ici se retire, l'interface est la nôtre,
 > et ce qui est utile à l'amont reste identifiable, un correctif par commit autonome.
 > « Réutilisable » veut dire : une autre station, avec ses propres flux (tout ce que ffmpeg

@@ -1,4 +1,4 @@
-# Audit produit : atc-scribe n'est plus co-atc — 09/10
+# Audit produit : Clairance n'est plus co-atc — 09/10
 
 *Ouvert le 9 octobre 2026 à la demande du propriétaire. Étude, pas chantier : rien n'est codé
 avant discussion (Q52 dans `05-decisions.md`).*
@@ -118,7 +118,7 @@ de départ, qui visaient un fork réintégrable dans co-atc. Relu : `00-mission.
    à fermer proprement (Q7 : « Windy gardée, Q36 »), pour que la mission ne promette plus ce
    que le plan ne fait pas.
 
-### Décision : D71 — atc-scribe est un produit à part *(validée le 10/10)*
+### Décision : D71 — Clairance est un produit à part *(validée le 10/10)*
 
 1. **Le dépôt reste un fork git** : historique amont, remote `upstream`, licence MIT de Yegor S,
    crédit dans le README — D19.1, D6, D7 inchangés ; `docs/` reste à eux.
@@ -126,7 +126,7 @@ de départ, qui visaient un fork réintégrable dans co-atc. Relu : `00-mission.
    (`cherry-pick`) commit par commit, pas l'inverse.
 3. **Ce qui n'a pas de rôle ici se retire**, il ne dort pas : chat vocal OpenAI, simulation,
    couches américaines, chemin de transcription OpenAI (D3). Tout reste dans l'historique git.
-4. **L'interface est la nôtre** : réglages, alertes, barre radio, téléphone, et ce qu'atc-scribe
+4. **L'interface est la nôtre** : réglages, alertes, barre radio, téléphone, et ce qu'Clairance
    sait et ne montre pas. La disposition générale reste celle de l'amont, par choix du
    propriétaire.
 5. **Le contribuable reste identifiable, et s'allonge** : en plus de la liste de D19 (sidecar
@@ -239,7 +239,7 @@ une carte et un fil de texte, n'a rien prévu pour ça. Efforts en jours de trav
 ### Ce que je recommande en premier
 
 **A1, A2, B1, C1 + C2, A4** — dans cet ordre. Les trois premiers changent ce qu'on *fait* avec
-atc-scribe (écouter en lisant, suivre un vol, voir qui atterrit ensuite) pour cinq jours de
+Clairance (écouter en lisant, suivre un vol, voir qui atterrit ensuite) pour cinq jours de
 travail, sans toucher à la disposition ; C1 et C2 sont les deux demandes du propriétaire ;
 A4 ouvre B2 et B3. D1 se mesure dès la prochaine séance, avant de choisir. Le reste attend
 les rapports.
@@ -325,7 +325,7 @@ indiqué en fin de ligne quand il a bougé ; chaque ligne se fait sous les sept 
 | 1.3 | Serveur : chat ATC et gabarits (−3 250 lignes) — *tranché le 10/10 : on retire* | 8 h | faible-moyen |
 | 1.4 | Serveur : simulation (−375 lignes) — *tranché le 10/10 (D71) : les sources ADS-B hors tar1090 sont **gardées** (réutilisable) ; le lecteur SRT est **retiré** (fait, `e9c336b`, −208 lignes, −9 modules), remplacé par les options d'entrée ffmpeg (`1858fc6`)* | 2 h | faible |
 | 1.5 | Accueil : plus d'écran bloquant ; un bandeau « reprendre l'écoute » au premier clic (le seul geste que le navigateur exige) — ***fait le 10/10*** : l'écran (84 lignes, 29 de CSS, son d'accueil) est retiré ; « Click anywhere to resume listening » s'affiche tant qu'une écoute mémorisée attend, et le premier clic ou la première touche la relance. Vérifié sur l'instance d'essai, après une connexion : bandeau visible, puis au clic sur la carte la fréquence mémorisée joue et l'autre reste coupée. La frappe du mot de passe ne compte pas (la page s'initialise après la connexion) : il faut un clic | 2 h | nul |
-| 1.6 | ~~Relance automatique (`launchd`)~~ — *refusée le 10/10 : la production ne doit pas tourner en permanence sur le Mac.* **Remplacée par un lanceur dans la barre de menus** : une icône qui dit si la production tourne (et l'instance d'essai) ; Démarrer, Arrêter ; ouvrir co-atc (local, Tailscale) ; antenne et sidecar en une ligne. Application SwiftUI native (`MenuBarExtra`), sans dépendance tierce : Xcode et Swift 6.4 sont sur le Mac (vérifié). Elle reprend la logique de `runs/production.command` (mot de passe rangé, liaison station, arrêt propre) et inscrit/retire la ligne du planning du GPU. — ***fait le 10/10*** (`7a65ab1`, `tools/menubar/`) : installé dans `~/Applications/atc-scribe.app`, réglages dans `~/.config/atc-scribe/launcher.json` ; il lance le script de production existant et l'arrête par SIGTERM ; état (depuis quand, sidecar, antenne), ouvrir la page, copier l'adresse Tailscale, journal ; tient la ligne du planning du GPU. Vérifié par son mode `--start`/`--stop` (même code que les boutons) : démarrage en 11 s, arrêt propre en 9 s, ligne du planning écrite puis retirée. Le menu lui-même est à essayer par le propriétaire (l'outil de contrôle de l'écran ne voit pas les applications de barre de menus) | 1 j | faible |
+| 1.6 | ~~Relance automatique (`launchd`)~~ — *refusée le 10/10 : la production ne doit pas tourner en permanence sur le Mac.* **Remplacée par un lanceur dans la barre de menus** : une icône qui dit si la production tourne (et l'instance d'essai) ; Démarrer, Arrêter ; ouvrir co-atc (local, Tailscale) ; antenne et sidecar en une ligne. Application SwiftUI native (`MenuBarExtra`), sans dépendance tierce : Xcode et Swift 6.4 sont sur le Mac (vérifié). Elle reprend la logique de `runs/production.command` (mot de passe rangé, liaison station, arrêt propre) et inscrit/retire la ligne du planning du GPU. — ***fait le 10/10*** (`7a65ab1`, `tools/menubar/`) : installé dans `~/Applications/Clairance.app`, réglages dans `~/.config/clairance/launcher.json` ; il lance le script de production existant et l'arrête par SIGTERM ; état (depuis quand, sidecar, antenne), ouvrir la page, copier l'adresse Tailscale, journal ; tient la ligne du planning du GPU. Vérifié par son mode `--start`/`--stop` (même code que les boutons) : démarrage en 11 s, arrêt propre en 9 s, ligne du planning écrite puis retirée. Le menu lui-même est à essayer par le propriétaire (l'outil de contrôle de l'écran ne voit pas les applications de barre de menus) | 1 j | faible |
 
 **2. Les deux demandes du propriétaire (≈ 2 j)**
 
@@ -492,6 +492,13 @@ sur la carte.
 
 ## État
 
+- 13/10 : **le produit s'appelle Clairance** (D74, choix du propriétaire sur les propositions
+  de la session design). Renommage en une fois : dépôt `chatelp/clairance`, page, lanceur,
+  dossier de configuration, documents ; dossier local, module Go, binaire et sessions gardent
+  l'ancien nom (voir D74). La veille, **D75** : position à deux décimales, adresses génériques,
+  historique réécrit et poussé de force ; l'étude communauté est livrée (recommandation :
+  consultation d'avocat d'abord) ; l'étude design est livrée sauf la marque, qui démarre sur
+  le nom.
 - 12/10 (soir) : **le garde-fou 3 était troué, et c'est la session design qui l'a vu** en
   écrivant son plan de migration : le serveur sert `www` relatif au répertoire courant
   (`routes.go`), et les lanceurs de production et d'essai se placent tous deux à la racine du

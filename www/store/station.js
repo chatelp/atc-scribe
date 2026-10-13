@@ -123,7 +123,7 @@
             const when = (v) => v ? this.timelineTime(v) : '';
             if (!rx) {
                 lights.push({ key: 'rx', label: 'Antenna', level: 'unknown', text: '?',
-                    help: 'Nothing reports the receiver\'s state: co-atc only sees its audio streams. On the owner\'s station, radio-ctl-sync reports it.' });
+                    help: 'Nothing reports the receiver\'s state: Clairance only sees its audio streams. On the owner\'s station, radio-ctl-sync reports it.' });
             } else {
                 const by = { on_air: ['ok', 'On air'], lent: ['warn', 'Lent'], switching: ['warn', 'Switching'], off: ['bad', 'Off'], unknown: ['unknown', '?'] };
                 let [level, text] = by[rx.state] || ['unknown', '?'];
