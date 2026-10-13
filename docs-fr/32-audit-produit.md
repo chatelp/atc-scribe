@@ -492,6 +492,18 @@ sur la carte.
 
 ## État
 
+- 13/10 (soir) : **la migration du design commence — étape 0 livrée** (plan validé par le
+  propriétaire, `docs-fr/design/04-migration.md` ; référence figée `design-reference-2026-10-13` ;
+  étude versée dans `local`, 1febe52 et e786aeb). Étape 0 : branche `migration` dans un arbre de
+  travail à part (`~/Dev/Aero/atc-scribe-migration`) ; l'instance d'essai a sa configuration
+  (`runs/son-test/config-migration.toml`, `static_dir` sur ce `www/`, lanceur
+  `son-test-migration.command`), vérifiée par un fichier témoin servi depuis l'arbre et absent de
+  `local` ; le filet vérifie les copies du système dans `www/` quand elles existent
+  (`ds-export.mjs --check`, éprouvé : fidèle → OK, retouchée → échec), l'étape 1 les y mettra ;
+  la sonde de rendu se rejoue en signet (`tools/design/probe-bookmarklet.mjs`). Rien à l'écran,
+  rien en production. Qui fait quoi : le propriétaire décide et valide à l'écoute ; cette session
+  implémente, publie et tient les registres ; la session design garde la référence, relit chaque
+  étape sur l'instance d'essai et complète le système quand il manque quelque chose.
 - 13/10 (soir) : **la bulle de dernière transmission fusionne dans l'étiquette de l'avion**
   (demande du propriétaire : la bulle du 12/10 recouvrait l'étiquette d'identification, et
   elle n'était pas dans le design). La dernière transmission devient la **troisième ligne de
