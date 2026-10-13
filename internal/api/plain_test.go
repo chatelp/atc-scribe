@@ -19,8 +19,10 @@ func TestTransmissionsAreServedInPlainWords(t *testing.T) {
 		Transcriptions []struct {
 			ID    int64 `json:"id"`
 			Plain []struct {
-				Role string `json:"role"`
-				Text string `json:"text"`
+				Role  string `json:"role"`
+				Text  string `json:"text"`
+				Value string `json:"value"`
+				Unit  string `json:"unit"`
 			} `json:"plain"`
 		} `json:"transcriptions"`
 	}
@@ -35,7 +37,7 @@ func TestTransmissionsAreServedInPlainWords(t *testing.T) {
 				continue
 			}
 			found = true
-			if got := fmt.Sprint(tr.Plain); got != "[{flight_level Descend to FL100} {frequency Contact 119.255}]" {
+			if got := fmt.Sprint(tr.Plain); got != "[{flight_level Descend to FL100 100 FL} {frequency Contact 119.255 119.255 MHz}]" {
 				t.Errorf("%s: %s", path, got)
 			}
 		}

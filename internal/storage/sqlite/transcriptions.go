@@ -54,6 +54,8 @@ type PlainInstruction struct {
 	Role   string `json:"role"`
 	Text   string `json:"text"`
 	TextFR string `json:"text_fr,omitempty"` // the same in plain French (13/10)
+	Value  string `json:"value,omitempty"`   // as said: "100", "4000", "119.255", "27R"
+	Unit   string `json:"unit,omitempty"`    // "FL", "ft", "deg", "kt", "MHz", "hPa", "code", "runway"; empty for a clearance
 }
 
 // TranscriptionStorage handles storage of transcription records
