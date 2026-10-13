@@ -12,6 +12,7 @@
 //   node tools/motion-bench/bench.mjs [--scenario a,b,c,d,e,f] [--chrome PATH]
 //        [--out DIR] [--warmup 60] [--measure 60] [--engine JSON]
 //        [--label NAME] [--save-reference] [--restart both|server|page] [--headed]
+//        [--profile SECONDS]
 //
 // Scenarios, each 60 s after a minute of warm-up but the first:
 //   a  the server restarted (and the page reloaded), measured from its first second;
@@ -54,6 +55,9 @@ const headed = flag('--headed');
 // a: what restarts -- both (the server, and the page reloaded), server (the
 // page kept open, it reconnects) or page (reloaded, the server kept running).
 const restart = opt('--restart', 'both');
+// --profile S: a CPU profile of the page over the first S seconds of the
+// measurement, summed by function and by script (profile-<label>-<id>.json).
+const profileSec = Number(opt('--profile', '0'));
 const genPort = Number(opt('--gen-port', '8790'));
 const serverPort = Number(opt('--port', '8791'));
 fs.mkdirSync(outDir, { recursive: true });
@@ -325,6 +329,7 @@ async function runScenario(id) {
         } else {
             t0 = Date.now();
             await rec.start();
+            if (profileSec > 0) result.profile = await profile(page, profileSec, `${label}-${id}`);
             if (id === 'd') await zoomAndDrag(page, t0);
             else if (id === 'e') await hideAndShow(page, cdp, t0, result);
             await sleep(Math.max(0, MEASURE - (Date.now() - t0)));
@@ -350,6 +355,31 @@ async function runScenario(id) {
         await stop(gen);
     }
     return result;
+}
+
+// A CPU profile of the page: self time by function and by script.
+async function profile(page, seconds, name) {
+    await page.send('Profiler.enable');
+    await page.send('Profiler.setSamplingInterval', { interval: 500 });
+    await page.send('Profiler.start');
+    await sleep(seconds * 1000);
+    const { profile: p } = await page.send('Profiler.stop');
+    fs.writeFileSync(path.join(outDir, `profile-${name}.cpuprofile`), JSON.stringify(p));
+    const self = new Map(p.nodes.map((n) => [n.id, 0]));
+    for (let i = 0; i < p.samples.length; i++) self.set(p.samples[i], self.get(p.samples[i]) + (p.timeDeltas[i] || 0) / 1000);
+    const byFn = new Map();
+    const byUrl = new Map();
+    for (const n of p.nodes) {
+        const ms = self.get(n.id);
+        if (!ms) continue;
+        const f = n.callFrame;
+        const file = (f.url || '').split('/').slice(-2).join('/') || '(native)';
+        const key = `${f.functionName || '(anonymous)'} ${file}:${f.lineNumber + 1}`;
+        byFn.set(key, (byFn.get(key) || 0) + ms);
+        byUrl.set(file, (byUrl.get(file) || 0) + ms);
+    }
+    const top = (m, n) => [...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => [k, Math.round(v)]);
+    return { seconds, byScript: top(byUrl, 12), byFunction: top(byFn, 20) };
 }
 
 // d: at 10 s the view zooms out from 10 to 50 NM with the wheel, at 25 s the
