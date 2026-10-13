@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/yegors/co-atc/internal/auth"
 )
 
 // Config represents the main application configuration structure
@@ -85,6 +86,13 @@ type ServerConfig struct {
 	// anyone lets any client on the network declare itself already on HTTPS, or
 	// wear another address to escape the login rate limit.
 	TrustedProxies []string `toml:"trusted_proxies"`
+
+	// Pages served from elsewhere that may call this server with the signed-in
+	// session, as origins (scheme://host[:port]). The server itself -- under
+	// whatever name the browser reaches it, on any of its ports -- is always
+	// allowed and is not listed; any other page gets no CORS header and no
+	// WebSocket. EMPTY BY DEFAULT. "*" is refused.
+	AllowedOrigins []string `toml:"allowed_origins"`
 }
 
 // ADSBConfig contains ADS-B aircraft tracking data source configuration
@@ -546,6 +554,11 @@ func (c *Config) Validate() error {
 		}
 		if named == 0 {
 			return fmt.Errorf("auth.enabled is true but no user has a password_hash; run: co-atc -add-user <name>")
+		}
+	}
+	for _, o := range c.Server.AllowedOrigins {
+		if _, err := auth.NormalizeOrigin(o); err != nil {
+			return fmt.Errorf("server.allowed_origins: %w", err)
 		}
 	}
 	if (c.Server.TLSCert == "") != (c.Server.TLSKey == "") {
