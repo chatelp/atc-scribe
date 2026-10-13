@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -17,6 +18,10 @@ func bulkRequest(t *testing.T, conn *gorilla.Conn, filters map[string]any) (hexe
 	t.Helper()
 	sendMessage(t, conn, websocket.MessageTypeAircraftBulkRequest, map[string]any{"filters": filters})
 	m := waitForMessage(t, conn, websocket.MessageTypeAircraftBulkResponse, 5*time.Second)
+	// The page dates the bulk's positions by the server's clock at sending.
+	if sent, err := time.Parse(time.RFC3339Nano, fmt.Sprint(m.Data["sent_at"])); err != nil || time.Since(sent) > time.Minute {
+		t.Errorf("bulk response sent_at %v: %v", m.Data["sent_at"], err)
+	}
 	list, _ := m.Data["aircraft"].([]any)
 	for _, a := range list {
 		if obj, ok := a.(map[string]any); ok {
