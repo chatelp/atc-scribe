@@ -98,7 +98,7 @@ func main() {
 
 	weatherService := startWeather(cfg, effectiveAirport, refAirport, runtimeSettings, log)
 
-	frequenciesService := startFrequencies(ctx, cfg, adsbService, refService, runtimeSettings, wsServer, store, log)
+	frequenciesService := startFrequencies(ctx, cfg, adsbService, refService, runtimeSettings, wsServer, store, sttSidecar, log)
 
 	router := buildRouter(cfg, adsbService, frequenciesService, weatherService, refService, wsServer, store, runtimeSettings, sttSidecar, log)
 

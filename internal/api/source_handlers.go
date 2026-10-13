@@ -66,6 +66,11 @@ func (h *Handler) PutSource(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, frequencies.ErrConfiguredSource):
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
+	case errors.Is(err, frequencies.ErrNoTranscription):
+		h.logger.Warn("Source refused: it asks for transcription and no sidecar answers",
+			logger.String("id", id), logger.Error(err))
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
