@@ -532,8 +532,14 @@
             const band = (Number(s.minAltitude) || 0) > 0 || (Number(s.maxAltitude) || 60000) < 60000;
             const on = phasesOff || band || s.showAirAircraft === false || s.showGroundAircraft === false || !!s.voiceOnly || !!(this.searchTerm || '').trim();
             if (!on) return '';
-            const shown = this.visibleAircraftOnMap ? this.visibleAircraftOnMap.size : this.visibleSidebarAircraft.length;
-            let text = `Showing ${shown} of ${this.activeAircraftCount}`;
+            // One population on both sides (design review, 13/10): the active
+            // aircraft the filters keep, over every active aircraft, with the same
+            // signal-lost rule; what the map draws beyond them (lost aircraft kept
+            // for a while) is not counted. The first number never exceeds the second.
+            const shown = this.activeAircraftCount;
+            let total = 0;
+            for (const a of Object.values(this.aircraft || {})) if (a && !this.isSignalLostForSidebar(a)) total++;
+            let text = `Showing ${shown} of ${Math.max(total, shown)}`;
             const A = window.AltitudeScale;
             if (band && A && typeof A.bandLabel === 'function') text += ` · ${A.bandLabel(Number(s.minAltitude) || 0, Number(s.maxAltitude) || 60000)}`;
             return text;
