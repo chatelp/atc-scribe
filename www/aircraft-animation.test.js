@@ -48,6 +48,33 @@ test('a new fix is sampled as before', () => {
     assert.ok(state.correction, 'a correction eases toward the new fix');
 });
 
+test('a correction neither stops the aircraft nor makes it jump', () => {
+    const { e } = engine();
+    e.updateAircraft(sample(48.5, 2.0));
+    e.updateAircraft(sample(48.5, 2.0028));
+    const state = e.aircraftStates.get('abc123');
+    // The aircraft was drawn 150 m behind the new fix: a correction starts.
+    state.lastRendered = { lat: 48.5, lon: 2.0008, alt: 30000, track: 90, timestamp: performance.now() };
+    e.updateAircraft(sample(48.5, 2.0056));
+    assert.ok(state.correction, 'a correction is in progress');
+
+    const t0 = performance.now();
+    const steps = [];
+    let prev = null;
+    // 150 m at 205 m/s close over about 2.2 s (three times the gap over the speed).
+    for (let ms = 0; ms <= 3000; ms += 33) {
+        const p = e._computePose(state, t0 + ms);
+        if (prev) steps.push((p.lon - prev.lon) * 111320 * Math.cos(48.5 * Math.PI / 180));
+        prev = p;
+    }
+    const sorted = steps.slice().sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    assert.ok(median > 0, 'the aircraft moves east');
+    assert.ok(Math.min(...steps) > median * 0.3, `no frame nearly stops: min ${Math.min(...steps).toFixed(2)} m, median ${median.toFixed(2)} m`);
+    assert.ok(Math.max(...steps) < median * 3, `no frame jumps: max ${Math.max(...steps).toFixed(2)} m, median ${median.toFixed(2)} m`);
+    assert.equal(state.correction, null, 'the correction has faded out');
+});
+
 test('a predicted sample never counts as the known fix', () => {
     const { e } = engine();
     e.updateAircraft(sample(48.5, 2.0));

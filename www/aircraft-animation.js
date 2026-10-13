@@ -30,7 +30,7 @@ class AircraftAnimationEngine {
             predictedHeadingDeadbandDeg: 1.4,
             mergeDurationMs: 450,
             minCorrectionDurationMs: 180,
-            maxCorrectionDurationMs: 900,
+            maxCorrectionDurationMs: 2500,
             realCorrectionThresholdNm: 0.016,
             predictedCorrectionThresholdNm: 0.004,
             headingSmoothingAlpha: 0.22,
@@ -205,20 +205,33 @@ class AircraftAnimationEngine {
                     ? this.config.predictedCorrectionThresholdNm
                     : this.config.realCorrectionThresholdNm;
                 if (distanceNm > correctionThresholdNm) {
-                    const distanceFactor = Math.min(1, distanceNm / 0.08);
-                    const sourceBias = snapshot.source === 'predicted' ? 0.9 : 1.2;
+                    // The gap closes at no more than half the aircraft's own
+                    // speed at the peak of the ease (1.5 times the mean rate):
+                    // closing 150 m in 450 ms made a 205 m/s aircraft sprint at
+                    // three times its speed for a few frames. A stationary
+                    // aircraft takes the base duration.
+                    const speedMps = state.velocity
+                        ? Math.hypot(state.velocity.eastMps, state.velocity.northMps)
+                        : 0;
+                    const gapM = distanceNm * 1852;
                     const baseDuration = Math.max(this.config.minCorrectionDurationMs, this.config.mergeDurationMs);
+                    const gentleMs = speedMps > 1 ? (3 * gapM / speedMps) * 1000 : baseDuration;
                     const correctionDurationMs = Math.min(
                         this.config.maxCorrectionDurationMs,
-                        Math.round(baseDuration * (0.75 + (distanceFactor * 0.75)) * sourceBias)
+                        Math.max(this.config.minCorrectionDurationMs, Math.round(gentleMs))
                     );
+                    // The correction is an offset that fades, not a glide to a
+                    // fixed point: the aircraft keeps flying its prediction from
+                    // the new sample, and the gap between where it was drawn and
+                    // where the sample puts it closes over the duration. Gliding
+                    // to the sample's position, as before, stopped the aircraft
+                    // there while the prediction moved on, then jumped to catch up
+                    // (measured 13/10/2026: 7 m, 5 m, 2 m, 0.2 m, then 76 m in one
+                    // frame, once a second, on every aircraft).
                     state.correction = {
-                        fromLat: previousRendered.lat,
-                        fromLon: previousRendered.lon,
-                        fromAlt: previousRendered.alt,
-                        toLat: effectiveSnapshot.lat,
-                        toLon: effectiveSnapshot.lon,
-                        toAlt: effectiveSnapshot.alt,
+                        dLat: previousRendered.lat - effectiveSnapshot.lat,
+                        dLon: previousRendered.lon - effectiveSnapshot.lon,
+                        dAlt: previousRendered.alt - effectiveSnapshot.alt,
                         startAt: now,
                         endAt: now + correctionDurationMs
                     };
@@ -358,28 +371,33 @@ class AircraftAnimationEngine {
                         ? state.velocity.headingDeg
                         : null)));
 
+        const pose = this._predictedPose(state, real, now, heading);
+
+        // A correction in progress: the aircraft flies its prediction, and the
+        // gap between where it was drawn and where the sample put it fades out.
         if (state.correction) {
             const duration = Math.max(1, state.correction.endAt - state.correction.startAt);
             const t = Math.min(1, Math.max(0, (now - state.correction.startAt) / duration));
-            const eased = t * t * (3 - (2 * t));
+            const remaining = 1 - (t * t * (3 - (2 * t)));
 
-            const lat = this._lerp(state.correction.fromLat, state.correction.toLat, eased);
-            const lon = this._lerp(state.correction.fromLon, state.correction.toLon, eased);
-            const alt = this._lerp(state.correction.fromAlt, state.correction.toAlt, eased);
+            pose.lat += state.correction.dLat * remaining;
+            pose.lon += state.correction.dLon * remaining;
+            pose.alt += state.correction.dAlt * remaining;
 
             if (t >= 1) {
                 state.correction = null;
             }
-
             this._secCorrectedCount++;
-            return { lat, lon, alt, heading };
         }
 
-        if (state.lastSampleSource === 'predicted') {
-            return { lat: real.lat, lon: real.lon, alt: real.alt, heading };
-        }
+        return pose;
+    }
 
-        if (!state.velocity) {
+    // Where the last sample says the aircraft is now: the sample itself when it
+    // came from the server's prediction or carries no velocity, else the sample
+    // carried forward by the velocity over a bounded horizon.
+    _predictedPose(state, real, now, heading) {
+        if (state.lastSampleSource === 'predicted' || !state.velocity) {
             return { lat: real.lat, lon: real.lon, alt: real.alt, heading };
         }
 
