@@ -2,21 +2,27 @@ package api
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
 // Middleware contains custom middleware functions
 type Middleware struct {
 	logger *logger.Logger
+
+	mu             sync.Mutex
+	refusedOrigins map[string]bool // logged once each; see refused
 }
 
 // NewMiddleware creates a new middleware
 func NewMiddleware(logger *logger.Logger) *Middleware {
 	return &Middleware{
-		logger: logger.Named("api-middleware"),
+		logger:         logger.Named("api-middleware"),
+		refusedOrigins: map[string]bool{},
 	}
 }
 
@@ -42,31 +48,29 @@ func (m *Middleware) Logger(next http.Handler) http.Handler {
 	})
 }
 
-// CORS is a middleware that adds CORS headers to responses
-func (m *Middleware) CORS(allowedOrigins []string) func(http.Handler) http.Handler {
+// CORS answers a browser that asks from another origin, for the pages the
+// policy allows and for them only: their exact origin, never "*", with
+// credentials, since the audio is fetched with the session cookie. An origin
+// that is not allowed is given no CORS header at all rather than a 403 -- the
+// browser then keeps the answer from the page, and a request that carries no
+// Origin, which is every same-origin GET and every client that is not a
+// browser, goes through untouched.
+func (m *Middleware) CORS(origins *auth.Origins) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-
-			// Check if the origin is allowed
-			allowed := false
-			if len(allowedOrigins) == 0 {
-				allowed = true
-			} else if origin != "" {
-				for _, allowedOrigin := range allowedOrigins {
-					if allowedOrigin == "*" || allowedOrigin == origin {
-						allowed = true
-						break
-					}
+			if origin != "" {
+				// The answer depends on who asks: a cache must not hand one
+				// page's answer to another.
+				w.Header().Add("Vary", "Origin")
+				if origins.Allowed(r) {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+					w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+					w.Header().Set("Access-Control-Allow-Credentials", "true")
+				} else {
+					m.refused(origin)
 				}
-			}
-
-			// Set CORS headers
-			if allowed {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
 			}
 
 			// Handle preflight requests
@@ -77,6 +81,24 @@ func (m *Middleware) CORS(allowedOrigins []string) func(http.Handler) http.Handl
 
 			next.ServeHTTP(w, r)
 		})
+	}
+}
+
+// refused says once per origin that a page was refused, so that the owner of
+// a page reached through a name the server cannot know -- a VPN, a proxy that
+// rewrites the Host header -- finds in the log what to add to
+// server.allowed_origins. Bounded: a stream of invented origins must not grow
+// memory or the log.
+func (m *Middleware) refused(origin string) {
+	m.mu.Lock()
+	first := !m.refusedOrigins[origin] && len(m.refusedOrigins) < 64
+	if first {
+		m.refusedOrigins[origin] = true
+	}
+	m.mu.Unlock()
+	if first {
+		m.logger.Warn("Refused a page from another origin; add it to server.allowed_origins if it is yours",
+			logger.String("origin", origin))
 	}
 }
 

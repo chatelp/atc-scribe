@@ -44,6 +44,7 @@ import (
 const (
 	testUser     = "pierre"
 	testPassword = "correcthorsebattery"
+	viewerUser   = "guest" // with stackOptions.viewer
 )
 
 var (
@@ -137,6 +138,7 @@ type stackOptions struct {
 	host      string   // bind address; "127.0.0.1" when empty
 	proxies   []string // server.trusted_proxies
 	noAccount bool     // local-only, nothing to sign in as
+	viewer    bool     // a second account, viewerUser, with the viewer role
 	tone      bool     // a configured frequency carrying audio; needs ffmpeg
 	sidecar   string   // health URL of a transcription sidecar; none when empty
 	idle      bool     // started without transcription, as main does when nothing asks for it
@@ -270,6 +272,9 @@ func newStack(t *testing.T, o stackOptions) *stack {
 	if !o.noAccount {
 		authCfg.Enabled = true
 		authCfg.Users = []auth.User{{Name: testUser, PasswordHash: cheapHash(testPassword)}}
+		if o.viewer {
+			authCfg.Users = append(authCfg.Users, auth.User{Name: viewerUser, PasswordHash: cheapHash(testPassword), Role: auth.RoleViewer})
+		}
 	}
 	svc, err := auth.NewService(authCfg)
 	if err != nil {
@@ -339,7 +344,13 @@ func (s *stack) get(path string, out any) {
 // signIn takes the test account's session.
 func (s *stack) signIn() *http.Cookie {
 	s.t.Helper()
-	rec := s.do("POST", "/api/v1/auth/login", `{"name":"`+testUser+`","password":"`+testPassword+`"}`)
+	return s.signInAs(testUser)
+}
+
+// signInAs signs in as one of the stack's accounts, which share a password.
+func (s *stack) signInAs(name string) *http.Cookie {
+	s.t.Helper()
+	rec := s.do("POST", "/api/v1/auth/login", `{"name":"`+name+`","password":"`+testPassword+`"}`)
 	for _, c := range rec.Result().Cookies() {
 		if c.Name == auth.CookieName {
 			s.cookie = c

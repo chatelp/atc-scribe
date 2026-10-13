@@ -160,7 +160,7 @@ func WriteJSON(w http.ResponseWriter, status int, data interface{}) {
 func authUsers(cfg *config.Config) []auth.User {
 	out := make([]auth.User, 0, len(cfg.Auth.Users))
 	for _, u := range cfg.Auth.Users {
-		out = append(out, auth.User{Name: u.Name, PasswordHash: u.PasswordHash})
+		out = append(out, auth.User{Name: u.Name, PasswordHash: u.PasswordHash, Role: u.Role})
 	}
 	return out
 }

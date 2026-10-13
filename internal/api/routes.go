@@ -1,11 +1,16 @@
 package api
 
 import (
-	chimw "github.com/go-chi/chi/v5/middleware"
+	"fmt"
 	"net/http"
+	"os"
+	"sync"
+
+	chimw "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/yegors/co-atc/internal/adsb"
+	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/frequencies"
 	"github.com/yegors/co-atc/internal/reference"
@@ -15,14 +20,18 @@ import (
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
-var defaultCORSAllowedOrigins = []string{"*"}
-
 // Router is the API router
 type Router struct {
 	handler    *Handler
 	middleware *Middleware
 	config     *config.Config
 	logger     *logger.Logger
+
+	// The pages that may call this server and open its WebSocket; see
+	// internal/auth/origin.go. Built by the first Routes(), which every
+	// listener calls, once.
+	originsOnce sync.Once
+	origins     *auth.Origins
 }
 
 // NewRouter creates a new API router
@@ -35,15 +44,41 @@ func NewRouter(adsbService *adsb.Service, frequenciesService *frequencies.Servic
 	}
 }
 
+// newOrigins is the server itself, on every port it listens on, and the pages
+// server.allowed_origins lists. The configuration has checked those already;
+// one that still does not parse is fatal, like any other failure to build who
+// may ask -- a server must not come up answering more pages than it says.
+func newOrigins(cfg *config.Config, log *logger.Logger) *auth.Origins {
+	if cfg == nil {
+		o, _ := auth.NewOrigins("", nil, nil)
+		return o
+	}
+	ports := append([]int{cfg.Server.Port}, cfg.Server.AdditionalPorts...)
+	o, err := auth.NewOrigins(cfg.Server.Host, ports, cfg.Server.AllowedOrigins)
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to build the allowed origins: %v", err))
+		os.Exit(1)
+	}
+	return o
+}
+
 // Routes returns the API routes
 func (r *Router) Routes() http.Handler {
 	router := chi.NewRouter()
+	r.originsOnce.Do(func() {
+		r.origins = newOrigins(r.config, r.logger)
+		// The same pages for the WebSocket, plus the clients that send no
+		// Origin, which are not browsers and carry no borrowed cookie.
+		if r.handler != nil && r.handler.wsServer != nil {
+			r.handler.wsServer.SetOriginCheck(r.origins.AllowedOrAbsent)
+		}
+	})
 
 	// Middleware
 	router.Use(r.middleware.RequestID)
 	router.Use(r.middleware.Logger)
 	router.Use(r.middleware.Recoverer)
-	router.Use(r.middleware.CORS(defaultCORSAllowedOrigins))
+	router.Use(r.middleware.CORS(r.origins))
 	// gzip for text (audit 4.3): the page's scripts, the airport layout and the
 	// aircraft list are the bulk of what a page loads -- 1.2 MB of the 1.76
 	// measured on 11/10 -- and were sent uncompressed. Audio (audio/wav) and the
@@ -77,6 +112,9 @@ func (r *Router) Routes() http.Handler {
 		// routes above -- chi refuses a Use() that follows a route on the same mux.
 		router.Group(func(router chi.Router) {
 			router.Use(r.handler.Auth().Require)
+			// A viewer account reads, and is not given the audio; see
+			// auth_handlers.go.
+			router.Use(r.handler.ViewerGuard)
 
 			// Aircraft routes
 			router.Get("/aircraft", r.handler.GetAllAircraft)

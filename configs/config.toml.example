@@ -9,6 +9,11 @@ host = "127.0.0.1"                          # 0.0.0.0 to reach it from the netwo
 additional_ports = [8001, 8002, 8003, 8004] # the audio streams are spread over these, one per listener
 # Reverse proxies whose X-Forwarded-* headers may be believed, as CIDRs: none by default, on purpose.
 trusted_proxies = []
+# Pages served from elsewhere that may call this server with the session: none by default. The
+# server itself, under any name, on any of its ports, needs no entry. A page reached by a name the
+# server cannot know (a VPN address, a proxy that rewrites Host) is logged when refused; "*" is refused.
+# allowed_origins = []                      # e.g. ["http://100.101.102.103:8000"]
+audio_replay = "owner"                      # who listens to the streams and the archived clips: "owner", or "all" (viewers too)
 # static_dir = "www"                        # the page; a snapshot copy for an instance that must not see edits
 # tls_cert and tls_key serve HTTPS with no proxy at all; leave them out behind one.
 
@@ -17,6 +22,9 @@ enabled = false                             # off on purpose: nobody cloning thi
 # When host is not 127.0.0.1 the first visit asks for an account; or co-atc -add-user <name>
 # prints a [[auth.users]] block (name, Argon2id password_hash) to paste here. A session lives
 # 720 h unused; 8 wrong passwords per address per 15 min. Restarting ends every session.
+# An account is an owner unless it says role = "viewer" (here or in users.json): a viewer reads
+# the map, the aircraft and the transcriptions, changes nothing, and is given the audio only
+# when [server] audio_replay = "all".
 
 [station]
 latitude = 43.6777                          # the receiver, decimal degrees (example: Toronto Pearson)
@@ -104,6 +112,10 @@ transcribe_audio = true
 # honours upstream's docs/LOCAL-STT.md; no key, no audio leaves the host. ffmpeg decodes
 # each stream to 24 kHz mono s16le. language = "en" serves a source that names none.
 log_dir = "data/transcriptions"             # raw/{date}_{frequency}.log, append-only; empty to disable
+# Swept at start and every hour, never today's files; 0 keeps everything. The archive of clips
+# (--save-audio below, or audio_archive_dir) loses its oldest clips past the size; its manifests stay.
+audio_archive_max_gb = 2                    # one to two days on two frequencies
+raw_log_max_days = 30                       # raw logs older than this, by the date in their name
 
 # Keep this sub-table last in [transcription]: a key written below it lands in it.
 [transcription.local]

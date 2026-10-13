@@ -18,6 +18,7 @@ const CookieName = "coatc_session"
 type User struct {
 	Name         string
 	PasswordHash string
+	Role         string // RoleOwner or RoleViewer; empty is owner
 }
 
 // Service answers "who is asking", and is the only place that says yes.
@@ -25,6 +26,7 @@ type Service struct {
 	mu      sync.RWMutex
 	enabled bool
 	users   map[string]string // name -> password hash
+	roles   map[string]string // name -> RoleOwner or RoleViewer, for every name in users
 	file    *UserFile
 	store   *Store
 	proxies *TrustedProxies
@@ -72,13 +74,17 @@ func NewService(cfg Config) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid trusted_proxies: %w", err)
 	}
-	users := map[string]string{}
+	users, roles := map[string]string{}, map[string]string{}
 	for _, u := range cfg.Users {
 		name := strings.TrimSpace(u.Name)
 		if name == "" || u.PasswordHash == "" {
 			continue
 		}
-		users[name] = u.PasswordHash
+		role, err := NormalizeRole(u.Role)
+		if err != nil {
+			return nil, fmt.Errorf("account %q in the configuration: %w", name, err)
+		}
+		users[name], roles[name] = u.PasswordHash, role
 	}
 	// The file comes second so an account created from the page can replace one
 	// of the same name in the configuration -- the page is the thing someone
@@ -86,7 +92,11 @@ func NewService(cfg Config) (*Service, error) {
 	if cfg.UserFile != nil {
 		for _, u := range cfg.UserFile.Users {
 			if name := strings.TrimSpace(u.Name); name != "" && u.PasswordHash != "" {
-				users[name] = u.PasswordHash
+				role, err := NormalizeRole(u.Role)
+				if err != nil {
+					return nil, fmt.Errorf("account %q in %s: %w", name, cfg.UserFile.Path(), err)
+				}
+				users[name], roles[name] = u.PasswordHash, role
 			}
 		}
 	}
@@ -103,6 +113,7 @@ func NewService(cfg Config) (*Service, error) {
 	}
 	s := &Service{
 		users:         users,
+		roles:         roles,
 		file:          cfg.UserFile,
 		store:         NewStore(cfg.SessionTTL),
 		proxies:       proxies,
@@ -394,7 +405,9 @@ func (s *Service) AddUser(name, password string) error {
 		s.file.Access = prev
 		return err
 	}
+	// The first account owns the server: it is the one that set it up.
 	s.users[strings.TrimSpace(name)] = hash
+	s.roles[strings.TrimSpace(name)] = RoleOwner
 	s.resolve()
 	return nil
 }

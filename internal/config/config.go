@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/yegors/co-atc/internal/auth"
 )
 
 // Config represents the main application configuration structure
@@ -57,6 +58,7 @@ type AuthConfig struct {
 type UserConfig struct {
 	Name         string `toml:"name"`
 	PasswordHash string `toml:"password_hash"`
+	Role         string `toml:"role"` // "owner" (the default) or "viewer", who reads and changes nothing
 }
 
 // ServerConfig contains HTTP server configuration settings
@@ -85,7 +87,25 @@ type ServerConfig struct {
 	// anyone lets any client on the network declare itself already on HTTPS, or
 	// wear another address to escape the login rate limit.
 	TrustedProxies []string `toml:"trusted_proxies"`
+
+	// Pages served from elsewhere that may call this server with the signed-in
+	// session, as origins (scheme://host[:port]). The server itself -- under
+	// whatever name the browser reaches it, on any of its ports -- is always
+	// allowed and is not listed; any other page gets no CORS header and no
+	// WebSocket. EMPTY BY DEFAULT. "*" is refused.
+	AllowedOrigins []string `toml:"allowed_origins"`
+
+	// Who may listen to the receiver through the server -- the live streams
+	// and the archived clip of each transmission: "owner" (the default), or
+	// "all", viewer accounts included. See internal/auth/role.go.
+	AudioReplay string `toml:"audio_replay"`
 }
+
+// The two answers to server.audio_replay.
+const (
+	AudioReplayOwner = "owner"
+	AudioReplayAll   = "all"
+)
 
 // ADSBConfig contains ADS-B aircraft tracking data source configuration
 type ADSBConfig struct {
@@ -190,6 +210,15 @@ type TranscriptionConfig struct {
 
 	// File logging settings
 	LogDir string `toml:"log_dir"` // Optional directory for transcription log files (append-only logs by date and frequency)
+
+	// What is kept of the files that grow every day outside the databases, swept
+	// at start and every hour (cmd/server/retention.go); today's are never
+	// deleted. AudioArchiveMaxGB caps the sidecar's archive of clips
+	// (Local.AudioArchiveDir, or its --save-audio), oldest clips first;
+	// RawLogMaxDays is the age past which LogDir/raw/{date}_{frequency}.log
+	// goes. 0 keeps everything.
+	AudioArchiveMaxGB float64 `toml:"audio_archive_max_gb"`
+	RawLogMaxDays     int     `toml:"raw_log_max_days"`
 
 	// How the frequencies service decodes each stream into the PCM that is
 	// played and transcribed.
@@ -546,6 +575,27 @@ func (c *Config) Validate() error {
 		}
 		if named == 0 {
 			return fmt.Errorf("auth.enabled is true but no user has a password_hash; run: co-atc -add-user <name>")
+		}
+	}
+	for _, u := range c.Auth.Users {
+		if _, err := auth.NormalizeRole(u.Role); err != nil {
+			return fmt.Errorf("auth.users %q: %w", u.Name, err)
+		}
+	}
+	if c.Transcription.AudioArchiveMaxGB < 0 {
+		return fmt.Errorf("invalid transcription.audio_archive_max_gb: %v (must be >= 0; 0 keeps everything)", c.Transcription.AudioArchiveMaxGB)
+	}
+	if c.Transcription.RawLogMaxDays < 0 {
+		return fmt.Errorf("invalid transcription.raw_log_max_days: %d (must be >= 0; 0 keeps everything)", c.Transcription.RawLogMaxDays)
+	}
+	switch c.Server.AudioReplay {
+	case "", AudioReplayOwner, AudioReplayAll:
+	default:
+		return fmt.Errorf("invalid server.audio_replay: %q (must be %q or %q)", c.Server.AudioReplay, AudioReplayOwner, AudioReplayAll)
+	}
+	for _, o := range c.Server.AllowedOrigins {
+		if _, err := auth.NormalizeOrigin(o); err != nil {
+			return fmt.Errorf("server.allowed_origins: %w", err)
 		}
 	}
 	if (c.Server.TLSCert == "") != (c.Server.TLSKey == "") {

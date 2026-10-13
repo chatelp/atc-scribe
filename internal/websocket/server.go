@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -72,24 +75,73 @@ type Server struct {
 	logger         *logger.Logger
 	mu             sync.RWMutex
 	messageHandler MessageHandler // Handler for incoming messages
+
+	// Which pages may open a connection; see SetOriginCheck.
+	originCheck atomic.Pointer[func(*http.Request) bool]
+	refusedMu   sync.Mutex
+	refused     map[string]bool // origins already logged
 }
 
 // NewServer creates a new WebSocket server
 func NewServer(logger *logger.Logger) *Server {
-	return &Server{
+	s := &Server{
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client, 32),   // Buffered to prevent goroutine blocking
 		unregister: make(chan *Client, 32),   // Buffered to prevent goroutine blocking
 		broadcast:  make(chan *Message, 512), // Buffered for high-throughput broadcasting
-		upgrader: websocket.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			CheckOrigin: func(r *http.Request) bool {
-				return true // Allow all origins
-			},
-		},
-		logger: logger.Named("web-socket"),
+		logger:     logger.Named("web-socket"),
+		refused:    map[string]bool{},
 	}
+	s.upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     s.checkOrigin,
+	}
+	return s
+}
+
+// SetOriginCheck says which pages may open a connection. A browser sends the
+// session cookie with the handshake whatever page asks -- the same-origin
+// policy does not apply to WebSockets -- so until 13/10, when every origin
+// was accepted, any page the signed-in user opened could read the aircraft
+// in their name. Without a check set, the rule is gorilla's own: no Origin
+// (a client that is not a browser), or one naming the host the request came
+// to.
+func (s *Server) SetOriginCheck(allowed func(*http.Request) bool) {
+	s.originCheck.Store(&allowed)
+}
+
+func (s *Server) checkOrigin(r *http.Request) bool {
+	ok := sameOrigin(r)
+	if f := s.originCheck.Load(); f != nil {
+		ok = (*f)(r)
+	}
+	if !ok {
+		// Once per origin, bounded: a refused page that keeps reconnecting
+		// must not fill the log.
+		origin := r.Header.Get("Origin")
+		s.refusedMu.Lock()
+		first := !s.refused[origin] && len(s.refused) < 64
+		if first {
+			s.refused[origin] = true
+		}
+		s.refusedMu.Unlock()
+		if first {
+			s.logger.Warn("Refused a WebSocket from another origin; add it to server.allowed_origins if it is yours",
+				String("origin", origin), String("remote_addr", r.RemoteAddr))
+		}
+	}
+	return ok
+}
+
+// sameOrigin is gorilla's default check, which an explicit CheckOrigin replaces.
+func sameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	return err == nil && strings.EqualFold(u.Host, r.Host)
 }
 
 // SetMessageHandler sets the message handler for incoming WebSocket messages

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -35,16 +36,39 @@ func printNewUser(name string) error {
 		return fmt.Errorf("the two entries differ")
 	}
 
+	role, err := readRole()
+	if err != nil {
+		return err
+	}
+
 	hash, err := auth.HashPassword(first)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("\n# Add this to your configuration, under [auth]:\n\n")
-	fmt.Printf("[auth]\nenabled = true\n\n[[auth.users]]\nname = %q\npassword_hash = %q\n\n", name, hash)
+	fmt.Printf("[auth]\nenabled = true\n\n[[auth.users]]\nname = %q\npassword_hash = %q\n", name, hash)
+	if role != auth.RoleOwner {
+		// An owner is what an account without a role is; only the other one
+		// is written, so the block for an owner reads as it always did.
+		fmt.Printf("role = %q\n", role)
+	}
+	fmt.Println()
 	fmt.Printf("# The password itself is not stored anywhere. Losing it means creating\n")
 	fmt.Printf("# another account with this command; there is no recovery by design.\n")
 	return nil
+}
+
+// readRole asks what the account may do, owner unless told otherwise: a
+// viewer reads the map, the aircraft and the transcriptions, changes nothing,
+// and is not given the audio unless server.audio_replay says so.
+func readRole() (string, error) {
+	fmt.Fprint(os.Stderr, "Role, owner or viewer (read-only) [owner]: ")
+	line, err := stdinReader.ReadString('\n')
+	if err != nil && !(err == io.EOF && line == "") {
+		return "", err
+	}
+	return auth.NormalizeRole(strings.TrimRight(line, "\r\n"))
 }
 
 // stdinReader is shared across reads. A fresh bufio.Reader per call would lose

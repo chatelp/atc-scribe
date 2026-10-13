@@ -365,6 +365,11 @@ func TestAValueOutOfBoundsIsStillRefused(t *testing.T) {
 		{"adsb", "fetch_interval_seconds = 0", "invalid fetch interval"},
 		{"wx", "refresh_interval_minutes = -1", "refresh_interval_minutes must be greater than 0"},
 		{"logging", `level = "loud"`, "invalid log level"},
+		{"server", `allowed_origins = ["*"]`, "server.allowed_origins"},
+		{"server", `allowed_origins = ["mac.local:8000"]`, "want scheme://host[:port]"},
+		{"server", `audio_replay = "everyone"`, "invalid server.audio_replay"},
+		{"transcription", "audio_archive_max_gb = -1", "invalid transcription.audio_archive_max_gb"},
+		{"transcription", "raw_log_max_days = -1", "invalid transcription.raw_log_max_days"},
 	} {
 		cfg, err := Load(writeConfig(t, withLines(minimalConfig, bad.section, bad.line)))
 		if err != nil {

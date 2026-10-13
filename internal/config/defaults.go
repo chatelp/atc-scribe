@@ -20,6 +20,7 @@ func Defaults() Config {
 			Port:            8000,
 			Host:            "127.0.0.1",
 			IdleTimeoutSecs: 3600,
+			AudioReplay:     AudioReplayOwner,
 		},
 		ADSB: ADSBConfig{
 			ExternalSourceURL:            "https://adsbexchange-com1.p.rapidapi.com/v2/lat/%f/lon/%f/dist/%.0f/",
@@ -68,6 +69,10 @@ func Defaults() Config {
 			FFmpegSampleRate: 24000,
 			FFmpegChannels:   1,
 			FFmpegFormat:     "s16le",
+			// 2 GB is one to two days on two frequencies (sidecar/README.md);
+			// 30 days of raw logs is a few MB.
+			AudioArchiveMaxGB: 2,
+			RawLogMaxDays:     30,
 			Local: LocalSTTFileConfig{
 				ServerURL:             "http://127.0.0.1:8178",
 				TimeoutSeconds:        60,
