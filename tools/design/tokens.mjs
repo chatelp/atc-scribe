@@ -130,18 +130,30 @@ p('- `border.default` et `border.subtle` ne sont pas soumis au 3:1 : ce sont des
     + `${r1(contrast(hex('color.border.default'), hex('color.surface.panel')))} et ${r1(contrast(hex('color.border.subtle'), hex('color.surface.panel')))} sur panel.`);
 p();
 
-// Altitude ramps
+// Altitude ramps: palette F (13/10), a ramp of hue. Required, on its base map:
+// every band at 3:1 at least (an icon is a mark); every pair of bands apart by
+// ΔE 12 under the worst of the four visions and by 20 under normal sight;
+// no band within ΔE 18 of the urgent red; none within 5 of a phase family (the
+// label of the same aircraft); near the ground the most visible, cruise the least.
 p('## Rampes d\'altitude (icône d\'avion sur la carte)');
 p();
 const bands = ['very-low', 'low', 'mid', 'high', 'cruise'];
+const views4 = [(c) => c, ...Object.values(CVD).map((m) => (c) => simulate(c, m))];
+const worstDE = (a, b) => Math.min(...views4.map((v) => deltaE(v(a), v(b))));
+const famHex = ['ground', 'departure', 'cruise', 'arrival', 'unknown'].map((f) => hex(`color.phase.${f}`));
 for (const [mode, bg] of [['dark', '#000000'], ['light', '#ffffff']]) {
     const vals = bands.map((b) => hex(`color.altitude.${mode}.${b}`));
-    const Ls = vals.map((v) => lab(v)[0]);
-    const monotone = Ls.every((L, i) => i === 0 || (mode === 'dark' ? L < Ls[i - 1] : L > Ls[i - 1]));
-    const steps = vals.slice(1).map((v, i) => deltaE(v, vals[i]));
-    const minStep = Math.min(...steps);
-    p(`- **${mode === 'dark' ? 'fond sombre' : 'fond clair'}** (sur ${bg}) : ${bands.map((b, i) => `${b} ${vals[i]} (L ${Ls[i].toFixed(0)}, ${r1(contrast(vals[i], bg))}${mark(contrast(vals[i], bg) >= 3)})`).join(' · ')}`);
-    p(`  - clarté monotone : ${monotone ? 'oui' : 'non ✗'}${monotone ? '' : (failures++, '')} ; écart minimal entre bandes voisines ΔE ${r1(minStep)}${mark(minStep >= 10)} ; sans teinte, donc identique pour tous les daltonismes.`);
+    const cons = vals.map((v) => contrast(v, bg));
+    let allWorst = Infinity, allNormal = Infinity;
+    for (let i = 0; i < vals.length; i++) for (let j = i + 1; j < vals.length; j++) {
+        allWorst = Math.min(allWorst, worstDE(vals[i], vals[j]));
+        allNormal = Math.min(allNormal, deltaE(vals[i], vals[j]));
+    }
+    const urgent = Math.min(...vals.map((v) => worstDE(v, hex('color.status.urgent'))));
+    const family = Math.min(...vals.flatMap((v) => famHex.map((f) => worstDE(v, f))));
+    const order = cons[0] >= Math.max(...cons) && cons[4] <= Math.min(...cons);
+    p(`- **${mode === 'dark' ? 'fond sombre' : 'fond clair'}** (sur ${bg}) : ${bands.map((b, i) => `${b} ${vals[i]} (${r1(cons[i])}${mark(cons[i] >= 3)})`).join(' · ')}`);
+    p(`  - toutes les paires : ΔE ${r1(allNormal)} en vision normale${mark(allNormal >= 20)}, ${r1(allWorst)} au pire daltonisme${mark(allWorst >= 12)} ; au rouge d'urgence ${r1(urgent)}${mark(urgent >= 18)} ; à une famille de phase ${r1(family)}${mark(family >= 5)} ; le plus bas le plus visible, la croisière la plus discrète : ${order ? 'oui' : 'non ✗'}${order ? '' : (failures++, '')}`);
 }
 p();
 

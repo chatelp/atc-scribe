@@ -200,7 +200,7 @@ def skymap(filtered=False, width=640, follow=False):
         track = ('<path d="M150 40 C190 110 220 190 250 250 S 330 262 400 236" fill="none" stroke="#b8b8b8" stroke-opacity=".75" stroke-width="1.5" stroke-dasharray="5 4"/>'
                  '<g fill="#b8b8b8" fill-opacity=".75"><circle cx="150" cy="40" r="2"/><circle cx="220" cy="190" r="2"/><circle cx="300" cy="258" r="2"/></g>'
                  '<g font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#949494"><text x="160" y="36">12:58 FL 150</text><text x="230" y="186">13:04 4000 ft</text></g>')
-    far = '' if filtered else ac(110, 140, 120, '#6b6b6b') + label(124, 140, 'CRZ', '#b8d3f2', 'DLH6TA', line2='FL 360 ↔ 452 kt', typ='A20N') + ac(470, 650, 200, '#6b6b6b')
+    far = '' if filtered else ac(110, 140, 120, '#6e7b8f') + label(124, 140, 'CRZ', '#b8d3f2', 'DLH6TA', line2='FL 360 ↔ 452 kt', typ='A20N') + ac(470, 650, 200, '#6e7b8f')
     # following: the view is centred on the aircraft, in the part the PAR frame leaves visible
     vx, vy = (400 - width / 2, 236 - 300) if follow else (-(width - 640) / 2, 0)
     return f'''<svg class="cl-sky__map" viewBox="{vx} {vy} {width} 852" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map of the traffic around the station">
@@ -209,11 +209,11 @@ def skymap(filtered=False, width=640, follow=False):
   <g stroke="#b8b8b8" stroke-width="3" stroke-linecap="round"><line x1="290" y1="438" x2="350" y2="424"/><line x1="470" y1="210" x2="560" y2="192"/><line x1="476" y1="230" x2="566" y2="212"/></g>
   <g font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#b8b8b8"><text x="354" y="444">LFPZ</text><text x="570" y="228">LFPG</text></g>
   <line x1="380" y1="232" x2="470" y2="210" stroke="#4c9ce8" stroke-dasharray="4 4" opacity=".6"/>
-  <g transform="translate(400 236)"><circle r="22" fill="none" stroke="#4caf50" stroke-width="1" opacity=".5"/><circle r="13" fill="none" stroke="#4caf50" stroke-width="2"/><path d="{AC}" fill="#cfcfcf" transform="rotate(78)"/></g>
+  <g transform="translate(400 236)"><circle r="22" fill="none" stroke="#4caf50" stroke-width="1" opacity=".5"/><circle r="13" fill="none" stroke="#4caf50" stroke-width="2"/><path d="{AC}" fill="#e68cba" transform="rotate(78)"/></g>
   {label(87, 246, 'APP', '#4c9ce8', 'AFR47KX', sel=True, line2='2 400 ft ↓ 158 kt', said='“autorisé ILS piste deux six gauche, cont…”', typ='A320')}
-  {ac(250, 336, 80, '#a8a8a8')}{label(266, 346, 'ARR', '#4c9ce8', 'EZY82QT', line2='5 000 ft ↓ 241 kt', typ='A21N')}
-  {ac(200, 560, -35, '#cfcfcf')}{label(214, 570, 'CLB', '#ec8b34', 'TVF61WB', line2='5 800 ft ↑ 212 kt', said='“climb flight level one two zero, direct…”', typ='B738')}
-  {ac(330, 420, 30, '#f5f5f5', .8)}
+  {ac(250, 336, 80, '#c2a3ff')}{label(266, 346, 'ARR', '#4c9ce8', 'EZY82QT', line2='5 000 ft ↓ 241 kt', typ='A21N')}
+  {ac(200, 560, -35, '#c2a3ff')}{label(214, 570, 'CLB', '#ec8b34', 'TVF61WB', line2='5 800 ft ↑ 212 kt', said='“climb flight level one two zero, direct…”', typ='B738')}
+  {ac(330, 420, 30, '#fff59a', .8)}
   {far}{track}
 </svg>'''
 

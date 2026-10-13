@@ -33,16 +33,16 @@
   --color-phase-cruise: #b8d3f2;
   --color-phase-arrival: #4c9ce8;
   --color-phase-unknown: #969696;
-  --color-altitude-dark-very-low: #f5f5f5;
-  --color-altitude-dark-low: #cfcfcf;
-  --color-altitude-dark-mid: #a8a8a8;
-  --color-altitude-dark-high: #858585;
-  --color-altitude-dark-cruise: #6b6b6b;
-  --color-altitude-light-very-low: #141414;
-  --color-altitude-light-low: #333333;
-  --color-altitude-light-mid: #4d4d4d;
-  --color-altitude-light-high: #666666;
-  --color-altitude-light-cruise: #808080;
+  --color-altitude-dark-very-low: #fff59a;
+  --color-altitude-dark-low: #e68cba;
+  --color-altitude-dark-mid: #c2a3ff;
+  --color-altitude-dark-high: #61c9e3;
+  --color-altitude-dark-cruise: #6e7b8f;
+  --color-altitude-light-very-low: #33311f;
+  --color-altitude-light-low: #452a38;
+  --color-altitude-light-mid: #746299;
+  --color-altitude-light-high: #27505b;
+  --color-altitude-light-cruise: #6e7b8f;
   --color-scrim: #000000b3;
   --shadow-overlay: 0 4px 16px #00000099;
 }

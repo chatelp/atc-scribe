@@ -101,7 +101,7 @@ qu'eux, et un réglage pour couper la console.
 
 | Date | Écart | Pourquoi | Suite |
 |---|---|---|---|
-| 13/10 | L'altitude des avions sur la carte garde sa palette par teinte d'avant (fond sombre : `#D35A48`, `#EA8A4A`, `#F4B55A`, `#F8D857`, `#E8ECEF` du plus bas à la croisière ; fond clair : la série bleu / orange), au lieu de la rampe de gris du système | soirée d'écoute de l'étape 2 : « le dégradé de gris ne marche pas, trop difficile de distinguer les uns des autres » | une alternative mesurée est proposée au propriétaire ; les jetons `color.altitude.*` suivront son choix |
+| 13/10 | L'altitude des avions sur la carte garde sa palette par teinte d'avant (fond sombre : `#D35A48`, `#EA8A4A`, `#F4B55A`, `#F8D857`, `#E8ECEF` du plus bas à la croisière ; fond clair : la série bleu / orange), au lieu de la rampe de gris du système | soirée d'écoute de l'étape 2 : « le dégradé de gris ne marche pas, trop difficile de distinguer les uns des autres » | **réglé le 13/10** : quatre palettes mesurées et dessinées sur une même scène ; le propriétaire choisit F, du chaud au froid (jaune, rose, violet, cyan, ardoise), qui tient toutes les paires sous les quatre visions sans rappeler l'urgence ni une famille de phase ; jetons `color.altitude.*` mis à jour, `03-systeme.md` § Altitude |
 
 ## Ce qui n'est pas dessiné
 
