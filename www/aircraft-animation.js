@@ -25,7 +25,11 @@ class AircraftAnimationEngine {
             enabled: true,
             interpolationFps: 30,
             maxPredictionSeconds: 3.0,
-            predictionGain: 0.72,
+            // At the aircraft's own speed: below one (0.72 before) the aircraft
+            // flew at 72 % of its speed between two samples and caught up the
+            // rest on each one, a sawtooth of speed once a second. An overshoot
+            // is paid back by the fading correction, gently.
+            predictionGain: 1.0,
             predictedJitterDeadbandNm: 0.0035,
             predictedHeadingDeadbandDeg: 1.4,
             mergeDurationMs: 450,
@@ -401,8 +405,12 @@ class AircraftAnimationEngine {
             return { lat: real.lat, lon: real.lon, alt: real.alt, heading };
         }
 
+        // The horizon does not shrink with the quality level: a changing
+        // horizon moved every aircraft back and forth as the frame budget came
+        // and went. The quality level only limits how many aircraft a frame
+        // animates.
         const elapsedSec = Math.max(0, (now - real.timestamp) / 1000);
-        const baseHorizon = Math.min(this.config.maxPredictionSeconds * this.qualityLevel, elapsedSec);
+        const baseHorizon = Math.min(this.config.maxPredictionSeconds, elapsedSec);
         const horizon = baseHorizon * (Number.isFinite(this.config.predictionGain) ? this.config.predictionGain : 0.72);
 
         const dNorth = state.velocity.northMps * horizon;
