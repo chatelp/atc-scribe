@@ -438,7 +438,7 @@ func recordReplay(t *testing.T) replayRecording {
 
 		simNow = replayStart.Add(time.Duration(k)*time.Second + replayFileAge + 500*time.Millisecond)
 		start = len(rec.msgs)
-		s.broadcastLivePredictions(simNow)
+		s.live.broadcast(simNow)
 		sortReplayMessages(rec.msgs[start:])
 	}
 

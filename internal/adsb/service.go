@@ -52,11 +52,6 @@ import (
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
-const (
-	livePredictionBroadcastInterval = 1 * time.Second
-	minPredictionConfidence         = 0.65
-)
-
 func roundTo(value float64, decimals int) float64 {
 	pow := math.Pow(10, float64(decimals))
 	return math.Round(value*pow) / pow
@@ -220,6 +215,7 @@ type Service struct {
 	flightPhasesConfig config.FlightPhasesConfig // Flight phases configuration
 	changeDetector     *ChangeDetector           // Tracks aircraft changes
 	trajectoryTracker  *TrajectoryTracker        // Trajectory-based phase detection
+	live               *livePredictor            // Predicted states between polls; nil without tracker or page
 
 	// clock is the service's time, the wall clock when nil; the replay bench
 	// (replay_test.go) runs the whole chain on a simulated one.
@@ -311,6 +307,9 @@ func NewService(
 			&service.flightPhasesConfig,
 			logger,
 		)
+		if wsServer != nil {
+			service.live = newLivePredictor(service.trajectoryTracker, wsServer)
+		}
 	}
 
 	return service
@@ -359,60 +358,6 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 	}
 }
 
-// predictionBroadcastLoop periodically publishes trajectory-based predicted states
-// so clients can animate smoothly between real ADS-B polls.
-func (s *Service) predictionBroadcastLoop(ctx context.Context) {
-	defer s.wg.Done()
-
-	ticker := time.NewTicker(livePredictionBroadcastInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			s.broadcastLivePredictions(s.now())
-
-		case <-s.stopCh:
-			return
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-// broadcastLivePredictions publishes the predicted state of every aircraft
-// at now, the predictions below the confidence floor left out.
-func (s *Service) broadcastLivePredictions(now time.Time) {
-	if s.wsServer == nil || s.trajectoryTracker == nil {
-		return
-	}
-	predictions := s.trajectoryTracker.GetLivePredictionsAt(now)
-	for _, p := range predictions {
-		if p.Confidence < minPredictionConfidence {
-			continue
-		}
-
-		s.wsServer.Broadcast(&websocket.Message{
-			Type: websocket.MessageTypeAircraftPredictedState,
-			Data: map[string]interface{}{
-				"hex":          p.Hex,
-				"predicted":    true,
-				"based_on":     p.BaseObserved.Format(time.RFC3339Nano),
-				"predicted_at": p.Timestamp.Format(time.RFC3339Nano),
-				"delta": map[string]interface{}{
-					"lat":        roundTo(p.Lat, 6),
-					"lon":        roundTo(p.Lon, 6),
-					"alt_baro":   roundTo(p.Altitude, 0),
-					"gs":         roundTo(p.Speed, 0),
-					"track":      roundTo(p.Heading, 0),
-					"confidence": roundTo(p.Confidence, 3),
-					"source":     "predicted",
-				},
-			},
-		})
-	}
-}
-
 // Start starts the ADS-B service
 func (s *Service) Start(ctx context.Context) error {
 	s.logger.Info("Starting ADS-B service",
@@ -432,9 +377,12 @@ func (s *Service) Start(ctx context.Context) error {
 	go s.fetchLoop(ctx)
 
 	// Start background prediction streaming (between ADS-B polls)
-	if s.trajectoryTracker != nil && s.wsServer != nil {
+	if s.live != nil {
 		s.wg.Add(1)
-		go s.predictionBroadcastLoop(ctx)
+		go func() {
+			defer s.wg.Done()
+			s.live.run(ctx, s.stopCh, s.now)
+		}()
 	}
 
 	return nil
