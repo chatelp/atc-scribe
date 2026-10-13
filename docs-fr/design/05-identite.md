@@ -120,10 +120,13 @@ la barre sombre et l'état pressé. Elles remplacent `dot.radiowaves.left.and.ri
 
 ## Ce qui reste
 
-- Le renommage lui-même est fait le 13/10 par la session atc-scribe (dépôt `chatelp/clairance`,
-  lanceur, dossier de configuration, titre de page, documents). Restent de son côté : le favicon
-  exporté et le manifeste, les deux images de la barre de menus, le signe et la première phrase
-  dans le README.
+- Le renommage est fait le 13/10 par la session atc-scribe (dépôt `chatelp/clairance`, lanceur,
+  dossier de configuration, titre de page, documents). **La marque est appliquée le même jour
+  (D76)** : favicon SVG et PNG 16/32/180/512, manifeste (`theme-color` `#0a0a0a`) ; les deux images
+  de barre de menus dans le lanceur, symboles système en repli ; README avec `<picture>` et la
+  première phrase. Copies dans `www/brand/` et `tools/menubar/` : **ce dossier `identite/` reste la
+  source**, toute retouche d'un SVG se signale à la session atc-scribe, qui recopie.
+- Restent pour la migration : la marque sur la page de connexion et dans l'en-tête de l'outil.
 - Les domaines `clairance.org` et `clairance.app`, libres le 13/10, si le propriétaire les veut ;
   rien n'est réservé.
 - La lecture du brevet US12277862B1 (Q53) avant toute diffusion hors de France.
