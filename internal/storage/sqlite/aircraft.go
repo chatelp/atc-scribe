@@ -946,56 +946,9 @@ func (s *AircraftStorage) GetByHex(hex string) (*adsb.Aircraft, bool) {
 		s.logger.Error("Failed to get position history", logger.Error(err), logger.String("hex", hex))
 	}
 
-	// Calculate future positions if we have the necessary data
-	if a.ADSB != nil && a.ADSB.HasPosition() && a.ADSB.AltBaro.Float64() != 0 {
-		lat, lon, _ := a.ADSB.Position()
-		// Get heading (use true_heading, track, or mag_heading, whichever is available)
-		heading := adsb.NumberOrZero(a.ADSB.TrueHeading)
-		if heading == 0 {
-			heading = adsb.NumberOrZero(a.ADSB.Track)
-		}
-		if heading == 0 {
-			heading = adsb.NumberOrZero(a.ADSB.MagHeading)
-		}
-
-		// Get speed (use TAS or GS, whichever is available)
-		speed := adsb.NumberOrZero(a.ADSB.TAS)
-		if speed == 0 {
-			speed = adsb.NumberOrZero(a.ADSB.GS)
-		}
-
-		// Get vertical rate (use baro_rate or geom_rate, whichever is available)
-		verticalRate := adsb.NumberOrZero(a.ADSB.BaroRate)
-		if verticalRate == 0 {
-			verticalRate = adsb.NumberOrZero(a.ADSB.GeomRate)
-		}
-
-		// Only predict if we have valid heading and speed
-		if heading != 0 && speed != 0 {
-			// Calculate future positions
-			// Get magnetic heading for predictions
-			magHeading := adsb.NumberOrZero(a.ADSB.MagHeading)
-			if magHeading == 0 {
-				magHeading = heading // fallback to whatever heading we found
-			}
-
-			a.Future = adsb.PredictFuturePositions(
-				lat,
-				lon,
-				a.ADSB.AltBaro.Float64(),
-				heading,    // true heading
-				magHeading, // magnetic heading
-				speed,
-				verticalRate,
-			)
-		} else {
-			// Initialize empty future slice
-			a.Future = []adsb.Position{}
-		}
-	} else {
-		// Initialize empty future slice
-		a.Future = []adsb.Position{}
-	}
+	// Predicted positions are the ADS-B service's (GetAircraftByHex), not
+	// the store's.
+	a.Future = []adsb.Position{}
 	a.Hindcast = []adsb.Position{}
 
 	// Populate phase data for this aircraft

@@ -16,9 +16,10 @@ import (
 // once when enough data has accumulated (≥5 valid points, R² ≥ 0.80), then
 // locked in. Uses OLS linear regression on position components.
 //
-// Forecast: Extends the track forward 2 minutes using a kinematic model
-// with acceleration and turn rate from DerivedState. Replaces the naive
-// constant-heading/constant-speed PredictFuturePositions().
+// Forecast: Extends the track forward 1 minute using a kinematic model
+// with acceleration and turn rate from DerivedState; from a single sample
+// (ForecastFromTarget) when the tracker has no forecast. It replaced the
+// naive constant-heading/constant-speed PredictFuturePositions(), removed.
 
 const (
 	// Hindcast: 6 points × 10s = 60 seconds backward
@@ -57,6 +58,10 @@ type TrajectoryPrediction struct {
 	Forecast       []PredictionPoint // Future predictions (nearest first, after latest obs)
 	HindcastLocked bool              // Once locked, don't recompute
 	ComputedAt     time.Time
+
+	// start is where the forecast starts, for the live prediction to follow
+	// the model between its points; nil when there is no forecast.
+	start *forecastStart
 }
 
 // ─── Hindcast (backward extrapolation) ──────────────────────────────────────
@@ -204,26 +209,120 @@ func computeForecast(at *AircraftTrajectory, derived *DerivedState) {
 		return
 	}
 
-	// Starting state from DerivedState (smoothed) + latest position
-	curLat := latest.Lat
-	curLon := latest.Lon
-	curAlt := derived.AltMean
-	curSpeed := derived.GroundSpeedKts
-	curHeading := derived.TrackDeg
+	// Starting state from DerivedState (smoothed) + latest position. The
+	// forecast starts where and when the position was decoded, not at the
+	// poll that repeated it: the live prediction interpolates from that fix.
+	st := forecastStart{
+		lat: latest.Lat, lon: latest.Lon, alt: derived.AltMean,
+		speed: derived.GroundSpeedKts, heading: forecastHeading(latest, derived),
+		gsAccel: derived.GSAccelKtsPerSec, trackRate: derived.TrackRateDegPerSec,
+		altRate: derived.AltTrendFPM / 60.0, // fpm to ft/sec
+		at:      latest.PositionTime(),
+	}
+	pred.Forecast = forecastPoints(st)
+	pred.start = &st
+	pred.ComputedAt = latest.PositionTime()
+}
 
-	// Trends
-	gsAccel := derived.GSAccelKtsPerSec
-	trackRate := derived.TrackRateDegPerSec
-	altRate := derived.AltTrendFPM / 60.0 // convert fpm to ft/sec
+// forecastHeading is the track the forecast starts on: the latest fix's.
+// The mean track of the short window (DerivedState.TrackDeg, ten seconds)
+// lags a turn by half the window: 15 deg at 3 deg/s, and the live prediction
+// drew a turning aircraft inside and behind its turn (replay bench).
+func forecastHeading(latest *TrajectorySnapshot, derived *DerivedState) float64 {
+	if latest.Track != 0 {
+		return latest.Track
+	}
+	return derived.TrackDeg
+}
+
+// position is where the forecast's model puts the aircraft sec seconds after
+// its start, and its track and speed there: the same kinematics as
+// forecastPoints, integrated in steps of at most half a second, so that a
+// turn is followed along its arc, not along the chord between two points.
+func (st forecastStart) position(sec float64) (lat, lon, heading, speed float64) {
+	lat, lon = st.lat, st.lon
+	speedAt := func(t float64) float64 {
+		v := st.speed + st.gsAccel*t
+		maxSpeed := math.Max(st.speed*2.0, 100)
+		return math.Max(0, math.Min(v, maxSpeed))
+	}
+	const maxStep = 0.5
+	for t := 0.0; t < sec; {
+		dt := math.Min(maxStep, sec-t)
+		avgSpeed := (speedAt(t) + speedAt(t+dt)) / 2
+		avgHeadingRad := (st.heading + st.trackRate*(t+dt/2)) * math.Pi / 180
+		distKm := avgSpeed * kmPerNM / 3600.0 * dt
+		cosLat := math.Max(0.01, math.Cos(lat*math.Pi/180))
+		lat += distKm * math.Cos(avgHeadingRad) * degPerKmLat
+		lon += distKm * math.Sin(avgHeadingRad) * degPerKmLat / cosLat
+		t += dt
+	}
+	heading = math.Mod(st.heading+st.trackRate*sec+360*10, 360)
+	return lat, lon, heading, speedAt(sec)
+}
+
+// ForecastFromTarget is the forecast of an aircraft the trajectory tracker
+// cannot forecast -- flight phases turned off (no tracker), a first poll, an
+// aircraft read back from the database: the same kinematic model started
+// from its one sample, speed, track and vertical rate held, the position
+// dated at. Nil without a position, an altitude, a speed and a heading, as
+// before (upstream's PredictFuturePositions, which this replaces).
+func ForecastFromTarget(t *ADSBTarget, at time.Time) []PredictionPoint {
+	if t == nil || !t.HasPosition() || t.AltBaro.Float64() == 0 {
+		return nil
+	}
+	lat, lon, _ := t.Position()
+	heading := NumberOrZero(t.Track)
+	if heading == 0 {
+		heading = NumberOrZero(t.TrueHeading)
+	}
+	if heading == 0 {
+		heading = NumberOrZero(t.MagHeading)
+	}
+	speed := NumberOrZero(t.GS)
+	if speed == 0 {
+		speed = NumberOrZero(t.TAS)
+	}
+	if heading == 0 || speed == 0 {
+		return nil
+	}
+	vr := NumberOrZero(t.BaroRate)
+	if vr == 0 {
+		vr = NumberOrZero(t.GeomRate)
+	}
+	return forecastPoints(forecastStart{
+		lat: lat, lon: lon, alt: t.AltBaro.Float64(), speed: speed, heading: heading,
+		altRate: vr / 60.0, at: at,
+	})
+}
+
+// forecastStart is where a forecast starts: a position, its time, and the
+// kinematics carried forward.
+type forecastStart struct {
+	lat, lon, alt      float64 // degrees, feet
+	speed, heading     float64 // knots, degrees
+	gsAccel, trackRate float64 // knots/sec, degrees/sec
+	altRate            float64 // feet/sec
+	at                 time.Time
+}
+
+// forecastPoints extrapolates forward with a kinematic model:
+// - Speed changes with gsAccel (clamped to reasonable bounds)
+// - Heading changes with trackRate (curved paths)
+// - Altitude changes with altRate
+//
+// Confidence decays per step, faster for turning/accelerating aircraft.
+func forecastPoints(st forecastStart) []PredictionPoint {
+	curLat, curLon := st.lat, st.lon
+	curAlt, curSpeed, curHeading := st.alt, st.speed, st.heading
+	gsAccel, trackRate, altRate := st.gsAccel, st.trackRate, st.altRate
 
 	// Confidence factors
 	turnFactor := math.Max(0.3, 1.0-math.Abs(trackRate)*0.15)
 	accelFactor := math.Max(0.5, 1.0-math.Abs(gsAccel)*0.1)
 
 	points := make([]PredictionPoint, forecastSteps)
-	// The forecast starts where and when the position was decoded, not at the
-	// poll that repeated it: the live prediction interpolates from that fix.
-	now := latest.PositionTime()
+	now := st.at
 
 	for i := 0; i < forecastSteps; i++ {
 		step := float64(i + 1)
@@ -299,8 +398,7 @@ func computeForecast(at *AircraftTrajectory, derived *DerivedState) {
 		}
 	}
 
-	pred.Forecast = points
-	pred.ComputedAt = now
+	return points
 }
 
 // ─── Conversion Helpers ─────────────────────────────────────────────────────
