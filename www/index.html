@@ -811,7 +811,7 @@
                         <div id="map" class="h-full w-full bg-black"></div>
                         <!-- What the map shows while a filter narrows it (step 4). -->
                         <div x-show="$store.atc.filterSummary" x-cloak class="cl-root absolute left-2 top-2 z-20 pointer-events-none">
-                            <span class="cl-badge" style="height: 20px; padding: 0 8px; background: var(--color-surface-panel);" x-text="$store.atc.filterSummary"></span>
+                            <div class="cl-sky__note" x-text="$store.atc.filterSummary"></div>
                         </div>
 
                         <!-- The main screen shows the radar map or the PAR view of one
@@ -1080,7 +1080,7 @@
                                        aria-label="Altitude ceiling" :aria-valuetext="label(max)"
                                        @input="moveHi($event.target.value)" @change="save()">
                             </div>
-                            <div class="alt-marks" aria-hidden="true" data-help-title="Scale"
+                            <div class="cl-altrange__marks alt-marks" aria-hidden="true" data-help-title="Scale"
                                  :data-help="'SFC is the surface. TA is the transition altitude (' + label(ta) + '): below it, altitudes are in feet on the local QNH; above it, in flight levels, hundreds of feet on the standard pressure.'">
                                 <template x-for="m in marks" :key="m.text">
                                     <span :style="'left:' + m.at + '%'" x-text="m.text"></span>
@@ -1115,10 +1115,11 @@
                         <!-- The five families of flight phase (step 2); keys 1 to 0 still toggle one phase. -->
                         <div class="cl-row">
                             <template x-for="fam in (window.PhaseFamilies ? PhaseFamilies.FAMILIES : [])" :key="fam">
-                                <button class="cl-toggle" :class="$store.atc.familyIsOn(fam) ? 'is-on' : ''"
+                                <button class="cl-toggle" :class="{ 'is-on': $store.atc.familyIsOn(fam), 'is-mixed': $store.atc.familyIsMixed(fam) }"
                                         :aria-pressed="$store.atc.familyIsMixed(fam) ? 'mixed' : String($store.atc.familyIsOn(fam))"
-                                        @click="$store.atc.toggleFamily(fam)" data-help-title="Flight phases" :data-help="$store.atc.familyHelp(fam)">
-                                    <i class="cl-dot" :class="'cl-dot--' + PhaseFamilies.MODIFIER[fam]"></i><span x-text="PhaseFamilies.LABEL[fam] + ($store.atc.familyIsMixed(fam) ? ' ·' : '')"></span>
+                                        :title="PhaseFamilies.LABEL[fam]"
+                                        @click="$store.atc.toggleFamily(fam)" :data-help-title="PhaseFamilies.LABEL[fam]" :data-help="$store.atc.familyHelp(fam)">
+                                    <i class="cl-dot" :class="'cl-dot--' + PhaseFamilies.MODIFIER[fam]"></i><span x-text="PhaseFamilies.SHORT[fam]"></span>
                                     <span class="cl-toggle__count" x-text="$store.atc.familyCount(fam)"></span>
                                 </button>
                             </template>

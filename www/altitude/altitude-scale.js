@@ -55,7 +55,7 @@
     function readingText(r, step = 100) {
         if (!r) return '-';
         if (r.kind === 'gnd') return 'GND';
-        if (r.kind === 'fl') return 'FL' + String(r.fl).padStart(3, '0');
+        if (r.kind === 'fl') return 'FL ' + String(r.fl).padStart(3, '0');
         return `${thousands(Math.round(r.ft / step) * step)} ft`;
     }
 
@@ -100,7 +100,7 @@
         if (ft >= NO_CEILING) return 'no ceiling';
         if (ft <= 0) return 'surface';
         if (ft <= transitionAltitudeFt) return `${thousands(ft)} ft`;
-        return 'FL' + String(Math.round(ft / 100)).padStart(3, '0');
+        return 'FL ' + String(Math.round(ft / 100)).padStart(3, '0');
     }
 
     function bandLabel(min, max, transitionAltitudeFt = DEFAULT_TA) {
@@ -126,11 +126,11 @@
     function presets(transitionAltitudeFt = DEFAULT_TA) {
         return [
             { id: 'all', label: 'All', min: FLOOR, max: NO_CEILING, help: 'Every altitude' },
-            { id: 'circuit', label: '≤ 3000 ft', min: FLOOR, max: 3000, help: 'Circuits, light aircraft, final approaches' },
+            { id: 'circuit', label: '≤ 3000', min: FLOOR, max: 3000, help: 'Circuits, light aircraft, final approaches' },
             { id: 'ta', label: `≤ TA`, min: FLOOR, max: transitionAltitudeFt, help: `Below the transition altitude (${thousands(transitionAltitudeFt)} ft): altitudes on QNH` },
-            { id: 'low', label: '≤ FL100', min: FLOOR, max: 10000, help: 'Arrivals and departures, below the 250 kt limit' },
-            { id: 'mid', label: 'FL100–195', min: 10000, max: 19500, help: 'Climbing and descending traffic, up to the ceiling of visual flight' },
-            { id: 'high', label: '≥ FL195', min: 19500, max: NO_CEILING, help: 'Upper airspace, en route (instrument flights only)' },
+            { id: 'low', label: '≤ FL 100', min: FLOOR, max: 10000, help: 'Arrivals and departures, below the 250 kt limit' },
+            { id: 'mid', label: '≤ FL 195', min: FLOOR, max: 19500, help: 'Up to FL 195, the top of the lower airspace: everything but the en-route flights' },
+            { id: 'high', label: '≥ FL 195', min: 19500, max: NO_CEILING, help: 'Upper airspace, en route (instrument flights only)' },
         ];
     }
 

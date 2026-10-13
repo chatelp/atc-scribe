@@ -59,6 +59,8 @@
     // The short modifier the components use: cl-strip--arr, cl-phase--arr, cl-dot--arr.
     const MODIFIER = Object.freeze({ ground: 'gnd', departure: 'dep', cruise: 'crz', arrival: 'arr', unknown: 'unk' });
     const LABEL = Object.freeze({ ground: 'Ground', departure: 'Departure', cruise: 'Cruise', arrival: 'Arrival', unknown: 'Unknown' });
+    // On a filter toggle, where the row must hold the five: the reference's short forms.
+    const SHORT = Object.freeze({ ground: 'Gnd', departure: 'Dep', cruise: 'Crz', arrival: 'Arr', unknown: '?' });
     const FAMILIES = Object.freeze(['ground', 'departure', 'cruise', 'arrival', 'unknown']);
 
     function codesOf(family) {
@@ -110,5 +112,5 @@
         return TEXT[familyOf(phase)];
     }
 
-    return { FAMILY_OF, HEX, FAMILIES, MODIFIER, LABEL, familyOf, codesOf, modifierOf, colorOf, isSolid, badgeClasses, textClass };
+    return { FAMILY_OF, HEX, FAMILIES, MODIFIER, LABEL, SHORT, familyOf, codesOf, modifierOf, colorOf, isSolid, badgeClasses, textClass };
 });

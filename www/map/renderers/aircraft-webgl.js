@@ -442,7 +442,7 @@
         const altitude = !Number.isFinite(aircraft?.adsb?.alt_baro)
             ? '-'
             : aircraft.adsb.alt_baro === 0 ? 'GND'
-            : reading && reading.kind === 'fl' ? 'FL' + String(reading.fl).padStart(3, '0')
+            : reading && reading.kind === 'fl' ? 'FL ' + String(reading.fl).padStart(3, '0')
             : `${Math.round((reading ? reading.ft : aircraft.adsb.alt_baro) / 10) * 10}ft`;
         const trendArrow = getAltitudeTrendArrow(aircraft);
         const speed = Number.isFinite(aircraft?.adsb?.gs)
