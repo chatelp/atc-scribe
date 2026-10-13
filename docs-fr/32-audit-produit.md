@@ -492,6 +492,30 @@ sur la carte.
 
 ## État
 
+- 13/10 (nuit) : **étape 6 de la migration livrée sur `migration`** (a15da0e), en relecture
+  design. La colonne de gauche devient **le fil** : tous les échanges de toutes les fréquences
+  en une liste qui grandit vers le bas, l'en-tête des fréquences (écouter / couper, menu avec
+  volume et « seulement cette fréquence », filtre « Show », recherche, « Mute all »), chaque
+  échange avec locuteur → destinataire, puce d'indicatif et sa phase, force des indices et sa
+  preuve, réécoute, transcription (`lang="fr"` pour une émission française), consignes en puces
+  et, pour une émission française, en français ; « quelqu'un parle » par le niveau audio, que
+  `audio-client.js` dessine désormais aussi dans le fil (il survivra au retrait de la barre) ;
+  « ↓ N new » quand on a remonté. La barre du bas reste jusqu'à l'étape 7 pour comparer.
+  **Inventaire préalable** : `openTranscriptionAt` n'avait plus d'appelant (les bulles de la
+  carte retirées le 13/10, rien d'autre ne l'appelait) : rien à rebrancher ; l'API ne garde
+  aucun lien entre une consigne et la réponse du pilote : la ligne « Pilot replied, 3 s later »
+  des maquettes n'a pas de source. **Banc de l'instance d'essai** : le faux sidecar répond
+  désormais à chaque vraie transmission par une phrase inventée qui nomme un avion présent, en
+  anglais ou en français, et le rapprochement local est activé comme en production : on voit des
+  échanges appariés, faibles et non appariés arriver en direct (jamais pour juger la
+  transcription). **Mesuré** (120 échanges, 150 avions, 10 s) : 0 blocage du fil principal,
+  6 % d'occupation ; la table des puces rafraîchie toutes les 5 s a ramené les réécritures du fil
+  de 794 à 10 et les recherches d'avion de 1 179 à 62 ; sonde du fil : 853 textes, 0 sous 11 px,
+  0 sous AA ; les puces d'indicatif font 20 px (géométrie du système), sous les 24 px.
+  **Non vérifié** : « quelqu'un parle » en direct (l'onglet visible disponible était en
+  arrière-plan, où le navigateur suspend l'animation ; même valeur que la barre de la tuile, dans
+  la même image). Au passage, une coupure de trois minutes entre le Mac et le port ADS-B de la
+  station (20 h 42-20 h 45, la station et ses conteneurs sains) a vidé un moment les flux.
 - 13/10 (nuit) : **étape 5 versée dans `local`** (0f846b1) après le coup d'œil du propriétaire
   (« ok pour l'étape 5 ») : « Right now » par défaut, colonne repliable, météo et piste en service
   sorties de la barre du bas, avec les corrections de la relecture design et la fiche L. En
