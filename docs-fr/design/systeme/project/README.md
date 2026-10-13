@@ -35,7 +35,8 @@ Clairance lets a listener hear the airband their station receives, read it in En
 
 - **The thread in the middle of attention.** Desk layout A: the radio thread (≈ 440 px), the sky (map or PAR), and a context column (≈ 380 px) with two tabs, "Right now" (default) and "Traffic". The map follows the Traffic filters.
 - **Fold, don't switch.** » folds the column (layout B): the thread widens into a transcript, Right now becomes a `cl-card` over the map with "Traffic" and « to unfold. Following a flight replaces the column's content with its story; ‹ returns.
-- **Phone**: one pane at a time; the thread is home.
+- **No bottom bar.** Its parts move: the frequencies to the `ThreadHead` (listen or mute, a `ChannelMenu` with the volume, one thread for all of them with a frequency filter and a search), the weather to Right now (`Weather`), the runways in use to the summary and the `ParView`, the lights and the clocks to the `TopBar`, the choice of UTC or local time to Settings › Display.
+- **Phone**: one pane at a time (`PhoneShell`): Radio, Sky, Traffic, Right now; the thread is home.
 - Desk targets `size-target-desk` (24 px), phone `size-target-touch` (44 px); rows `size-row-desk` / `size-row-touch`. The breakpoint is 768 px.
 
 ## States and motion

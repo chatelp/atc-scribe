@@ -17,7 +17,7 @@ README : c'est ce que lira la session qui migre `www/`.*
   rayons, ombre, tailles, plans, durées. Le 13/10, quatre jetons de taille ont été ajoutés pour que
   les composants n'aient plus de hauteur en dur : `size.control-large` (32), `size.panel-head`
   (40), `size.tabs-head` (44), `size.bar` (48).
-- **27 composants et 2 compositions**, chacun avec ses règles et un aperçu en direct : Button,
+- **41 fiches** (39 composants et 2 compositions), chacune avec ses règles et un aperçu en direct. Le 13/10 au soir, douze se sont ajoutées pour les écrans finaux (`09-ecrans.md`) : AppShell, ThreadHead, ChannelMenu, MapControls, KeyValues, Badge, Weather, Notices, ParView, SettingsPage, SignIn, PhoneShell ; avec la densité tactile et le bouton radio. Les premières : Button,
   FilterToggle, Checkbox, Tabs, SegmentedControl, SearchField, Slider ; StatusLight, Counter,
   MatchStrength, LevelMeter ; PhaseBadge, Chips ; ChannelButton, Exchange ; AircraftStrip,
   ArrivalSequence ; SummarySentence, EventList, AircraftStory ; MapLabel, ParFrame ; Panel,
@@ -63,12 +63,7 @@ changer dans `jetons.json`.
 
 ## Ce qui n'y est pas encore
 
-Tirés de l'inventaire et des esquisses, pas encore dessinés en composants :
-- le menu d'une fréquence avec son volume (la place proposée pour le volume, non validée) ;
-- la page des réglages et la page de connexion en entier (leurs pièces y sont : Checkbox, Tabs,
-  Button, SearchField) ;
-- la disposition du téléphone (un volet à la fois) ;
-- le journal des événements (la cloche) en page ;
-- les commandes de la carte (calques, fonds).
-
-Ensuite viendront les maquettes finales construites avec ces composants, puis la migration.
+Tout ce que les quatorze écrans finaux emploient y est (vérifié le 13/10 : aucune classe des écrans
+hors du système). Restent hors du système : les volets Track et Nearby de la fiche avion, dont le
+contenu ne change pas, et les fiches de balise et d'héliport, de même forme que celle d'un
+aérodrome.
