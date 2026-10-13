@@ -29,7 +29,7 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 | **Clairance** (cette session) | le produit : code, mesures, documents, coordination | paliers 0 à 5 de l'audit faits ; bulles de dernière transmission ; retours de l'inventaire design traités (palette, 51 règles orphelines) | le renommage, dès le choix du nom | — |
 | **Whisper-lab** (`~/Dev/Aero/whisper-lab`, privé) | reconnaissance : modèles, corpus, mesures, GPU | précision par niveau d'indices mesurée (borne haute) ; Kyutai écarté (28/09) | tirage au hasard de la précision quand l'annotation aura avancé (jalon du labo) | la mesure de non-régression du modèle converti, le jour du portage |
 | **ATC-scribe communauté** (`~/Dev/Aero/atc-scribe-communaute`, privé, dépôt `chatelp/atc-scribe-communaute`) | cadre légal, existant, communautés françaises, prérequis, recommandation | **étude livrée le 12/10** : `SYNTHESE.md` et fiches 01 à 05 | — (session en veille ; reprend sur question de Pierre) | la décision de Pierre sur le premier pas (consultation d'avocat) ; le P0 de la fiche 04 entre dans le jalon « installable ailleurs » |
-| **ATC-scribe design** (branche `design`, index `docs-fr/design/README.md`) | identité, nom, système de design, maquettes, plan de migration | **tout est livré sauf la marque** : inventaire (01), nom et positionnement (00), principes (02), système et 91 jetons (03, `jetons.json`), maquettes HTML, plan de migration (04, ≈ 13 j, par étapes vérifiables) | identité (marque, favicon, icône), dès le choix du nom | **les choix du propriétaire** : le nom, puis les six points du système listés ci-dessous ; après validation, la migration étape par étape avec cette session |
+| **ATC-scribe design** (branche `design`, index `docs-fr/design/README.md`) | identité, nom, système de design, maquettes, plan de migration | **tout est livré** : inventaire (01), nom (00), principes (02), système et jetons (03), maquettes, migration (04, ≈ 13 j), identité (05, le scope radar, appliquée), esquisses de la structure (07, validées, D77), **système de composants (08, `docs-fr/design/systeme/`, artefact https://claude.ai/artifact/Ut6hWDRRUcWC58HHz6UP2K)** : classes CSS `cl-` avec états pour Alpine, 95 variables de `tokens.css`, chaque fiche nommant ses données (`store.arrivals`, `plainFrench`, `events.recent`, `messages_per_second`, `match_reason`) ; la PAR n'est pas redessinée, seule sa palette de phases change | — (en veille jusqu'à la migration) | **la validation du système de composants par le propriétaire, qui ouvre la migration** étape par étape avec cette session, sous les garde-fous |
 | **Station radio** (session de la station) | la station : réception, chaîne VHF, captations | en veille ; `radio-ctl-sync` rapporte l'état au bandeau | — | prévenue à chaque bascule d'écoute |
 
 ## Les jalons
@@ -98,7 +98,10 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
    couleurs ; (3) une rampe de clarté sans teinte pour l'altitude des avions ; (4) J / K au lieu
    de Tab pour passer d'un avion à l'autre ; (5) l'interpolation des avions gardée sous
    `prefers-reduced-motion` ; (6) ~~la validation des esquisses~~ **faite le 13/10 (D77)** ; reste
-   la validation du système de composants, qui ouvre la migration.
+   **la validation du système de composants** (livré le 13/10, artefact
+   https://claude.ai/artifact/Ut6hWDRRUcWC58HHz6UP2K, fiche `08-design-system.md`), qui ouvre
+   la migration : première étape, les jetons dans `tailwind.config.js` et `style.css` à
+   comportement identique (plan `04-migration.md`).
 3. ~~Le premier pas communautaire~~ — **tranché le 13/10** avec la session communauté : pas
    d'avocat ni de démarche auprès d'une autorité ; le premier pas est l'outil strictement local
    installable ailleurs (P0), puis un corpus simulé avec consentement (voie A seule) ; les
