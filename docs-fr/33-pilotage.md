@@ -106,7 +106,7 @@ dettes de sécurité (CORS, WebSocket, rôle lecture seule, purges) ; **J** la c
 Windows ; **K** « Then » sans verdict ; **L** (ajoutée le 13/10 au soir, après D79) le bloc
 position, trajectoire, prédiction remis d'équerre : banc de rejeu synthétique avec métriques de
 mouvement, un seul prédicteur, la prédiction en direct hors de `service.go`, l'observé séparé
-du déduit dans la page, interface écrite du moteur — à métriques égales ou meilleures. Indépendantes, **G, H et I lancées par le propriétaire le 13/10 au soir** (A, B, C relancées par erreur puis arrêtées, aucune branche à intégrer) ; **G intégrée le 13/10** (route `/api/v1/vitals`, `since` de la piste, valeur et unité des consignes, version et commit du binaire) ; H et I terminées, relues vertes, à intégrer ; **L lancée par le propriétaire le 13/10 au soir** ; J et K à lancer ensuite ;
+du déduit dans la page, interface écrite du moteur — à métriques égales ou meilleures. Indépendantes, **G, H et I lancées par le propriétaire le 13/10 au soir** (A, B, C relancées par erreur puis arrêtées, aucune branche à intégrer) ; **G intégrée le 13/10** (route `/api/v1/vitals`, `since` de la piste, valeur et unité des consignes, version et commit du binaire) ; H et I terminées, relues vertes, à intégrer ; **L lancée par le propriétaire le 13/10 au soir, intégrée la nuit même** (le mouvement : vitesse dessinée qui varie de 8 à 13 % contre 38 à 48 %, plus aucun pas à reculons hors trous de réception) ; J et K à lancer ensuite ;
 chaque branche `cloud/…` revient sur le Mac pour relecture et intégration. La migration de
 l'interface, elle, reste sur le Mac.
 

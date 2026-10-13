@@ -492,6 +492,37 @@ sur la carte.
 
 ## État
 
+- 13/10 (nuit) : **fiche L intégrée** (vague 3 cloud, branche `claude/blissful-babbage-oiwjxm`,
+  quinze commits) : le bloc position, trajectoire, prédiction remis d'équerre. Banc de rejeu
+  synthétique (générateur Go à 0,6 position/s, récepteur fictif à 45,0 / 4,67, flux enregistré,
+  rejeu node à 30 i/s) avec l'erreur contre la vraie position ; un seul prédicteur côté serveur
+  (`PredictFuturePositions` retiré) ; la prédiction en direct dans `live_prediction.go` ; formes
+  des messages figées clé par clé ; `aircraft.adsb` ne porte plus que ce que la station a dit,
+  les estimations vont au moteur (`observe`, `estimate`, échantillons datés par leur source,
+  décalage d'horloge serveur/page estimé) ; trois corrections du serveur de production,
+  contribuables : la route prédite part de la route du relevé, l'état prédit suit un virage,
+  `seen_pos` compté depuis le `now` d'`aircraft.json`. Banc : erreur moyenne 181 → 38 m, pas à
+  reculons 1,3 → 0 %. **Relu et mesuré sur le Mac** : build, vet, `go test -race` (seize paquets),
+  filet vert ; aucun fichier de la migration touché, aucune valeur privée, l'enregistrement est
+  synthétique ; horloges vérifiées (station à 0,1 ms du temps de référence, Mac à 6 ms, âge du
+  fichier 0 à 1 s, médiane 0,52 s, l'hypothèse du banc). **En direct, onglet visible, même trafic,
+  deux paires de 20 s** :
+
+  | | avant (D79) | après (fiche L) |
+  |---|---|---|
+  | pas à reculons | 1,1 % / 0,7 % | 0 % / 0 % |
+  | images lentes (avions rapides) | 3,2 % / 3,3 % | 0,7 % / 0,1 % |
+  | sauts | 2,6 % / 1,2 % | 0,6 % / 0 % |
+  | variation de la vitesse dessinée | 38 % / 48 % | 13 % / 11 % |
+
+  Version intégrée (sur `local` et `migration`) : 0 % d'images lentes, 0 % de sauts, 8 % de
+  variation, **une fois passée la première minute après un redémarrage du serveur** (la passe
+  faite aussitôt montrait 76 % : le moteur estime le décalage d'horloge sur 30 s et le serveur
+  n'a pas encore d'historique). Cas limite restant : un avion qui retrouve une position après
+  un long trou de réception (AIC143, 18 s sans position, 45 NM) recule pour la rejoindre. Notés
+  par la session cloud et non traités : chaque `aircraft_update` transporte l'avion entier,
+  prévision comprise (≈ 5,8 Ko par avion et par seconde, à mesurer sur le réseau) ;
+  `aircraft-animation.js` reste à 898 lignes, loin des 300 visées côté page.
 - 13/10 (soir, tard) : **étape 5 de la migration livrée sur `migration`** (a1533b8), en relecture
   design avant le coup d'œil du propriétaire. « Right now » devient l'onglet par défaut de la
   colonne : la **phrase de synthèse** (gabarits de `www/now/right-now.js`, douze tests node : piste
