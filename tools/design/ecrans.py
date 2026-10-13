@@ -276,7 +276,7 @@ def column_traffic(with_tabs=True):
 <div class="cl-section">
 <input class="cl-input" type="search" placeholder="Callsign, registration, type" aria-label="Find an aircraft">
 <div class="cl-altrange"><div class="cl-altrange__head"><span class="cl-label">Altitude <span class="cl-age">QNH 1018</span></span><span class="cl-altrange__value">SFC – FL 195 <small>· 64 of 107</small></span></div><div class="cl-altrange__histo">{histo}</div><div class="cl-slider"><span class="cl-slider__rail"></span><span class="cl-slider__fill" style="left:0;width:56%"></span><span class="cl-slider__thumb" style="left:0"></span><span class="cl-slider__thumb" style="left:56%"></span></div><div class="cl-altrange__marks"><span>SFC</span><span>TA 5000</span><span>FL 100</span><span>FL 195</span><span>∞</span></div></div>
-<div class="cl-seg">''' + ''.join(f'<button class="cl-seg__item" aria-pressed="{str(x == "≤ FL 195").lower()}">{x}</button>' for x in ('All', '≤ 3000', '≤ TA', '≤ FL 100', '≤ FL 195', '≥ FL 195')) + f'''</div>
+<div class="cl-seg cl-seg--dense">''' + ''.join(f'<button class="cl-seg__item" aria-pressed="{str(x == "All").lower()}">{x}</button>' for x in ('All', '≤ 3000', '≤ TA', '≤ FL 100', 'FL 100–195', '≥ FL 195')) + f'''</div>
 <div class="cl-row"><button class="cl-toggle is-on">Air <span class="cl-toggle__count">107</span></button><button class="cl-toggle is-on">Ground <span class="cl-toggle__count">3</span></button><button class="cl-toggle">Heard <span class="cl-toggle__count">12</span></button></div>
 <div class="cl-row">{fam('gnd', 'Gnd', 3)}{fam('dep', 'Dep', 18)}{fam('crz', 'Crz', 61)}{fam('arr', 'Arr', 21)}{fam('unk', '?', 7, False)}</div>
 </div>
