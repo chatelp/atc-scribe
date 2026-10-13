@@ -492,6 +492,10 @@ sur la carte.
 
 ## État
 
+- 13/10 (nuit) : **étape 5 versée dans `local`** (0f846b1) après le coup d'œil du propriétaire
+  (« ok pour l'étape 5 ») : « Right now » par défaut, colonne repliable, météo et piste en service
+  sorties de la barre du bas, avec les corrections de la relecture design et la fiche L. En
+  production au prochain lancement (copie de `www/` prise par `runs/production.command`).
 - 13/10 (nuit) : **fiche L intégrée** (vague 3 cloud, branche `claude/blissful-babbage-oiwjxm`,
   quinze commits) : le bloc position, trajectoire, prédiction remis d'équerre. Banc de rejeu
   synthétique (générateur Go à 0,6 position/s, récepteur fictif à 45,0 / 4,67, flux enregistré,
