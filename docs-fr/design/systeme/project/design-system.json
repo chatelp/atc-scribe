@@ -1,0 +1,192 @@
+{
+  "v": 3,
+  "layout": "files",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-13T11:10:16Z"
+  },
+  "title": "Clairance",
+  "namespace": "Clairance",
+  "libraries": [],
+  "sections": {},
+  "groups": [
+    "Logos",
+    "Aircraft"
+  ],
+  "assetGroups": {
+    "Logos": {
+      "name": "Logos",
+      "tile": "m",
+      "order": [
+        "signe.svg",
+        "signe-16.svg",
+        "signe-actif.svg",
+        "signe-actif-16.svg",
+        "signe-clair.svg",
+        "marque.svg",
+        "marque-clair.svg",
+        "favicon.svg",
+        "favicon-actif.svg",
+        "barre-menus-marche.svg",
+        "barre-menus-arret.svg",
+        "barre-menus-ecoute.svg"
+      ],
+      "files": {
+        "signe.svg": {
+          "name": "signe.svg",
+          "blob": "de0e173aa8860f192605fa533f2e6743",
+          "size": 694,
+          "type": "image/svg+xml"
+        },
+        "signe-16.svg": {
+          "name": "signe-16.svg",
+          "blob": "59473ab65b7e55fa4d9ed7722d702ed0",
+          "size": 537,
+          "type": "image/svg+xml"
+        },
+        "signe-actif.svg": {
+          "name": "signe-actif.svg",
+          "blob": "951c54ba57f8fed00e6a267988fa7666",
+          "size": 731,
+          "type": "image/svg+xml"
+        },
+        "signe-actif-16.svg": {
+          "name": "signe-actif-16.svg",
+          "blob": "166c8c24c49e3d4e310499e6f10893d4",
+          "size": 607,
+          "type": "image/svg+xml"
+        },
+        "signe-clair.svg": {
+          "name": "signe-clair.svg",
+          "blob": "e87388720682f77f4f5718d064c71a07",
+          "size": 657,
+          "type": "image/svg+xml"
+        },
+        "marque.svg": {
+          "name": "marque.svg",
+          "blob": "efdf3e5e28a726957b53fe13567683a9",
+          "size": 892,
+          "type": "image/svg+xml"
+        },
+        "marque-clair.svg": {
+          "name": "marque-clair.svg",
+          "blob": "2850edf21bcf86ecf64c6d545fc336bd",
+          "size": 896,
+          "type": "image/svg+xml"
+        },
+        "favicon.svg": {
+          "name": "favicon.svg",
+          "blob": "554fbf9c98c84d29c9a5fa3ceedcf68d",
+          "size": 592,
+          "type": "image/svg+xml"
+        },
+        "favicon-actif.svg": {
+          "name": "favicon-actif.svg",
+          "blob": "b0355149a0ebcf1a3f404e0eeb3655e2",
+          "size": 679,
+          "type": "image/svg+xml"
+        },
+        "barre-menus-marche.svg": {
+          "name": "barre-menus-marche.svg",
+          "blob": "21b636fd0c98901e4f61d430db98d0ad",
+          "size": 562,
+          "type": "image/svg+xml"
+        },
+        "barre-menus-arret.svg": {
+          "name": "barre-menus-arret.svg",
+          "blob": "3f267d4af7a169e71630f0c9ee545cd2",
+          "size": 377,
+          "type": "image/svg+xml"
+        },
+        "barre-menus-ecoute.svg": {
+          "name": "barre-menus-ecoute.svg",
+          "blob": "6ad923a9f385fa4ccc0a2dbbcad7f7be",
+          "size": 649,
+          "type": "image/svg+xml"
+        }
+      }
+    },
+    "Aircraft": {
+      "name": "Aircraft",
+      "tile": "s",
+      "order": [
+        "leger.svg",
+        "turboprop.svg",
+        "affaires.svg",
+        "bireacteur.svg",
+        "gros.svg",
+        "quadri.svg",
+        "helico.svg",
+        "planeur.svg",
+        "inconnu.svg"
+      ],
+      "files": {
+        "leger.svg": {
+          "name": "leger.svg",
+          "blob": "d55b9cfcf1c2bac55e67232f725a3b3e",
+          "size": 871,
+          "type": "image/svg+xml"
+        },
+        "turboprop.svg": {
+          "name": "turboprop.svg",
+          "blob": "744c630b742850d1aa4d4ded561446d1",
+          "size": 1392,
+          "type": "image/svg+xml"
+        },
+        "affaires.svg": {
+          "name": "affaires.svg",
+          "blob": "12436af0caf703efb51969c1144e12a9",
+          "size": 1065,
+          "type": "image/svg+xml"
+        },
+        "bireacteur.svg": {
+          "name": "bireacteur.svg",
+          "blob": "334cad217bc070b3519e19bae2f8b796",
+          "size": 1075,
+          "type": "image/svg+xml"
+        },
+        "gros.svg": {
+          "name": "gros.svg",
+          "blob": "755ec0abd94a3d80a0d02952f812a190",
+          "size": 1118,
+          "type": "image/svg+xml"
+        },
+        "quadri.svg": {
+          "name": "quadri.svg",
+          "blob": "22867fe793a756faa777b4c6f492f22e",
+          "size": 1549,
+          "type": "image/svg+xml"
+        },
+        "helico.svg": {
+          "name": "helico.svg",
+          "blob": "81e7f7d2ab130b42ab007335be289437",
+          "size": 899,
+          "type": "image/svg+xml"
+        },
+        "planeur.svg": {
+          "name": "planeur.svg",
+          "blob": "4f1547f9e3bb589c61af4684bfd5752c",
+          "size": 675,
+          "type": "image/svg+xml"
+        },
+        "inconnu.svg": {
+          "name": "inconnu.svg",
+          "blob": "bae3875a94643c114a414e7499847631",
+          "size": 372,
+          "type": "image/svg+xml"
+        }
+      }
+    }
+  },
+  "blobs": {},
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "lastChange": {
+    "by": "Pierre",
+    "at": "2026-10-13T11:10:16Z",
+    "via": "Claude Code",
+    "note": "First system: tokens from jetons.json, 27 components and 2 column patterns from 03-systeme.md and the validated sketches, the sign and the aircraft family."
+  }
+}

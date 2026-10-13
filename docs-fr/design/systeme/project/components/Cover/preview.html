@@ -1,0 +1,43 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Clairance — cover</title>
+<style>
+html, body { margin: 0; background: var(--color-surface-page); }
+.cover { position: relative; width: 960px; height: 288px; overflow: hidden; background: var(--color-surface-page); }
+.cover svg { position: absolute; inset: 0; }
+.acc { fill: var(--color-accent-default); }
+.arr { fill: var(--color-phase-arrival); }
+.dep { fill: var(--color-phase-departure); }
+.sel { fill: var(--color-surface-selected); }
+.tile { rx: var(--radius-md); }
+.ring { fill: none; stroke: var(--color-surface-page); stroke-width: var(--border-width-strong); }
+.blip { fill: var(--color-text-primary); }
+.name { position: absolute; left: 40px; bottom: 64px; margin: 0; max-width: 440px; font: var(--font-weight-strong) 76px / 0.95 var(--font-family-mono); color: var(--color-text-primary); }
+.tag { position: absolute; left: 40px; bottom: 36px; margin: 0; max-width: 440px; font: var(--font-weight-regular) 13px / 18px var(--font-family-text); color: var(--color-text-secondary); }
+</style></head>
+<body>
+<div class="cover">
+  <svg width="960" height="288" viewBox="0 0 960 288" aria-hidden="true">
+    <!-- blocks: accent 320x288 (space-8 x 10 by x 9), selected 160x96, phase-arrival 160x128, phase-departure 96x64; all on a space-8 grid, corners radius-md
+         arrangement: one tall slab bleeding off the top and right, satellites stepping down to its left
+         pattern: a literal motif, the radar scope of the sign -> range arcs: four rings at space-8 x 2, 4, 6, 8 from the slab's corner, cut out in surface-page at border-width-strong, and one blip
+         steps and radii: space-8 (32 px) for every side and offset, radius-md on tiles, radius-full on the blip -->
+    <defs><clipPath id="slab"><rect x="640" y="-8" width="328" height="304"/></clipPath></defs>
+    <rect class="sel tile" x="480" y="64" width="160" height="96"/>
+    <rect class="arr tile" x="512" y="160" width="128" height="128"/>
+    <rect class="dep tile" x="544" y="96" width="96" height="64"/>
+    <rect class="acc" x="640" y="-8" width="328" height="304"/>
+    <g clip-path="url(#slab)">
+      <circle class="ring" cx="960" cy="288" r="64"/>
+      <circle class="ring" cx="960" cy="288" r="128"/>
+      <circle class="ring" cx="960" cy="288" r="192"/>
+      <circle class="ring" cx="960" cy="288" r="256"/>
+      <circle class="blip" cx="792" cy="112" r="8"/>
+    </g>
+  </svg>
+  <p class="name">Clairance</p>
+  <p class="tag">Hear the airband, read it, see who is speaking.</p>
+</div>
+</body>
+</html>

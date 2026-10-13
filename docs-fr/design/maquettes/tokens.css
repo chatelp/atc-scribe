@@ -91,4 +91,8 @@
     --size-row-touch: 56px;
     --size-control-desk: 24px;
     --size-control-touch: 44px;
+    --size-control-large: 32px;
+    --size-panel-head: 40px;
+    --size-tabs-head: 44px;
+    --size-bar: 48px;
 }

@@ -1,0 +1,110 @@
+/* Clairance — generated from tokens.json */
+:root, [data-theme="dark"] {
+  --color-surface-map: #000000;
+  --color-surface-page: #0a0a0a;
+  --color-surface-panel: #1a1a1a;
+  --color-surface-raised: #222222;
+  --color-surface-hover: #2a2a2a;
+  --color-surface-selected: #163020;
+  --color-surface-urgent: #2b1214;
+  --color-surface-warn: #2e2410;
+  --color-text-primary: #e0e0e0;
+  --color-text-secondary: #b8b8b8;
+  --color-text-tertiary: #949494;
+  --color-text-disabled: #6b6b6b;
+  --color-text-on-accent: #06140a;
+  --color-text-on-urgent: #ffffff;
+  --color-text-on-warn: #0a0a0a;
+  --color-border-subtle: #262626;
+  --color-border-default: #333333;
+  --color-border-control: #787878;
+  --color-border-focus: #4caf50;
+  --color-accent-default: #4caf50;
+  --color-accent-strong: #66c56a;
+  --color-accent-fill: #4caf50;
+  --color-status-urgent: #ff6e6e;
+  --color-status-urgent-fill: #b3262f;
+  --color-status-warn: #f5b83d;
+  --color-status-info: #6cb6ff;
+  --color-status-ok: #4caf50;
+  --color-status-unknown: #949494;
+  --color-phase-ground: #dccb9e;
+  --color-phase-departure: #ec8b34;
+  --color-phase-cruise: #b8d3f2;
+  --color-phase-arrival: #4c9ce8;
+  --color-phase-unknown: #969696;
+  --color-altitude-dark-very-low: #f5f5f5;
+  --color-altitude-dark-low: #cfcfcf;
+  --color-altitude-dark-mid: #a8a8a8;
+  --color-altitude-dark-high: #858585;
+  --color-altitude-dark-cruise: #6b6b6b;
+  --color-altitude-light-very-low: #141414;
+  --color-altitude-light-low: #333333;
+  --color-altitude-light-mid: #4d4d4d;
+  --color-altitude-light-high: #666666;
+  --color-altitude-light-cruise: #808080;
+  --color-scrim: #000000b3;
+  --shadow-overlay: 0 4px 16px #00000099;
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-0-5: 2px;
+  --space-1-5: 6px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+  --font-size-caption: 11px;
+  --font-size-small: 12px;
+  --font-size-body: 14px;
+  --font-size-title: 16px;
+  --font-size-display: 20px;
+  --font-line-height-caption: 14px;
+  --font-line-height-small: 16px;
+  --font-line-height-body: 20px;
+  --font-line-height-title: 22px;
+  --font-line-height-display: 26px;
+  --font-weight-regular: 400;
+  --font-weight-strong: 600;
+  --font-tracking-label: 0.04em;
+  --border-width-default: 1px;
+  --border-width-strong: 2px;
+  --z-map-overlay: 10;
+  --z-panel: 20;
+  --z-radio-bar: 30;
+  --z-popover: 40;
+  --z-page: 50;
+  --z-toast: 60;
+  --z-sign-in: 70;
+  --size-target-desk: 24px;
+  --size-target-touch: 44px;
+  --size-row-desk: 44px;
+  --size-row-touch: 56px;
+  --size-control-desk: 24px;
+  --size-control-touch: 44px;
+  --size-control-large: 32px;
+  --size-panel-head: 40px;
+  --size-tabs-head: 44px;
+  --size-bar: 48px;
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 200ms;
+  --motion-duration-alert-pulse: 1000ms;
+  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --font-family-text: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.text-label { font-family: var(--font-family-text); font-size: 11px; line-height: 14px; font-weight: 400; letter-spacing: 0.04em; }
+.text-small { font-family: var(--font-family-text); font-size: 12px; line-height: 16px; font-weight: 400; }
+.text-body { font-family: var(--font-family-text); font-size: 14px; line-height: 20px; font-weight: 400; }
+.text-title { font-family: var(--font-family-text); font-size: 16px; line-height: 22px; font-weight: 600; }
+.text-display { font-family: var(--font-family-text); font-size: 20px; line-height: 26px; font-weight: 600; }
+.mono-caption { font-family: var(--font-family-mono); font-size: 11px; line-height: 14px; font-weight: 400; }
+.mono-small { font-family: var(--font-family-mono); font-size: 12px; line-height: 16px; font-weight: 400; }
+.mono-body { font-family: var(--font-family-mono); font-size: 14px; line-height: 20px; font-weight: 400; }
+.mono-callsign { font-family: var(--font-family-mono); font-size: 14px; line-height: 20px; font-weight: 600; }
+.mono-display { font-family: var(--font-family-mono); font-size: 20px; line-height: 26px; font-weight: 600; }

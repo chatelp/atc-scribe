@@ -155,7 +155,11 @@
     "target-touch": { "$value": "44px", "$description": "Minimal side of a touch target on the phone." },
     "row-desk": { "$value": "44px", "$description": "Aircraft row in the list, desk: two lines (body 20 + caption 14) and 2 x 4 px padding, plus 2 px gap. Today about 50 px (12/10 captures)." },
     "row-touch": { "$value": "56px", "$description": "Aircraft row in the list, phone: the whole row is the target." },
-    "control-desk": { "$value": "24px" },
-    "control-touch": { "$value": "44px" }
+    "control-desk": { "$value": "24px", "$description": "Height of a button, toggle or segment on the desk." },
+    "control-touch": { "$value": "44px", "$description": "Height of a control on the phone." },
+    "control-large": { "$value": "32px", "$description": "A control that carries two texts: the search field, a channel button." },
+    "panel-head": { "$value": "40px", "$description": "Header of a panel (title and quiet actions)." },
+    "tabs-head": { "$value": "44px", "$description": "Header of the context column: its two tabs and the fold button." },
+    "bar": { "$value": "48px", "$description": "The top bar: the sign, what is on air, the lights, the clock." }
   }
 }

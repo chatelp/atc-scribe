@@ -20,12 +20,14 @@ atc-scribe (`04-migration.md`).
 | `05-identite.md`, `identite/` | la marque Clairance : signe, nom, favicon, barre de menus, connexion, README (`identite/index.html` pour la planche) | fait, nom décidé le 13/10 |
 | `06-avions.md`, `avions/` | l'inventaire des avions dessinés dans l'outil, et notre famille de neuf silhouettes (`tools/design/avions.mjs`) | fait |
 | `07-esquisses.md` | le fil au centre : A et sa colonne à deux onglets, B replié, suivre un vol ; d'où vient chaque donnée | esquisses validées le 13/10 (A, B replié, C) |
+| `08-design-system.md`, `systeme/` | le design system Clairance : livre de marque, 95 jetons, 27 composants et 2 compositions en classes CSS `cl-`, le signe et les avions ; publié comme artefact, source dans `systeme/project/` | fait le 13/10 |
 
 Outils, dans `tools/design/` :
 
 ```bash
 node tools/design/inventory.mjs > docs-fr/design/01-inventaire-brut.md   # l'inventaire
 node tools/design/tokens.mjs                                              # vérifier les jetons, écrire tokens.css
+node tools/design/ds-export.mjs                                           # les jetons du design system (systeme/project/)
 ```
 
 `contrast-probe.js` se colle dans la console d'une page (l'instance d'essai ou une maquette)

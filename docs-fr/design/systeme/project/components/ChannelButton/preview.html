@@ -1,0 +1,17 @@
+<!-- @dsCard group="Radio" height=112 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>ChannelButton — preview</title>
+<style>html, body { margin: 0; background: var(--color-surface-page); }</style></head>
+<body>
+<div class="cl-root" style="padding: 16px;">
+<div style="display:flex;gap:6px;flex-wrap:wrap;max-width:620px">
+  <button class="cl-channel is-on" aria-pressed="true"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2 6h3l4-3v10L5 10H2z"/><path fill="none" stroke="currentColor" stroke-width="1.5" d="M11 5.5a3.5 3.5 0 0 1 0 5"/></svg><span class="cl-channel__freq">124.350</span> Approche De Gaulle<span class="cl-channel__age">8 s ago</span></button>
+  <button class="cl-channel" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2 6h3l4-3v10L5 10H2z"/><path fill="none" stroke="currentColor" stroke-width="1.5" d="m11 6 4 4m0-4-4 4"/></svg><span class="cl-channel__freq">126.425</span> De Gaulle App. (L)<span class="cl-channel__age">1 min ago</span></button>
+  <span class="cl-channel is-off-air" title="Known frequency, not received by the station now"><span class="cl-channel__freq">120.650</span> Tour · not on air</span>
+  <button class="cl-channel is-connecting"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2 6h3l4-3v10L5 10H2z"/><path fill="none" stroke="currentColor" stroke-width="1.5" d="m11 6 4 4m0-4-4 4"/></svg><span class="cl-channel__freq">119.250</span> Orly App.<span class="cl-channel__status">connecting…</span></button>
+  <button class="cl-channel is-failed"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2 6h3l4-3v10L5 10H2z"/><path fill="none" stroke="currentColor" stroke-width="1.5" d="m11 6 4 4m0-4-4 4"/></svg><span class="cl-channel__freq">118.700</span> Toussus<span class="cl-channel__status">■ failed, retry</span></button>
+</div>
+</div>
+</body>
+</html>
