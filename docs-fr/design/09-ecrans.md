@@ -28,7 +28,7 @@ migration : chaque étape livrée se compare à eux.*
 | `a-journal` | le journal (la cloche) : ses six sortes d'événements et ses sons |
 | `par` | la vue PAR existante, son en-tête et sa séquence, à la place du ciel |
 | `reglages` | la page des réglages par-dessus l'écran |
-| `connexion`, `premier-lancement` | la connexion ; la question du premier lancement |
+| `connexion`, `premier-lancement` | la connexion, « le ciel » : la page est le scope du signe, le nom en grand, la console de la station, le formulaire au centre ; la question du premier lancement dans le même cadre |
 | `etats` | rien à l'antenne, connexion perdue, « cliquez pour reprendre l'écoute » |
 | `telephone` | trois volets du téléphone, barre d'onglets en bas, tailles tactiles |
 
@@ -82,6 +82,20 @@ Présentées une à une, avant / après sur les écrans réels ; toutes retenues
    autres) devient « Then » et dit ce que l'avion a fait (« level at 4000 ft »), sans
    qualifier l'écart. C'est le principe « constater, ne pas juger » appliqué à une fonction qui
    existe ; le propriétaire a confirmé qu'il s'applique ici.
+
+## La page de connexion (13/10, le soir)
+
+À la demande du propriétaire (« pas une bête fenêtre de login, la présence de marque doit être
+assurée, et quelques infos geek avant même d'être loggé »), trois directions ont été dessinées
+(`connexion/`, `tools/design/connexion.py`) : A le scope, B un échange, C le ciel. **Il a retenu
+C** : la page entière est le scope du signe (anneaux, balayage figé, lueur, un plot, quelques
+silhouettes de notre famille), le nom en grand, la console de la station en haut à droite, le
+formulaire au centre. **Et les constantes agrégées avant la connexion** : avions suivis, messages
+par seconde, portée maximale, canaux à l'antenne, transmissions du jour, modèle de transcription,
+taux d'appariement, aérodromes et pistes, temps de fonctionnement, version ; jamais une position,
+un indicatif ni une fréquence nommée. La page n'existe qu'en mode « réseau avec mot de passe » :
+ces chiffres sont vus de tout appareil du réseau ou du VPN, d'où une route publique qui ne sert
+qu'eux, et un réglage pour couper la console.
 
 ## Ce qui n'est pas dessiné
 

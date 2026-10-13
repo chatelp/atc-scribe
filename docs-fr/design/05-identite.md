@@ -126,8 +126,9 @@ la barre sombre et l'état pressé. Elles remplacent `dot.radiowaves.left.and.ri
   barre d'état (esquisses A, B, C). Au téléphone, le signe seul.
 - **L'onglet** : favicon et `<title>Clairance</title>`, plus un manifeste d'application avec
   `theme-color` `#0a0a0a`, pour que le téléphone l'ajoute à son écran d'accueil.
-- **La connexion** : la marque en tête de la carte, puis « Sign in » et la promesse en une
-  phrase (`maquettes/connexion.html`).
+- **La connexion** : « le ciel », retenu le 13/10 : la page entière est le scope du signe, le nom
+  en grand (56 px), la console de la station, le formulaire au centre (`ecrans/connexion.html`,
+  `09-ecrans.md`).
 - **Le bandeau de reprise** : le signe tient lieu de voyant devant « click anywhere to resume
   listening ».
 - **Le README** : `<picture>` qui sert `signe.svg` ou `signe-clair.svg` selon le thème, le nom en

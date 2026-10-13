@@ -17,7 +17,7 @@ README : c'est ce que lira la session qui migre `www/`.*
   rayons, ombre, tailles, plans, durées. Le 13/10, quatre jetons de taille ont été ajoutés pour que
   les composants n'aient plus de hauteur en dur : `size.control-large` (32), `size.panel-head`
   (40), `size.tabs-head` (44), `size.bar` (48).
-- **41 fiches** (39 composants et 2 compositions), chacune avec ses règles et un aperçu en direct. Le 13/10 au soir, douze se sont ajoutées pour les écrans finaux (`09-ecrans.md`) : AppShell, ThreadHead, ChannelMenu, MapControls, KeyValues, Badge, Weather, Notices, ParView, SettingsPage, SignIn, PhoneShell ; avec la densité tactile et le bouton radio. Les premières : Button,
+- **42 fiches** (40 composants et 2 compositions), chacune avec ses règles et un aperçu en direct. Le 13/10 au soir, douze se sont ajoutées pour les écrans finaux (`09-ecrans.md`) : AppShell, ThreadHead, ChannelMenu, MapControls, KeyValues, Badge, Weather, Notices, ParView, SettingsPage, SignIn, PhoneShell ; avec la densité tactile et le bouton radio. Les premières : Button,
   FilterToggle, Checkbox, Tabs, SegmentedControl, SearchField, Slider ; StatusLight, Counter,
   MatchStrength, LevelMeter ; PhaseBadge, Chips ; ChannelButton, Exchange ; AircraftStrip,
   ArrivalSequence ; SummarySentence, EventList, AircraftStory ; MapLabel, ParFrame ; Panel,

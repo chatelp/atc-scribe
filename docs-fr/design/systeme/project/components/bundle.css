@@ -485,3 +485,28 @@
 }
 /* MapLabel's optional third line: the last transmission heard, quoted, for ten minutes */
 .cl-maplabel__said { font-family: var(--font-family-text); color: var(--color-text-secondary); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; }
+
+/* ------------------------------------------------------------ SignIn, the sky (chosen 13/10): the page is the sign's scope */
+.cl-signin--sky { position: relative; display: block; height: 100%; overflow: hidden; background: var(--color-surface-map); }
+.cl-signin__scope { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cl-signin__brand { position: absolute; left: var(--space-8); top: var(--space-8); display: flex; align-items: center; gap: var(--space-4); font: var(--font-weight-strong) 56px / 1 var(--font-family-mono); letter-spacing: -0.02em; color: var(--color-text-primary); }
+.cl-signin__brand svg { width: 64px; height: 64px; }
+.cl-signin--sky .cl-signin__card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 400px; padding: var(--space-8); gap: var(--space-6); background: color-mix(in srgb, var(--color-surface-panel) 92%, transparent); box-shadow: var(--shadow-overlay); }
+.cl-signin__title { margin: 0; font-size: var(--font-size-title); line-height: var(--font-line-height-title); font-weight: var(--font-weight-strong); }
+.cl-signin__console { position: absolute; right: var(--space-8); top: var(--space-8); width: 420px; padding: var(--space-4); background: color-mix(in srgb, var(--color-surface-page) 88%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); }
+.cl-signin__foot { position: absolute; left: 0; right: 0; bottom: var(--space-6); text-align: center; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); color: var(--color-text-tertiary); }
+@media (max-width: 767px) {
+    .cl-signin__brand { left: var(--space-4); top: var(--space-4); font-size: 32px; gap: var(--space-2); }
+    .cl-signin__brand svg { width: 36px; height: 36px; }
+    .cl-signin--sky .cl-signin__card { width: calc(100% - 2 * var(--space-4)); padding: var(--space-6) var(--space-4); }
+    .cl-signin__console { position: static; width: auto; margin: 0 var(--space-4); }
+}
+
+/* ------------------------------------------------------------ StationVitals: the station's console, aggregated figures only */
+.cl-vitals { display: flex; flex-direction: column; gap: var(--space-2); }
+.cl-vitals__head { display: flex; justify-content: space-between; align-items: baseline; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: var(--font-tracking-label); }
+.cl-vitals__list { display: grid; grid-template-columns: max-content 1fr; gap: 6px var(--space-4); margin: 0; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); }
+.cl-vitals__list dt { color: var(--color-text-tertiary); }
+.cl-vitals__list dd { margin: 0; color: var(--color-text-primary); display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.cl-vitals__list dd span { color: var(--color-text-tertiary); }
+.cl-vitals__ok { width: 8px; height: 8px; border-radius: 50%; background: var(--color-status-ok); display: inline-block; }

@@ -463,23 +463,48 @@ def settings():
 SIGN_64 = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26.5" fill="none" stroke="#e0e0e0" stroke-width="4"/><circle cx="32" cy="32" r="13" fill="none" stroke="#e0e0e0" stroke-width="2" opacity="0.55"/><path d="M32 32 L32 6 A26 26 0 0 1 50.385 13.615 Z" fill="#4caf50" fill-opacity="0.35"/><path d="M32 32 L50.385 13.615" fill="none" stroke="#4caf50" stroke-width="4" stroke-linecap="round"/><circle cx="39.18" cy="16.59" r="3.8" fill="#4caf50"/></svg>'
 
 
+import importlib.util as _ilu
+_cspec = _ilu.spec_from_file_location('connexion', os.path.join(os.path.dirname(__file__), 'connexion.py'))
+_conn = _ilu.module_from_spec(_cspec); _cspec.loader.exec_module(_conn)
+
+
+def vitals():
+    """StationVitals: aggregated figures only; served before sign-in by a public route (≈ 1 h server)."""
+    ok = '<i class="cl-vitals__ok"></i>'
+    return f'''<div class="cl-vitals"><div class="cl-vitals__head"><span>This station, live</span><span>refreshed every 10 s</span></div>
+<dl class="cl-vitals__list">
+  <dt>ads-b</dt><dd>{ok}107 aircraft <span>·</span> 702 msg/s <span>·</span> farthest 182 NM</dd>
+  <dt>airband</dt><dd>{ok}2 channels on air <span>·</span> 412 transmissions today</dd>
+  <dt>speech</dt><dd>{ok}whisper large-v3 <span>·</span> GPU <span>·</span> 1.4 s a transmission</dd>
+  <dt>matched</dt><dd>31 % of transmissions to an aircraft today</dd>
+  <dt>runways</dt><dd>3 airports followed <span>·</span> 4 runways in use</dd>
+  <dt>up</dt><dd>6 d 14 h <span>·</span> Clairance 2026.10 <span>·</span> a7489d5</dd>
+</dl></div>'''
+
+
 def signin(first_run=False):
     if first_run:
-        body = '''<span class="cl-plain">First start. Who may open Clairance?</span>
+        body = '''<h1 class="cl-signin__title">Welcome</h1>
+<span class="cl-plain">First start. Who may open Clairance?</span>
 <label class="cl-check cl-check--radio is-on"><span class="cl-check__box"></span>Only this machine, no password</label>
 <label class="cl-check cl-check--radio"><span class="cl-check__box"></span>Any device on my network, with a password</label>
 <span class="cl-plain">You can change this later in Settings › Account.</span>
 <button class="cl-btn cl-btn--primary">Continue</button>'''
     else:
-        body = '''<label class="cl-signin__field"><span class="cl-label">User</span><input class="cl-input" autocomplete="username"></label>
+        body = '''<h1 class="cl-signin__title">Sign in</h1>
+<label class="cl-signin__field"><span class="cl-label">User</span><input class="cl-input" autocomplete="username"></label>
 <label class="cl-signin__field"><span class="cl-label">Password</span><input class="cl-input" type="password" autocomplete="current-password"></label>
 <button class="cl-btn cl-btn--primary">Sign in</button>
 <span class="cl-plain">After 8 failed tries, wait 15 minutes.</span>'''
-    return f'''<div class="cl-signin"><div class="cl-signin__card">
-<span class="cl-signin__mark">{SIGN_64}Clairance</span>
-<span class="cl-plain">Hear the airband you receive, read it in English and French, and see which aircraft is speaking.</span>
+    return f'''<div class="cl-signin cl-signin--sky">
+{_conn.scope_svg('cl-signin__scope')}
+<div class="cl-signin__brand">{SIGN_64}Clairance</div>
+<div class="cl-signin__console">{vitals()}</div>
+<div class="cl-signin__card"><span class="cl-plain">Hear the airband you receive, read it in English and French, and see which aircraft is speaking.</span>
 {body}
-</div></div>'''
+</div>
+<div class="cl-signin__foot">Runs on your own machine: nothing leaves it. Made for the listener; it judges no one.</div>
+</div>'''
 
 
 # ---------------------------------------------------------------- phone
@@ -556,7 +581,7 @@ if __name__ == '__main__':
         ('a-journal.html', 'A · Event log', 'The bell: emergencies, go-arounds, runway changes, aircraft of interest, the station; its sounds.', 1440, 900),
         ('par.html', 'The PAR view', 'The existing PAR, with its header and arrival sequence, in the sky\'s place.', 1440, 900),
         ('reglages.html', 'Settings', 'A page over the screen: Listening, Callsign matching, Display, Account, System (shown whole, as if scrolled).', 1440, 1500),
-        ('connexion.html', 'Sign in', 'The mark, one sentence, two fields.', 1440, 900),
+        ('connexion.html', 'Sign in', "The sky: the page is the sign's scope; the station's console; the form at the centre.", 1440, 900),
         ('premier-lancement.html', 'First run', 'Who may open Clairance: this machine, or the network with a password.', 1440, 900),
         ('etats.html', 'States', 'Nothing on air, connection lost, click to resume listening.', 1440, 900),
         ('telephone.html', 'Phone', 'One pane at a time: Radio, Sky, Traffic, Right now; touch sizes.', 1300, 900),
