@@ -303,6 +303,15 @@ cp configs/config.toml.example configs/config.toml
 go build -o bin/co-atc ./cmd/server
 ```
 
+To have the settings panel and the sign-in page say which build is running,
+give the binary its version and commit when building; without them it says
+`dev` and `unknown`:
+
+```bash
+go build -ldflags "-X main.version=$(git describe --tags --always) -X main.commit=$(git rev-parse --short HEAD)" \
+  -o bin/co-atc ./cmd/server
+```
+
 > The binary is still called `co-atc`, and the Go module path is still upstream's.
 > Both are deliberate: on macOS the Local Network permission is granted **per
 > executable**, so renaming the binary means re-granting it — and a permission that

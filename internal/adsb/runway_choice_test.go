@@ -1,8 +1,11 @@
 package adsb
 
 import (
+	"encoding/json"
 	"math"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/pkg/logger"
@@ -138,5 +141,60 @@ func TestRunwaysTwelveDegreesApartStaySeparate(t *testing.T) {
 	}
 	if rt.IsActiveRunway("06-24/24") {
 		t.Error("Orly 24 is 12 degrees from 25: not a parallel")
+	}
+}
+
+// The sign-in page counts runways, not runway ends: De Gaulle landing on 09L
+// uses its four runways, Orly on 25 one, and nothing is counted before the
+// first evidence.
+func TestRunwaysInUseCountsRunwaysNotEnds(t *testing.T) {
+	cdg := newChoiceTracker(t, cdgRunways())
+	if n := cdg.RunwaysInUse(); n != 0 {
+		t.Errorf("before any evidence: %d runways, want 0", n)
+	}
+	cdg.RecordEvent("09L-27R/09L", RunwayEventApproach, "abc123")
+	if n := cdg.RunwaysInUse(); n != 4 {
+		t.Errorf("De Gaulle on 09L: %d runways, want 4 (its parallels)", n)
+	}
+	orly := newChoiceTracker(t, orlyRunways())
+	orly.RecordEvent("07-25/25", RunwayEventApproach, "abc123")
+	orly.RecordEvent("07-25/07", RunwayEventClimb, "def456")
+	if n := orly.RunwaysInUse(); n != 1 {
+		t.Errorf("Orly on 25 and 07: %d runways, want 1 (both ends of one runway)", n)
+	}
+}
+
+// "Since when" the runway in use: unknown for the first runway detected, then
+// the moment of the event that made it change, on every score of the airport;
+// forgotten when the airport's evidence is.
+func TestTheRunwayInUseSaysSinceWhen(t *testing.T) {
+	rt := newChoiceTracker(t, orlyRunways())
+	rt.RecordEvent("07-25/07", RunwayEventApproach, "first")
+	if scores := rt.GetTopScores(3); len(scores) != 1 || scores[0].Since != nil {
+		t.Fatalf("the first runway detected: %+v, want no since", scores)
+	}
+
+	before := time.Now()
+	rt.RecordEvent("07-25/25", RunwayEventLanding, "second") // weighs 3 against 2: 25 takes over
+	after := time.Now()
+	scores := rt.GetTopScores(3)
+	if len(scores) != 2 || scores[0].RunwayEnd != "07-25/25" {
+		t.Fatalf("after a landing on 25: %+v, want 25 first", scores)
+	}
+	for _, s := range scores {
+		if s.Since == nil || s.Since.Before(before) || s.Since.After(after) {
+			t.Errorf("%s: since %v, want the moment of the landing on 25, between %v and %v",
+				s.RunwayEnd, s.Since, before, after)
+		}
+	}
+	b, err := json.Marshal(scores[0])
+	if err != nil || !strings.Contains(string(b), `"since":"`+scores[0].Since.Format(time.RFC3339Nano)+`"`) {
+		t.Errorf("served as %s (%v), want since in RFC 3339", b, err)
+	}
+
+	rt.Reset()
+	rt.RecordEvent("07-25/07", RunwayEventApproach, "third")
+	if scores := rt.GetTopScores(3); scores[0].Since != nil {
+		t.Errorf("after a reset: since %v, want none", scores[0].Since)
 	}
 }

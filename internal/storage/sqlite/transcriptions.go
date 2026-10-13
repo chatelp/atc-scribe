@@ -54,6 +54,8 @@ type PlainInstruction struct {
 	Role   string `json:"role"`
 	Text   string `json:"text"`
 	TextFR string `json:"text_fr,omitempty"` // the same in plain French (13/10)
+	Value  string `json:"value,omitempty"`   // as said: "100", "4000", "119.255", "27R"
+	Unit   string `json:"unit,omitempty"`    // "FL", "ft", "deg", "kt", "MHz", "hPa", "code", "runway"; empty for a clearance
 }
 
 // TranscriptionStorage handles storage of transcription records
@@ -270,6 +272,19 @@ func (s *TranscriptionStorage) GetTranscriptions(limit, offset int) ([]*Transcri
 	defer rows.Close()
 
 	return readTranscriptions(rows)
+}
+
+// CountTransmissions counts the transmissions of the open daily database and
+// those tied to an aircraft, in one query: the file rotates at midnight, so
+// these are today's. NULLIF rather than a comparison with the empty string:
+// COUNT counts every non-NULL value, and the comparison is 0, not NULL, for an
+// empty callsign.
+func (s *TranscriptionStorage) CountTransmissions() (total, matched int, err error) {
+	err = s.db.QueryRow(`SELECT COUNT(*), COUNT(NULLIF(callsign, '')) FROM transcriptions`).Scan(&total, &matched)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to count transcriptions: %w", err)
+	}
+	return total, matched, nil
 }
 
 // GetTranscriptionByID returns one transmission, or nil when there is none.

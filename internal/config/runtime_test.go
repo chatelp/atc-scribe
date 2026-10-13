@@ -309,3 +309,29 @@ func TestSectorSizesChangeWithinBoundsAndPersist(t *testing.T) {
 		t.Error("editing a copy must not change the rules in force")
 	}
 }
+
+// The sign-in page's figures are on until turned off; off is kept across a
+// restart; a file saved before the setting existed means on.
+func TestTheVitalsSettingIsOnByDefaultAndKept(t *testing.T) {
+	dir := t.TempDir()
+	r := newRuntimeIn(t, dir)
+	if !r.VitalsEnabled() || r.Settings().Vitals == nil || !r.Settings().Vitals.Enabled {
+		t.Fatal("the vitals should be on by default")
+	}
+	next := r.Settings()
+	next.Vitals = &VitalsSettings{Enabled: false}
+	if err := r.Apply(next); err != nil {
+		t.Fatal(err)
+	}
+	if newRuntimeIn(t, dir).VitalsEnabled() {
+		t.Error("turned off, the vitals came back on after a restart")
+	}
+
+	old := t.TempDir()
+	if err := os.WriteFile(filepath.Join(old, RuntimeSettingsFile), []byte(`{"db_retention_gb":30,"log_level":"info"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !newRuntimeIn(t, old).VitalsEnabled() {
+		t.Error("a file saved before the setting existed turned the vitals off")
+	}
+}

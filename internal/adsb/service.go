@@ -781,6 +781,15 @@ func (s *Service) GetRunwayInUseScoresFor(airport string, n int) []RunwayScore {
 	return nil
 }
 
+// RunwaysInUse counts the runways in use at every followed airport, as the
+// runway-in-use trackers judge them.
+func (s *Service) RunwaysInUse() int {
+	if s.trajectoryTracker != nil {
+		return s.trajectoryTracker.RunwaysInUse()
+	}
+	return 0
+}
+
 // phaseAirport is the followed airport a phase of this aircraft belongs to: the
 // one it is judged against, for the phases that are about an airport. Cruise
 // and the rest belong to none, and so does a takeoff or landing away from the

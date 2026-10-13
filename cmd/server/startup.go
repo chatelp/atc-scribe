@@ -348,5 +348,6 @@ func buildRouter(cfg *config.Config, adsbService *adsb.Service, frequenciesServi
 	// Create API router
 	router := api.NewRouter(adsbService, frequenciesService, weatherService, refService, cfg, log, wsServer, store.transcriptions, store.clearances)
 	router.Handler().AttachRuntime(runtimeSettings, store.aircraft.GetDB(), sttSidecar)
+	router.Handler().SetBuild(version, commit)
 	return router
 }
