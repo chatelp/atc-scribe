@@ -107,11 +107,12 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
    d'avocat ni de démarche auprès d'une autorité ; le premier pas est l'outil strictement local
    installable ailleurs (P0), puis un corpus simulé avec consentement (voie A seule) ; les
    voies sur du réel sont fermées. Reste à décider plus tard : le pilote de corpus simulé.
-4. **Demander à GitHub la purge des anciens objets** (après D75, faite le 12/10 : position
-   arrondie, adresses génériques, historique réécrit et poussé de force sur les quatre
-   branches, sauvegarde `~/Dev/Aero/atc-scribe-sauvegarde-2026-10-12.git`) : les commits
-   d'avant restent servis par GitHub par leur identifiant jusqu'à une demande au support, que
-   seul le propriétaire peut faire (texte fourni le 12/10). À vérifier aussi : le réglage de
+4. **Demander à GitHub la purge des anciens objets** (D75, deux réécritures : le 12/10 pour la
+   position et les adresses, le 13/10 au soir pour les captures de la carte réelle entrées par
+   la fusion du design ; sauvegardes `atc-scribe-sauvegarde-2026-10-12.git` et `-13.git`) :
+   les commits d'avant restent servis par GitHub par leur identifiant jusqu'à une demande au
+   support, que seul le propriétaire peut faire (texte fourni le 12/10, identifiants à citer :
+   `d0b14c3`, `cdbf843`, `a892d77`, `1febe52`, `e786aeb`, `bde4b04`). À vérifier aussi : le réglage de
    précision de la carte de couverture sur FlightAware (« My ADS-B »).
 5. Le moment du **portage** (cible fixée, calendrier non).
 6. Le **tirage au hasard** de la précision d'appariement (jalon du labo, lié à l'annotation).

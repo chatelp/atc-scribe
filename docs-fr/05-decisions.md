@@ -4936,15 +4936,18 @@ de commits cités dans les documents d'avant le 12/10 ne correspondent plus : il
 sont pas réécrits. Coût mesuré : ni fork ni étoile sur le dépôt, 483 commits, aucune copie
 connue ailleurs.
 
-> **Exception décidée par le propriétaire le 13/10** : les six captures « avant » de la carte
-> réelle (anneaux de distance centrés sur la station, à côté d'une piste dessinée : un pixel vaut
-> 60 m à 1 440 px) sont tenues hors de l'arbre publié de `main` (versement du 13/10,
-> `runs/design/captures/` sur le Mac), mais **restent dans l'historique public** de la branche
-> `design` et de l'étiquette `design-reference-2026-10-13` (commits du 12 et 13/10), et donc
-> dans l'historique de `main` qui les a fusionnés. La session design a proposé de supprimer la
-> branche et l'étiquette et de les recréer sur un commit propre ; réponse du propriétaire :
-> « Non, laisser en l'état ». Règle pour la suite : toute capture de l'instance d'essai va dans
-> `runs/design/captures/`, jamais dans le dépôt.
+> **Seconde réécriture, le 13/10 au soir, pour les captures de la carte réelle.** Six captures
+> « avant » (anneaux de distance centrés sur la station, à côté d'une piste dessinée : un pixel
+> vaut 60 m à 1 440 px) étaient entrées dans l'historique public par la branche `design`, son
+> étiquette et leur fusion dans `main` ; l'arbre publié les excluait, l'historique les gardait.
+> Le propriétaire avait d'abord dit « laisser en l'état », puis, la fusion faite et le constat
+> précisé, a décidé la réécriture (confirmée à cette session). Faite : `filter-repo` retire le
+> seul chemin `docs-fr/design/captures` de tous les commits ; l'arbre final est identique à
+> l'octet près ; `main` poussé de force (188f21c), la branche `design` et l'étiquette supprimées
+> sur GitHub, l'étiquette recréée sur la fusion réécrite (e578081) ; sauvegarde d'avant
+> `~/Dev/Aero/atc-scribe-sauvegarde-2026-10-13.git`. Les anciens identifiants restent servis par
+> GitHub jusqu'à la purge par son support, à demander par le propriétaire. Règle pour la suite :
+> toute capture de l'instance d'essai va dans `runs/design/captures/`, jamais dans le dépôt.
 
 ### D74 — Le nom « atc-scribe » est abandonné ; le nouveau nom est **Clairance** *(12/10, choisi le 13/10)*
 
