@@ -299,37 +299,21 @@
         return BRIGHT_MAP_STYLES.includes((store?.settings?.mapStyle || 'none').toLowerCase());
     }
 
-    // The altitude of an aircraft on the map is a ramp of lightness without hue
-    // (design system, migration step 2): the lower, the lighter on a dark map,
-    // the darker on a bright one; the label carries the phase's colour. The
-    // values are the tokens color.altitude.dark-* and light-* (www/tokens.css),
-    // read once from the page, the same hex as fallbacks for a canvas.
-    const ALTITUDE_RAMP = {
-        dark: { 'very-low': '#f5f5f5', low: '#cfcfcf', mid: '#a8a8a8', high: '#858585', cruise: '#6b6b6b' },
-        light: { 'very-low': '#141414', low: '#333333', mid: '#4d4d4d', high: '#666666', cruise: '#808080' },
+    // The altitude of an aircraft on the map, by hue, as before the migration.
+    // The design system's ramp of lightness without hue (tokens
+    // color.altitude.*) was tried at step 2 on 13/10 and refused by the owner
+    // at a glance: the five greys could not be told apart. Kept here until the
+    // design session proposes a measured alternative (09-ecrans.md records
+    // the deliberate departure).
+    const ALTITUDE_PALETTE = {
+        dark: { 'very-low': '#D35A48', low: '#EA8A4A', mid: '#F4B55A', high: '#F8D857', cruise: '#E8ECEF' },
+        light: { 'very-low': '#B91C1C', low: '#C2410C', mid: '#B45309', high: '#0E7490', cruise: '#1D4ED8' },
     };
-    let altitudeRampCache = null;
-
-    function altitudeRamp() {
-        if (altitudeRampCache) return altitudeRampCache;
-        const ramp = { dark: { ...ALTITUDE_RAMP.dark }, light: { ...ALTITUDE_RAMP.light } };
-        if (typeof document !== 'undefined' && document.documentElement) {
-            const cs = getComputedStyle(document.documentElement);
-            for (const theme of ['dark', 'light']) {
-                for (const band of Object.keys(ramp[theme])) {
-                    const v = cs.getPropertyValue(`--color-altitude-${theme}-${band}`).trim();
-                    if (v) ramp[theme][band] = v;
-                }
-            }
-        }
-        altitudeRampCache = ramp;
-        return ramp;
-    }
 
     function getAltitudeBandColor(aircraft, store) {
         const band = getAltitudeColorBand(aircraft, store);
-        const ramp = altitudeRamp()[isBrightMapStyle(store) ? 'light' : 'dark'];
-        return ramp[band] || ramp.cruise;
+        const palette = ALTITUDE_PALETTE[isBrightMapStyle(store) ? 'light' : 'dark'];
+        return palette[band] || palette.cruise;
     }
 
     // The text colours of the design system (color.text.primary / tertiary),
