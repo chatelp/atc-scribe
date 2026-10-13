@@ -337,6 +337,14 @@
     const TEXT_COLORS = { primary: '#e0e0e0', secondary: '#b8b8b8', tertiary: '#949494' };
     let textColorCache = null;
 
+    function accentColor() {
+        if (typeof document !== 'undefined' && document.documentElement) {
+            const v = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-default').trim();
+            if (v) return v;
+        }
+        return '#4CAF50';
+    }
+
     function labelTextColor(level) {
         if (!textColorCache) {
             textColorCache = { ...TEXT_COLORS };
@@ -689,7 +697,9 @@
                     symbol: {
                         symbolType: 'circle',
                         size: 12,
-                        color: '#4CAF50',
+                        // The accent token (the tool's own green), read from the
+                        // page; the WebGLPoints path itself is judged at step 13.
+                        color: accentColor(),
                         rotateWithView: false,
                         rotation: 0,
                         opacity: 1,
