@@ -502,7 +502,14 @@ sur la carte.
   Après : 3,3 % de recul, 3,2 km en 15 s. Garde-fou 4 tenu (mesure avant/après sur le même
   trafic). Second chantier mesuré au passage, antérieur à la migration : la liste Trafic
   reconstruit ses lignes chaque seconde (14 000 mutations DOM en 10 s, ~100 ms de blocage par
-  seconde, moteur à 21 images/s) — à traiter à l'étape 5.
+  seconde, moteur à 21 images/s) — à traiter à l'étape 5. Dans la foulée, deux leçons de
+  l'instance d'essai : (1) le propriétaire veut **toute instance d'essai sans page de
+  connexion** (accès local dans `runs/son-test/users.json`, serveur lié à 127.0.0.1) ; (2) le
+  serveur répondait « non modifié » d'après la **date** du fichier, et mes bascules de `www/`
+  entre branches avaient laissé Chrome avec un mélange de versions (« Connection lost ») :
+  l'ETag est désormais l'empreinte du contenu, sans Last-Modified (commit autonome,
+  contribuable, test). Et ne jamais recopier un binaire par-dessus un fichier existant : sur
+  Apple Silicon le noyau le tue au lancement (statut 137) ; supprimer puis reconstruire.
 - 13/10 (soir) : **fiche G intégrée** (vague 3 cloud, branche
   `cloud/g-chiffres-avant-connexion`, six commits, 1 229 lignes dont 540 de tests) : la route
   publique `GET /api/v1/vitals` (agrégats seulement, cache de 10 s sous mutex, coupable par
