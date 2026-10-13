@@ -229,8 +229,8 @@ cryptique qu'atc-scribe ». Deux leçons : un mot de la fréquence elle-même, e
 - **Lecture.** Pour un logiciel libre qui ne vend rien, rien ne bloque l'usage du mot. Si un dépôt
   de marque était voulu un jour (cl. 9 et 42), « éclairance » serait l'antériorité à faire examiner
   par un conseil.
-- **Forme.** Marque « Clairance », dépôt `chatelp/clairance`, signe : une piste et une coche,
-  « autorisé ». Positionnement générique (§ 2) : page GitHub en anglais, README français complet à
+- **Forme.** Marque « Clairance », dépôt `chatelp/clairance`, signe : le scope radar (R1), choisi
+  le même jour après la piste et l'avion (`05-identite.md`). Positionnement générique (§ 2) : page GitHub en anglais, README français complet à
   égalité, le français comme capacité.
 
 **Ma recommandation : Clairance.** Sérieux, aviation sans détour, compréhensible du premier coup,

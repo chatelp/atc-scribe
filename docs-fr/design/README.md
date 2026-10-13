@@ -15,7 +15,7 @@ atc-scribe (`04-migration.md`).
 | `jetons.json` | les 91 jetons, source unique des valeurs | fait |
 | `03-systeme-verif.md` | chaque contraste et chaque distance pour les daltoniens, produit par `tools/design/tokens.mjs` | régénérable |
 | `maquettes/` | écrans en HTML statique sur les jetons (`index.html` pour commencer) | fait |
-| `captures/` | l'interface « avant », 12/10 | référence |
+| `captures/` | l'interface « avant », 12/10 ; la PAR reprise le 13/10 (la première capture avait figé ses cadres à 480 px) | référence |
 | `04-migration.md` | le plan par étapes, vérifiables, avec l'effort (≈ 13 j) | fait |
 | `05-identite.md`, `identite/` | la marque Clairance : signe, nom, favicon, barre de menus, connexion, README (`identite/index.html` pour la planche) | fait, nom décidé le 13/10 |
 | `06-avions.md`, `avions/` | l'inventaire des avions dessinés dans l'outil, et notre famille de neuf silhouettes (`tools/design/avions.mjs`) | fait |

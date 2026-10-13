@@ -35,6 +35,16 @@ du bas de la première esquisse B est abandonnée. Ce partage A/B est la proposi
 revenir à l'onglet d'où l'on vient ; le fil se restreint à ses échanges sur toutes les fréquences.
 Le principe est à valider par le propriétaire.
 
+**La PAR existe et ne se redessine pas.** Son approche, sous la carte de C, est le cadre de la vue
+PAR (`www/par/par-view.js`) réduit à la piste où il atterrit : échelle d'altitude en racine
+carrée, couche de transition, cônes de 7° et 15°, plan de 3° et ses marges de 0,7°, bande
+d'azimut, triangle plein quand le juge de piste l'a rattaché à cette piste, trace de l'avion
+suivi en blanc. L'esquisse est générée avec les mêmes formules (remarque du propriétaire, 13/10).
+De même, la séquence de « Right now » est le tableau « Arrivals to 26L » de la PAR, sorti de la
+PAR : distance au seuil, heure, écart avec le précédent, ambre sous 3 NM. Le design system
+reprendra ces deux composants tels qu'ils sont ; seule leur palette de phases passera aux cinq
+familles (`04-migration.md`).
+
 ## D'où viennent les données
 
 Vérifié dans le code par la session atc-scribe le 13/10. **D** disponible, **P** calculable dans
@@ -48,7 +58,7 @@ la page, **S** travail serveur, **X** pas aujourd'hui.
 | D | compteurs en vol, au sol, entendus | filtres du store, `voiceAircraftCount` |
 | P | phrase de synthèse | gabarits, rien de génératif ; **elle dit qu'elle vient de l'ADS-B** |
 | D | antenne : à l'antenne, choisi où, depuis quand | `/api/v1/status` → `antenna` |
-| S | messages ADS-B par seconde | non exposé (≈ 2 h serveur) : **retiré des esquisses** |
+| D | messages ADS-B par seconde | non exposé lors de la réponse, puis **ajouté le 13/10 à 12 h 47** (`131ba7b`, `messages_per_second` dans `/api/v1/status`) : déjà dans la barre d'état de l'outil (« 84 · 703/s ») |
 | P | explication en français sous l'échange | un gabarit par rôle de consigne de `Plain`, page ou `explain.go` (≈ ½ j) ; la tour n'est nommée que si sa fréquence est connue (`/frequencies`) |
 | P | « someone is speaking » | niveau audio de chaque fréquence, avec un seuil ; **« transcription dans 2 s » : X, retiré** |
 | P | avion suivi : première détection, transferts, écart au plan de 3°, toucher estimé | `created_at` du serveur ; le reste dans la page, même déplacement que la séquence |
@@ -62,7 +72,7 @@ la séquence d'arrivée, et le seul choix à faire est la survie de « Worth kno
 - « ✓ readback » remplacé par « ↩ pilot replied, 4 s later » : constater, jamais juger (rien de
   type SLASH) ;
 - pas de bouton pour changer l'antenne depuis la page : « chosen at the station » ;
-- « transcription in 2 s » et « 41 msg/s » retirés (X et S ci-dessus) ;
+- « transcription in 2 s » retiré (X ci-dessus) ; le débit ADS-B garde le format de l'outil (« 107 · 700/s ») ;
 - la phrase de synthèse porte « Read from the ADS-B tracks, not announced by the controllers » ;
 - le signe de l'en-tête est l'état « à l'écoute » (R2) dès qu'une fréquence joue (`05-identite.md`).
 
@@ -70,5 +80,8 @@ la séquence d'arrivée, et le seul choix à faire est la survie de « Worth kno
 
 - valider le principe de « Suivre un vol » (C) ;
 - choisir la survie de « Worth knowing » : `localStorage` (proposé, rien au serveur) ou une route ;
+- signaler à la session atc-scribe que le cadre PAR prend sa largeur une fois par seconde : rendu
+  au moment où le conteneur est encore masqué, ou onglet en arrière-plan (minuteries ralenties),
+  il reste à 480 px ; un `ResizeObserver` le corrigerait (petit, non urgent) ;
 - puis construire le design system (composants du canevas : échange, bande d'avion, voyant,
   bascule, onglets, carte) et refaire les maquettes à partir de lui.
