@@ -40,8 +40,6 @@ class AircraftAnimationEngine {
             mergeDurationMs: 450,
             minCorrectionDurationMs: 180,
             maxCorrectionDurationMs: 2500,
-            realCorrectionThresholdNm: 0.016,
-            predictedCorrectionThresholdNm: 0.004,
             headingSmoothingAlpha: 0.22,
             viewportCulling: true,
             adaptivePerformance: true,
@@ -220,11 +218,13 @@ class AircraftAnimationEngine {
 
         if (previousReal) {
             if (previousRendered) {
+                // Every gap fades, however small: below a threshold (30 m for
+                // a real sample, 7 m for a predicted one, before) the aircraft
+                // jumped to the sample in one frame, backwards as often as
+                // forwards (replay bench: 0.83 % of the steps backwards, 0.03 %
+                // without the thresholds).
                 const distanceNm = this._distanceNm(previousRendered.lat, previousRendered.lon, effectiveSnapshot.lat, effectiveSnapshot.lon);
-                const correctionThresholdNm = snapshot.source === 'predicted'
-                    ? this.config.predictedCorrectionThresholdNm
-                    : this.config.realCorrectionThresholdNm;
-                if (distanceNm > correctionThresholdNm) {
+                if (distanceNm > 0) {
                     // The gap closes at no more than half the aircraft's own
                     // speed at the peak of the ease (1.5 times the mean rate):
                     // closing 150 m in 450 ms made a 205 m/s aircraft sprint at
