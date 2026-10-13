@@ -58,6 +58,10 @@ type TrajectoryPrediction struct {
 	Forecast       []PredictionPoint // Future predictions (nearest first, after latest obs)
 	HindcastLocked bool              // Once locked, don't recompute
 	ComputedAt     time.Time
+
+	// start is where the forecast starts, for the live prediction to follow
+	// the model between its points; nil when there is no forecast.
+	start *forecastStart
 }
 
 // ─── Hindcast (backward extrapolation) ──────────────────────────────────────
@@ -208,14 +212,53 @@ func computeForecast(at *AircraftTrajectory, derived *DerivedState) {
 	// Starting state from DerivedState (smoothed) + latest position. The
 	// forecast starts where and when the position was decoded, not at the
 	// poll that repeated it: the live prediction interpolates from that fix.
-	pred.Forecast = forecastPoints(forecastStart{
+	st := forecastStart{
 		lat: latest.Lat, lon: latest.Lon, alt: derived.AltMean,
-		speed: derived.GroundSpeedKts, heading: derived.TrackDeg,
+		speed: derived.GroundSpeedKts, heading: forecastHeading(latest, derived),
 		gsAccel: derived.GSAccelKtsPerSec, trackRate: derived.TrackRateDegPerSec,
 		altRate: derived.AltTrendFPM / 60.0, // fpm to ft/sec
 		at:      latest.PositionTime(),
-	})
+	}
+	pred.Forecast = forecastPoints(st)
+	pred.start = &st
 	pred.ComputedAt = latest.PositionTime()
+}
+
+// forecastHeading is the track the forecast starts on: the latest fix's.
+// The mean track of the short window (DerivedState.TrackDeg, ten seconds)
+// lags a turn by half the window: 15 deg at 3 deg/s, and the live prediction
+// drew a turning aircraft inside and behind its turn (replay bench).
+func forecastHeading(latest *TrajectorySnapshot, derived *DerivedState) float64 {
+	if latest.Track != 0 {
+		return latest.Track
+	}
+	return derived.TrackDeg
+}
+
+// position is where the forecast's model puts the aircraft sec seconds after
+// its start, and its track and speed there: the same kinematics as
+// forecastPoints, integrated in steps of at most half a second, so that a
+// turn is followed along its arc, not along the chord between two points.
+func (st forecastStart) position(sec float64) (lat, lon, heading, speed float64) {
+	lat, lon = st.lat, st.lon
+	speedAt := func(t float64) float64 {
+		v := st.speed + st.gsAccel*t
+		maxSpeed := math.Max(st.speed*2.0, 100)
+		return math.Max(0, math.Min(v, maxSpeed))
+	}
+	const maxStep = 0.5
+	for t := 0.0; t < sec; {
+		dt := math.Min(maxStep, sec-t)
+		avgSpeed := (speedAt(t) + speedAt(t+dt)) / 2
+		avgHeadingRad := (st.heading + st.trackRate*(t+dt/2)) * math.Pi / 180
+		distKm := avgSpeed * kmPerNM / 3600.0 * dt
+		cosLat := math.Max(0.01, math.Cos(lat*math.Pi/180))
+		lat += distKm * math.Cos(avgHeadingRad) * degPerKmLat
+		lon += distKm * math.Sin(avgHeadingRad) * degPerKmLat / cosLat
+		t += dt
+	}
+	heading = math.Mod(st.heading+st.trackRate*sec+360*10, 360)
+	return lat, lon, heading, speedAt(sec)
 }
 
 // ForecastFromTarget is the forecast of an aircraft the trajectory tracker

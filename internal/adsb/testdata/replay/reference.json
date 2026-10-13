@@ -1,19 +1,19 @@
 {
   "steps": 81000,
-  "backwardsPct": 0.04,
-  "slowPct": 1.39,
-  "jumpsPct": 0.45,
-  "speedStdPct": 29.89,
+  "backwardsPct": 0,
+  "slowPct": 1.36,
+  "jumpsPct": 0.41,
+  "speedStdPct": 29.55,
   "maxCorrectionM": 3254,
-  "meanErrorM": 108.4,
-  "p95ErrorM": 124.7,
+  "meanErrorM": 106.5,
+  "p95ErrorM": 124.9,
   "byKind": {
     "climb": [
-      76.4,
+      76.9,
       0,
       0,
       0,
-      7.9
+      8
     ],
     "cruise": [
       115.3,
@@ -23,39 +23,39 @@
       7.6
     ],
     "descent": [
-      60.2,
+      59.8,
       0,
       0,
       0,
-      9
+      9.1
     ],
     "gap": [
-      201.1,
+      201.9,
       0,
       5.5,
       1.6,
-      55.9
+      55.6
     ],
     "slow": [
-      30,
+      29.7,
       0,
       0,
       0,
-      12.9
+      13
     ],
     "slowdown": [
-      38.4,
+      38.2,
       0,
       0,
       0,
-      11.1
+      11.2
     ],
     "turn": [
-      87.5,
-      0.2,
+      79.1,
+      0,
+      0,
       0.1,
-      0.3,
-      16.1
+      14.7
     ]
   }
 }

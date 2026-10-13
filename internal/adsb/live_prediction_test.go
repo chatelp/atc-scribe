@@ -155,3 +155,69 @@ func TestLivePredictionTrackIsNotTheHeading(t *testing.T) {
 		}
 	}
 }
+
+// turningTrack feeds twenty seconds of a constant turn, one fix a second,
+// and returns the last fix.
+func turningTrack(tt *TrajectoryTracker, hex string, base time.Time, rateDps float64) TrajectorySnapshot {
+	const gs = 250.0
+	lat, lon, track := 48.5, 2.0, 0.0
+	var last TrajectorySnapshot
+	for i := 0; i < 20; i++ {
+		ts := base.Add(time.Duration(i) * time.Second)
+		last = TrajectorySnapshot{Timestamp: ts, PosTimestamp: ts, Lat: lat, Lon: lon,
+			AltBaro: 8000, GS: gs, TAS: gs, Track: track, Valid: true}
+		tt.Ingest(hex, last)
+		v := gs * 0.514444
+		rad := (track + rateDps/2) * math.Pi / 180
+		lat += v * math.Cos(rad) / 111320
+		lon += v * math.Sin(rad) / (111320 * math.Cos(lat*math.Pi/180))
+		track = math.Mod(track+rateDps+360, 360)
+	}
+	tt.EnsureDerived(hex)
+	return last
+}
+
+// In a turn the forecast starts on the fix's track, not on the mean track of
+// the last ten seconds, which lags half the window behind.
+func TestForecastStartsOnTheFixTrack(t *testing.T) {
+	tt := newTestTracker(t, PhaseReference{Lat: receiverLat, Lon: receiverLon, Runways: testRunways()})
+	last := turningTrack(tt, "abc125", time.Now().UTC().Add(-30*time.Second), 3)
+	f := tt.GetForecast("abc125")
+	if len(f) == 0 {
+		t.Fatal("no forecast")
+	}
+	// Five seconds on at 3 deg/s: 15 deg past the fix's track.
+	if got, want := f[0].Heading, math.Mod(last.Track+15, 360); math.Abs(circularDiff(got, want)) > 2 {
+		t.Errorf("first forecast point on track %.1f, want %.1f (the fix's %.1f, turned 5 s)", got, want, last.Track)
+	}
+}
+
+// In a turn the live prediction follows the arc, not the chord to the first
+// forecast point five seconds on.
+func TestLivePredictionFollowsTheTurn(t *testing.T) {
+	tt := newTestTracker(t, PhaseReference{Lat: receiverLat, Lon: receiverLon, Runways: testRunways()})
+	const rate, gs = 3.0, 250.0
+	base := time.Now().UTC().Add(-30 * time.Second)
+	last := turningTrack(tt, "abc126", base, rate)
+	// The true path on from the last fix, 2.5 s later.
+	lat, lon, track := last.Lat, last.Lon, last.Track
+	for i := 0; i < 250; i++ {
+		v := gs * 0.514444 * 0.01
+		rad := track * math.Pi / 180
+		lat += v * math.Cos(rad) / 111320
+		lon += v * math.Sin(rad) / (111320 * math.Cos(lat*math.Pi/180))
+		track += rate * 0.01
+	}
+	at := last.PositionTime().Add(2500 * time.Millisecond)
+	for _, p := range tt.GetLivePredictionsAt(at) {
+		if p.Hex != "abc126" {
+			continue
+		}
+		off := Haversine(p.Lat, p.Lon, lat, lon)
+		if off > 6 {
+			t.Errorf("2.5 s into the turn the prediction is %.1f m off the arc, want under 6 m", off)
+		}
+		return
+	}
+	t.Fatal("no live prediction in the turn")
+}

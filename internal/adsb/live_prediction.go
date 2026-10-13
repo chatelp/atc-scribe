@@ -146,6 +146,15 @@ func (tt *TrajectoryTracker) GetLivePredictionsAt(t time.Time) []LivePrediction 
 		if !ok {
 			continue
 		}
+		// The position, track and speed from the model itself at t, along the
+		// arc of a turn; the interpolation between points, a chord, cut
+		// inside it (21 m at 3 deg/s over the first five seconds). The
+		// altitude and the confidence stay interpolated.
+		if st := at.Prediction.start; st != nil {
+			if sec := t.Sub(st.at).Seconds(); sec >= 0 {
+				p.Lat, p.Lon, p.Heading, p.Speed = st.position(sec)
+			}
+		}
 
 		p.Hex = hex
 		p.BaseObserved = latest.Timestamp
