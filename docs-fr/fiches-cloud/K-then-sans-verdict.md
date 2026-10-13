@@ -31,7 +31,7 @@ then(instruction, track, options) -> { text, at, kind }   ou null
 Ce qu'il rend, en anglais, une phrase courte et factuelle, et `kind` ∈ `level`, `heading`,
 `speed`, `frequency`, `runway`, `clearance` :
 
-- niveau : « level at 4 000 ft, 2 min later », « descending through 5 200 ft » (encore en
+- niveau : « level at 4 000 ft, 2 min later », « descending through 5 200 ft » (encore en
   route à la fin de la fenêtre), « at FL 110, 6 min later » (aucun mouvement : le même fait,
   sans attente) ;
 - cap : « turned to 270° », « heading 254°, still turning » ;
@@ -48,7 +48,7 @@ sur chaque sortie possible : c'est le principe « constater, ne pas juger » (D7
 propriétaire a confirmé.
 
 **Format des nombres**, celui du système de design (`docs-fr/design/systeme/project/README.md`,
-Content › Numbers) : milliers séparés par une **espace fine insécable U+202F** (« 4 000 ft »,
+Content › Numbers) : milliers séparés par une **espace fine insécable U+202F** (« 4 000 ft »,
 jamais « 4,000 ft »), niveau de vol avec une espace (« FL 110 », jamais « FL110 »), et une
 virgule avant le délai (« , 2 min later »). Un test vérifie le format de chaque phrase.
 
