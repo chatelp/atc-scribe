@@ -16,7 +16,7 @@ atc-scribe (`04-migration.md`).
 | `03-systeme-verif.md` | chaque contraste et chaque distance pour les daltoniens, produit par `tools/design/tokens.mjs` | régénérable |
 | `maquettes/` | écrans en HTML statique sur les jetons (`index.html` pour commencer) | fait |
 | `captures/` | l'interface « avant », 12/10 ; la PAR reprise le 13/10 (la première capture avait figé ses cadres à 480 px) | référence |
-| `04-migration.md` | le plan de migration vers les écrans validés : 14 étapes vérifiables, leurs écrans de référence et leurs mesures (≈ 17 j) | réécrit le 13/10 |
+| `04-migration.md` | le plan de migration vers les écrans validés : 14 étapes vérifiables, leurs écrans de référence et leurs mesures (≈ 17 j) | réécrit et validé le 13/10 |
 | `05-identite.md`, `identite/` | la marque Clairance : signe, nom, favicon, barre de menus, connexion, README (`identite/index.html` pour la planche) | fait, nom décidé le 13/10 |
 | `06-avions.md`, `avions/` | l'inventaire des avions dessinés dans l'outil, et notre famille de neuf silhouettes (`tools/design/avions.mjs`) | fait |
 | `07-esquisses.md` | le fil au centre : A et sa colonne à deux onglets, B replié, suivre un vol ; d'où vient chaque donnée | esquisses validées le 13/10 (A, B replié, C) |

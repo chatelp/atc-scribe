@@ -1,6 +1,7 @@
 # Plan de migration — des écrans validés à l'interface vivante
 
-*Réécrit le 13/10/2026 par la session design, après la validation des écrans finaux (D77, D78). Il
+*Réécrit le 13/10/2026 par la session design, après la validation des écrans finaux (D77, D78) ;
+**validé par le propriétaire le 13/10**, après la relecture côté code de la session atc-scribe. Il
 remplace le plan du 12/10, qui gardait la disposition : ses étapes de fond (jetons, couleurs,
 phases, police) restent, mais s'appliquent maintenant aux composants de la nouvelle structure au
 lieu de retoucher ceux qui vont disparaître. La migration se fait par la session atc-scribe, sous
