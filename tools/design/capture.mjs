@@ -12,6 +12,7 @@
 // --setup runs once the page has loaded, then the page is reloaded (to set
 // localStorage keys such as columnFolded before the app reads them);
 // --after runs after the wait, then a second short wait (to click a tab);
+// what it returns is printed as JSON;
 // --probe runs tools/design/contrast-probe.js and prints its summary as JSON;
 // --profile keeps the browser profile in DIR (default: a fresh one, removed).
 // Captures of the test instance go to runs/design/captures/, never into the
@@ -87,7 +88,8 @@ try {
     }
     await sleep(wait);
     if (after) {
-        await evaluate(after);
+        const said = await evaluate(after);
+        if (said !== undefined) console.log(JSON.stringify(said, null, 1));
         await sleep(Math.min(wait, 3000));
     }
     if (probe) {
