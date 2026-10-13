@@ -10,6 +10,15 @@
 // tokens.css declares the same variables as the mock-ups and, later, www/.
 // Edit jetons.json, run tokens.mjs (checks) then this script; never edit the
 // output by hand.
+//
+//   node tools/design/ds-export.mjs --www [dir]     also copy the system into www/
+//   node tools/design/ds-export.mjs --check [dir]   only check the copies (exit 1 if they differ)
+//
+// The interface gets two copies, written here and nowhere else (04-migration.md,
+// rule 1): <dir>/tokens.css from systeme/project/tokens.css, and
+// <dir>/components.css from systeme/project/components/bundle.css, each under a
+// first line that says where to change it. --check is for tools/www-check: it
+// regenerates nothing and fails when a copy was edited or is out of date.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -123,9 +132,14 @@ for (const [fam, v] of Object.entries(ds)) {
     }
 }
 
-fs.mkdirSync(path.dirname(out), { recursive: true });
-fs.writeFileSync(out, JSON.stringify(ds, null, 2) + '\n');
-console.log(`${path.relative(root, out)}: ${names.size} tokens, ${ds.type.groups.reduce((n, g) => n + g.styles.length, 0)} type styles`);
+// --check compares the copies with the sources as they stand: it writes nothing
+const args = process.argv.slice(2);
+const checkOnly = args[0] === '--check';
+if (!checkOnly) {
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, JSON.stringify(ds, null, 2) + '\n');
+    console.log(`${path.relative(root, out)}: ${names.size} tokens, ${ds.type.groups.reduce((n, g) => n + g.styles.length, 0)} type styles`);
+}
 
 // The artifact compiles tokens.css itself when someone saves on its page; until
 // then the previews need one. Same layout as the page writes (format.md), and
@@ -145,5 +159,33 @@ const css = [
     '}',
     ...ds.type.groups.flatMap((g) => g.styles.map((s) => `.${s.name} { font-family: var(--font-${s.family || g.family}); font-size: ${s.fontSize}; line-height: ${s.lineHeight}; font-weight: ${s.fontWeight};${s.letterSpacing ? ` letter-spacing: ${s.letterSpacing};` : ''} }`)),
 ].join('\n') + '\n';
-fs.writeFileSync(cssOut, css);
-console.log(`${path.relative(root, cssOut)} written`);
+if (!checkOnly) {
+    fs.writeFileSync(cssOut, css);
+    console.log(`${path.relative(root, cssOut)} written`);
+}
+
+// ---------------------------------------------------------------- copies for www/
+if (args[0] === '--www' || checkOnly) {
+    const dir = path.resolve(root, args[1] || 'www');
+    const copies = [
+        ['tokens.css', path.join(path.dirname(out), 'tokens.css')],
+        ['components.css', path.join(path.dirname(out), 'components', 'bundle.css')],
+    ];
+    let bad = 0;
+    for (const [name, from] of copies) {
+        const head = `/* Copied from ${path.relative(root, from)} by tools/design/ds-export.mjs --www. Change jetons.json or the system there, never this file. */\n`;
+        const want = head + fs.readFileSync(from, 'utf8');
+        const to = path.join(dir, name);
+        if (checkOnly) {
+            const have = fs.existsSync(to) ? fs.readFileSync(to, 'utf8') : null;
+            if (have !== want) { bad++; console.error(`${path.relative(root, to)}: ${have === null ? 'missing' : 'differs from its source'} (run ds-export.mjs --www)`); }
+        } else {
+            fs.writeFileSync(to, want);
+            console.log(`${path.relative(root, to)} written`);
+        }
+    }
+    if (checkOnly) {
+        if (bad) process.exit(1);
+        console.log(`copies of the design system in ${path.relative(root, dir) || '.'}: identical to their sources`);
+    }
+}
