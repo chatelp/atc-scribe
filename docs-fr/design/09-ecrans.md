@@ -102,7 +102,17 @@ qu'eux, et un réglage pour couper la console.
 | Date | Écart | Pourquoi | Suite |
 |---|---|---|---|
 | 13/10 | Les préréglages d'altitude de l'onglet Traffic : l'écran de référence avait remplacé, par erreur, la tranche « FL100–195 » par un plafond « ≤ FL 195 », ce qui retirait une fonction | relevé à la relecture de l'étape 4 | la tranche revient (« FL 100–195 »), dans un contrôle segmenté dense (`cl-seg--dense`) pour tenir sur une ligne ; écran `a-trafic` corrigé |
+| 13/10 | La phrase de synthèse de référence : « De Gaulle lands on 26L since 11:40 » est un calque du français ; avec « since », l'anglais veut le present perfect | relevé à la relecture de l'étape 5 (« uses runway 25 since… » sur l'instance) | « has been using runway 26L since 11:40 » ; « uses » plutôt que « lands on », le serveur ne distinguant pas arrivées et départs ; écrans et fiche `SummarySentence` corrigés |
+| 13/10 | TAF, NOTAM et METAR précédents (« Earlier », gardé de l'ancienne bulle METAR) s'ouvrent en carte dans la colonne, sous les boutons, et non en bulle flottante | étape 5 : un NOTAM est long, et rien ne flotte sur la carte | accepté ; fiche `Weather` mise à jour, bouton ouvert `aria-expanded`, dessiné sélectionné |
+| 13/10 | Un tableau d'arrivées par piste en service ayant des avions, au lieu d'un seul | étape 5 : De Gaulle, Orly et Saint-Cyr suivis ensemble | accepté : la plus proche arrivée d'abord, cinq lignes s'il est seul, trois s'il y en a plusieurs ; fiche `ArrivalSequence` |
+| 13/10 | La carte « Right now » repliée se place sous la bascule Radar / PAR, pas au bout de `cl-sky__top` | étape 5 : la bascule n'a pas encore migré | provisoire : elle rejoint `cl-sky__top` avec la bascule, à l'étape 9 (ajoutée au plan) |
 | 13/10 | L'altitude des avions sur la carte garde sa palette par teinte d'avant (fond sombre : `#D35A48`, `#EA8A4A`, `#F4B55A`, `#F8D857`, `#E8ECEF` du plus bas à la croisière ; fond clair : la série bleu / orange), au lieu de la rampe de gris du système | soirée d'écoute de l'étape 2 : « le dégradé de gris ne marche pas, trop difficile de distinguer les uns des autres » | **réglé le 13/10** : quatre palettes mesurées et dessinées sur une même scène ; le propriétaire choisit F, du chaud au froid (jaune, rose, violet, cyan, ardoise), qui tient toutes les paires sous les quatre visions sans rappeler l'urgence ni une famille de phase ; jetons `color.altitude.*` mis à jour, `03-systeme.md` § Altitude |
+
+## Demandes ouvertes
+
+| Date | Demande | Suite |
+|---|---|---|
+| 13/10 | Le propriétaire : des étiquettes d'avion allégées à faible zoom, par exemple l'indicatif seul sous un seuil (relayé par la session atc-scribe) | à mesurer avant de dessiner : nombre d'étiquettes et recouvrements par niveau de zoom, sur le ciel réel de l'instance d'essai ; puis une variante compacte de `MapLabel` et son seuil, proposés au propriétaire |
 
 ## Ce qui n'est pas dessiné
 

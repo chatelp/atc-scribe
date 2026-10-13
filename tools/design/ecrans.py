@@ -251,7 +251,7 @@ def column_now():
     return f'''<aside class="cl-app__column" aria-label="Context">
 {tabs('Right now')}
 <div class="cl-app__scroll">
-<div class="cl-section"><p class="cl-summary">De Gaulle lands on <b>26L</b> since 11:40. Three aircraft on final, next touchdown in about 2 min. Orly uses <b>06</b>.</p><p class="cl-summary__source">Read from the ADS-B tracks, not announced by the controllers.</p></div>
+<div class="cl-section"><p class="cl-summary">De Gaulle has been using runway <b>26L</b> since 11:40. Three aircraft on final, next touchdown in about 2 min. Orly uses <b>06</b>.</p><p class="cl-summary__source">Read from the ADS-B tracks, not announced by the controllers.</p></div>
 <div class="cl-section"><span class="cl-label">Arrivals to LFPG 26L</span>{SEQ}</div>
 <div class="cl-section"><span class="cl-label">Worth knowing · last 30 min</span><ul class="cl-events"><li><time>13:09</time><span><span class="is-warn">▲ Go-around</span> EZY14LM on 27R, now climbing back.</span></li><li><time>13:05</time><span>LFPG switched to landing west (26L, was 08R).</span></li></ul></div>
 <div class="cl-section"><span class="cl-label">Weather at LFPG</span><span class="cl-metar">LFPG 131300Z 25012KT 9999 FEW030 17/09 Q1018</span><span class="cl-metar__plain">Wind from the west, 12 kt; visibility over 10 km; a few clouds at 3 000 ft; QNH 1018.</span><span class="cl-row"><button class="cl-btn">TAF</button><button class="cl-btn">NOTAM <span class="cl-tabs__count">4</span></button></span></div>
@@ -552,7 +552,7 @@ if __name__ == '__main__':
     write('a-frequence.html', page('A · A frequency\'s menu', topbar() + '<div class="cl-app__main">' + thread(menu=True, newbelow=True) + sky() + column_now() + '</div>' + channel_menu()))
     card = ('<div class="cl-row"><button class="cl-btn">Traffic <span class="cl-tabs__count">110</span></button>'
             '<button class="cl-btn cl-btn--icon cl-mono" aria-label="Unfold the column">«</button></div>'
-            '<div class="cl-card cl-card--sky"><span class="cl-label">Right now</span><p class="cl-summary">De Gaulle lands on <b>26L</b>, three on final, next in about 2 min. '
+            '<div class="cl-card cl-card--sky"><span class="cl-label">Right now</span><p class="cl-summary">De Gaulle lands on <b>26L</b>, three on final, next in about 2 min. '
             '<span class="cl-warn">▲</span> A go-around at 13:09.</p><span class="cl-summary__source">From the ADS-B tracks.</span>'
             '<button class="cl-btn">Open Right now</button></div>')
     write('b-replie.html', page('B · Column folded', topbar() + '<div class="cl-app__main">' + thread(wide=True) + sky(card=card, width=800) + '</div>', folded=True))
