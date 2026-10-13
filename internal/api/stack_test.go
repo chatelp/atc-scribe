@@ -139,6 +139,7 @@ type stackOptions struct {
 	noAccount bool     // local-only, nothing to sign in as
 	tone      bool     // a configured frequency carrying audio; needs ffmpeg
 	sidecar   string   // health URL of a transcription sidecar; none when empty
+	idle      bool     // started without transcription, as main does when nothing asks for it
 }
 
 type stack struct {
@@ -240,6 +241,18 @@ func newStack(t *testing.T, o stackOptions) *stack {
 	t.Cleanup(func() { adsbSvc.Stop(); cancel() })
 
 	freqs := frequencies.NewService(cfg, log, ws, tx, clr, nil)
+	var sidecar *transcription.Sidecar
+	if o.sidecar != "" || o.idle {
+		url := o.sidecar
+		if url == "" {
+			url = "http://127.0.0.1:1"
+		}
+		sidecar = transcription.NewSidecar(transcription.SidecarConfig{ServerURL: url}, log)
+		if o.idle {
+			sidecar.Idle()
+			freqs.SetTranscriptionGate(sidecar.Ensure)
+		}
+	}
 	if o.tone {
 		if err := freqs.Start(ctx); err != nil {
 			t.Fatal(err)
@@ -263,10 +276,6 @@ func newStack(t *testing.T, o stackOptions) *stack {
 		t.Fatal(err)
 	}
 
-	var sidecar *transcription.Sidecar
-	if o.sidecar != "" {
-		sidecar = transcription.NewSidecar(transcription.SidecarConfig{ServerURL: o.sidecar}, log)
-	}
 	rt := config.NewRuntime(cfg, cfg.ConfigPath, log)
 
 	h := &Handler{
