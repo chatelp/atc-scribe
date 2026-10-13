@@ -289,8 +289,6 @@
         cacheInvalidationPending: false,
         _lastUnknownAircraftResyncAt: 0,
         _unknownAircraftResyncCooldownMs: 5000,
-        _predictedMinApplyIntervalMs: 1000,
-        _predictedMinConfidence: 0.65,
         
         // Filtering throttling state to prevent main thread blocking
         _lastFilterTime: null,
@@ -303,16 +301,8 @@
 
             if (data.aircraft) {
                 const observedAtMs = Date.parse(data.observed_at || '');
-                const payloadLastSeenMs = Date.parse(data.aircraft.last_seen || '');
-                const realObservedAt = Number.isFinite(observedAtMs)
-                    ? observedAtMs
-                    : (Number.isFinite(payloadLastSeenMs) ? payloadLastSeenMs : null);
-                if (Number.isFinite(realObservedAt)) {
-                    data.aircraft._lastRealObservedAt = realObservedAt;
-                    data.aircraft.last_seen = new Date(realObservedAt).toISOString();
-                }
-                if (data.aircraft.adsb) {
-                    data.aircraft.adsb.source = 'real';
+                if (Number.isFinite(observedAtMs)) {
+                    data.aircraft.last_seen = new Date(observedAtMs).toISOString();
                 }
 
                 // Update last update timestamp
@@ -327,7 +317,7 @@
 
                 // Update animation engine with new aircraft data
                 if (this.animationEngine) {
-                    this.animationEngine.updateAircraft(data.aircraft);
+                    this.animationEngine.updateAircraft(data.aircraft, observedAtMs);
                 }
 
                 // Queue for throttled map update (map will handle visibility based on filters)
@@ -347,9 +337,8 @@
             const hex = data.hex;
             let existing = this.aircraft[hex];
             const observedAtMs = Date.parse(data.observed_at || '');
-            const realObservedAt = Number.isFinite(observedAtMs) ? observedAtMs : null;
-            const realObservedAtIso = Number.isFinite(realObservedAt)
-                ? new Date(realObservedAt).toISOString()
+            const realObservedAtIso = Number.isFinite(observedAtMs)
+                ? new Date(observedAtMs).toISOString()
                 : null;
 
             // Update last update timestamp
@@ -363,13 +352,6 @@
                 if (!existing) {
                     this.requestInitialAircraftDataThrottled('delta_without_local_aircraft', hex);
                     return;
-                }
-
-                if (Number.isFinite(realObservedAt)) {
-                    existing._lastRealObservedAt = realObservedAt;
-                }
-                if (existing.adsb) {
-                    existing.adsb.source = 'real';
                 }
 
                 // Heal previously sparse entries (delta streams may not include all metadata fields).
@@ -389,7 +371,7 @@
 
                 // Update animation engine with delta
                 if (this.animationEngine) {
-                    this.animationEngine.updateAircraftDelta(hex, data.delta);
+                    this.animationEngine.updateAircraftDelta(hex, data.delta, observedAtMs);
                 }
 
                 // Queue map update - map will handle visibility based on filters
@@ -408,16 +390,8 @@
             }
             // Fallback: full aircraft object (backward compatibility)
             else if (data.aircraft) {
-                const payloadLastSeenMs = Date.parse(data.aircraft.last_seen || '');
-                const effectiveObservedAt = Number.isFinite(realObservedAt)
-                    ? realObservedAt
-                    : (Number.isFinite(payloadLastSeenMs) ? payloadLastSeenMs : null);
-                if (Number.isFinite(effectiveObservedAt)) {
-                    data.aircraft._lastRealObservedAt = effectiveObservedAt;
-                    data.aircraft.last_seen = new Date(effectiveObservedAt).toISOString();
-                }
-                if (data.aircraft.adsb) {
-                    data.aircraft.adsb.source = 'real';
+                if (realObservedAtIso) {
+                    data.aircraft.last_seen = realObservedAtIso;
                 }
 
                 // ALWAYS store aircraft data - filtering is done at display level
@@ -425,7 +399,7 @@
                 this.calculateAircraftDistance(data.aircraft);
 
                 if (this.animationEngine) {
-                    this.animationEngine.updateAircraft(data.aircraft);
+                    this.animationEngine.updateAircraft(data.aircraft, observedAtMs);
                 }
 
                 // Queue map update - map will handle visibility based on filters
@@ -441,72 +415,34 @@
             }
         },
 
+        // A predicted state is what the server expects between two polls, not
+        // what the station said: it goes to the animation engine alone, and
+        // aircraft.adsb keeps only the station's figures, which the distance,
+        // the list, the flight card, the trails and the PAR read. (It was
+        // written into aircraft.adsb, marked adsb.source = 'predicted', and
+        // the next real update that only changed the altitude handed the
+        // engine that predicted position as a real fix.)
         handleAircraftPredictedState(data) {
             if (this.wsUpdatesPaused || !data || !data.hex || !data.delta) {
                 return;
             }
 
             const aircraft = this.aircraft[data.hex];
-            if (!aircraft || aircraft.status === 'signal_lost') {
-                return;
-            }
-
-            const confidence = Number(data.delta.confidence);
-            if (Number.isFinite(confidence) && confidence < this._predictedMinConfidence) {
-                return;
-            }
-
-            const preservedLastSeen = aircraft.last_seen;
-            const preservedRealObservedAt = aircraft._lastRealObservedAt;
-
-            if (!aircraft.adsb) {
-                aircraft.adsb = {};
-            }
-
-            const basedOnMs = Date.parse(data.based_on || '');
-            const predictedAtMs = Date.parse(data.predicted_at || '');
-            const latestRealObservedAt = Number.isFinite(aircraft._lastRealObservedAt) ? aircraft._lastRealObservedAt : null;
-
-            // Real ADS-B updates always win over predicted updates.
-            if (Number.isFinite(basedOnMs) && Number.isFinite(latestRealObservedAt) && basedOnMs < latestRealObservedAt) {
-                return;
-            }
-
-            const predictionTs = Number.isFinite(predictedAtMs)
-                ? predictedAtMs
-                : (Number.isFinite(basedOnMs) ? basedOnMs : Date.now());
-            const lastAppliedPredictionTs = Number.isFinite(aircraft._lastPredictedAppliedAt)
-                ? aircraft._lastPredictedAppliedAt
-                : null;
-            if (Number.isFinite(lastAppliedPredictionTs) &&
-                (predictionTs - lastAppliedPredictionTs) < this._predictedMinApplyIntervalMs) {
+            if (!aircraft || aircraft.status === 'signal_lost' || !this.animationEngine) {
                 return;
             }
 
             const delta = data.delta;
-            if (delta.lat !== undefined) aircraft.adsb.lat = delta.lat;
-            if (delta.lon !== undefined) aircraft.adsb.lon = delta.lon;
-            if (delta.alt_baro !== undefined) aircraft.adsb.alt_baro = delta.alt_baro;
-            if (delta.gs !== undefined) aircraft.adsb.gs = delta.gs;
-            if (delta.track !== undefined) aircraft.adsb.track = delta.track;
-            if (delta.true_heading !== undefined) aircraft.adsb.true_heading = delta.true_heading;
-            if (delta.mag_heading !== undefined) aircraft.adsb.mag_heading = delta.mag_heading;
-            aircraft.adsb.source = 'predicted';
-
-            aircraft._lastPredictedObservedAt = Number.isFinite(basedOnMs) ? basedOnMs : Date.now();
-            aircraft._lastPredictedAppliedAt = predictionTs;
-
-            // Predicted updates must never advance real timing fields.
-            aircraft.last_seen = preservedLastSeen;
-            aircraft._lastRealObservedAt = preservedRealObservedAt;
-
-            this.calculateAircraftDistance(aircraft);
-
-            if (this.animationEngine) {
-                this.animationEngine.updateAircraft(aircraft);
-            }
-
-            this.queueMapUpdate(data.hex);
+            this.animationEngine.estimate(data.hex, {
+                lat: delta.lat,
+                lon: delta.lon,
+                alt: delta.alt_baro,
+                track: delta.track,
+                gs: delta.gs,
+                confidence: Number(delta.confidence),
+                at: Date.parse(data.predicted_at || ''),
+                basedOn: Date.parse(data.based_on || ''),
+            });
         },
 
         // Apply delta updates to an existing aircraft object
@@ -542,7 +478,6 @@
             if (delta.mag_heading !== undefined && aircraft.adsb.mag_heading !== delta.mag_heading) aircraft.adsb.mag_heading = delta.mag_heading;
             if (delta.true_heading !== undefined && aircraft.adsb.true_heading !== delta.true_heading) aircraft.adsb.true_heading = delta.true_heading;
             if (delta.squawk !== undefined) aircraft.adsb.squawk = delta.squawk;
-            if (delta.source !== undefined && aircraft.adsb.source !== delta.source) aircraft.adsb.source = delta.source;
             if (delta.atc_derived !== undefined && aircraft.adsb.atc_derived !== delta.atc_derived) aircraft.adsb.atc_derived = delta.atc_derived;
 
             // Apply full adsb object if provided — preserve last known position if new object has no GPS

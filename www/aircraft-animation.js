@@ -45,7 +45,9 @@ class AircraftAnimationEngine {
             adaptivePerformance: true,
             maxFrameBudgetMs: 14,
             cleanupIntervalMs: 30000,
-            maxStates: 600
+            maxStates: 600,
+            minEstimateConfidence: 0.65,
+            minEstimateIntervalMs: 1000
         };
 
         this.aircraftStates = new Map();
@@ -134,21 +136,72 @@ class AircraftAnimationEngine {
         this.aircraftStates.delete(hex);
     }
 
-    updateAircraft(aircraft) {
+    // What the station said about an aircraft (store/feed.js): its
+    // aircraft.adsb, and when the server observed it (wall clock, ms).
+    updateAircraft(aircraft, observedAtMs = null) {
         if (!this.config.enabled || !aircraft?.hex) return;
 
         const snapshot = this._extractSnapshotFromAircraft(aircraft);
         if (!snapshot) return;
 
-        if (this.aircraftStates.size >= this.config.maxStates && !this.aircraftStates.has(aircraft.hex)) {
+        const state = this._ingest(aircraft.hex, snapshot, aircraft.status);
+        if (state && Number.isFinite(observedAtMs)) {
+            state.lastObservedAt = observedAtMs;
+        }
+    }
+
+    // What the server expects between two polls (aircraft_predicted_state,
+    // passed on by store/feed.js): never taken for a fix. Left out below the
+    // confidence floor, when based on an older observation than the last one
+    // received (real updates win), and within a second of the last one
+    // applied.
+    estimate(hex, e) {
+        if (!this.config.enabled || !hex || !e) return;
+        if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon) || (e.lat === 0 && e.lon === 0)) return;
+        if (Number.isFinite(e.confidence) && e.confidence < this.config.minEstimateConfidence) return;
+
+        const state = this.aircraftStates.get(hex);
+        if (state && Number.isFinite(e.basedOn) && Number.isFinite(state.lastObservedAt) && e.basedOn < state.lastObservedAt) {
+            return;
+        }
+        const at = Number.isFinite(e.at) ? e.at : (Number.isFinite(e.basedOn) ? e.basedOn : Date.now());
+        if (state && Number.isFinite(state.lastEstimateAt) && (at - state.lastEstimateAt) < this.config.minEstimateIntervalMs) {
+            return;
+        }
+
+        const observed = state?.lastObserved;
+        const track = Number.isFinite(e.track) ? e.track : (observed?.track ?? null);
+        const updated = this._ingest(hex, {
+            lat: e.lat,
+            lon: e.lon,
+            alt: Number.isFinite(e.alt) ? e.alt : (observed?.alt ?? 0),
+            // The heading is the station's (with the wind's drift); an
+            // estimate carries only a track.
+            heading: observed?.heading ?? track,
+            track,
+            speedKts: Number.isFinite(e.gs) ? e.gs : (observed?.speedKts ?? null),
+            baroRate: observed?.baroRate ?? 0,
+            source: 'predicted',
+            timestamp: performance.now()
+        }, state?.status);
+        if (updated) {
+            updated.lastEstimateAt = at;
+        }
+    }
+
+    _ingest(hex, snapshot, status) {
+        if (this.aircraftStates.size >= this.config.maxStates && !this.aircraftStates.has(hex)) {
             this._evictOldestState();
         }
 
         const now = performance.now();
-        let state = this.aircraftStates.get(aircraft.hex);
+        let state = this.aircraftStates.get(hex);
         if (!state) {
-            state = this._createState(aircraft.hex);
-            this.aircraftStates.set(aircraft.hex, state);
+            state = this._createState(hex);
+            this.aircraftStates.set(hex, state);
+        }
+        if (snapshot.source !== 'predicted') {
+            state.lastObserved = snapshot;
         }
 
         const previousReal = state.lastReal;
@@ -178,9 +231,9 @@ class AircraftAnimationEngine {
             Math.abs(state.lastRealFix.lat - snapshot.lat) < 1e-7 &&
             Math.abs(state.lastRealFix.lon - snapshot.lon) < 1e-7) {
             state.lastSeenAt = Date.now();
-            state.status = aircraft.status || 'active';
+            state.status = status || 'active';
             this._refreshFromRepeatedFix(state, snapshot);
-            return;
+            return state;
         }
 
         if (previousReal && snapshot.source === 'predicted') {
@@ -188,7 +241,7 @@ class AircraftAnimationEngine {
         }
 
         state.lastSeenAt = Date.now();
-        state.status = aircraft.status || 'active';
+        state.status = status || 'active';
         state.lastSampleSource = snapshot.source || 'real';
         if (Number.isFinite(effectiveSnapshot.heading)) {
             const baseAlpha = Number.isFinite(this.config.headingSmoothingAlpha)
@@ -271,6 +324,7 @@ class AircraftAnimationEngine {
         if (!state.lastRendered) {
             state.lastRendered = { ...effectiveSnapshot };
         }
+        return state;
     }
 
     // A drawn point moved on to time `now` at a velocity.
@@ -309,11 +363,11 @@ class AircraftAnimationEngine {
         }
     }
 
-    updateAircraftDelta(hex, _delta) {
+    updateAircraftDelta(hex, _delta, observedAtMs = null) {
         if (!hex) return;
         const aircraft = this.store?.aircraft?.[hex];
         if (!aircraft) return;
-        this.updateAircraft(aircraft);
+        this.updateAircraft(aircraft, observedAtMs);
     }
 
     rafLoop(now) {
@@ -530,7 +584,7 @@ class AircraftAnimationEngine {
             track,
             speedKts,
             baroRate,
-            source: adsb.source === 'predicted' ? 'predicted' : 'real',
+            source: 'real',
             timestamp: performance.now()
         };
     }
@@ -717,7 +771,10 @@ class AircraftAnimationEngine {
             displayHeading: null,
             velocity: null,
             correction: null,
-            lastSampleSource: 'real'
+            lastSampleSource: 'real',
+            lastObserved: null,
+            lastObservedAt: null,
+            lastEstimateAt: null
         };
     }
 

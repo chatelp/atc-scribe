@@ -80,7 +80,9 @@ test('a predicted sample never counts as the known fix', () => {
     e.updateAircraft(sample(48.5, 2.0));
     e.updateAircraft(sample(48.5, 2.0028));
     const state = e.aircraftStates.get('abc123');
-    e.updateAircraft(sample(48.5, 2.0040, { source: 'predicted' }));
+    // The server's predicted state reaches the engine through estimate(),
+    // never through the aircraft's adsb (fiche L, step 4).
+    e.estimate('abc123', { lat: 48.5, lon: 2.0040, alt: 30000, gs: 400, track: 90, confidence: 0.9 });
     assert.deepEqual(state.lastRealFix, { lat: 48.5, lon: 2.0028 });
     assert.equal(state.lastSampleSource, 'predicted');
 });
