@@ -492,6 +492,32 @@ sur la carte.
 
 ## État
 
+- 13/10 (soir, tard) : **étape 5 de la migration livrée sur `migration`** (a1533b8), en relecture
+  design avant le coup d'œil du propriétaire. « Right now » devient l'onglet par défaut de la
+  colonne : la **phrase de synthèse** (gabarits de `www/now/right-now.js`, douze tests node : piste
+  de chaque aérodrome suivi et depuis quand, « depuis au moins » l'heure de démarrage du serveur
+  tant qu'il n'a vu aucun changement, seconde piste probable, nombre d'avions en finale et prochain
+  toucher), les **tableaux d'arrivée** (ceux de la PAR, hors de la PAR), les **événements** de la
+  dernière demi-heure, la **météo** de l'aérodrome de référence avec le **METAR lu en clair**
+  (`www/now/metar-plain.js`, sept tests ; la source ne donnait qu'une lecture technique), TAF,
+  NOTAM et METAR précédents derrière des boutons, et les **compteurs**. Le bouton » **replie la
+  colonne** (disposition B, nouvelle clé `columnFolded`) : la carte prend la largeur, « Right now »
+  devient une carte sur le ciel. Retirés de la barre du bas : METAR, TAF, NOTAM, piste en service,
+  leurs bulles et trois aides du store sans lecteur. Vérifié sur l'instance d'essai : la phrase a
+  suivi un vrai changement de piste (De Gaulle passée sur 26L, « since 16:04Z ») ; le repli gardé
+  au rechargement ; le téléphone inchangé, sans débordement. **Mesuré** (149 avions, 10 s) : avec
+  « Right now » ouvert, **aucun blocage du fil principal** contre 25 blocages et 105 ms perdues par
+  seconde avec la liste Trafic ouverte (le chantier de la liste se règle donc d'abord en ne la
+  dessinant plus par défaut) ; colonne : 0 texte sous 11 px, 0 sous AA ; page : tailles en dur
+  79 → 74, opacités de texte 107 → 95, classes du système 81 → 128. Écarts nommés pour la
+  relecture : carte repliée sous la bascule carte/PAR (qui garde le coin jusqu'à son étape) ; TAF
+  et NOTAM en carte dépliée sous les boutons plutôt qu'en bulle ; bouton « Earlier » pour les
+  METAR précédents (fonction de l'ancienne bulle gardée) ; « uses runway » plutôt que « lands on »
+  (`runway_in_use` ne distingue pas arrivées et départs) ; lignes d'événements cliquables à 16 px
+  (règle du système à porter à 24) ; pas de classe de texte « urgent » hors de la liste. L'outil
+  d'inventaire de la session design ne tourne plus depuis l'étape 2 (il cherche `PHASE_COLORS`
+  dans `par-view.js`) : signalé. L'instance d'essai suit désormais Orly comme référence, comme la
+  production (Saint-Cyr ne publie pas de METAR).
 - 13/10 (soir, tard) : **fiches H et I intégrées** (vague 3 cloud). H (`claude/quirky-ritchie-mfjscr`,
   six commits) : le serveur démarre **sans transcription** quand aucune source ne transcrit et
   qu'aucun sidecar n'est configuré (`Sidecar.Idle/Off/Ensure`, une source qui passe à
