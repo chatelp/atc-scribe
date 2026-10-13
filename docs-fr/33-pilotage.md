@@ -90,7 +90,7 @@ Cinq fiches dans `docs-fr/fiches-cloud/` (prompts à coller dans son README), du
 logique pure, sans la station : **G** la route publique des chiffres avant connexion et les trois
 valeurs qui manquent ; **H** le serveur sans transcription et le Docker amont retiré ; **I** les
 dettes de sécurité (CORS, WebSocket, rôle lecture seule, purges) ; **J** la compilation
-Windows ; **K** « Then » sans verdict. Indépendantes, **G, H et I lancées par le propriétaire le 13/10 au soir** (A, B, C relancées par erreur puis arrêtées, aucune branche à intégrer) ; J et K à lancer ensuite ;
+Windows ; **K** « Then » sans verdict. Indépendantes, **G, H et I lancées par le propriétaire le 13/10 au soir** (A, B, C relancées par erreur puis arrêtées, aucune branche à intégrer) ; **G intégrée le 13/10** (route `/api/v1/vitals`, `since` de la piste, valeur et unité des consignes, version et commit du binaire) ; H et I en cours ; J et K à lancer ensuite ;
 chaque branche `cloud/…` revient sur le Mac pour relecture et intégration. La migration de
 l'interface, elle, reste sur le Mac.
 
