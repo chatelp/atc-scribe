@@ -26,6 +26,7 @@
     // bar did (alternate shown above 15 %).
     const SECOND_RUNWAY_PROBABILITY = 0.15;
     const MAX_ROWS = 5;
+    const MAX_ROWS_SEVERAL = 3;
 
     const SOURCE = 'Read from the ADS-B tracks, not announced by the controllers.';
 
@@ -61,9 +62,20 @@
         return parts.length === 2 ? parts[1] : String(id);
     }
 
-    function parallel(a, b) {
-        if (!a || !b || a === b) return false;
-        return a.replace(/[LRC]$/, '') === b.replace(/[LRC]$/, '');
+    // Two runway ends flown the same way: numbers one apart at most, around
+    // the compass (De Gaulle's 26L and 27R land together). The server and the
+    // event log use the same rule (internal/adsb/runway_tracker.go, events.js).
+    function number(end) {
+        const n = parseInt(String(end || '').replace(/[LRC]$/, ''), 10);
+        return n >= 1 && n <= 36 ? n : null;
+    }
+
+    function sameDirection(a, b) {
+        const na = number(runwayEnd(a)), nb = number(runwayEnd(b));
+        if (na == null || nb == null) return false;
+        let d = Math.abs(na - nb);
+        if (d > 18) d = 36 - d;
+        return d <= 1;
     }
 
     // What runway_in_use says for one airport: the ends in use (two when they
@@ -76,7 +88,7 @@
         const second = entries[1];
         if (second && second.probability > SECOND_RUNWAY_PROBABILITY) {
             const end = runwayEnd(second.runway_end);
-            if (parallel(first, end)) out.ends.push(end);
+            if (sameDirection(first, end)) out.ends.push(end);
             else if (end && end !== first) out.maybe = end;
         }
         const since = entries[0].since ? new Date(entries[0].since) : null;
@@ -107,12 +119,23 @@
         return list.filter((a) => a.principal).concat(list.filter((a) => !a.principal));
     }
 
-    function onFinal(sequences) {
-        let n = 0;
-        for (const seqs of Object.values(sequences || {})) {
-            for (const s of seqs || []) n += (s.items || []).length;
+    // The sequences shown, as the tables show them: each runway end in use
+    // with aircraft coming in; if no end in use has any, the ends that have
+    // some. The counts of the sentence read the same ones, so the sentence,
+    // the folded card and the tables say the same number.
+    function shown(airports, sequences) {
+        const out = [];
+        for (const apt of ordered(airports)) {
+            for (const s of (sequences || {})[apt.code] || []) {
+                if (s.items && s.items.length) out.push({ apt, s });
+            }
         }
-        return n;
+        const inUse = out.filter((t) => t.s.inUse);
+        return inUse.length ? inUse : out;
+    }
+
+    function onFinal(list) {
+        return list.reduce((n, t) => n + t.s.items.length, 0);
     }
 
     // summary builds the sentence. input:
@@ -129,7 +152,6 @@
         const clock = typeof o.clock === 'function' ? o.clock : (d) => d.toISOString().slice(11, 16);
         const list = ordered(o.airports);
         const sentences = [];
-        let shortLead = '';
 
         list.forEach((apt, i) => {
             const r = runwaysInUse(apt.runway_in_use);
@@ -138,15 +160,16 @@
                 if (i === 0) sentences.push(`${name}: runway in use not known yet.`);
                 return;
             }
-            let s = `${name} uses ${r.ends.length > 1 ? 'runways' : 'runway'} ${ends(r)}`;
             // Since when, for every airport whose change the server saw; "since
             // at least" the server's start for the first one only, to keep the
-            // sentence short.
-            if (r.since) s += ` since ${esc(clock(r.since))}`;
-            else if (i === 0 && o.serverStarted) s += ` since at least ${esc(clock(o.serverStarted))}`;
+            // sentence short. With "since", the present perfect.
+            const rw = `${r.ends.length > 1 ? 'runways' : 'runway'} ${ends(r)}`;
+            let s;
+            if (r.since) s = `${name} has been using ${rw} since ${esc(clock(r.since))}`;
+            else if (i === 0 && o.serverStarted) s = `${name} has been using ${rw} since at least ${esc(clock(o.serverStarted))}`;
+            else s = `${name} uses ${rw}`;
             if (r.maybe) s += `, perhaps <b>${esc(r.maybe)}</b> too`;
             sentences.push(s + '.');
-            if (!shortLead) shortLead = `${name} uses ${ends(r)}`;
         });
 
         if (!list.some((a) => runwaysInUse(a.runway_in_use))) {
@@ -154,26 +177,37 @@
             sentences.push('No runway in use known yet: it is judged from the takeoffs and landings the receiver sees.');
         }
 
-        const n = onFinal(o.sequences);
+        const finals = shown(o.airports, o.sequences);
+        const n = onFinal(finals);
         const next = o.next;
         let arrivals = '';
-        let shortArrivals = '';
         if (n > 0 && next) {
             const apt = list.find((a) => a.code === next.airport);
             const where = apt && list.length > 1 ? ` at ${esc(shortName(apt))}` : '';
-            arrivals = `${capital(count(n))} ${n === 1 ? 'aircraft' : 'aircraft'} on final; the next, ` +
+            arrivals = `${capital(count(n))} aircraft on final; the next, ` +
                 `${esc(next.callsign)}, lands on <b>${esc(runwayEnd(next.runway))}</b>${where} ${inAbout(next.etaSec)}.`;
-            shortArrivals = `${count(n)} on final, next ${inAbout(next.etaSec)}`;
         } else if (n > 0) {
             arrivals = `${capital(count(n))} aircraft on final.`;
-            shortArrivals = `${count(n)} on final`;
         } else {
             arrivals = 'Nobody on final.';
-            shortArrivals = 'nobody on final';
         }
         sentences.push(arrivals);
 
-        let short = shortLead ? `${shortLead}, ${shortArrivals}.` : `${capital(shortArrivals)}.`;
+        // Folded, one airport: the one of the next touchdown, with the count
+        // on final there; with no arrival, the reference airport.
+        let short;
+        const nextApt = next && list.find((a) => a.code === next.airport);
+        if (nextApt) {
+            const there = onFinal(finals.filter((t) => t.apt.code === nextApt.code));
+            short = `${esc(shortName(nextApt))} lands on <b>${esc(runwayEnd(next.runway))}</b>, ` +
+                `${count(Math.max(1, there))} on final, next ${inAbout(next.etaSec)}.`;
+        } else {
+            const ref = list[0];
+            const r = ref && runwaysInUse(ref.runway_in_use);
+            const lead = ref && r ? `${esc(shortName(ref))} uses ${ends(r)}` : '';
+            const said = n > 0 ? `${count(n)} on final` : 'nobody on final';
+            short = lead ? `${lead}, ${said}.` : `${capital(said)}.`;
+        }
         if (o.warning) {
             short += ` <span class="${esc(o.warning.cls || 'cl-warn')}">${esc(o.warning.mark)}</span> ` +
                 `${esc(o.warning.text)} at ${esc(clock(o.warning.at))}.`;
@@ -186,24 +220,19 @@
     // aircraft coming in, nearest touchdown first; if no end in use has any,
     // the ends that have aircraft. Rows as the PAR writes them.
     function tables(airports, sequences) {
-        const out = [];
-        for (const apt of ordered(airports)) {
-            for (const s of (sequences || {})[apt.code] || []) {
-                if (!s.items || !s.items.length) continue;
-                out.push({ apt, s });
-            }
-        }
-        const inUse = out.filter((t) => t.s.inUse);
-        const shown = inUse.length ? inUse : out;
+        const list = shown(airports, sequences);
         const firstEta = (t) => {
             const e = t.s.items.map((x) => x.etaSec).filter((x) => x != null);
             return e.length ? Math.min(...e) : Infinity;
         };
-        shown.sort((a, b) => firstEta(a) - firstEta(b));
-        return shown.map(({ apt, s }) => ({
+        list.sort((a, b) => firstEta(a) - firstEta(b));
+        // Five rows when alone, three when there are several: three tables of
+        // five pushed "Worth knowing" below the fold at 900 px.
+        const rowsEach = list.length > 1 ? MAX_ROWS_SEVERAL : MAX_ROWS;
+        return list.map(({ apt, s }) => ({
             key: `${apt.code}-${s.runway}`,
             title: `Arrivals to ${apt.code} ${runwayEnd(s.runway)}`,
-            rows: s.items.slice(0, MAX_ROWS).map((x, i) => ({
+            rows: s.items.slice(0, rowsEach).map((x, i) => ({
                 rank: i + 1,
                 hex: x.hex,
                 callsign: x.callsign,
@@ -214,7 +243,7 @@
                 first: x.gapNM == null,
                 tight: x.gapNM != null && x.gapNM < TIGHT_NM,
             })),
-            more: Math.max(0, s.items.length - MAX_ROWS),
+            more: Math.max(0, s.items.length - rowsEach),
         }));
     }
 
@@ -228,5 +257,5 @@
         }
     }
 
-    return { summary, tables, runwaysInUse, runwayEnd, shortName, eventMark, inAbout, mmss, SOURCE, TIGHT_NM };
+    return { summary, tables, runwaysInUse, runwayEnd, sameDirection, shortName, eventMark, inAbout, mmss, SOURCE, TIGHT_NM };
 });

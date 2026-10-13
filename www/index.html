@@ -1108,7 +1108,7 @@
                         <div class="cl-section">
                             <span class="cl-label">Worth knowing · last 30 min</span>
                             <template x-if="$store.atc.nowEvents.length === 0">
-                                <span class="cl-summary__source">Nothing notable in the last half hour: no emergency, go-around or runway change.</span>
+                                <span class="cl-summary__source" x-text="$store.atc.nowEmptyText"></span>
                             </template>
                             <ul class="cl-events" x-show="$store.atc.nowEvents.length > 0">
                                 <template x-for="ev in $store.atc.nowEvents" :key="ev.id">
@@ -1135,25 +1135,25 @@
                                 <span class="cl-summary__source" x-text="'No METAR for ' + $store.atc.weatherAirport + ': the weather service has none for this airfield. Small airfields often publish none.'"></span>
                             </template>
                             <span class="cl-row" x-show="$store.atc.metarTrend.length > 1 || ($store.atc.stationFetchTAF && $store.atc.taf) || ($store.atc.stationFetchNOTAMs && $store.atc.notams && $store.atc.notams.length)">
-                                <button class="cl-btn" x-show="$store.atc.metarTrend.length > 1" :aria-pressed="$store.atc.nowWeatherOpen === 'trend'" @click="$store.atc.toggleNowWeather('trend')"
-                                        data-help-title="Earlier METARs" data-help="The last few reports, newest first: how the weather has been changing.">Earlier</button>
-                                <button class="cl-btn" x-show="$store.atc.stationFetchTAF && $store.atc.taf" :aria-pressed="$store.atc.nowWeatherOpen === 'taf'" @click="$store.atc.toggleNowWeather('taf')"
+                                <button class="cl-btn" x-show="$store.atc.stationFetchTAF && $store.atc.taf" :aria-expanded="String($store.atc.nowWeatherOpen === 'taf')" aria-controls="now-weather-taf" @click="$store.atc.toggleNowWeather('taf')"
                                         data-help-title="TAF" data-help="The forecast for the airport over the next day, in the same code as the METAR.">TAF</button>
-                                <button class="cl-btn" x-show="$store.atc.stationFetchNOTAMs && $store.atc.notams && $store.atc.notams.length" :aria-pressed="$store.atc.nowWeatherOpen === 'notam'" @click="$store.atc.toggleNowWeather('notam')"
+                                <button class="cl-btn" x-show="$store.atc.stationFetchNOTAMs && $store.atc.notams && $store.atc.notams.length" :aria-expanded="String($store.atc.nowWeatherOpen === 'notam')" aria-controls="now-weather-notam" @click="$store.atc.toggleNowWeather('notam')"
                                         data-help-title="NOTAM" data-help="Notices to airmen: closed runways, works, unserviceable aids, temporary procedures.">NOTAM <span class="cl-tabs__count" x-text="($store.atc.notams || []).length"></span></button>
+                                <button class="cl-btn" x-show="$store.atc.metarTrend.length > 1" :aria-expanded="String($store.atc.nowWeatherOpen === 'trend')" aria-controls="now-weather-trend" @click="$store.atc.toggleNowWeather('trend')"
+                                        data-help-title="Earlier METARs" data-help="The last few reports, newest first: how the weather has been changing.">Earlier</button>
                             </span>
                             <template x-if="$store.atc.nowWeatherOpen === 'trend'">
-                                <div class="cl-card">
+                                <div id="now-weather-trend" class="cl-card">
                                     <template x-for="(m, i) in $store.atc.metarTrend" :key="i">
                                         <span class="cl-metar" x-text="m.metar"></span>
                                     </template>
                                 </div>
                             </template>
                             <template x-if="$store.atc.nowWeatherOpen === 'taf' && $store.atc.taf">
-                                <div class="cl-card"><span class="cl-metar" x-text="$store.atc.taf.taf"></span></div>
+                                <div id="now-weather-taf" class="cl-card"><span class="cl-metar" x-text="$store.atc.taf.taf"></span></div>
                             </template>
                             <template x-if="$store.atc.nowWeatherOpen === 'notam'">
-                                <div class="cl-card max-h-[40vh] overflow-y-auto">
+                                <div id="now-weather-notam" class="cl-card max-h-[40vh] overflow-y-auto">
                                     <template x-for="(n, i) in ($store.atc.notams || [])" :key="i">
                                         <span class="cl-metar whitespace-pre-wrap" x-text="n.raw || n.message"></span>
                                     </template>

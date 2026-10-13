@@ -51,10 +51,20 @@
             if (!Array.isArray(kept)) return [];
             return kept
                 .filter((e) => e && e.kind && e.text && e.at)
+                .filter((e) => !sameDirectionChange(e))
                 .slice(0, MAX_EVENTS)
                 .map((e) => ({ ...e, at: new Date(e.at) }))
                 .filter((e) => !Number.isNaN(e.at.getTime()));
         } catch (e) { return []; }
+    }
+
+    // A runway line logged before 13/10 for the lead passing between two
+    // runways of the same direction ("LFPG runway in use now 26L (was 27R)")
+    // was not a change: it is dropped when the log is read back.
+    function sameDirectionChange(e) {
+        if (e.kind !== 'runway') return false;
+        const m = /runway in use now (\S+) \(was (\S+)\)/.exec(e.text);
+        return !!m && sameDirection(m[1], m[2]);
     }
 
     function saveLog(list) {
@@ -83,6 +93,31 @@
         return parts.length === 2 ? parts[1] : String(id);
     }
 
+    // A runway end's direction, from its number (the heading in tens of
+    // degrees): 26L -> "west". Two ends one number apart at most are flown the
+    // same way (De Gaulle's 26L and 27R land together): the lead passing
+    // between them is not a change of runway. Same rule as the server
+    // (internal/adsb/runway_tracker.go) and Right now (www/now/right-now.js).
+    const POINTS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+
+    function runwayNumber(end) {
+        const n = parseInt(String(end || '').replace(/[LRC]$/, ''), 10);
+        return n >= 1 && n <= 36 ? n : null;
+    }
+
+    function sameDirection(a, b) {
+        const na = runwayNumber(a), nb = runwayNumber(b);
+        if (na == null || nb == null) return false;
+        let d = Math.abs(na - nb);
+        if (d > 18) d = 36 - d;
+        return d <= 1;
+    }
+
+    function direction(end) {
+        const n = runwayNumber(end);
+        return n == null ? '' : POINTS[Math.round((n * 10) % 360 / 45) % 8];
+    }
+
     document.addEventListener('alpine:init', () => {
         const restored = loadLog();
         Alpine.store('events', {
@@ -96,6 +131,9 @@
 
             _seen: new Set(restored.map((e) => e.key).filter(Boolean)),  // keys of events already logged
             _runways: {},      // airport code -> { shown, candidate, since }
+            // When this page opened: an empty list is honest only about what it
+            // watched, the log of a closed page does not grow.
+            openedAt: new Date(),
             _timer: null,
 
             init() {
@@ -201,13 +239,19 @@
                         this._runways[apt.code] = { shown: end, candidate: null, since: 0 };
                         continue;
                     }
-                    if (end === st.shown) {
+                    if (end === st.shown || sameDirection(end, st.shown)) {
+                        // The same runway, or the lead passing within the same
+                        // direction: followed silently.
+                        st.shown = end;
                         st.candidate = null;
                     } else if (end !== st.candidate) {
                         st.candidate = end;
                         st.since = now;
                     } else if (now - st.since >= RUNWAY_HOLD_MS) {
-                        this.add({ kind: 'runway', text: `${apt.code} runway in use now ${end} (was ${st.shown})` });
+                        const way = direction(end);
+                        this.add({ kind: 'runway', text: way
+                            ? `${apt.code} switched to landing ${way} (${end}, was ${st.shown})`
+                            : `${apt.code} runway in use now ${end} (was ${st.shown})` });
                         st.shown = end;
                         st.candidate = null;
                     }

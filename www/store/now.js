@@ -79,7 +79,7 @@
             const w = ev.recent(30).find((e) => e.kind === 'emergency' || e.kind === 'go_around');
             if (!w) return null;
             const m = RightNow.eventMark(w.kind);
-            return { mark: m.mark, cls: 'cl-warn', text: ev.kinds[w.kind].label, at: w.at };
+            return { mark: m.mark, cls: w.kind === 'emergency' ? 'cl-urgent' : 'cl-warn', text: ev.kinds[w.kind].label, at: w.at };
         },
 
         // { html, short, source }: see www/now/right-now.js.
@@ -107,6 +107,19 @@
             const ev = window.Alpine && Alpine.store('events');
             if (!ev) return [];
             return ev.recent(30).slice(0, 5).map((e) => Object.assign({ mark: RightNow.eventMark(e.kind) }, e));
+        },
+
+        // An empty list says what it has watched: the log of a closed page
+        // does not grow, so "the last half hour" only once the page has been
+        // open that long.
+        get nowEmptyText() {
+            this.nowTick;
+            const ev = window.Alpine && Alpine.store('events');
+            const opened = ev && ev.openedAt;
+            if (!opened || Date.now() - opened.getTime() >= 30 * 60000) {
+                return 'Nothing notable in the last half hour: no emergency, go-around or runway change.';
+            }
+            return `Nothing notable since ${this.clockText(opened)}, when this page opened.`;
         },
 
         // The airport the weather is fetched for: the reference airport.

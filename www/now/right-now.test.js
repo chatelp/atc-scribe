@@ -25,9 +25,10 @@ test('the runway in use since a change the server saw, the arrivals and the next
         clock,
     });
     assert.equal(text(s.html),
-        'Paris-Orly uses runway 25 since 15:20. Charles de Gaulle uses runway 27R since 15:56, perhaps 26L too. ' +
+        'Paris-Orly has been using runway 25 since 15:20. Charles de Gaulle has been using runways 27R and 26L since 15:56. ' +
         'Three aircraft on final; the next, AFR47KX, lands on 25 at Paris-Orly in about 2 min.');
-    assert.equal(text(s.short), 'Paris-Orly uses 25, three on final, next in about 2 min.');
+    // Folded: one airport, the next touchdown's, with its own count on final.
+    assert.equal(text(s.short), 'Paris-Orly lands on 25, one on final, next in about 2 min.');
     assert.equal(s.source, 'Read from the ADS-B tracks, not announced by the controllers.');
 });
 
@@ -38,7 +39,7 @@ test('parallel runways both in use are named together', () => {
 
 test('since unknown: "since at least" the server started, never a bare "since"', () => {
     const s = R.summary({ airports: airports([{ runway_end: '07-25/25', probability: 1, since: null }], null), serverStarted: new Date('2026-10-13T15:05:00Z'), clock });
-    assert.match(text(s.html), /^Paris-Orly uses runway 25 since at least 15:05\./);
+    assert.match(text(s.html), /^Paris-Orly has been using runway 25 since at least 15:05\./);
     const t = R.summary({ airports: airports([{ runway_end: '07-25/25', probability: 1, since: null }], null), clock });
     assert.match(text(t.html), /^Paris-Orly uses runway 25\./);
     assert.doesNotMatch(text(t.html), /since/);
@@ -105,5 +106,47 @@ test('"since at least" is said for the first airport only', () => {
         airports: airports([{ runway_end: '07-25/25', probability: 1, since: null }], [{ runway_end: '09L-27R/27R', probability: 1, since: null }]),
         serverStarted: new Date('2026-10-13T15:05:00Z'), clock,
     });
-    assert.match(text(s.html), /^Paris-Orly uses runway 25 since at least 15:05\. Charles de Gaulle uses runway 27R\./);
+    assert.match(text(s.html), /^Paris-Orly has been using runway 25 since at least 15:05\. Charles de Gaulle uses runway 27R\./);
+});
+
+test('runways of the same direction are named together, others are "perhaps"', () => {
+    const cdg = (second) => R.summary({ airports: [{ code: 'LFPG', name: 'Charles de Gaulle International Airport', principal: true,
+        runway_in_use: [{ runway_end: '08R-26L/26L', probability: 0.57 }, { runway_end: second, probability: 0.43 }] }], clock });
+    assert.match(text(cdg('09L-27R/27R').html), /^Charles de Gaulle uses runways 26L and 27R\./);
+    assert.match(text(cdg('08L-26R/26R').html), /^Charles de Gaulle uses runways 26L and 26R\./);
+    assert.match(text(cdg('08R-26L/08R').html), /^Charles de Gaulle uses runway 26L, perhaps 08R too\./);
+    assert.equal(R.sameDirection('18-36/36', '01-19/01'), true);
+    assert.equal(R.sameDirection('07-25/25', '02-20/20'), false);
+});
+
+test('folded with no arrival: the reference airport', () => {
+    const s = R.summary({ airports: airports([{ runway_end: '07-25/25', probability: 1 }], [{ runway_end: '09L-27R/27R', probability: 1 }]), clock });
+    assert.equal(text(s.short), 'Paris-Orly uses 25, nobody on final.');
+});
+
+test('folded, the next touchdown elsewhere: that airport and its own count', () => {
+    const s = R.summary({
+        airports: airports([{ runway_end: '07-25/25', probability: 1 }], [{ runway_end: '09L-27R/27R', probability: 1 }]),
+        sequences: { LFPO: [seq('07-25/25', true, [item('A1', 9, 300, null), item('A2', 12, 400, 3)])], LFPG: [seq('08R-26L/26L', true, [item('B1', 4, 100, null), item('B2', 8, 160, 4), item('B3', 12, 220, 4)])] },
+        next: { airport: 'LFPG', runway: '08R-26L/26L', callsign: 'B1', etaSec: 100 }, clock,
+    });
+    assert.equal(text(s.short), 'Charles de Gaulle lands on 26L, three on final, next in about 2 min.');
+});
+
+test('three rows each when there are several tables, five when alone', () => {
+    const items = Array.from({ length: 6 }, (_, i) => item(`AC${i}`, 5 + i, 100 + i * 60, i ? 1 + i : null));
+    const two = R.tables(airports(null, null), { LFPO: [seq('07-25/25', true, items)], LFPG: [seq('09L-27R/27R', true, items.map((x) => ({ ...x, hex: 'g' + x.hex })))] });
+    assert.deepEqual(two.map((t) => [t.rows.length, t.more]), [[3, 3], [3, 3]]);
+    const one = R.tables(airports(null, null), { LFPO: [seq('07-25/25', true, items)] });
+    assert.deepEqual([one[0].rows.length, one[0].more], [5, 1]);
+});
+
+test('the counts read the sequences the tables show: an aircraft in the opposite end cone is not on final', () => {
+    const s = R.summary({
+        airports: airports([{ runway_end: '07-25/25', probability: 1 }], [{ runway_end: '08R-26L/26L', probability: 1 }]),
+        sequences: { LFPG: [seq('08R-26L/26L', true, [item('B1', 4, 100, null), item('B2', 8, 160, 4)]), seq('08R-26L/08R', false, [item('X1', 6, 120, null), item('X2', 9, 200, 3)])] },
+        next: { airport: 'LFPG', runway: '08R-26L/26L', callsign: 'B1', etaSec: 100 }, clock,
+    });
+    assert.match(text(s.html), /Two aircraft on final;/);
+    assert.equal(text(s.short), 'Charles de Gaulle lands on 26L, two on final, next in about 2 min.');
 });
