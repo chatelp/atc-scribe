@@ -174,9 +174,10 @@ Indépendante de la disposition, elle passe en premier.
   « ↓ N new » quand le fil est remonté (décision 2) ; le menu de chaque fréquence avec son volume
   (décision 1), clés `frequencyVolumes` et `listeningFrequencies`.
 - **Rebranche, avant que la barre parte** :
-  - les bulles de la carte (`voice-bubbles-feature.js:42`) et les liens de la chronologie, qui
-    ouvrent aujourd'hui la fenêtre d'une fréquence par `openTranscriptionAt(frequencyId, id)` :
-    ils font défiler le fil jusqu'à l'échange et le surlignent ;
+  - plus rien à rebrancher vers un échange : les bulles de la carte, qui ouvraient la fenêtre
+    d'une fréquence par `openTranscriptionAt(frequencyId, id)`, sont retirées depuis le 13/10 (la
+    dernière émission est la troisième ligne de l'étiquette), et la fonction n'a plus d'appelant
+    (relevé à la livraison de l'étape 6) ; elle part avec la barre, à l'étape 7 ;
   - le niveau audio : `audio-client` dessine dans la barre de la tuile
     (`.audio-visualizer-container`, `index.html:2056`) ; `ThreadHead` héberge cet élément ou
     lit le niveau par le store, sinon « quelqu'un parle » perd sa source à l'étape 7.
@@ -191,7 +192,10 @@ Indépendante de la disposition, elle passe en premier.
 - **Retire** : la barre radio et les fenêtres de transcription par fréquence, avec leurs règles de
   `style.css` et le recalcul de leur disposition au redimensionnement et au défilement de
   `.radio-strip` (`app.js:878-879`) (garde-fou 7).
-- **Vérifier** : la table de `09-ecrans.md`, lignes de la barre radio, toutes cochées ; le filet.
+- **Garde** : au téléphone (sous 768 px), la barre reste jusqu'à l'étape 12 : le fil y est caché
+  jusque-là, et sans elle le téléphone n'aurait plus de radio (relevé à la relecture de l'étape 6).
+- **Vérifier** : la table de `09-ecrans.md`, lignes de la barre radio, toutes cochées ; le filet ;
+  au téléphone, la radio s'écoute encore.
 
 ### 8. Suivre un vol — 2 j
 
