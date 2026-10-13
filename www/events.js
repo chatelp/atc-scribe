@@ -39,6 +39,34 @@
         return { ...DEFAULT_SOUNDS };
     }
 
+    // The log outlives a reload (13/10): the bell showed an empty list after
+    // every refresh, and "what happened in the last half hour" needs the past.
+    // Kept in this browser, newest first, bounded like the list itself; the
+    // keys come back too, so a restored event is not logged a second time.
+    const LOG_KEY = 'eventLog';
+
+    function loadLog() {
+        try {
+            const kept = JSON.parse(localStorage.getItem(LOG_KEY) || 'null');
+            if (!Array.isArray(kept)) return [];
+            return kept
+                .filter((e) => e && e.kind && e.text && e.at)
+                .slice(0, MAX_EVENTS)
+                .map((e) => ({ ...e, at: new Date(e.at) }))
+                .filter((e) => !Number.isNaN(e.at.getTime()));
+        } catch (e) { return []; }
+    }
+
+    function saveLog(list) {
+        try {
+            localStorage.setItem(LOG_KEY, JSON.stringify(list.map((e) => ({ ...e, at: e.at.toISOString() }))));
+        } catch (e) { /* lasts the page */ }
+    }
+
+    function sameDay(a, b) {
+        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+
     function callsign(a) {
         return ((a && a.flight) || '').trim() || (a && a.hex ? a.hex.toUpperCase() : '?');
     }
@@ -50,15 +78,16 @@
     }
 
     document.addEventListener('alpine:init', () => {
+        const restored = loadLog();
         Alpine.store('events', {
             kinds: KINDS,
-            list: [],          // newest first
+            list: restored,    // newest first; what this browser logged before, too
             unread: 0,
             open: false,
             soundsOpen: false,
             sounds: loadSounds(),
 
-            _seen: new Set(),  // keys of events already logged
+            _seen: new Set(restored.map((e) => e.key).filter(Boolean)),  // keys of events already logged
             _runways: {},      // airport code -> { shown, candidate, since }
             _timer: null,
 
@@ -71,10 +100,18 @@
                     if (this._seen.has(key)) return;
                     this._seen.add(key);
                 }
-                this.list.unshift({ id: Date.now() + Math.random(), at: new Date(), kind, text, hex });
+                this.list.unshift({ id: Date.now() + Math.random(), at: new Date(), kind, text, hex, key });
                 if (this.list.length > MAX_EVENTS) this.list.length = MAX_EVENTS;
+                saveLog(this.list);
                 if (!this.open) this.unread++;
                 if (this.sounds[kind]) this.ring();
+            },
+
+            // The events of the last few minutes, newest first: what a "right
+            // now" summary reads.
+            recent(minutes = 30) {
+                const since = Date.now() - minutes * 60000;
+                return this.list.filter((e) => e.at.getTime() >= since);
             },
 
             ring() {
@@ -93,6 +130,7 @@
             clear() {
                 this.list = [];
                 this.unread = 0;
+                saveLog(this.list);
             },
 
             toggleSound(kind) {
@@ -107,7 +145,9 @@
             },
 
             time(ev) {
-                return ev.at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const t = ev.at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                // A restored event from another day says which one.
+                return sameDay(ev.at, new Date()) ? t : `${ev.at.toLocaleDateString([], { day: '2-digit', month: '2-digit' })} ${t}`;
             },
 
             scan() {
