@@ -54,7 +54,7 @@ la page, **S** travail serveur, **X** pas aujourd'hui.
 
 | | Élément | Source, ou travail |
 |---|---|---|
-| D + S | piste en service par aérodrome suivi, depuis quand | la piste : juge de piste du serveur (`/api/v1/station`, `runway_in_use`) ; le « depuis quand » n'existe que par avion : à exposer au niveau de l'aérodrome (≈ 1 h serveur, étape 5 de la migration ; corrigé par la session atc-scribe le 13/10) |
+| D | piste en service par aérodrome suivi, depuis quand | juge de piste du serveur (`/api/v1/station`, `runway_in_use`) ; `since` au niveau de l'aérodrome depuis le 13/10 (fiche cloud G), nul tant qu'aucun changement n'a été vu depuis le démarrage du serveur : la phrase dit alors « since at least » l'heure de démarrage |
 | D | séquence d'arrivée hors de la PAR | depuis le 13/10 à 13 h 02 (`1cfa887`) : `store.arrivals[code]` pour chaque aérodrome suivi, recalculé toutes les 5 s, PAR ouverte ou non, et `store.nextTouchdown` ; la PAR dessine depuis le même calcul (`par-arrivals.js`) |
 | D | « Worth knowing » | journal de la page gardé dans le navigateur depuis le 13/10 à 12 h 43 (`986354f`, `localStorage`, 100 événements) ; `events.recent(30)` donne les 30 dernières minutes ; une route serveur seulement pour partager l'historique entre navigateurs |
 | D | compteurs en vol, au sol, entendus | filtres du store, `voiceAircraftCount` |
