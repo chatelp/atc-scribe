@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" width="220" height="48" role="img" aria-label="Clairance">
+  <title>Clairance — the mark, for light backgrounds</title>
+  <g transform="translate(4 4) scale(0.625)">
+    <rect x="8" y="48" width="48" height="8" rx="4" fill="#1a1a1a"/>
+    <g fill="#ffffff"><rect x="19" y="51" width="8" height="2" rx="1"/><rect x="32" y="51" width="8" height="2" rx="1"/><rect x="45" y="51" width="6" height="2" rx="1"/></g>
+    <path d="M16 32 28 44 52 20" fill="none" stroke="#2e7d32" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="54" y="33" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="26" font-weight="600" fill="#1a1a1a">Clairance</text>
+</svg>

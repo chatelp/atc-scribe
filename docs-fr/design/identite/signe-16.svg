@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" role="img" aria-label="Clairance">
+  <title>Clairance — the sign at 16 px</title>
+  <!-- The 64 grid divided by four, the centreline dropped: at this size it
+       would be noise. This is what sits in a browser tab and in the header. -->
+  <rect x="2" y="12" width="12" height="2" rx="1" fill="#e0e0e0"/>
+  <path d="M4 8 7 11 13 5" fill="none" stroke="#4caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

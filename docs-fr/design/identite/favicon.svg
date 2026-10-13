@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Clairance">
+  <title>Clairance — favicon</title>
+  <!-- A dark tile so the sign reads on light and dark tab bars alike; the
+       tile is the panel colour of the interface. Export to 16, 32, 180 and
+       512 px for the manifest; the geometry is the 16 grid doubled. -->
+  <rect width="32" height="32" rx="7" fill="#1a1a1a"/>
+  <rect x="6" y="23" width="20" height="4" rx="2" fill="#e0e0e0"/>
+  <path d="M9 16 14 21 24 10" fill="none" stroke="#4caf50" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
