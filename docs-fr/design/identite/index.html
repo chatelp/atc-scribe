@@ -56,6 +56,12 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <path id="plane" d="M8 1 L10 3.5 L10 5 L15 10.5 L15 12.5 L10 9.5 L10 12 L11.8 13.8 L11.8 15.2 L8 14 L4.2 15.2 L4.2 13.8 L6 12 L6 9.5 L1 12.5 L1 10.5 L6 5 L6 3.5 Z"/>
+    <symbol id="s64" viewBox="0 0 64 64"><rect x="3" y="55" width="28" height="6" rx="3" fill="#e0e0e0"/><use href="#plane" fill="#4caf50" transform="translate(36 26) rotate(45) scale(3.3) translate(-8 -8)"/></symbol>
+    <symbol id="s16" viewBox="0 0 16 16"><use href="#plane" fill="#4caf50" transform="translate(8 8) rotate(45) scale(0.76) translate(-8 -8)"/></symbol>
+    <symbol id="s64l" viewBox="0 0 64 64"><rect x="3" y="55" width="28" height="6" rx="3" fill="#1a1a1a"/><use href="#plane" fill="#2e7d32" transform="translate(36 26) rotate(45) scale(3.3) translate(-8 -8)"/></symbol>
+</svg>
 <main>
     <header>
         <h1 class="t-display">Clairance — l'identité</h1>
@@ -64,10 +70,10 @@
 
     <section>
         <h2>Le signe</h2>
-        <p style="margin-bottom: var(--space-4)">Une piste, et la coche « autorisé » dont le sommet touche la piste : l'avion arrive de la gauche et se pose. Deux traits d'épaisseur 2 sur une grille de 16 ; à 64, la piste reçoit son axe.</p>
+        <p style="margin-bottom: var(--space-4)">Un avion qui s'arrache de la piste, autorisé au décollage : la clairance que tout le monde connaît. Un pictogramme trapu, dans l'esprit de ceux des aéroports, qui reste un avion à 16 px. La piste qu'il quitte, une barre sous sa queue, apparaît à partir de 32 px.</p>
         <div class="grid">
             <div class="tile"><span class="cap">Sur sombre, 64 · 32 · 24 · 16</span><div class="sizes"><img src="signe.svg" width="64" height="64" alt=""><img src="signe.svg" width="32" height="32" alt=""><img src="signe-16.svg" width="24" height="24" alt=""><img src="signe-16.svg" width="16" height="16" alt=""></div></div>
-            <div class="tile light"><span class="cap">Sur clair (README, papier)</span><div class="sizes"><img src="signe-clair.svg" width="64" height="64" alt=""><img src="signe-clair.svg" width="32" height="32" alt=""><img src="signe-clair.svg" width="16" height="16" alt=""></div></div>
+            <div class="tile light"><span class="cap">Sur clair (README, papier)</span><div class="sizes"><img src="signe-clair.svg" width="64" height="64" alt=""><img src="signe-clair.svg" width="32" height="32" alt=""><svg width="16" height="16" viewBox="0 0 16 16"><use href="#plane" fill="#2e7d32" transform="translate(8 8) rotate(45) scale(0.76) translate(-8 -8)"/></svg></div></div>
         </div>
     </section>
 
@@ -75,14 +81,14 @@
         <h2>La marque</h2>
         <p style="margin-bottom: var(--space-4)">Le signe à 40 px et le nom en monospace, graisse 600, la capitale seule. Le nom n'est pas dessiné : il est typé dans la police de la machine, comme l'interface. Espace de protection : la moitié de la hauteur du signe.</p>
         <div class="grid">
-            <div class="tile"><span class="cap">Dans l'interface et sur sombre</span><div class="wordmark"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="48" width="48" height="8" rx="4" fill="#e0e0e0"/><g fill="#1a1a1a"><rect x="19" y="51" width="8" height="2" rx="1"/><rect x="32" y="51" width="8" height="2" rx="1"/><rect x="45" y="51" width="6" height="2" rx="1"/></g><path d="M16 32 28 44 52 20" fill="none" stroke="#4caf50" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>Clairance</div><span class="cap"><code>marque.svg</code></span></div>
-            <div class="tile light"><span class="cap">Sur clair</span><div class="wordmark" style="color: #1a1a1a"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="48" width="48" height="8" rx="4" fill="#1a1a1a"/><g fill="#fff"><rect x="19" y="51" width="8" height="2" rx="1"/><rect x="32" y="51" width="8" height="2" rx="1"/><rect x="45" y="51" width="6" height="2" rx="1"/></g><path d="M16 32 28 44 52 20" fill="none" stroke="#2e7d32" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>Clairance</div><span class="cap"><code>marque-clair.svg</code></span></div>
+            <div class="tile"><span class="cap">Dans l'interface et sur sombre</span><div class="wordmark"><svg><use href="#s64"/></svg>Clairance</div><span class="cap"><code>marque.svg</code></span></div>
+            <div class="tile light"><span class="cap">Sur clair</span><div class="wordmark" style="color: #1a1a1a"><svg><use href="#s64l"/></svg>Clairance</div><span class="cap"><code>marque-clair.svg</code></span></div>
         </div>
     </section>
 
     <section>
         <h2>Dans un onglet</h2>
-        <p style="margin-bottom: var(--space-4)">Le favicon est le signe sur une tuile de la couleur des panneaux, pour tenir sur une barre d'onglets claire comme sombre. Le titre de la page devient « Clairance ».</p>
+        <p style="margin-bottom: var(--space-4)">Le favicon est l'avion sur une tuile de la couleur des panneaux, pour tenir sur une barre d'onglets claire comme sombre. Le titre de la page est « Clairance ».</p>
         <div class="grid">
             <div class="tile"><span class="cap">Navigateur sombre</span><div class="tabs-dark"><span class="tab"><img src="favicon.svg" alt="">Clairance</span><span class="tab off">FlightAware</span><span class="tab off">GitHub</span></div></div>
             <div class="tile"><span class="cap">Navigateur clair</span><div class="tabs-light"><span class="tab"><img src="favicon.svg" alt="">Clairance</span><span class="tab off">FlightAware</span><span class="tab off">GitHub</span></div></div>
@@ -91,10 +97,10 @@
 
     <section>
         <h2>Dans la barre de menus</h2>
-        <p style="margin-bottom: var(--space-4)">Images « template » : une couleur et de la transparence, le système les teinte. Deux états qui diffèrent par la forme : en marche, la piste et la coche ; à l'arrêt, la piste et la ligne d'attente avant piste (<i>hold short</i>), à 55 %. Ils remplacent les deux symboles SF de <code>tools/menubar/</code>.</p>
+        <p style="margin-bottom: var(--space-4)">Images « template » : une couleur et de la transparence, le système les teinte. Deux états qui diffèrent par la forme : en marche, l'avion monte ; à l'arrêt, il est posé au sol, à plat, à 55 %. Ils remplacent les deux symboles SF de <code>tools/menubar/</code>.</p>
         <div class="grid">
-            <div class="tile"><span class="cap">Barre sombre</span><div class="menubar dark"><span>Lun. 13 oct. 21:14</span><img class="ico" src="barre-menus-marche.svg" alt="en marche"><img class="ico" src="barre-menus-arret.svg" alt="à l'arrêt"><span>􀙇</span></div><span class="cap">en marche · à l'arrêt</span></div>
-            <div class="tile"><span class="cap">Barre claire</span><div class="menubar light"><span>Lun. 13 oct. 21:14</span><img class="ico" src="barre-menus-marche.svg" alt="en marche"><img class="ico" src="barre-menus-arret.svg" alt="à l'arrêt"><span>􀙇</span></div><span class="cap">en marche · à l'arrêt</span></div>
+            <div class="tile"><span class="cap">Barre sombre</span><div class="menubar dark"><span>Lun. 13 oct. 21:14</span><img class="ico" src="barre-menus-marche.svg" alt="en marche"><img class="ico" src="barre-menus-arret.svg" alt="à l'arrêt"><span>◧ ◔</span></div><span class="cap">en marche · à l'arrêt</span></div>
+            <div class="tile"><span class="cap">Barre claire</span><div class="menubar light"><span>Lun. 13 oct. 21:14</span><img class="ico" src="barre-menus-marche.svg" alt="en marche"><img class="ico" src="barre-menus-arret.svg" alt="à l'arrêt"><span>◧ ◔</span></div><span class="cap">en marche · à l'arrêt</span></div>
         </div>
     </section>
 
@@ -102,7 +108,7 @@
         <h2>La page de connexion</h2>
         <p style="margin-bottom: var(--space-4)">Mêmes surfaces et même vert que l'outil ; la marque en tête, la promesse en une phrase. La maquette complète : <a class="c-accent" href="../maquettes/connexion.html">maquettes/connexion.html</a>.</p>
         <form class="card" onsubmit="return false">
-            <div class="wordmark" style="font-size: 16px"><svg style="width: 24px; height: 24px" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="48" width="48" height="8" rx="4" fill="#e0e0e0"/><g fill="#1a1a1a"><rect x="19" y="51" width="8" height="2" rx="1"/><rect x="32" y="51" width="8" height="2" rx="1"/><rect x="45" y="51" width="6" height="2" rx="1"/></g><path d="M16 32 28 44 52 20" fill="none" stroke="#4caf50" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>Clairance</div>
+            <div class="wordmark" style="font-size: 16px"><svg style="width: 24px; height: 24px"><use href="#s64"/></svg>Clairance</div>
             <div><div class="t-title">Sign in</div><p style="font-size: var(--font-size-small); line-height: var(--font-line-height-small)">Runs here, on this station; nothing leaves it. For the listener; it judges no one.</p></div>
             <label class="field"><span class="label">User</span><input class="input" value="listener" autocomplete="username"></label>
             <label class="field"><span class="label">Password</span><input class="input" type="password" value="xxxxxxxxxxxx" autocomplete="current-password"></label>
@@ -113,7 +119,7 @@
     <section>
         <h2>Le bandeau de reprise</h2>
         <p style="margin-bottom: var(--space-4)">Ce qui remplace l'écran d'accueil depuis le 10/10 : une ligne, en haut de la carte, tant qu'une écoute mémorisée attend le premier geste. Le signe y tient lieu de voyant.</p>
-        <div class="banner"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="12" width="12" height="2" rx="1" fill="#e0e0e0"/><path d="M4 8 7 11 13 5" fill="none" stroke="#4caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Approche De Gaulle was on when you left. Click anywhere, or press <kbd>space</kbd>, to resume listening.</span></div>
+        <div class="banner"><svg><use href="#s16"/></svg><span>Approche De Gaulle was on when you left. Click anywhere, or press <kbd>space</kbd>, to resume listening.</span></div>
     </section>
 
     <section>
@@ -130,9 +136,9 @@
     <section>
         <h2>Ce qu'on ne fait pas</h2>
         <div class="dont">
-            <div class="tile"><svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true"><path d="M16 32 28 44 52 20" fill="none" stroke="#4caf50" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="cap">la coche sans la piste : une coche quelconque</span></div>
-            <div class="tile"><svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="48" width="48" height="8" rx="4" fill="#e0e0e0"/><path d="M16 32 28 44 52 20" fill="none" stroke="#ff6e6e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="cap">une autre couleur que le vert de l'outil</span></div>
-            <div class="tile"><svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#4caf50"/><stop offset="1" stop-color="#6cb6ff"/></linearGradient></defs><rect x="8" y="48" width="48" height="8" rx="4" fill="#e0e0e0"/><path d="M16 32 28 44 52 20" fill="none" stroke="url(#g)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="cap">dégradé, ombre, relief</span></div>
+            <div class="tile"><svg width="40" height="40" viewBox="0 0 16 16"><use href="#plane" fill="#4caf50" transform="translate(8 8) rotate(0) scale(0.76) translate(-8 -8)"/></svg><span class="cap">l'avion à la verticale ou à plat : il monte, à 45°</span></div>
+            <div class="tile"><svg width="40" height="40" viewBox="0 0 16 16"><use href="#plane" fill="#ff6e6e" transform="translate(8 8) rotate(45) scale(0.76) translate(-8 -8)"/></svg><span class="cap">une autre couleur que le vert de l'outil</span></div>
+            <div class="tile"><svg width="40" height="40" viewBox="0 0 16 16"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#4caf50"/><stop offset="1" stop-color="#6cb6ff"/></linearGradient></defs><use href="#plane" fill="url(#g)" transform="translate(8 8) rotate(45) scale(0.76) translate(-8 -8)"/></svg><span class="cap">dégradé, ombre, relief, traînée</span></div>
             <div class="tile"><span style="font: 600 22px/1 var(--font-family-text); letter-spacing: .1em">CLAIRANCE</span><span class="cap">le nom en capitales ou dans une autre police</span></div>
         </div>
     </section>
