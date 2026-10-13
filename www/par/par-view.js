@@ -17,11 +17,9 @@
     const SVG_NS = 'http://www.w3.org/2000/svg';
 
     // Same colours as the aircraft labels on the map (aircraft-webgl.js).
-    const PHASE_COLORS = {
-        'NEW': '#9CA3AF', 'TAX': '#C084FC', 'T/O': '#FB923C', 'CLB': '#A3E635',
-        'DEP': '#4ADE80', 'CRZ': '#60A5FA', 'ARR': '#F9A8D4', 'APP': '#FACC15',
-        'T/D': '#2DD4BF', 'UNK': '#94A3B8',
-    };
+    // The five families of the design system (www/phase/phase-families.js,
+    // migration step 2): the PAR paints an aircraft in its family's colour.
+    const phaseColor = (code) => (window.PhaseFamilies ? window.PhaseFamilies.colorOf(code) : "#969696");
     const C = {
         grid: '#262626', gridStrong: '#3a3a3a', label: '#8a8a8a', text: '#e0e0e0',
         highlight: '#4CAF50', transition: '#FFC107', runway: '#bdbdbd', cone: '#4a4a4a',
@@ -638,7 +636,7 @@
                     pe.push([x(uu), y(alt)]);
                     pa.push([x(uu), yAz(pr.c)]);
                 }
-                const col = PHASE_COLORS[phaseOf(it.a)] || PHASE_COLORS.UNK;
+                const col = phaseColor(phaseOf(it.a));
                 poly(pe, col, 'stroke-opacity="0.35"');
                 poly(pa, col, 'stroke-opacity="0.35"');
             }
@@ -655,7 +653,7 @@
             const alt = a.on_ground ? g.ground : it.altFt;
             const py = g.y(alt);
             const ay = g.yAz(p.c);
-            const col = PHASE_COLORS[phaseOf(a)] || PHASE_COLORS.UNK;
+            const col = phaseColor(phaseOf(a));
             // Faded when off the axis: in the cone, but not lined up.
             const off = p.side !== 'rwy' && Math.abs(p.azimuthDeg) > g.opts.azToleranceDeg;
             const sel = a.hex === g.selected;

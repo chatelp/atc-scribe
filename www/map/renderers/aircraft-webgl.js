@@ -299,31 +299,37 @@
         return BRIGHT_MAP_STYLES.includes((store?.settings?.mapStyle || 'none').toLowerCase());
     }
 
-    function getAltitudeBandColor(aircraft, store) {
-        const band = getAltitudeColorBand(aircraft, store);
-        const isBrightMap = isBrightMapStyle(store);
+    // The altitude of an aircraft on the map is a ramp of lightness without hue
+    // (design system, migration step 2): the lower, the lighter on a dark map,
+    // the darker on a bright one; the label carries the phase's colour. The
+    // values are the tokens color.altitude.dark-* and light-* (www/tokens.css),
+    // read once from the page, the same hex as fallbacks for a canvas.
+    const ALTITUDE_RAMP = {
+        dark: { 'very-low': '#f5f5f5', low: '#cfcfcf', mid: '#a8a8a8', high: '#858585', cruise: '#6b6b6b' },
+        light: { 'very-low': '#141414', low: '#333333', mid: '#4d4d4d', high: '#666666', cruise: '#808080' },
+    };
+    let altitudeRampCache = null;
 
-        if (isBrightMap) {
-            switch (band) {
-                case 'high': return '#0E7490';
-                case 'mid': return '#B45309';
-                case 'low': return '#C2410C';
-                case 'very-low': return '#B91C1C';
-                case 'cruise':
-                default:
-                    return '#1D4ED8';
+    function altitudeRamp() {
+        if (altitudeRampCache) return altitudeRampCache;
+        const ramp = { dark: { ...ALTITUDE_RAMP.dark }, light: { ...ALTITUDE_RAMP.light } };
+        if (typeof document !== 'undefined' && document.documentElement) {
+            const cs = getComputedStyle(document.documentElement);
+            for (const theme of ['dark', 'light']) {
+                for (const band of Object.keys(ramp[theme])) {
+                    const v = cs.getPropertyValue(`--color-altitude-${theme}-${band}`).trim();
+                    if (v) ramp[theme][band] = v;
+                }
             }
         }
+        altitudeRampCache = ramp;
+        return ramp;
+    }
 
-        switch (band) {
-            case 'high': return '#F8D857';
-            case 'mid': return '#F4B55A';
-            case 'low': return '#EA8A4A';
-            case 'very-low': return '#D35A48';
-            case 'cruise':
-            default:
-                return '#E8ECEF';
-        }
+    function getAltitudeBandColor(aircraft, store) {
+        const band = getAltitudeColorBand(aircraft, store);
+        const ramp = altitudeRamp()[isBrightMapStyle(store) ? 'light' : 'dark'];
+        return ramp[band] || ramp.cruise;
     }
 
     function getAircraftSymbolColor(aircraft, visualState, store) {
@@ -376,20 +382,11 @@
         return '↔';
     }
 
+    // The five families of the design system (www/phase/phase-families.js,
+    // migration step 2): one colour per family, the code written on the label.
     function getPhaseLabelColor(phase) {
-        const phaseColorMap = {
-            'NEW': '#9CA3AF',
-            'TAX': '#C084FC',
-            'T/O': '#FB923C',
-            'CLB': '#A3E635',
-            'DEP': '#4ADE80',
-            'CRZ': '#60A5FA',
-            'ARR': '#F9A8D4',
-            'APP': '#FACC15',
-            'T/D': '#2DD4BF',
-            'UNK': '#94A3B8',
-        };
-        return phaseColorMap[phase] || '#9CA3AF';
+        const P = window.PhaseFamilies;
+        return P ? P.colorOf(phase) : '#969696';
     }
 
     function getAircraftLabelParts(aircraft, store) {

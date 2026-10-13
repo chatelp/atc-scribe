@@ -446,20 +446,22 @@
         },
 
         // Get phase color class (matches navigation bar colors)
+        // The five families of the design system (www/phase/phase-families.js,
+        // migration step 2): the text colour of a phase code, and the badge's
+        // classes, outlined, or solid for T/O and T/D.
         getPhaseColorClass(phase) {
-            const phaseColorMap = {
-                'NEW': 'text-gray-400',
-                'TAX': 'text-purple-400',
-                'T/O': 'text-orange-400',
-                'CLB': 'text-lime-400',
-                'DEP': 'text-green-400',
-                'CRZ': 'text-blue-400',
-                'ARR': 'text-pink-300',
-                'APP': 'text-yellow-400',
-                'T/D': 'text-teal-400',
-                'UNK': 'text-slate-400'
-            };
-            return phaseColorMap[phase] || 'text-gray-400';
+            const P = window.PhaseFamilies;
+            return P ? P.textClass(phase) : 'text-text/60';
+        },
+
+        phaseBadgeClasses(aircraft) {
+            return this.phaseCodeBadgeClasses(this.getCurrentPhase(aircraft));
+        },
+
+        // The same, from a phase code (the phase history of the details panel).
+        phaseCodeBadgeClasses(code) {
+            const P = window.PhaseFamilies;
+            return P ? P.badgeClasses(code) : '';
         },
 
         // Get phase icon class
