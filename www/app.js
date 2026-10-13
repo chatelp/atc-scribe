@@ -564,7 +564,6 @@ document.addEventListener('alpine:init', () => {
 
         toggleVoiceBubbles() {
             this.saveSettings();
-            if (this.mapManager && this.mapManager.voiceBubbles) this.mapManager.voiceBubbles.refresh();
         },
 
         togglePaths() {

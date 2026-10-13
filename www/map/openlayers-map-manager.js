@@ -1111,8 +1111,6 @@
             });
             this.engine.init();
             this._olMap = this.engine.getMap();
-            // Speech bubbles over the aircraft the radio named (voice-bubbles-feature.js).
-            this.voiceBubbles = window.MapVoiceBubbles ? window.MapVoiceBubbles.create(this, this.store) : null;
             console.info('[OpenLayersMapManager] OpenLayers map initialized');
 
             if (!window.MapAircraftWebGLRenderer || !window.MapAircraftWebGLRenderer.createAircraftWebGLRenderer) {
@@ -1282,7 +1280,6 @@
 
             const coordinate = this._toMapCoordinate(lat, lon);
             geometry.setCoordinates(coordinate);
-            if (this.voiceBubbles) this.voiceBubbles.move(hex, coordinate);
 
             const headingDeg = Number(pose.heading);
             if (Number.isFinite(headingDeg)) {

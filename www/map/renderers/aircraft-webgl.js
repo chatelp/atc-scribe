@@ -401,6 +401,7 @@
                 typeText: '',
                 detailsText: '',
                 ageText: '',
+                voiceText: '',
             };
         }
 
@@ -446,7 +447,28 @@
             ageText: (ageSeconds === null || !Number.isFinite(ageSeconds) || ageSeconds < 5)
                 ? ''
                 : `-${Math.max(0, ageSeconds)}s`,
+            voiceText: getVoiceLabelLine(aircraft, store),
         };
+    }
+
+    // The last transmission matched to the aircraft, as a third line of its
+    // label (13/10, owner's request): the separate speech bubble of 12/10 sat
+    // over the label and hid it. Shown for ten minutes after it was heard, cut
+    // short, off when the "last transmission on the label" setting is.
+    const VOICE_LINE_WINDOW_MS = 10 * 60 * 1000;
+    const VOICE_LINE_MAX_CHARS = 40;
+    // One line of the 11 px label, at OpenLayers' default line height of 1.2.
+    const LABEL_LINE_PX = 13;
+
+    function getVoiceLabelLine(aircraft, store) {
+        if (store?.settings?.voiceBubbles === false) return '';
+        const v = aircraft?.voice;
+        if (!v || !v.last_text || !v.last_heard) return '';
+        const heard = Date.parse(v.last_heard);
+        if (!Number.isFinite(heard) || Date.now() - heard > VOICE_LINE_WINDOW_MS) return '';
+        const t = String(v.last_text).replace(/\s+/g, ' ').trim();
+        if (!t) return '';
+        return '“' + (t.length > VOICE_LINE_MAX_CHARS ? t.slice(0, VOICE_LINE_MAX_CHARS - 1).trimEnd() + '…' : t) + '”';
     }
 
     function createAircraftWebGLRenderer(map, options) {
@@ -489,7 +511,7 @@
             const properties = feature.getProperties();
             const aircraft = store?.aircraft?.[properties.hex] || null;
             const labelParts = (store?.settings?.showLabels === false)
-                ? { callsignText: '', typeText: '', detailsText: '', ageText: '' }
+                ? { callsignText: '', typeText: '', detailsText: '', ageText: '', voiceText: '' }
                 : getAircraftLabelParts(aircraft, store);
 
             const isActiveAircraft = aircraft?.status === 'active';
@@ -527,7 +549,8 @@
             const textOpacity = baseTextOpacity * labelAgeFade;
             const labelLineOne = `${labelParts.phaseText || ''}${labelParts.callsignText || ''}${labelParts.typeText || ''}`;
             const labelLineTwo = `${labelParts.detailsText || ''}`;
-            const longestLabelLineLength = Math.max(labelLineOne.length, labelLineTwo.length);
+            const labelLineThree = `${labelParts.voiceText || ''}`;
+            const longestLabelLineLength = Math.max(labelLineOne.length, labelLineTwo.length, labelLineThree.length);
             const estimatedLabelWidthPx = Math.max(72, Math.round(longestLabelLineLength * 6.4) + 12);
             const labelBorderColor = brightMap
                 ? hexToRgba('#111827', (deemphasized ? 0.7 : 0.85) * labelAgeFade)
@@ -587,9 +610,13 @@
                 text: new window.ol.style.Text({
                     text: labelParts.callsignText
                         ? `${labelParts.phaseText || ''}${labelParts.callsignText}${labelParts.typeText}\n${labelParts.detailsText}`
+                            + (labelParts.voiceText ? `\n${labelParts.voiceText}` : '')
                         : '',
                     font: '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                    offsetY: -(iconSize / 2 + 8),
+                    // A third line (the last transmission) grows the block by one
+                    // line: the block moves up by half of it, so its bottom stays
+                    // where the two-line label's was, clear of the icon.
+                    offsetY: -(iconSize / 2 + 8 + (labelParts.voiceText ? LABEL_LINE_PX / 2 : 0)),
                     textAlign: 'left',
                     fill: new window.ol.style.Fill({ color: hexToRgba(labelColor, textOpacity) }),
                     backgroundFill: new window.ol.style.Fill({ color: labelBackgroundColor }),
@@ -603,7 +630,8 @@
                     text: new window.ol.style.Text({
                         text: labelParts.phaseText,
                         font: '700 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                        offsetY: -(iconSize / 2 + 14),
+                        // Drawn over the first line, which a third line moves up by one.
+                        offsetY: -(iconSize / 2 + 14 + (labelParts.voiceText ? LABEL_LINE_PX : 0)),
                         textAlign: 'left',
                         fill: new window.ol.style.Fill({ color: hexToRgba(labelParts.phaseColor || '#9CA3AF', textOpacity) }),
                     }),

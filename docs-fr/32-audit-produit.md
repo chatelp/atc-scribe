@@ -492,6 +492,21 @@ sur la carte.
 
 ## État
 
+- 13/10 (soir) : **la bulle de dernière transmission fusionne dans l'étiquette de l'avion**
+  (demande du propriétaire : la bulle du 12/10 recouvrait l'étiquette d'identification, et
+  elle n'était pas dans le design). La dernière transmission devient la **troisième ligne de
+  l'étiquette** (entre guillemets, 40 caractères, dix minutes), dessinée avec elle ; la bulle à
+  part, son fichier, ses styles et son câblage sont retirés (garde-fou 7). Le réglage garde sa
+  clé (`voiceBubbles`), relibellé « Last transmission on the label ». Le clic sur l'avion ouvre
+  sa fiche, où la transmission se lit ; le saut direct vers la ligne du fil reviendra avec le
+  fil unifié de la migration (D77). **Vérification « aucune fonction perdue »** par le
+  propriétaire : la table de `09-ecrans.md` couvre les seize fonctions déplacées ; l'inventaire
+  de la page (51 actions, 28 champs de réglage, 13 raccourcis, 43 clés) relevé contre les écrans
+  trouve **huit réglages non dessinés**, à inscrire comme gardés : les six opacités de calques,
+  la longueur des traînées et la limite de pistes, la bulle de dernière transmission, les trois
+  réglages d'animation et le bouton WebSocket de « Performance and debug », l'exclusion des
+  avions au sol des autres aérodromes ; et le choix « accès local / compte » de la page de
+  connexion, qui passe au premier lancement et aux réglages (déplacé, pas perdu).
 - 13/10 (après-midi) : **trois petits chantiers pour le panneau « Right now »** des esquisses
   design, validés par le propriétaire après l'état des lieux (ce que la page peut afficher
   aujourd'hui, vérifié ligne par ligne) : (1) le journal d'événements survit au rechargement

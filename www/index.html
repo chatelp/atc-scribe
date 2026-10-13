@@ -49,7 +49,6 @@
     <!-- 5) Map feature modules (user interactions and contextual overlays) -->
     <script defer src="map/features/interactions-feature.js"></script>
     <script defer src="map/features/proximity-feature.js"></script>
-    <script defer src="map/features/voice-bubbles-feature.js"></script>
     <script defer src="map/features/minimap-feature.js"></script>
 
     <!-- 6) Map renderers (facades first, concrete aircraft renderer second) -->
@@ -278,8 +277,8 @@
                             <div class="grid gap-4">
                                 <div class="grid gap-3">
                                     <div class="flex items-center justify-between gap-2.5"
-                                         data-help-title="Speech bubbles" data-help="Over each aircraft the radio has named in the last ten minutes, its last transmission in a bubble; a click opens the transcript at it. Off, the map shows only the labels.">
-                                        <span class="text-sm">Speech bubbles on the map</span>
+                                         data-help-title="Last transmission on the label" data-help="Under the callsign of each aircraft the radio has named in the last ten minutes, its last transmission, cut short. Click the aircraft to read it in full in its details.">
+                                        <span class="text-sm">Last transmission on the label</span>
                                         <label class="switch">
                                             <input type="checkbox" x-model="$store.atc.settings.voiceBubbles" @change="$store.atc.toggleVoiceBubbles()">
                                             <span class="slider"></span>
