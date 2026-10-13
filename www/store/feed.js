@@ -315,9 +315,10 @@
                 // ALWAYS add to aircraft store - filtering is done at display level
                 this.aircraft[data.aircraft.hex] = data.aircraft;
 
-                // Update animation engine with new aircraft data
+                // The engine, dated by the position's time (observed_at, seen, seen_pos)
                 if (this.animationEngine) {
-                    this.animationEngine.updateAircraft(data.aircraft, observedAtMs);
+                    this.animationEngine.observe(data.aircraft.hex,
+                        this.animationEngine.sampleFromAircraft(data.aircraft, observedAtMs));
                 }
 
                 // Queue for throttled map update (map will handle visibility based on filters)
@@ -370,8 +371,11 @@
                 this.calculateAircraftDistance(existing);
 
                 // Update animation engine with delta
+                // The engine: the aircraft with the delta applied, dated by the
+                // seen and seen_pos of the aircraft the message carries
                 if (this.animationEngine) {
-                    this.animationEngine.updateAircraftDelta(hex, data.delta, observedAtMs);
+                    this.animationEngine.observe(hex,
+                        this.animationEngine.sampleFromAircraft(existing, observedAtMs, data.aircraft?.adsb));
                 }
 
                 // Queue map update - map will handle visibility based on filters
@@ -399,7 +403,8 @@
                 this.calculateAircraftDistance(data.aircraft);
 
                 if (this.animationEngine) {
-                    this.animationEngine.updateAircraft(data.aircraft, observedAtMs);
+                    this.animationEngine.observe(data.aircraft.hex,
+                        this.animationEngine.sampleFromAircraft(data.aircraft, observedAtMs));
                 }
 
                 // Queue map update - map will handle visibility based on filters
@@ -441,6 +446,7 @@
                 gs: delta.gs,
                 confidence: Number(delta.confidence),
                 at: Date.parse(data.predicted_at || ''),
+                sentAt: Date.parse(data.predicted_at || ''),
                 basedOn: Date.parse(data.based_on || ''),
             });
         },
