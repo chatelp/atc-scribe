@@ -1,11 +1,28 @@
 # L'identité : Clairance
 
-*13/10/2026, session design. Le nom est décidé par le propriétaire le 13/10 (D74, `00-nom.md` § 4).
-Ce document dit comment la marque est construite et comment on s'en sert. Les fichiers sont dans
-`identite/` ; la planche de présentation est `identite/index.html` (à ouvrir en servant
-`docs-fr/design/`, comme les maquettes). Première version avec une piste et une coche, le 13/10
-au matin ; le propriétaire ne reconnaissait pas la piste à petite taille, l'avion l'a remplacée
-le soir même.*
+*13/10/2026, session design. Le nom est décidé par le propriétaire le 13/10 (D74, `00-nom.md` § 4),
+le signe le même jour. Ce document dit comment la marque est construite et comment on s'en sert.
+Les fichiers sont dans `identite/` ; la planche de présentation est `identite/index.html` (à ouvrir
+en servant `docs-fr/design/`, comme les maquettes).*
+
+## Comment le signe a été choisi
+
+Le 13/10, dans l'ordre :
+1. une **piste et une coche** « autorisé » : la piste, une barre plate, n'était pas reconnaissable
+   à petite taille (le propriétaire) ;
+2. un **avion pictogramme** qui décolle : le propriétaire n'aimait pas la forme de l'avion, et a
+   demandé d'abord l'inventaire des avions de l'interface, puis notre propre famille
+   (`06-avions.md`), dans laquelle choisir ;
+3. sur la planche finale (huit signes aux mêmes tailles et dans les mêmes usages : trois tours de
+   contrôle, trois radars, deux avions de la famille), le propriétaire a retenu **R1, le scope
+   radar**.
+
+Ce qui a pesé : le scope se lit à 16 px (un cercle, un trait, un point) ; son noir et son vert sont
+ceux de l'outil, la marque et l'interface parlent la même langue ; il met moins le contrôleur au
+centre qu'une tour. Ce qui reste à savoir : c'est l'image la plus attendue pour un outil qui affiche
+une carte, et les traqueurs de vols l'emploient sans doute (non vérifié) ; le registre du radar est
+aussi celui de la surveillance, que la présentation doit désamorcer par ses mots (les trois messages
+de `00-nom.md` § 1). L'avion de la famille reste celui de la carte.
 
 ## Le nom
 
@@ -16,29 +33,29 @@ les fichiers s'écrivent `clairance`.
 
 ## Le signe
 
-**Un avion qui s'arrache de la piste**, autorisé au décollage : la clairance que tout le monde
-connaît (« autorisé décollage »). C'est un pictogramme trapu, dans l'esprit des pictogrammes
-d'aéroport (les « départs » de Cook et Shanosky, 1974), choisi pour rester un avion à 16 px : un
-avion fin s'efface sous 24 px (mesuré dans un onglet de navigateur, 13/10).
+**Le scope radar** : le cercle de l'écran, un anneau de distance, le balayage et le plot qu'il
+vient d'afficher.
 
-Construction :
-- **l'avion** est dessiné sur une grille de 16, nez en haut, centré sur (8, 8) : fuselage de 4 de
-  large, ailes en flèche jusqu'à (1, 12,5) et (15, 12,5), empennage jusqu'à (4,2, 15,2) et
-  (11,8, 15,2). Son tracé est le même dans tous les fichiers :
-  `M8 1 L10 3.5 L10 5 L15 10.5 L15 12.5 L10 9.5 L10 12 L11.8 13.8 L11.8 15.2 L8 14 L4.2 15.2 L4.2 13.8 L6 12 L6 9.5 L1 12.5 L1 10.5 L6 5 L6 3.5 Z` ;
-- il est **tourné de 45°**, nez vers le haut à droite : il monte ;
-- **à 64**, il est posé à l'échelle 3,3 autour de (36, 26) ; **la piste qu'il quitte** est une barre
-  de 28 × 6 à (3, 55), rayon 3, sous sa queue ;
-- **à 16** (onglet, en-tête, barre de menus), l'avion seul, à l'échelle 0,76 autour de (8, 8) :
-  la barre n'apporterait qu'un trait sous un avion de 10 px. La règle : la piste apparaît à
-  partir de 32 px.
+Construction, sur une grille de 64, centre (32, 32) :
+- **le cercle de l'écran** : rayon 26,5, trait de 4 ;
+- **un anneau de distance** : rayon 13, trait de 2, à 55 % ;
+- **le balayage** : un trait de 4, bouts ronds, du centre jusqu'à 45° (nord-est) ;
+- **la lueur** qu'il laisse derrière lui : le secteur de 0° à 45°, vert à 35 %. Le balayage
+  tourne dans le sens des aiguilles d'une montre, la lueur est donc du côté de 0° ;
+- **un plot** : un disque de rayon 3,8 à 25° et à 17 du centre, dans la lueur, celui que le
+  balayage vient de peindre.
 
-Couleurs : l'avion en `accent` (`#4caf50`), la piste en `text.primary` (`#e0e0e0`). Sur fond
-clair : avion `#2e7d32` (5,1:1 sur blanc), piste `#1a1a1a`. En une couleur (barre de menus,
-gravure) : tout dans la même teinte.
+**À 16 px** (`signe-16.svg`) : la même grille divisée par quatre, sans l'anneau de distance (il
+ferait une tache grise), les traits portés de 1 à 1,6 pour garder un pixel plein. Le plot a un
+rayon de 1,15.
 
-Pourquoi un avion vert et non gris : le vert est la voix de l'outil, ce qui est vivant ; l'avion
-qui décolle est ce qui vit. La piste, elle, est du décor, dans la couleur du texte.
+Couleurs : le cercle et l'anneau en `text.primary` (`#e0e0e0`) ; le balayage, la lueur et le plot
+en `accent` (`#4caf50`). Sur fond clair : cercle `#1a1a1a`, vert `#2e7d32` (5,1:1 sur blanc), lueur
+à 25 %. En une couleur (barre de menus, gravure) : tout dans la même teinte, la lueur à 35 %.
+
+**Le signe ne bouge pas.** Un balayage qui tourne serait l'animation décorative que le principe 5
+exclut. Le seul usage animé envisageable est l'indicateur de chargement (le balayage fait un tour
+pendant l'attente) : à décider à la migration, jamais en boucle permanente.
 
 ## La marque
 
@@ -54,10 +71,10 @@ marque complète : 24 px de signe ; en dessous, le signe seul.
 
 | Fichier | Usage |
 |---|---|
-| `signe.svg` | le signe, 64, fond sombre, avec la piste ; source des tailles ≥ 32 |
+| `signe.svg` | le signe, 64, fond sombre ; source des tailles ≥ 24 |
 | `signe-clair.svg` | fond clair (README en thème clair, papier) |
-| `signe-16.svg` | l'avion seul, pour l'onglet, l'en-tête et tout ce qui est sous 32 px |
-| `favicon.svg` | tuile `#1a1a1a` à coins de 7, l'avion au centre ; à exporter en 16, 32, 180 (iOS) et 512 (manifeste) |
+| `signe-16.svg` | sans l'anneau de distance, pour l'onglet, l'en-tête et tout ce qui est sous 24 px |
+| `favicon.svg` | tuile `#1a1a1a` à coins de 7, le scope au centre ; à exporter en 16, 32, 180 (iOS) et 512 (manifeste) |
 | `marque.svg`, `marque-clair.svg` | signe et nom |
 | `barre-menus-marche.svg`, `barre-menus-arret.svg` | images « template » de 18 pt pour `tools/menubar/` |
 | `index.html` | la planche : tailles, onglet, barre de menus, connexion, bandeau, README, interdits |
@@ -67,24 +84,23 @@ Export en PNG, quand il faudra : `rsvg-convert -w 512 signe.svg > signe-512.png`
 ## La barre de menus
 
 Deux états, qui diffèrent **par la forme** et pas seulement par la teinte (principe 6) :
-- **en marche** : l'avion monte, à 45°, plein ;
-- **à l'arrêt** : l'avion est posé, à plat, nez à droite, sur la barre du sol ; l'ensemble à 55 %
-  d'opacité.
+- **en marche** : le cercle, le balayage, sa lueur et le plot ;
+- **à l'arrêt** : l'écran vide, le cercle et son seul centre, à 55 % d'opacité.
 
 Ce sont des images « template » (noir et transparence) : macOS les teinte pour la barre claire,
 la barre sombre et l'état pressé. Elles remplacent `dot.radiowaves.left.and.right` et
 `antenna.radiowaves.left.and.right.slash` dans `tools/menubar/AtcScribe.swift`. Un troisième
-état « dégradé » (sidecar tombé) pourra ajouter le triangle des voyants ; non dessiné.
+état « dégradé » (sidecar tombé) pourra remplacer le plot par le triangle des voyants ; non dessiné.
 
 ## Où elle apparaît
 
-- **L'en-tête de l'outil** : l'avion à 20 px et « Clairance » en monospace 600, à gauche de la
-  barre d'état (esquisses A, B, C). Au téléphone, l'avion seul.
+- **L'en-tête de l'outil** : le signe à 20 px et « Clairance » en monospace 600, à gauche de la
+  barre d'état (esquisses A, B, C). Au téléphone, le signe seul.
 - **L'onglet** : favicon et `<title>Clairance</title>`, plus un manifeste d'application avec
   `theme-color` `#0a0a0a`, pour que le téléphone l'ajoute à son écran d'accueil.
 - **La connexion** : la marque en tête de la carte, puis « Sign in » et la promesse en une
   phrase (`maquettes/connexion.html`).
-- **Le bandeau de reprise** : l'avion tient lieu de voyant devant « click anywhere to resume
+- **Le bandeau de reprise** : le signe tient lieu de voyant devant « click anywhere to resume
   listening ».
 - **Le README** : `<picture>` qui sert `signe.svg` ou `signe-clair.svg` selon le thème, le nom en
   titre, et la première phrase qui porte les trois messages (`00-nom.md` § 1) : *Hear the airband
@@ -95,11 +111,12 @@ la barre sombre et l'état pressé. Elles remplacent `dot.radiowaves.left.and.ri
 
 ## Ce qu'on ne fait pas
 
-- l'avion à la verticale, à plat ou en descente : il monte, à 45° (à plat, c'est l'état
-  « arrêté » de la barre de menus, et rien d'autre) ;
-- une autre couleur que le vert de l'outil, un dégradé, une ombre, un relief, une traînée ;
-- le nom en capitales, dans une autre police, ou avec le signe à droite ;
-- une antenne, des ondes, une coche autour de l'avion : il est complet.
+- le cercle sans le balayage : ce n'est plus un radar (sauf l'état « arrêté » de la barre de
+  menus, et rien d'autre) ;
+- d'autres plots, un avion dans l'écran, une grille, des graduations : un seul plot ;
+- une autre couleur que le vert de l'outil, un dégradé, une ombre, un relief, un reflet de verre ;
+- le balayage ailleurs qu'à 45°, ou qui tourne en boucle ;
+- le nom en capitales, dans une autre police, ou avec le signe à droite.
 
 ## Ce qui reste
 

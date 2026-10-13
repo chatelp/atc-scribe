@@ -123,7 +123,11 @@ planeur.
 Tailles sur la carte proposées : inconnu 18, léger 20, affaires, hélicoptère et planeur 22,
 turbopropulseur 24, moyen-courrier 26, gros-porteur 30, quadriréacteur 32 px.
 
-Ce qui reste ouvert : le choix de l'avion du logo dans la famille (le propriétaire choisit) ;
+Le logo, finalement, n'est pas un avion : le 13/10, sur une planche de huit signes (trois tours,
+trois radars, deux avions de la famille), le propriétaire a retenu le scope radar
+(`05-identite.md`). La famille reste celle de la carte.
+
+Ce qui reste ouvert :
 l'adaptation des règles de `getAircraftIconClass` aux neuf classes (un code de type → une classe,
 par la base `aircraft.csv` et la catégorie ADS-B) ; le remplacement des 28 fichiers de
 `www/assets/`, au moment de la migration.

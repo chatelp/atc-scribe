@@ -1,9 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Clairance">
-  <title>Clairance — the sign: the aircraft climbing away from the runway, cleared for take-off</title>
-  <!-- The aircraft is a 16-grid pictogram (nose up, centred on 8,8), in the
-       spirit of the airport pictograms; here scaled 3.3 and turned 45° so it
-       climbs to the upper right. The runway it leaves is the bar under its
-       tail; it appears from 32 px up (signe-16.svg has the aircraft alone). -->
-  <rect x="3" y="55" width="28" height="6" rx="3" fill="#e0e0e0"/>
-  <path d="M8 1 L10 3.5 L10 5 L15 10.5 L15 12.5 L10 9.5 L10 12 L11.8 13.8 L11.8 15.2 L8 14 L4.2 15.2 L4.2 13.8 L6 12 L6 9.5 L1 12.5 L1 10.5 L6 5 L6 3.5 Z" fill="#4caf50" transform="translate(36 26) rotate(45) scale(3.3) translate(-8 -8)"/>
+  <title>Clairance — the sign: a radar scope, its sweep and the blip it has just painted</title>
+  <!-- 64 grid, centre (32, 32). The screen's ring (r 26.5, stroke 4), one
+       range ring (r 13, stroke 2, 55 %), the sweep at 45° (north-east) with the
+       afterglow it leaves behind it (0° to 45°, green at 35 %: the sweep turns
+       clockwise), and one blip at 25°, 17 from the centre, inside the glow. -->
+  <circle cx="32" cy="32" r="26.5" fill="none" stroke="#e0e0e0" stroke-width="4"/>
+  <circle cx="32" cy="32" r="13" fill="none" stroke="#e0e0e0" stroke-width="2" opacity="0.55"/>
+  <path d="M32 32 L32 6 A26 26 0 0 1 50.385 13.615 Z" fill="#4caf50" fill-opacity="0.35"/>
+  <path d="M32 32 L50.385 13.615" fill="none" stroke="#4caf50" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="39.18" cy="16.59" r="3.8" fill="#4caf50"/>
 </svg>

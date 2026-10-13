@@ -57,23 +57,22 @@
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <path id="plane" d="M8 1 L10 3.5 L10 5 L15 10.5 L15 12.5 L10 9.5 L10 12 L11.8 13.8 L11.8 15.2 L8 14 L4.2 15.2 L4.2 13.8 L6 12 L6 9.5 L1 12.5 L1 10.5 L6 5 L6 3.5 Z"/>
-    <symbol id="s64" viewBox="0 0 64 64"><rect x="3" y="55" width="28" height="6" rx="3" fill="#e0e0e0"/><use href="#plane" fill="#4caf50" transform="translate(36 26) rotate(45) scale(3.3) translate(-8 -8)"/></symbol>
-    <symbol id="s16" viewBox="0 0 16 16"><use href="#plane" fill="#4caf50" transform="translate(8 8) rotate(45) scale(0.76) translate(-8 -8)"/></symbol>
-    <symbol id="s64l" viewBox="0 0 64 64"><rect x="3" y="55" width="28" height="6" rx="3" fill="#1a1a1a"/><use href="#plane" fill="#2e7d32" transform="translate(36 26) rotate(45) scale(3.3) translate(-8 -8)"/></symbol>
+    <symbol id="s64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26.5" fill="none" stroke="#e0e0e0" stroke-width="4"/><circle cx="32" cy="32" r="13" fill="none" stroke="#e0e0e0" stroke-width="2" opacity=".55"/><path d="M32 32 L32 6 A26 26 0 0 1 50.385 13.615 Z" fill="#4caf50" fill-opacity=".35"/><path d="M32 32 L50.385 13.615" fill="none" stroke="#4caf50" stroke-width="4" stroke-linecap="round"/><circle cx="39.18" cy="16.59" r="3.8" fill="#4caf50"/></symbol>
+    <symbol id="s64l" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26.5" fill="none" stroke="#1a1a1a" stroke-width="4"/><circle cx="32" cy="32" r="13" fill="none" stroke="#1a1a1a" stroke-width="2" opacity=".4"/><path d="M32 32 L32 6 A26 26 0 0 1 50.385 13.615 Z" fill="#2e7d32" fill-opacity=".25"/><path d="M32 32 L50.385 13.615" fill="none" stroke="#2e7d32" stroke-width="4" stroke-linecap="round"/><circle cx="39.18" cy="16.59" r="3.8" fill="#2e7d32"/></symbol>
+    <symbol id="s16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.6" fill="none" stroke="#e0e0e0" stroke-width="1.6"/><path d="M8 8 L8 1.6 A6.4 6.4 0 0 1 12.525 3.475 Z" fill="#4caf50" fill-opacity=".35"/><path d="M8 8 L12.525 3.475" fill="none" stroke="#4caf50" stroke-width="1.6" stroke-linecap="round"/><circle cx="9.78" cy="4.19" r="1.15" fill="#4caf50"/></symbol>
 </svg>
 <main>
     <header>
         <h1 class="t-display">Clairance — l'identité</h1>
-        <p style="margin-top: var(--space-2)">Le nom est décidé le 13/10 (D74). La marque est un système : un signe, le nom typé, un vert. Elle se décline sans rien redessiner. Construction et règles dans <code>05-identite.md</code>.</p>
+        <p style="margin-top: var(--space-2)">Le nom est décidé le 13/10 (D74), le signe le même jour : le scope radar (R1). La marque est un système : un signe, le nom typé, un vert. Elle se décline sans rien redessiner. Construction et règles dans <code>05-identite.md</code>.</p>
     </header>
 
     <section>
         <h2>Le signe</h2>
-        <p style="margin-bottom: var(--space-4)">Un avion qui s'arrache de la piste, autorisé au décollage : la clairance que tout le monde connaît. Un pictogramme trapu, dans l'esprit de ceux des aéroports, qui reste un avion à 16 px. La piste qu'il quitte, une barre sous sa queue, apparaît à partir de 32 px.</p>
+        <p style="margin-bottom: var(--space-4)">L'écran radar : son cercle, un anneau de distance, le balayage à 45° avec la lueur qu'il laisse derrière lui, et le plot qu'il vient d'afficher. Le noir et le vert du scope sont ceux de l'outil. À 16 px, l'anneau de distance disparaît : un cercle, un trait, un point.</p>
         <div class="grid">
             <div class="tile"><span class="cap">Sur sombre, 64 · 32 · 24 · 16</span><div class="sizes"><img src="signe.svg" width="64" height="64" alt=""><img src="signe.svg" width="32" height="32" alt=""><img src="signe-16.svg" width="24" height="24" alt=""><img src="signe-16.svg" width="16" height="16" alt=""></div></div>
-            <div class="tile light"><span class="cap">Sur clair (README, papier)</span><div class="sizes"><img src="signe-clair.svg" width="64" height="64" alt=""><img src="signe-clair.svg" width="32" height="32" alt=""><svg width="16" height="16" viewBox="0 0 16 16"><use href="#plane" fill="#2e7d32" transform="translate(8 8) rotate(45) scale(0.76) translate(-8 -8)"/></svg></div></div>
+            <div class="tile light"><span class="cap">Sur clair (README, papier)</span><div class="sizes"><img src="signe-clair.svg" width="64" height="64" alt=""><img src="signe-clair.svg" width="32" height="32" alt=""><img src="signe-clair.svg" width="16" height="16" alt=""></div></div>
         </div>
     </section>
 
@@ -88,7 +87,7 @@
 
     <section>
         <h2>Dans un onglet</h2>
-        <p style="margin-bottom: var(--space-4)">Le favicon est l'avion sur une tuile de la couleur des panneaux, pour tenir sur une barre d'onglets claire comme sombre. Le titre de la page est « Clairance ».</p>
+        <p style="margin-bottom: var(--space-4)">Le favicon est le scope sur une tuile de la couleur des panneaux, pour tenir sur une barre d'onglets claire comme sombre. Le titre de la page est « Clairance ».</p>
         <div class="grid">
             <div class="tile"><span class="cap">Navigateur sombre</span><div class="tabs-dark"><span class="tab"><img src="favicon.svg" alt="">Clairance</span><span class="tab off">FlightAware</span><span class="tab off">GitHub</span></div></div>
             <div class="tile"><span class="cap">Navigateur clair</span><div class="tabs-light"><span class="tab"><img src="favicon.svg" alt="">Clairance</span><span class="tab off">FlightAware</span><span class="tab off">GitHub</span></div></div>
@@ -97,7 +96,7 @@
 
     <section>
         <h2>Dans la barre de menus</h2>
-        <p style="margin-bottom: var(--space-4)">Images « template » : une couleur et de la transparence, le système les teinte. Deux états qui diffèrent par la forme : en marche, l'avion monte ; à l'arrêt, il est posé au sol, à plat, à 55 %. Ils remplacent les deux symboles SF de <code>tools/menubar/</code>.</p>
+        <p style="margin-bottom: var(--space-4)">Images « template » : une couleur et de la transparence, le système les teinte. Deux états qui diffèrent par la forme : en marche, le balayage et son plot ; à l'arrêt, l'écran vide, son seul centre, à 55 %. Ils remplacent les deux symboles SF de <code>tools/menubar/</code>.</p>
         <div class="grid">
             <div class="tile"><span class="cap">Barre sombre</span><div class="menubar dark"><span>Lun. 13 oct. 21:14</span><img class="ico" src="barre-menus-marche.svg" alt="en marche"><img class="ico" src="barre-menus-arret.svg" alt="à l'arrêt"><span>◧ ◔</span></div><span class="cap">en marche · à l'arrêt</span></div>
             <div class="tile"><span class="cap">Barre claire</span><div class="menubar light"><span>Lun. 13 oct. 21:14</span><img class="ico" src="barre-menus-marche.svg" alt="en marche"><img class="ico" src="barre-menus-arret.svg" alt="à l'arrêt"><span>◧ ◔</span></div><span class="cap">en marche · à l'arrêt</span></div>
@@ -136,9 +135,9 @@
     <section>
         <h2>Ce qu'on ne fait pas</h2>
         <div class="dont">
-            <div class="tile"><svg width="40" height="40" viewBox="0 0 16 16"><use href="#plane" fill="#4caf50" transform="translate(8 8) rotate(0) scale(0.76) translate(-8 -8)"/></svg><span class="cap">l'avion à la verticale ou à plat : il monte, à 45°</span></div>
-            <div class="tile"><svg width="40" height="40" viewBox="0 0 16 16"><use href="#plane" fill="#ff6e6e" transform="translate(8 8) rotate(45) scale(0.76) translate(-8 -8)"/></svg><span class="cap">une autre couleur que le vert de l'outil</span></div>
-            <div class="tile"><svg width="40" height="40" viewBox="0 0 16 16"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#4caf50"/><stop offset="1" stop-color="#6cb6ff"/></linearGradient></defs><use href="#plane" fill="url(#g)" transform="translate(8 8) rotate(45) scale(0.76) translate(-8 -8)"/></svg><span class="cap">dégradé, ombre, relief, traînée</span></div>
+            <div class="tile"><svg width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26.5" fill="none" stroke="#e0e0e0" stroke-width="4"/><circle cx="39.18" cy="16.59" r="3.8" fill="#4caf50"/></svg><span class="cap">le cercle sans le balayage : ce n'est plus un radar</span></div>
+            <div class="tile"><svg width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26.5" fill="none" stroke="#e0e0e0" stroke-width="4"/><path d="M32 32 L32 6 A26 26 0 0 1 50.385 13.615 Z" fill="#6cb6ff" fill-opacity=".35"/><path d="M32 32 L50.385 13.615" stroke="#6cb6ff" stroke-width="4" stroke-linecap="round"/><circle cx="39.18" cy="16.59" r="3.8" fill="#6cb6ff"/></svg><span class="cap">une autre couleur que le vert de l'outil</span></div>
+            <div class="tile"><svg width="40" height="40" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26.5" fill="none" stroke="#e0e0e0" stroke-width="4"/><path d="M32 32 L50.385 13.615" stroke="#4caf50" stroke-width="4" stroke-linecap="round"/><g fill="#4caf50"><circle cx="39.18" cy="16.59" r="3.8"/><circle cx="20" cy="40" r="3"/><circle cx="44" cy="44" r="3"/><circle cx="18" cy="22" r="3"/></g></svg><span class="cap">d'autres plots, un avion, une grille : un seul plot</span></div>
             <div class="tile"><span style="font: 600 22px/1 var(--font-family-text); letter-spacing: .1em">CLAIRANCE</span><span class="cap">le nom en capitales ou dans une autre police</span></div>
         </div>
     </section>
