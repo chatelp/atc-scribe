@@ -220,6 +220,18 @@ type Service struct {
 	flightPhasesConfig config.FlightPhasesConfig // Flight phases configuration
 	changeDetector     *ChangeDetector           // Tracks aircraft changes
 	trajectoryTracker  *TrajectoryTracker        // Trajectory-based phase detection
+
+	// clock is the service's time, the wall clock when nil; the replay bench
+	// (replay_test.go) runs the whole chain on a simulated one.
+	clock func() time.Time
+}
+
+// now is the time on the service's clock, in UTC.
+func (s *Service) now() time.Time {
+	if s.clock != nil {
+		return s.clock().UTC()
+	}
+	return time.Now().UTC()
 }
 
 // AircraftBulkResponse represents server response with bulk aircraft data
@@ -333,7 +345,7 @@ func (s *Service) broadcastAircraftChange(change AircraftChange) {
 		"hex":  change.Hex,
 	}
 
-	observedAt := time.Now().UTC()
+	observedAt := s.now()
 	if change.Aircraft != nil && !change.Aircraft.LastSeen.IsZero() {
 		observedAt = change.Aircraft.LastSeen.UTC()
 	}
@@ -370,42 +382,46 @@ func (s *Service) predictionBroadcastLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			if s.wsServer == nil || s.trajectoryTracker == nil {
-				continue
-			}
-
-			now := time.Now().UTC()
-			predictions := s.trajectoryTracker.GetLivePredictionsAt(now)
-			for _, p := range predictions {
-				if p.Confidence < minPredictionConfidence {
-					continue
-				}
-
-				s.wsServer.Broadcast(&websocket.Message{
-					Type: websocket.MessageTypeAircraftPredictedState,
-					Data: map[string]interface{}{
-						"hex":          p.Hex,
-						"predicted":    true,
-						"based_on":     p.BaseObserved.Format(time.RFC3339Nano),
-						"predicted_at": p.Timestamp.Format(time.RFC3339Nano),
-						"delta": map[string]interface{}{
-							"lat":        roundTo(p.Lat, 6),
-							"lon":        roundTo(p.Lon, 6),
-							"alt_baro":   roundTo(p.Altitude, 0),
-							"gs":         roundTo(p.Speed, 0),
-							"track":      roundTo(p.Heading, 0),
-							"confidence": roundTo(p.Confidence, 3),
-							"source":     "predicted",
-						},
-					},
-				})
-			}
+			s.broadcastLivePredictions(s.now())
 
 		case <-s.stopCh:
 			return
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+// broadcastLivePredictions publishes the predicted state of every aircraft
+// at now, the predictions below the confidence floor left out.
+func (s *Service) broadcastLivePredictions(now time.Time) {
+	if s.wsServer == nil || s.trajectoryTracker == nil {
+		return
+	}
+	predictions := s.trajectoryTracker.GetLivePredictionsAt(now)
+	for _, p := range predictions {
+		if p.Confidence < minPredictionConfidence {
+			continue
+		}
+
+		s.wsServer.Broadcast(&websocket.Message{
+			Type: websocket.MessageTypeAircraftPredictedState,
+			Data: map[string]interface{}{
+				"hex":          p.Hex,
+				"predicted":    true,
+				"based_on":     p.BaseObserved.Format(time.RFC3339Nano),
+				"predicted_at": p.Timestamp.Format(time.RFC3339Nano),
+				"delta": map[string]interface{}{
+					"lat":        roundTo(p.Lat, 6),
+					"lon":        roundTo(p.Lon, 6),
+					"alt_baro":   roundTo(p.Altitude, 0),
+					"gs":         roundTo(p.Speed, 0),
+					"track":      roundTo(p.Heading, 0),
+					"confidence": roundTo(p.Confidence, 3),
+					"source":     "predicted",
+				},
+			},
+		})
 	}
 }
 
@@ -478,7 +494,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	s.messages.note(rawData.Messages, time.Now())
+	s.messages.note(rawData.Messages, s.now())
 
 	// Process raw data
 	newAircraft := s.ProcessRawData(rawData)
@@ -582,7 +598,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 
 		// Feed corrected data into trajectory tracker for phase analysis
 		if s.trajectoryTracker != nil && a.ADSB != nil {
-			snap := TrajectorySnapshotFromADSB(a.ADSB, a.OnGround, time.Now().UTC())
+			snap := TrajectorySnapshotFromADSB(a.ADSB, a.OnGround, s.now())
 			s.trajectoryTracker.Ingest(a.Hex, snap)
 		}
 		if a.ADSB != nil {
@@ -590,7 +606,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 				s.runwayJudge.Observe(a.Hex, s.ref.all(), RunwayObservation{
 					Lat: lat, Lon: lon, TrackDeg: *a.ADSB.Track, AltFt: a.ADSB.AltBaro.Float64(),
 					BaroRateFPM: a.ADSB.BaroRate, OnGround: a.OnGround,
-					MaxApproachFt: float64(s.flightPhasesConfig.ApproachMaxAltitudeFt), At: time.Now().UTC(),
+					MaxApproachFt: float64(s.flightPhasesConfig.ApproachMaxAltitudeFt), At: s.now(),
 				})
 			}
 		}
@@ -615,7 +631,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 						"flight":     a.Flight,
 						"altitude":   a.ADSB.AltBaro.Float64(),
 						"on_ground":  a.OnGround,
-						"timestamp":  time.Now().UTC().Format(time.RFC3339),
+						"timestamp":  s.now().Format(time.RFC3339),
 						"new_status": "new_aircraft",
 					},
 				})
@@ -645,7 +661,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 	// PRIORITY 2: Handle all other phase changes (normal phase detection)
 	newPhaseChanges := s.processPhaseChangesBatch(newAircraft, immediatePhaseChanges, currentPhases, adsbTargetIDs, takeoffTimes)
 
-	s.setLastFetchTime(time.Now().UTC())
+	s.setLastFetchTime(s.now())
 
 	// Detect and broadcast changes using enriched newAircraft (no DB read)
 	if s.changeDetector != nil {
@@ -1057,7 +1073,7 @@ func (s *Service) HandleBulkRequest(filters map[string]interface{}) (*AircraftBu
 }
 
 func (s *Service) filterByLastSeen(aircraft []*Aircraft, minutes int) []*Aircraft {
-	cutoffTime := time.Now().UTC().Add(-time.Duration(minutes) * time.Minute)
+	cutoffTime := s.now().Add(-time.Duration(minutes) * time.Minute)
 	filtered := make([]*Aircraft, 0)
 	for _, a := range aircraft {
 		if a.LastSeen.After(cutoffTime) {
@@ -1193,7 +1209,7 @@ func (s *Service) setFetchStatus(status bool) {
 // updateAircraftStatus updates the status of aircraft that are no longer active.
 // Uses a targeted query instead of GetAll() — only fetches aircraft that actually need status updates.
 func (s *Service) updateAircraftStatus(activeAircraft map[string]bool) {
-	now := time.Now().UTC()
+	now := s.now()
 	cutoff := now.Add(-s.signalLostTimeout)
 
 	// Build list of active hex codes for exclusion
@@ -1262,7 +1278,7 @@ func (s *Service) updateAircraftStatus(activeAircraft map[string]bool) {
 // Uses pre-fetched batch data to avoid per-aircraft database queries.
 func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnGround map[string]bool, currentPhases map[string]*PhaseChange, adsbTargetIDs map[string]*int) []PhaseChangeInsert {
 	var immediatePhaseChanges []PhaseChangeInsert
-	now := time.Now().UTC()
+	now := s.now()
 
 	for _, a := range aircraft {
 		// Check if aircraft exists using pre-fetched batch data
@@ -1284,7 +1300,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 
 				// Anti-flapping: Prevent T/O → T/D transition if T/O was recent
 				if currentPhase != nil && currentPhase.Phase == "T/O" {
-					timeSinceTakeoff := time.Since(currentPhase.Timestamp).Seconds()
+					timeSinceTakeoff := s.now().Sub(currentPhase.Timestamp).Seconds()
 					preservationThreshold := float64(s.flightPhasesConfig.PhasePreservationSeconds)
 					if timeSinceTakeoff < preservationThreshold {
 						s.logger.Warn("Preventing rapid T/O → T/D flapping",
@@ -1342,7 +1358,7 @@ func (s *Service) detectGroundStateTransitions(aircraft []*Aircraft, existingOnG
 
 				// Anti-flapping: Prevent T/D → T/O transition if T/D was recent
 				if currentPhase != nil && currentPhase.Phase == "T/D" {
-					timeSinceLanding := time.Since(currentPhase.Timestamp).Seconds()
+					timeSinceLanding := s.now().Sub(currentPhase.Timestamp).Seconds()
 					preservationThreshold := float64(s.flightPhasesConfig.PhasePreservationSeconds)
 					if timeSinceLanding < preservationThreshold {
 						s.logger.Warn("Preventing rapid T/D → T/O flapping",
@@ -1399,7 +1415,7 @@ func (s *Service) detectSignalLostLandings(inactiveAircraft []*Aircraft) []Phase
 		return landingPhaseChanges
 	}
 
-	now := time.Now().UTC()
+	now := s.now()
 
 	for _, aircraft := range inactiveAircraft {
 		// Skip if already on ground or no ADSB data
@@ -1524,7 +1540,7 @@ func (s *Service) processPhaseChangesBatch(aircraft []*Aircraft, immediatePhaseC
 				Hex:       a.Hex,
 				Flight:    a.Flight,
 				Phase:     finalPhase,
-				Timestamp: time.Now().UTC(),
+				Timestamp: s.now(),
 				ADSBId:    adsbTargetIDs[a.Hex],
 				Airport:   s.phaseAirport(a, finalPhase),
 			})
@@ -1574,7 +1590,7 @@ func (s *Service) evaluatePhaseChange(aircraft *Aircraft, latestPhase *PhaseChan
 				currentPhase = "TAX"
 			} else {
 				// Keep T/D visible for the preservation period
-				timeSinceLanding := time.Since(latestPhase.Timestamp).Seconds()
+				timeSinceLanding := s.now().Sub(latestPhase.Timestamp).Seconds()
 				if timeSinceLanding < float64(s.flightPhasesConfig.PhasePreservationSeconds) {
 					currentPhase = "T/D"
 				} else if aircraft.ADSB != nil && groundSpeed >= float64(s.flightPhasesConfig.TaxiingMinSpeedKts) {
@@ -1590,7 +1606,7 @@ func (s *Service) evaluatePhaseChange(aircraft *Aircraft, latestPhase *PhaseChan
 	// Keep takeoff phase visible for at least PhasePreservationSeconds so
 	// controllers can see it in the UI before it transitions to DEP.
 	if latestPhase != nil && latestPhase.Phase == "T/O" {
-		timeSinceTakeoff := time.Since(latestPhase.Timestamp).Seconds()
+		timeSinceTakeoff := s.now().Sub(latestPhase.Timestamp).Seconds()
 		if timeSinceTakeoff < float64(s.flightPhasesConfig.PhasePreservationSeconds) {
 			currentPhase = "T/O"
 		}
@@ -1616,7 +1632,7 @@ func (s *Service) evaluatePhaseChange(aircraft *Aircraft, latestPhase *PhaseChan
 	} else if latestPhase.Phase != currentPhase {
 		// Phase changed — check for premature ground transitions
 		if currentPhase == "NEW" && (latestPhase.Phase == "T/D" || latestPhase.Phase == "TAX") {
-			timeSinceLastPhase := time.Since(latestPhase.Timestamp).Seconds()
+			timeSinceLastPhase := s.now().Sub(latestPhase.Timestamp).Seconds()
 			if timeSinceLastPhase < float64(s.flightPhasesConfig.PhaseTransitionTimeoutSeconds) {
 				// Too soon — keep the current ground phase
 				currentPhase = latestPhase.Phase
@@ -1629,7 +1645,7 @@ func (s *Service) evaluatePhaseChange(aircraft *Aircraft, latestPhase *PhaseChan
 	} else {
 		// Phase unchanged — check inactive aircraft timeout
 		if latestPhase.Phase != "NEW" {
-			timeSinceLastPhase := time.Since(latestPhase.Timestamp).Seconds()
+			timeSinceLastPhase := s.now().Sub(latestPhase.Timestamp).Seconds()
 			if timeSinceLastPhase > float64(s.flightPhasesConfig.PhaseChangeTimeoutSeconds) {
 				currentPhase = "NEW"
 				shouldInsert = true
@@ -1794,7 +1810,7 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 	)
 
 	aircraft := make([]*Aircraft, 0, len(rawData.Aircraft))
-	now := time.Now().UTC() // Ensure we use UTC time
+	now := s.now() // Ensure we use UTC time
 
 	for _, raw := range rawData.Aircraft {
 		// Skip aircraft without a hex identifier (unusable data)
