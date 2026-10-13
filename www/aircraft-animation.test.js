@@ -155,3 +155,23 @@ test("the bulk load's aircraft is dated by its last_seen, as the stream's are", 
     const s = e.sampleFromAircraft(aircraft, Date.parse(aircraft.last_seen));
     assert.equal(s.at, Date.parse(lastSeen) - 1700);
 });
+
+test('after a pause of the frames, the aircraft goes on from where its samples put it (fiche M, scenario e)', () => {
+    const { e, poses } = engine();
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 1000, now));
+    e.observe('abc123', fix(2.0028, now - 500, now));
+    const state = e.aircraftStates.get('abc123');
+    // Drawn 30 s ago, far behind, with a gap fading from there.
+    const t = performance.now();
+    state.lastRendered = { lat: 48.5, lon: 1.9, alt: 30000, track: 90, timestamp: t - 30000 };
+    state.correction = { dLat: 0, dLon: -0.1, dAlt: 0, startAt: t, endAt: t + 2500 };
+    globalThis.requestAnimationFrame = () => 0;
+    e.isRunning = true;
+    e.lastFrameAt = t - 30000;
+    e.rafLoop(t);
+    assert.equal(state.correction, null, 'no sweep from the pose drawn before the pause');
+    const drawn = poses[poses.length - 1];
+    const fresh = e._predictedPose(state, state.lastReal, t, null);
+    assert.ok(Math.abs(drawn.lon - fresh.lon) < 1e-6, 'drawn where the samples put it now');
+});

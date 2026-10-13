@@ -83,7 +83,14 @@ class AircraftAnimationEngine {
             minEstimateIntervalMs: 1000,
             // Seconds of messages the server clock's offset is taken over
             // (_pageTime).
-            clockWindowSec: 30
+            clockWindowSec: 30,
+            // A pause of the animation frames longer than this, in ms (the
+            // tab hidden, the machine asleep), and every aircraft starts again
+            // from where its samples put it now. The gaps faded from the pose
+            // drawn before the pause swept the aircraft across the map for up
+            // to 2.5 s once the tab was shown again (browser bench, scenario e:
+            // a 6 km step in one frame after 30 s hidden).
+            resumeAfterMs: 1000
         };
 
         this.aircraftStates = new Map();
@@ -488,12 +495,28 @@ class AircraftAnimationEngine {
         const targetFrameMs = 1000 / Math.max(1, this.config.interpolationFps || 30);
         const elapsed = now - this.lastFrameAt;
 
+        if (elapsed > this.config.resumeAfterMs) {
+            this._resume();
+        }
+
         if (elapsed >= targetFrameMs) {
             this._processFrame(now);
             this.lastFrameAt = now;
         }
 
         this.rafId = requestAnimationFrame(this.rafLoop);
+    }
+
+    // After a pause of the frames, nothing was drawn meanwhile: the pose
+    // drawn before it is not where the aircraft is on screen any more, it is
+    // where it was. The corrections built from it are dropped, and the next
+    // frame draws each aircraft where its last sample, carried forward, puts
+    // it: one step, then the motion goes on from there.
+    _resume() {
+        for (const state of this.aircraftStates.values()) {
+            state.correction = null;
+            state.lastRendered = null;
+        }
     }
 
     _processFrame(now) {
