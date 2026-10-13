@@ -13,6 +13,8 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 sed "s|@REPO@|$repo|" "$here/Clairance.swift" > "$here/build/Clairance.swift"
 swiftc -O -parse-as-library -target "$(uname -m)-apple-macos13.0" \
 	-o "$app/Contents/MacOS/clairance" "$here/build/Clairance.swift"
+# The brand's two menu bar images (docs-fr/design/identite/), template SVGs.
+cp "$here/barre-menus-marche.svg" "$here/barre-menus-arret.svg" "$app/Contents/Resources/"
 cat > "$app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

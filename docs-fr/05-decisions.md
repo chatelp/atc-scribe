@@ -4852,6 +4852,22 @@ la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1
 La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
 validée contre `actual_runway_off`.
 
+### D76 — Le signe de Clairance est le scope radar *(13/10)*
+
+**Choisi par le propriétaire le 13/10** avec la session design, sur une planche de huit signes
+(trois tours, trois radars, deux avions ; un avion au décollage avait été retenu puis abandonné
+le soir même). Le signe : le cercle de l'écran, un anneau de distance (absent à 16 px), le
+balayage à 45° et le plot qu'il vient de peindre, cercle en `#e0e0e0`, balayage, lueur et plot
+en `#4caf50` ; le nom en monospace 600, sans police livrée. **Le signe ne bouge pas** : pas de
+balayage qui tourne (au plus un tour comme indicateur de chargement, à décider à la migration).
+Fichiers : `docs-fr/design/identite/` sur la branche `design` (`05-identite.md` pour les règles),
+copiés dans `www/brand/` pour la page et le README, `tools/menubar/` pour le lanceur.
+**Appliqué le 13/10** : favicon (SVG et PNG 16, 32, 180, 512) et manifeste d'application
+(`theme-color` `#0a0a0a`) ; images de barre de menus « template », deux états par la forme
+(balayage et plot en marche, écran vide à l'arrêt) à la place des symboles système ; README avec
+le signe selon le thème et la première phrase de la marque. La marque en tête de la carte de
+connexion et dans l'en-tête de l'outil viendra avec la migration du design.
+
 ### D75 — La position de la station à deux décimales, le réseau domestique hors du dépôt, l'historique réécrit *(12/10)*
 
 **Décision du propriétaire le 12/10**, sur l'alerte de la session « communauté » (fiche 04) : le

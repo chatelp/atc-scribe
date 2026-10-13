@@ -20,6 +20,7 @@ type StaticFileHandler struct {
 func NewStaticFileHandler(staticDir string, logger *logger.Logger) *StaticFileHandler {
 	// The airport layout is GeoJSON; without this it went out as text/plain.
 	_ = mime.AddExtensionType(".geojson", "application/geo+json")
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 	return &StaticFileHandler{
 		staticDir: staticDir,
 		logger:    logger.Named("static-handler"),

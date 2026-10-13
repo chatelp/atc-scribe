@@ -239,6 +239,21 @@ enum Entry {
     }
 }
 
+// menuBarIcon loads barre-menus-marche.svg or barre-menus-arret.svg from the
+// bundle's Resources (build.sh copies them there), 18 pt, as a template image.
+// Without the bundle (the command-line form), the system symbols stand in.
+func menuBarIcon(running: Bool) -> NSImage {
+    let name = running ? "barre-menus-marche" : "barre-menus-arret"
+    if let url = Bundle.main.url(forResource: name, withExtension: "svg"),
+       let image = NSImage(contentsOf: url) {
+        image.isTemplate = true
+        image.size = NSSize(width: 18, height: 18)
+        return image
+    }
+    let fallback = running ? "dot.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash"
+    return NSImage(systemSymbolName: fallback, accessibilityDescription: "Clairance") ?? NSImage()
+}
+
 struct ClairanceLauncher: App {
     @StateObject private var p = Production()
 
@@ -253,13 +268,16 @@ struct ClairanceLauncher: App {
             Button("Start production") { p.start() }.disabled(p.running || p.busy)
             Button("Stop production") { p.stop() }.disabled(!p.running)
             Divider()
-            Button("Open co-atc") { p.open("http://127.0.0.1:8000/") }.disabled(!p.running)
+            Button("Open Clairance") { p.open("http://127.0.0.1:8000/") }.disabled(!p.running)
             if p.cfg.tailscale_url != nil { Button("Copy remote address") { p.copyRemoteAddress() } }
             Button("Production log") { p.openLog() }
             Divider()
             Button("Quit launcher (production keeps running)") { NSApplication.shared.terminate(nil) }
         } label: {
-            Image(systemName: p.running ? "dot.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
+            // The brand's two states (docs-fr/design/05-identite.md): the scope with
+            // its sweep and plot while production runs, the empty screen when it is
+            // stopped. Template images, so macOS tints them for a light or dark bar.
+            Image(nsImage: menuBarIcon(running: p.running))
         }
         .menuBarExtraStyle(.menu)
     }

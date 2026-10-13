@@ -1,4 +1,13 @@
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="www/brand/signe-clair.svg">
+  <img src="www/brand/signe.svg" alt="Clairance: a radar scope" width="96" height="96">
+</picture>
+
 # Clairance
+
+**Hear the airband you receive, read it in English and French, and see which
+aircraft is speaking. Runs on your own machine: nothing leaves it. Made for the
+listener; it judges no one.**
 
 *A fork of [Co-ATC](https://github.com/yegors/co-atc) that does the listening on
 your own machine.*

@@ -1,0 +1,14 @@
+{
+  "name": "Clairance",
+  "short_name": "Clairance",
+  "description": "Hear the airband you receive, read it in English and French, and see which aircraft is speaking.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    { "src": "favicon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "favicon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
