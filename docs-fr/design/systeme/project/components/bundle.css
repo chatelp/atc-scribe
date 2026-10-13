@@ -483,3 +483,5 @@
     .cl-toggle, .cl-seg__item, .cl-input, .cl-channel { height: var(--size-control-touch); }
     .cl-exchange__play { width: var(--size-target-touch); height: var(--size-target-touch); }
 }
+/* MapLabel's optional third line: the last transmission heard, quoted, for ten minutes */
+.cl-maplabel__said { font-family: var(--font-family-text); color: var(--color-text-secondary); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; }

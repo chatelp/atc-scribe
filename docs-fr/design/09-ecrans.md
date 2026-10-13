@@ -34,8 +34,10 @@ migration : chaque étape livrée se compare à eux.*
 
 ## Où va chaque fonction d'aujourd'hui
 
-Tiré de l'inventaire de `www/` fait le 13/10 sur `origin/main` (≈ 150 fonctions). Ne sont listées
-que celles qui changent de place ; le reste garde la sienne (carte, PAR, liste, fiche).
+Tiré de l'inventaire de `www/` fait le 13/10 sur `origin/main` (≈ 150 fonctions), puis contrôlé
+par la session atc-scribe le même jour (51 actions, 28 champs de réglage, 13 raccourcis, 43 clés) :
+les lignes des réglages ci-dessous viennent de ce contrôle. Ne sont listées que les fonctions qui
+changent de place ou de forme ; le reste garde la sienne (carte, PAR, liste, fiche).
 
 | Aujourd'hui | Demain |
 |---|---|
@@ -55,6 +57,14 @@ que celles qui changent de place ; le reste garde la sienne (carte, PAR, liste, 
 | Tab / Maj-Tab : avion suivant | J / K, ↓ / ↑ dans la liste (choix du 13/10) ; Tab rend la main au navigateur |
 | Téléphone : Map, PAR, List | Radio (accueil), Sky (carte ou PAR), Traffic, Right now |
 | Écran « Connection Lost » plein écran | `ErrorBanner` en haut du ciel, la carte reste utilisable |
+| Bulle de dernière transmission posée sur la carte (retirée le 13/10 à la demande du propriétaire : elle couvrait l'étiquette) | troisième ligne de l'étiquette de l'avion, entre guillemets, 40 caractères, dix minutes après l'écoute (`MapLabel`) ; réglage « Last transmission on aircraft labels », clé `voiceBubbles` |
+| Opacité des six calques (anneaux, espace aérien, aérodromes, héliports, balises, autres pistes) | panneau des calques, un curseur par calque (`a-calques`) |
+| Longueur des traînées (`trailLength`) | panneau des calques, « Tracks, last N min » (`a-calques`) |
+| Lissage, images par seconde (trois clés d'animation) | Réglages › Display (`reglages`) |
+| Points de trace gardés (`tracksLimit`) | Réglages › Display |
+| Masquer les avions au sol des autres aérodromes (`excludeOtherAirportsGrounded`) | Réglages › Display |
+| Pause des mises à jour (WebSocket, « Performance and debug ») | Réglages › System, section repliée |
+| Accès : cette machine ou un compte (`switchAccess`, page de connexion et réglages) | premier lancement (`premier-lancement`) et Réglages › Account |
 
 ## Six propositions, validées par le propriétaire le 13/10
 

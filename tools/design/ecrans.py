@@ -184,19 +184,23 @@ def skymap(filtered=False, width=640, follow=False):
     def ac(x, y, rot, fill, scale=1):
         return f'<g transform="translate({x} {y})"><path d="{AC}" fill="{fill}" transform="rotate({rot}) scale({scale})"/></g>'
 
-    def label(x, y, ph, col, cs, sel=False, line2=None):
-        h = 34 if line2 else 20
-        out = f'<g transform="translate({x} {y})"><rect width="{126 if line2 else 112}" height="{h}" rx="4" fill="#0a0a0ad9" stroke="{"#4caf50" if sel else "none"}"/>'
-        out += f'<text x="7" y="14" font-family="ui-monospace,Menlo,monospace" font-size="11"><tspan fill="{col}" font-weight="600">{ph}</tspan><tspan fill="#e0e0e0" font-weight="600"> {cs}</tspan></text>'
+    def label(x, y, ph, col, cs, sel=False, line2=None, said=None, typ=''):
+        lines = [f'{ph} {cs} {typ}'] + ([line2] if line2 else []) + ([said] if said else [])
+        w = int(max(len(l) for l in lines) * 6.7 + 16)
+        h = 6 + 14 * len(lines)
+        out = f'<g transform="translate({x} {y})"><rect width="{w}" height="{h}" rx="4" fill="#0a0a0ad9" stroke="{"#4caf50" if sel else "none"}"/>'
+        out += f'<text x="7" y="14" font-family="ui-monospace,Menlo,monospace" font-size="11"><tspan fill="{col}" font-weight="600">{ph}</tspan><tspan fill="#e0e0e0" font-weight="600"> {cs}</tspan><tspan fill="#b8b8b8"> {typ}</tspan></text>'
         if line2:
             out += f'<text x="7" y="28" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#b8b8b8">{line2}</text>'
+        if said:
+            out += f'<text x="7" y="{14 + 14 * (2 if line2 else 1)}" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#b8b8b8">{said}</text>'
         return out + '</g>'
     track = ''
     if follow:
         track = ('<path d="M150 40 C190 110 220 190 250 250 S 330 262 400 236" fill="none" stroke="#b8b8b8" stroke-opacity=".75" stroke-width="1.5" stroke-dasharray="5 4"/>'
                  '<g fill="#b8b8b8" fill-opacity=".75"><circle cx="150" cy="40" r="2"/><circle cx="220" cy="190" r="2"/><circle cx="300" cy="258" r="2"/></g>'
                  '<g font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#949494"><text x="160" y="36">12:58 FL 150</text><text x="230" y="186">13:04 4000 ft</text></g>')
-    far = '' if filtered else ac(110, 140, 120, '#6b6b6b') + label(124, 140, 'CRZ', '#b8d3f2', 'DLH6TA') + ac(470, 650, 200, '#6b6b6b')
+    far = '' if filtered else ac(110, 140, 120, '#6b6b6b') + label(124, 140, 'CRZ', '#b8d3f2', 'DLH6TA', line2='FL 360 ↔ 452 kt', typ='A20N') + ac(470, 650, 200, '#6b6b6b')
     # following: the view is centred on the aircraft, in the part the PAR frame leaves visible
     vx, vy = (400 - width / 2, 236 - 300) if follow else (-(width - 640) / 2, 0)
     return f'''<svg class="cl-sky__map" viewBox="{vx} {vy} {width} 852" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map of the traffic around the station">
@@ -206,9 +210,9 @@ def skymap(filtered=False, width=640, follow=False):
   <g font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#b8b8b8"><text x="354" y="444">LFPZ</text><text x="570" y="228">LFPG</text></g>
   <line x1="380" y1="232" x2="470" y2="210" stroke="#4c9ce8" stroke-dasharray="4 4" opacity=".6"/>
   <g transform="translate(400 236)"><circle r="22" fill="none" stroke="#4caf50" stroke-width="1" opacity=".5"/><circle r="13" fill="none" stroke="#4caf50" stroke-width="2"/><path d="{AC}" fill="#cfcfcf" transform="rotate(78)"/></g>
-  {label(416, 246, 'APP', '#4c9ce8', 'AFR47KX', sel=True, line2='2 400 ft ↓ 158 kt')}
-  {ac(250, 286, 80, '#a8a8a8')}{label(266, 296, 'ARR', '#4c9ce8', 'EZY82QT')}
-  {ac(200, 560, -35, '#cfcfcf')}{label(214, 570, 'CLB', '#ec8b34', 'TVF61WB')}
+  {label(87, 246, 'APP', '#4c9ce8', 'AFR47KX', sel=True, line2='2 400 ft ↓ 158 kt', said='“autorisé ILS piste deux six gauche, cont…”', typ='A320')}
+  {ac(250, 336, 80, '#a8a8a8')}{label(266, 346, 'ARR', '#4c9ce8', 'EZY82QT', line2='5 000 ft ↓ 241 kt', typ='A21N')}
+  {ac(200, 560, -35, '#cfcfcf')}{label(214, 570, 'CLB', '#ec8b34', 'TVF61WB', line2='5 800 ft ↑ 212 kt', said='“climb flight level one two zero, direct…”', typ='B738')}
   {ac(330, 420, 30, '#f5f5f5', .8)}
   {far}{track}
 </svg>'''
@@ -371,7 +375,7 @@ def map_controls():
   <div class="cl-menu__sep"></div>
   <div class="cl-menu__group"><span class="cl-label">Aircraft</span>{row('Labels')}{row('Tracks, last 3 min', True, 30)}</div>
   <div class="cl-menu__sep"></div>
-  <div class="cl-menu__group"><span class="cl-label">Layers</span>{row('Distance rings', True, 60)}{row('Airspace', False)}{row('Airports', True, 80)}{row('Heliports', False)}{row('Navaids', False)}{row('Other runways', True, 50)}{row('Airport layout')}</div>
+  <div class="cl-menu__group"><span class="cl-label">Layers <span class="cl-age">switch · opacity</span></span>{row('Distance rings', True, 60)}{row('Airspace', True, 40)}{row('Airports', True, 80)}{row('Heliports', True, 50)}{row('Navaids', True, 50)}{row('Other runways', True, 50)}{row('Airport layout')}</div>
 </div>'''
 
 
@@ -434,9 +438,22 @@ def settings():
     <button class="cl-disclosure" aria-expanded="false">The eleven rules</button>
   </section>
   <section class="cl-page__section"><h3>Display <span class="cl-age">this browser</span></h3>
-    <div class="cl-field"><span class="cl-field__label">Speech bubbles on the map</span><span class="cl-switch is-on" role="switch" aria-checked="true"></span></div>
+    <div class="cl-field"><span class="cl-field__label">Last transmission on aircraft labels</span><span class="cl-switch is-on" role="switch" aria-checked="true"></span><span class="cl-field__help">A third line under the label, in quotes, for ten minutes after it was heard.</span></div>
     <div class="cl-field"><span class="cl-field__label">Smooth movement between updates</span><span class="cl-switch is-on" role="switch" aria-checked="true"></span></div>
-    <div class="cl-field"><span class="cl-field__label">Times in</span><div class="cl-seg"><button class="cl-seg__item" aria-pressed="true">UTC</button><button class="cl-seg__item" aria-pressed="false">Local</button></div></div>
+    <div class="cl-field"><span class="cl-field__label">Frames per second</span><span class="cl-row" style="width: 240px;"><div class="cl-slider" style="flex: 1;"><span class="cl-slider__rail"></span><span class="cl-slider__fill" style="left:0;width:40%"></span><span class="cl-slider__thumb" style="left:40%"></span></div><span class="cl-age">30</span></span></div>
+    <div class="cl-field"><span class="cl-field__label">Track points kept per aircraft</span><span class="cl-row" style="width: 240px;"><div class="cl-slider" style="flex: 1;"><span class="cl-slider__rail"></span><span class="cl-slider__fill" style="left:0;width:25%"></span><span class="cl-slider__thumb" style="left:25%"></span></div><span class="cl-age">1000</span></span></div>
+    <div class="cl-field"><span class="cl-field__label">Hide ground aircraft at other airports</span><span class="cl-switch" role="switch" aria-checked="false"></span></div>
+    <div class="cl-field"><span class="cl-field__label">Times in</span><div class="cl-seg"><button class="cl-seg__item" aria-pressed="true">UTC</button><button class="cl-seg__item" aria-pressed="false">Local</button></div><span class="cl-field__help">The clock in green in the top bar dates everything on screen.</span></div>
+  </section>
+  <section class="cl-page__section"><h3>Account</h3>
+    <div class="cl-field"><span class="cl-field__label">Who may open Clairance</span><span class="cl-row"><label class="cl-check cl-check--radio is-on"><span class="cl-check__box"></span>This machine</label><label class="cl-check cl-check--radio"><span class="cl-check__box"></span>The network, with a password</label></span><span class="cl-field__help">The same choice as at the first start.</span></div>
+  </section>
+  <section class="cl-page__section"><h3>System</h3>
+    <div class="cl-field"><span class="cl-field__label">Log level</span><select class="cl-select" aria-label="Log level"><option>info</option></select></div>
+    <div class="cl-field"><span class="cl-field__label">Keep databases up to</span><span class="cl-row"><input class="cl-input" style="width: 72px;" value="20" aria-label="Gigabytes"><span class="cl-age">GB</span></span></div>
+    <button class="cl-disclosure" aria-expanded="false">Reports: database, ADS-B source, receiver, decoder</button>
+    <button class="cl-disclosure" aria-expanded="true">Performance and debug</button>
+    <div class="cl-field"><span class="cl-field__label">Live updates</span><button class="cl-btn">Pause</button><span class="cl-field__help">Freezes the map and the lists to look at a moment; the radio keeps playing.</span></div>
   </section>
 </div>
 </div></div>'''
@@ -519,7 +536,7 @@ if __name__ == '__main__':
     write('a-calques.html', page('A · Layers and an airport', topbar() + '<div class="cl-app__main">' + thread() + sky(extra=airport_popup()) + column_now() + '</div>' + map_controls()))
     write('a-journal.html', page('A · Event log', topbar() + '<div class="cl-app__main">' + thread() + sky() + column_now() + '</div>' + event_log()))
     write('par.html', page('The PAR view', topbar() + '<div class="cl-app__main">' + thread() + sky(extra=par_view(), corner=False, pressed='PAR · LFPG') + column_now() + '</div>'))
-    write('reglages.html', page('Settings', topbar() + '<div class="cl-app__main">' + thread() + sky() + column_now() + '</div>' + settings()))
+    write('reglages.html', page('Settings', topbar() + '<div class="cl-app__main">' + thread() + sky() + column_now() + '</div>' + settings(), height=1500))
     write('connexion.html', page('Sign in', signin(), width=1440, height=900))
     write('premier-lancement.html', page('First run', signin(first_run=True), width=1440, height=900))
     write('etats.html', page('States: connection lost, nothing on air, resume listening', topbar() + '<div class="cl-app__main">' + thread_empty() + states_sky() + column_now() + '</div>'))
@@ -538,7 +555,7 @@ if __name__ == '__main__':
         ('a-calques.html', 'A · Layers, an airport', 'The map controls (base map, layers, opacity) and an airport\'s card.', 1440, 900),
         ('a-journal.html', 'A · Event log', 'The bell: emergencies, go-arounds, runway changes, aircraft of interest, the station; its sounds.', 1440, 900),
         ('par.html', 'The PAR view', 'The existing PAR, with its header and arrival sequence, in the sky\'s place.', 1440, 900),
-        ('reglages.html', 'Settings', 'A page over the screen: Listening, Callsign matching, Display, Account, System.', 1440, 900),
+        ('reglages.html', 'Settings', 'A page over the screen: Listening, Callsign matching, Display, Account, System (shown whole, as if scrolled).', 1440, 1500),
         ('connexion.html', 'Sign in', 'The mark, one sentence, two fields.', 1440, 900),
         ('premier-lancement.html', 'First run', 'Who may open Clairance: this machine, or the network with a password.', 1440, 900),
         ('etats.html', 'States', 'Nothing on air, connection lost, click to resume listening.', 1440, 900),
