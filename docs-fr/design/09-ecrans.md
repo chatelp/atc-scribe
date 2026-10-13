@@ -67,8 +67,9 @@ Présentées une à une, avant / après sur les écrans réels ; toutes retenues
 3. **La météo dans « Right now »**, le METAR lu en clair en une phrase.
 4. **Le choix UTC / heure locale dans les réglages**, les deux horloges restant affichées.
 5. **Le téléphone à quatre onglets**, la radio en accueil.
-6. **Les consignes entendues sans verdict** : la colonne « Status (issued / complied / deviation) »
-   de la fiche devient « Then » et dit ce que l'avion a fait (« level at 4000 ft »), sans
+6. **Les consignes entendues sans verdict** : la colonne « Status » de la fiche (prévue pour
+   issued / complied / deviation, mais qui n'affiche jamais que « issued » : rien n'écrit les deux
+   autres) devient « Then » et dit ce que l'avion a fait (« level at 4000 ft »), sans
    qualifier l'écart. C'est le principe « constater, ne pas juger » appliqué à une fonction qui
    existe ; le propriétaire a confirmé qu'il s'applique ici.
 

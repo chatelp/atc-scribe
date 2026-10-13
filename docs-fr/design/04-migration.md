@@ -42,9 +42,9 @@ En plus des sept garde-fous du doc 32 :
    `activeListSort`, `sidebarAircraftTab`, `lastSeenMinutes`, `voiceOnly`, `voiceBubbles`, `eventSounds`,
    `eventLog`, `showAirAircraft`, `showGroundAircraft`, `excludeOtherAirportsGrounded`, les
    dix-huit de la carte (`mapStyle`, neuf `show*`, six `*Opacity`, `trailLength`, `tracksLimit`)
-   et les trois de l'animation. Relevé sur `origin/main` le 13/10. Une clé dont le
-   sens change (par exemple `sidebarAircraftTab`, quand la fiche devient la colonne) se **lit**
-   sous son ancien nom.
+   et les trois de l'animation. Relevé sur `origin/main` le 13/10. `sidebarAircraftTab` est le
+   choix Active / Signal lost de la liste : elle reste dans l'onglet Traffic. Une clé dont le sens
+   changerait se **lit** sous son ancien nom.
 5. **Chaque étape visible se termine par une soirée d'écoute** du propriétaire (garde-fou 5) avant
    l'étape suivante sur le même terrain.
 
@@ -95,7 +95,8 @@ Indépendante de la disposition, elle passe en premier.
 - **Change** :
   - `phaseColorMap` (`map/renderers/aircraft-webgl.js`), `PHASE_COLORS` (`par/par-view.js`),
     `getPhaseColorClass` (`store/sidebar.js`) : cinq familles ; badges pleins pour T/O et T/D ;
-  - `getAltitudeBandColor` : la rampe de clarté (`color-altitude-dark-*`, `-light-*` sur fond clair).
+  - `getAltitudeBandColor` : la rampe de clarté (`color-altitude-dark-*` ; `-light-*` sur les fonds
+    IGN et OSM, dont la palette corrigée le 12/10, `46dc425`, est gardée).
 - **Ne change pas** : les dix filtres de phase et leurs raccourcis 1 à 0, la clé `phaseFilters` ;
   les seuils des bandes d'altitude ; la géométrie de la PAR.
 - **Référence** : `par.html`, la carte de `a-maintenant.html`.
@@ -106,7 +107,9 @@ Indépendante de la disposition, elle passe en premier.
 
 - **Change** : `TopBar` : le signe et le nom, ce qui est à l'antenne, les voyants (transcription,
   ADS-B et messages par seconde), l'heure UTC et l'heure locale, la cloche et l'engrenage. Ils
-  quittent la carte (coin haut gauche) et la barre du bas. Le choix UTC / locale passe dans
+  quittent la carte (coin haut gauche) et la barre du bas. Le message du récepteur (prêté, éteint,
+  en bascule : `store.receiverMessage`), qui tient aujourd'hui la place de la barre radio vide,
+  rejoint « ce qui est à l'antenne » : sans cela il disparaîtrait à l'étape 7. Le choix UTC / locale passe dans
   Réglages › Display (décision 4), même clé `showLocalDates`.
 - **Ne change pas** : la barre du bas garde, pour l'instant, les fréquences, la météo et la piste
   en service.
@@ -129,7 +132,9 @@ Indépendante de la disposition, elle passe en premier.
 ### 5. La colonne : Right now, et le repli (B) — 1,5 j
 
 - **Change** : l'onglet par défaut « Right now » : `SummarySentence` (piste en service et depuis
-  quand, source ADS-B dite), `ArrivalSequence` (`store.arrivals`), `EventList`
+  quand, source ADS-B dite ; le « depuis quand » n'existe que par avion aujourd'hui : la session
+  atc-scribe l'expose au niveau de l'aérodrome dans `runway_in_use`, depuis le suivi des pistes,
+  ≈ 1 h serveur), `ArrivalSequence` (`store.arrivals`), `EventList`
   (`events.recent(30)`), `Weather` (METAR lu en clair, TAF et NOTAM en boutons, décision 3), les
   compteurs. Le bouton » replie la colonne (disposition B) : « Right now » devient une carte sur le
   ciel.
@@ -146,6 +151,13 @@ Indépendante de la disposition, elle passe en premier.
   `plainFrench`, réponse du pilote, lecture) ; « quelqu'un parle » par le niveau audio ;
   « ↓ N new » quand le fil est remonté (décision 2) ; le menu de chaque fréquence avec son volume
   (décision 1), clés `frequencyVolumes` et `listeningFrequencies`.
+- **Rebranche, avant que la barre parte** :
+  - les bulles de la carte (`voice-bubbles-feature.js:42`) et les liens de la chronologie, qui
+    ouvrent aujourd'hui la fenêtre d'une fréquence par `openTranscriptionAt(frequencyId, id)` :
+    ils font défiler le fil jusqu'à l'échange et le surlignent ;
+  - le niveau audio : `audio-client` dessine dans la barre de la tuile
+    (`.audio-visualizer-container`, `index.html:2056`) ; `ThreadHead` héberge cet élément ou
+    lit le niveau par le store, sinon « quelqu'un parle » perd sa source à l'étape 7.
 - **Ne change pas** : la barre du bas reste encore, pour comparer pendant une soirée.
 - **Référence** : `a-maintenant.html`, `a-frequence.html`.
 - **Vérifier** : un échange arrive dans le fil au même moment que dans l'ancienne fenêtre ;
@@ -155,7 +167,8 @@ Indépendante de la disposition, elle passe en premier.
 ### 7. Retirer la barre du bas — 0,5 j
 
 - **Retire** : la barre radio et les fenêtres de transcription par fréquence, avec leurs règles de
-  `style.css` (garde-fou 7).
+  `style.css` et le recalcul de leur disposition au redimensionnement et au défilement de
+  `.radio-strip` (`app.js:878-879`) (garde-fou 7).
 - **Vérifier** : la table de `09-ecrans.md`, lignes de la barre radio, toutes cochées ; le filet.
 
 ### 8. Suivre un vol — 2 j
@@ -165,7 +178,11 @@ Indépendante de la disposition, elle passe en premier.
   contenu inchangé), « ‹ Back to Traffic », ✕ « Stop following » dans la barre du haut. La carte se
   centre sur lui avec sa trace ; son approche s'affiche dans le cadre PAR sous la carte. Le
   tableau des consignes entendues remplace « Status » par « Then », qui décrit ce que l'avion a
-  fait, sans verdict (décision 6 ; ≈ ½ j de logique dans le store, aucun serveur).
+  fait, sans verdict (décision 6). Aujourd'hui le statut vaut toujours « issued » : rien n'écrit
+  « complied » ni « deviation » (`grammar_processor.go:580`). « Then » se construit dans la page
+  à partir de la trace de l'avion après l'heure de la consigne (`/aircraft/{hex}/tracks`) et de la
+  valeur de la consigne ; pour ne pas relire l'anglais des consignes en clair, le serveur ajoute
+  `value` et `unit` à chaque consigne (≈ 1 h, sans rupture), puis ≈ ½ j dans le store.
 - **Ne change pas** : les données de la fiche, les rafraîchissements toutes les 5 s, Échap pour
   désélectionner.
 - **Référence** : `c-suivre.html`, `c-details.html`.
@@ -224,8 +241,12 @@ Indépendante de la disposition, elle passe en premier.
 
 Ce que l'estimation ne couvre pas : une reprise demandée après usage. Elle est probable sur le fil
 et la colonne, que le propriétaire regarde le plus ; une demi-journée par étape visible mène à
-≈ 22 j au pire. Aucune étape ne demande de travail serveur : tout ce que les écrans montrent est
-dans le store depuis le 13/10.
+≈ 22 j au pire. Le serveur ne bouge que pour ≈ 2 h : le « depuis quand » de la piste en service
+(étape 5) et la valeur des consignes (étape 8). Tout le reste est dans le store depuis le 13/10.
+
+Relu côté code par la session atc-scribe le 13/10 : l'ordre 0 → 13 tient ; ses corrections sont
+intégrées (clé `sidebarAircraftTab`, « depuis quand », « Then », message du récepteur, bulles de
+la carte, niveau audio, recalcul des fenêtres).
 
 ## La revue de design, à chaque étape
 
