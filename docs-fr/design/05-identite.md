@@ -57,6 +57,29 @@ en `accent` (`#4caf50`). Sur fond clair : cercle `#1a1a1a`, vert `#2e7d32` (5,1:
 exclut. Le seul usage animé envisageable est l'indicateur de chargement (le balayage fait un tour
 pendant l'attente) : à décider à la migration, jamais en boucle permanente.
 
+## Trois états du même signe
+
+Le 13/10, le propriétaire a gardé R2, l'écran allumé, pour dire un changement d'état. Même
+géométrie que le signe : l'écran s'allume, ce n'est pas un autre dessin.
+
+| État | Dessin | Barre de menus (lanceur) | Onglet et en-tête (navigateur) |
+|---|---|---|---|
+| **Arrêté** | l'écran vide, son centre, à 55 % | la production ne tourne pas | — |
+| **En marche** (R1) | le scope qui balaie | la production tourne, rien n'est à l'antenne de la station | la page est ouverte, rien n'est écouté |
+| **À l'écoute** (R2) | l'écran allumé : disque `surface.selected` (#163020), cercle et anneau `accent`, balayage `accent.strong`, plot `text.primary` | la production tourne et la station a des fréquences à l'antenne (`/api/v1/status`, antenne `on_air`) | au moins une fréquence joue dans ce navigateur |
+
+Pourquoi ces données : le lanceur ne sait pas ce que joue le navigateur, mais il sait si la
+station reçoit (l'état d'antenne que rapporte `radio-ctl-sync`) ; le navigateur, lui, sait ce
+qu'il joue. Chacun montre l'état qu'il connaît.
+
+Dans la barre de menus, « à l'écoute » **n'est pas une image template** : il garde ses couleurs,
+c'est son rôle (macOS teinterait le vert en gris). Son disque sombre le garde lisible sur une
+barre claire comme sombre. Les deux autres états restent des images template.
+
+Dans le navigateur, la page remplace `favicon.svg` par `favicon-actif.svg` tant qu'une fréquence
+joue : on retrouve d'un coup d'œil l'onglet qui parle. Le changement est instantané, sans
+animation (principe 5).
+
 ## La marque
 
 Le signe à 40 px, puis le nom en monospace, graisse 600, 26 px, séparés de 10 px. **Le nom n'est
@@ -77,15 +100,20 @@ marque complète : 24 px de signe ; en dessous, le signe seul.
 | `favicon.svg` | tuile `#1a1a1a` à coins de 7, le scope au centre ; à exporter en 16, 32, 180 (iOS) et 512 (manifeste) |
 | `marque.svg`, `marque-clair.svg` | signe et nom |
 | `barre-menus-marche.svg`, `barre-menus-arret.svg` | images « template » de 18 pt pour `tools/menubar/` |
+| `signe-actif.svg`, `signe-actif-16.svg` | l'état « à l'écoute » (R2), 64 et 16 |
+| `favicon-actif.svg` | le favicon tant qu'une fréquence joue |
+| `barre-menus-ecoute.svg` | l'état « à l'écoute » de la barre de menus, en couleur (pas une image template) |
 | `index.html` | la planche : tailles, onglet, barre de menus, connexion, bandeau, README, interdits |
 
 Export en PNG, quand il faudra : `rsvg-convert -w 512 signe.svg > signe-512.png`, ou un navigateur.
 
 ## La barre de menus
 
-Deux états, qui diffèrent **par la forme** et pas seulement par la teinte (principe 6) :
+Trois états (§ « Trois états du même signe »), qui diffèrent **par la forme** et pas seulement par
+la teinte (principe 6) :
+- **à l'arrêt** : l'écran vide, le cercle et son seul centre, à 55 % d'opacité ;
 - **en marche** : le cercle, le balayage, sa lueur et le plot ;
-- **à l'arrêt** : l'écran vide, le cercle et son seul centre, à 55 % d'opacité.
+- **à l'écoute** : le même, écran allumé, en couleur.
 
 Ce sont des images « template » (noir et transparence) : macOS les teinte pour la barre claire,
 la barre sombre et l'état pressé. Elles remplacent `dot.radiowaves.left.and.right` et
