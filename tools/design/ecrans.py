@@ -475,7 +475,7 @@ def vitals():
 <dl class="cl-vitals__list">
   <dt>ads-b</dt><dd>{ok}107 aircraft <span>·</span> 702 msg/s <span>·</span> farthest 182 NM</dd>
   <dt>airband</dt><dd>{ok}2 channels on air <span>·</span> 412 transmissions today</dd>
-  <dt>speech</dt><dd>{ok}Whisper large-v3 ATCO2 <span>·</span> Apple GPU <span>·</span> 1.4 s a transmission</dd>
+  <dt>speech</dt><dd>{ok}Whisper large-v3 ATCO2 <span>·</span> Apple M2 Pro <span>·</span> 1.4 s a transmission</dd>
   <dt>matched</dt><dd>31 % of transmissions to an aircraft today</dd>
   <dt>runways</dt><dd>3 airports followed <span>·</span> 4 runways in use</dd>
   <dt>up</dt><dd>6 d 14 h <span>·</span> Clairance 2026.10 <span>·</span> a7489d5</dd>
