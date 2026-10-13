@@ -28,7 +28,7 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 |---|---|---|---|---|
 | **atc-scribe** (cette session) | le produit : code, mesures, documents, coordination | paliers 0 à 5 de l'audit faits ; bulles de dernière transmission ; retours de l'inventaire design traités (palette, 51 règles orphelines) | le renommage, dès le choix du nom | — |
 | **Whisper-lab** (`~/Dev/Aero/whisper-lab`, privé) | reconnaissance : modèles, corpus, mesures, GPU | précision par niveau d'indices mesurée (borne haute) ; Kyutai écarté (28/09) | tirage au hasard de la précision quand l'annotation aura avancé (jalon du labo) | la mesure de non-régression du modèle converti, le jour du portage |
-| **ATC-scribe communauté** (`~/Dev/Aero/atc-scribe-communaute`, privé) | cadre légal, existant, communautés françaises, prérequis, recommandation | questions 1, 2, 3 livrées | question 4 (prérequis techniques : Wyoming, Pi en différé, Windows pour l'affinage) puis 5 (le premier pas) et la synthèse | la liste hiérarchisée de ce que l'outil doit changer avant qu'on en parle à quiconque |
+| **ATC-scribe communauté** (`~/Dev/Aero/atc-scribe-communaute`, privé, dépôt `chatelp/atc-scribe-communaute`) | cadre légal, existant, communautés françaises, prérequis, recommandation | **étude livrée le 12/10** : `SYNTHESE.md` et fiches 01 à 05 | — (session en veille ; reprend sur question de Pierre) | la décision de Pierre sur le premier pas (consultation d'avocat) ; le P0 de la fiche 04 entre dans le jalon « installable ailleurs » |
 | **ATC-scribe design** (branche `design`, index `docs-fr/design/README.md`) | identité, nom, système de design, maquettes, plan de migration | **tout est livré sauf la marque** : inventaire (01), nom et positionnement (00), principes (02), système et 91 jetons (03, `jetons.json`), maquettes HTML, plan de migration (04, ≈ 13 j, par étapes vérifiables) | identité (marque, favicon, icône), dès le choix du nom | **les choix du propriétaire** : le nom, puis les six points du système listés ci-dessous ; après validation, la migration étape par étape avec cette session |
 | **Station radio** (session de la station) | la station : réception, chaîne VHF, captations | en veille ; `radio-ctl-sync` rapporte l'état au bandeau | — | prévenue à chaque bascule d'écoute |
 
@@ -70,13 +70,14 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 |---|---|---|
 | Renommage | choix du nom | cible : oui (D74) ; nom : non |
 | Migration du design | validation du système | non |
-| Installation sans la station du propriétaire (sources audio et ADS-B génériques documentées, configuration d'exemple, README) | question 4 | principe : oui (mission communauté) |
+| **Installable ailleurs** — le P0 de la fiche 04 de l'étude, « avant d'en parler à quiconque » : sidecar porté ; **mode sans transcription** (le serveur démarre sans sidecar) ; avertissement légal ; rediffusion de l'audio coupée par défaut et **rôle lecture seule** ; guide d'installation bilingue ; Docker de l'amont retiré. Mesure de sortie : une installation sur une machine vierge, à partir du seul guide, **en moins d'une heure, par quelqu'un qui n'a pas écrit le code** ; précision d'appariement inchangée après portage (95 %, D73) | portage (ci-dessous) pour la transcription ; le reste n'en dépend pas | principe : oui (mission communauté) ; ordre et calendrier : non |
 | Version en/fr de l'interface | après le design (les textes bougent) | principe : oui (10/10) |
 | **Portage du sidecar : Linux x86-64 + NVIDIA** (faster-whisper / CTranslate2, repli processeur ; Pi qui reçoit, transcription déportée) ; **Windows au moins pour l'affinage** (les simmers) ; sous-point pour un mode différé (Pi 5, dix minutes de retard) : apparier contre le ciel de l'instant de la transmission relu dans `adsb_targets`, comme le fait déjà l'outil de mesure, au lieu de la flotte vivante (modification bornée au point d'appariement) | question 4 ; format permettant l'affinage ; non-régression mesurée au labo | **cible : oui (12/10) ; pas dans l'immédiat** (Q54) |
 | **Refonte de la structure de l'écran** (mission design élargie par le propriétaire le 12/10, contrainte « disposition gardée » levée) : fil unifié des échanges au centre, toutes fréquences ; le ciel (carte / PAR) à côté ; panneau de contexte « en ce moment » ; puis le système de composants. Esquisses en cours, hors dépôt. Si le fil est retenu, deux chantiers serveur bornés : (1) rapprocher chaque instruction ATC de la réponse du pilote qui la suit, **pour la lecture seulement, jamais un jugement d'erreur** (rien de type SLASH) ; (2) enregistrer la raison d'un non-appariement (aucun indicatif entendu / aucun avion en portée / candidats refusés), aujourd'hui seulement journalisée | esquisses validées par le propriétaire | non |
-| Corpus simulé (VATSIM / IVAO, sessions dédiées, accord écrit) et annotation communautaire | cadre légal (audio réel exclu) ; premier pas décidé | non |
-| Affinage communautaire ou fédéré (modèle adapté au français) | corpus ; portage | non |
-| Premier pas public (quoi, où, quand) | question 5 ; renommage ; installable ailleurs | non |
+| **Consultation d'avocat en droit du numérique**, réponse écrite, sur quatre questions : « correspondance » et transcriptions pseudonymisées ; accord de participation pour un corpus simulé ; échange de poids affinés chez soi ; autorisation ANSSI des récepteurs — **c'est le premier pas recommandé par l'étude (fiche 05) : « pas encore » pour faire connaître l'outil** | décision du propriétaire | non |
+| Corpus simulé (pilote avec IVAO France, sessions dédiées, accord écrit) et annotation communautaire | réponse favorable de l'avocat sur l'accord de participation | non |
+| Affinage communautaire ou fédéré (modèle adapté au français) ; prérequis caché : **un jeu de validation partageable**, qui ne peut pas venir des enregistrements de la station (corpus simulé, ou évaluation chez le contributeur en ne rapatriant que les chiffres) | corpus ; portage | non |
+| Premier pas public (quoi, où, quand) | avocat ; renommage ; installable ailleurs | non |
 
 Plus tard, à discuter (doc 32) : strips de vol, clairance contre trajectoire, vue d'approche en
 plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
@@ -95,7 +96,10 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
    de Tab pour passer d'un avion à l'autre ; (5) l'interpolation des avions gardée sous
    `prefers-reduced-motion` ; (6) la validation d'ensemble, maquettes à l'appui, qui ouvre la
    migration.
-3. **Le premier pas communautaire**, sur la recommandation de l'étude (question 5).
+3. **Le premier pas communautaire** — recommandation livrée le 12/10 (`SYNTHESE.md` du dossier
+   privé) : **pas encore** pour faire connaître l'outil ; d'abord une consultation d'avocat en
+   droit du numérique, réponse écrite, sur les quatre questions listées dans les jalons. À
+   décider : la faire, et quand.
 4. **Demander à GitHub la purge des anciens objets** (après D75, faite le 12/10 : position
    arrondie, adresses génériques, historique réécrit et poussé de force sur les quatre
    branches, sauvegarde `~/Dev/Aero/atc-scribe-sauvegarde-2026-10-12.git`) : les commits
