@@ -69,6 +69,7 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 | Jalon | Dépend de | Décidé ? |
 |---|---|---|
 | Renommage | choix du nom | cible : oui (D74) ; nom : non |
+| **Application de la marque** (livrée le 13/10 sur `design` : `docs-fr/design/identite/`, `05-identite.md`, planche `identite/index.html` ; signe = une piste et la coche « autorisé », nom en monospace) : (1) favicon et manifeste de la page ; (2) icônes de barre de menus, deux états par la forme, à la place des symboles système ; (3) README avec le signe et la première phrase proposée. Trois petites étapes, chacune livrable à part | validation de la marque par le propriétaire | non |
 | Migration du design | validation du système | non |
 | **Installable ailleurs** — le P0 de la fiche 04 de l'étude, « avant d'en parler à quiconque » : sidecar porté ; **mode sans transcription** (le serveur démarre sans sidecar) ; avertissement légal ; rediffusion de l'audio coupée par défaut et **rôle lecture seule** ; guide d'installation bilingue ; Docker de l'amont retiré. Mesure de sortie : une installation sur une machine vierge, à partir du seul guide, **en moins d'une heure, par quelqu'un qui n'a pas écrit le code** ; précision d'appariement inchangée après portage (95 %, D73) | portage (ci-dessous) pour la transcription ; le reste n'en dépend pas | principe : oui (mission communauté) ; ordre et calendrier : non |
 | Version en/fr de l'interface | après le design (les textes bougent) | principe : oui (10/10) |
