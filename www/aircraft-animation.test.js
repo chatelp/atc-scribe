@@ -135,3 +135,23 @@ test("an aircraft's sample is dated as the server dates its position", () => {
     assert.equal(s.at, observedAt + 1000 - 2300);
     assert.equal(e.sampleFromAircraft({ hex: 'abc123', adsb: { lat: 0, lon: 0 } }), null, 'no position, no sample');
 });
+
+test('the first sample flies at its own speed (fiche M, scenario a)', () => {
+    const { e } = engine();
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 1000, now));
+    const state = e.aircraftStates.get('abc123');
+    assert.ok(state.velocity, 'a velocity from the first sample');
+    const a = e._computePose(state, performance.now());
+    const b = e._computePose(state, performance.now() + 1000);
+    const metres = (b.lon - a.lon) * 111320 * Math.cos(48.5 * Math.PI / 180);
+    assert.ok(Math.abs(metres - 400 * 0.514444) < 5, `${metres.toFixed(1)} m in a second, want about 206`);
+});
+
+test("the bulk load's aircraft is dated by its last_seen, as the stream's are", () => {
+    const { e } = engine();
+    const lastSeen = '2026-10-13T12:00:00Z';
+    const aircraft = { hex: 'abc123', last_seen: lastSeen, adsb: { lat: 48.5, lon: 2.0, gs: 400, track: 90, seen: 0.4, seen_pos: 1.7 } };
+    const s = e.sampleFromAircraft(aircraft, Date.parse(aircraft.last_seen));
+    assert.equal(s.at, Date.parse(lastSeen) - 1700);
+});

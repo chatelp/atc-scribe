@@ -245,9 +245,16 @@
                     // Calculate distance
                     this.calculateAircraftDistance(aircraft);
                     
-                    // Update animation engine with aircraft data
+                    // The engine, dated as the stream's samples are: last_seen
+                    // is the server's observed_at (the poll less the whole
+                    // seconds of seen). Dated on arrival, as before, each
+                    // position was taken for current although decoded up to
+                    // two seconds earlier: on a page just loaded, aircraft
+                    // were drawn 300 m behind and caught up over 7 s
+                    // (browser bench, scenario a).
                     if (this.animationEngine) {
-                        this.animationEngine.updateAircraft(aircraft);
+                        this.animationEngine.observe(aircraft.hex,
+                            this.animationEngine.sampleFromAircraft(aircraft, Date.parse(aircraft.last_seen || '')));
                     }
                     
                     // Add to aircraft map (all aircraft from bulk response are pre-filtered)

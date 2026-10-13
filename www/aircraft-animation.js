@@ -387,6 +387,12 @@ class AircraftAnimationEngine {
                 state.velocity = this._blendVelocity(state.velocity, derivedVelocity);
             }
         }
+        // The first sample flies at its own ground speed and track: without
+        // a velocity the aircraft stood still until its second observation,
+        // one to two seconds, then caught up (browser bench, scenario a).
+        if (!state.velocity && Number.isFinite(snapshot.speedKts) && Number.isFinite(snapshot.track)) {
+            state.velocity = this._deriveVelocity(snapshot, snapshot);
+        }
 
         state.lastReal = snapshot;
         if (snapshot.source !== 'predicted') {
