@@ -58,6 +58,15 @@ func FromSidecarCommand(command []string) string {
 	return ""
 }
 
+// DirOf is where the archive is: the directory the configuration names, or
+// else the --save-audio of the sidecar's command line, or "" for none.
+func DirOf(configured string, sidecarCommand []string) string {
+	if strings.TrimSpace(configured) != "" {
+		return configured
+	}
+	return FromSidecarCommand(sidecarCommand)
+}
+
 // Root is the archive's directory.
 func (a *Archive) Root() string { return a.root }
 

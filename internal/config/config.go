@@ -211,6 +211,15 @@ type TranscriptionConfig struct {
 	// File logging settings
 	LogDir string `toml:"log_dir"` // Optional directory for transcription log files (append-only logs by date and frequency)
 
+	// What is kept of the files that grow every day outside the databases, swept
+	// at start and every hour (cmd/server/retention.go); today's are never
+	// deleted. AudioArchiveMaxGB caps the sidecar's archive of clips
+	// (Local.AudioArchiveDir, or its --save-audio), oldest clips first;
+	// RawLogMaxDays is the age past which LogDir/raw/{date}_{frequency}.log
+	// goes. 0 keeps everything.
+	AudioArchiveMaxGB float64 `toml:"audio_archive_max_gb"`
+	RawLogMaxDays     int     `toml:"raw_log_max_days"`
+
 	// How the frequencies service decodes each stream into the PCM that is
 	// played and transcribed.
 	FFmpegPath       string `toml:"ffmpeg_path"`        // Path to FFmpeg executable
@@ -572,6 +581,12 @@ func (c *Config) Validate() error {
 		if _, err := auth.NormalizeRole(u.Role); err != nil {
 			return fmt.Errorf("auth.users %q: %w", u.Name, err)
 		}
+	}
+	if c.Transcription.AudioArchiveMaxGB < 0 {
+		return fmt.Errorf("invalid transcription.audio_archive_max_gb: %v (must be >= 0; 0 keeps everything)", c.Transcription.AudioArchiveMaxGB)
+	}
+	if c.Transcription.RawLogMaxDays < 0 {
+		return fmt.Errorf("invalid transcription.raw_log_max_days: %d (must be >= 0; 0 keeps everything)", c.Transcription.RawLogMaxDays)
 	}
 	switch c.Server.AudioReplay {
 	case "", AudioReplayOwner, AudioReplayAll:

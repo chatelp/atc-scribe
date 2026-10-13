@@ -90,6 +90,7 @@ func main() {
 	defer cancel()
 
 	go runDatabaseRetentionCleanup(ctx, store.dir, store.aircraft.GetDB(), runtimeSettings, log)
+	go runFilePurge(ctx, cfg, log)
 
 	if err := adsbService.Start(ctx); err != nil {
 		log.Error("Failed to start ADS-B service", logger.Error(err))

@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/yegors/co-atc/internal/audioarchive"
 	"github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/storage/sqlite"
 	"github.com/yegors/co-atc/pkg/logger"
@@ -156,4 +158,218 @@ func cleanupOldDailyDatabases(dbDir, activeDBPath string, capGB float64, log *lo
 			logger.Float64("retention_gb", capGB))
 	}
 	return nil
+}
+
+// runFilePurge keeps the two kinds of files that grow every day outside the
+// databases within what the configuration allows: the sidecar's archive of
+// clips (transcription.audio_archive_max_gb) and the raw transcription logs
+// (transcription.raw_log_max_days). Neither had a limit before 13/10: on a
+// station archiving two frequencies the archive takes 1 to 2 GB a day. Swept at
+// start, then every hour like the databases; 0 keeps everything.
+func runFilePurge(ctx context.Context, cfg *config.Config, log *logger.Logger) {
+	archive := audioarchive.DirOf(cfg.Transcription.Local.AudioArchiveDir, cfg.Transcription.Local.Command)
+	rawDir := ""
+	if cfg.Transcription.LogDir != "" {
+		rawDir = filepath.Join(cfg.Transcription.LogDir, "raw")
+	}
+	sweep := func() {
+		now := time.Now()
+		if archive != "" && cfg.Transcription.AudioArchiveMaxGB > 0 {
+			if err := purgeAudioArchive(archive, int64(cfg.Transcription.AudioArchiveMaxGB*(1<<30)), now, log); err != nil {
+				log.Warn("Audio archive purge failed", logger.Error(err), logger.String("path", archive))
+			}
+		}
+		if rawDir != "" && cfg.Transcription.RawLogMaxDays > 0 {
+			if err := purgeRawLogs(rawDir, cfg.Transcription.RawLogMaxDays, now, log); err != nil {
+				log.Warn("Raw transcription log purge failed", logger.Error(err), logger.String("path", rawDir))
+			}
+		}
+	}
+
+	sweep()
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sweep()
+		}
+	}
+}
+
+// purgeAudioArchive keeps the archive within capBytes, deleting the oldest clips
+// first. It touches only what the sidecar writes there (sidecar/whisper_server.py,
+// keep_audio): root/YYYYMMDD/<frequency>/*.wav. Everything in the archive counts
+// towards the cap; only those clips are deleted, today's never, and a frequency
+// folder left empty goes with its last clip. The day's manifest stays: it is a
+// few kilobytes, it carries the texts as first read, and a line whose clip is
+// gone is a 404 for the page, as for a transmission never archived. An archive
+// that is not there -- an external disk unplugged -- is not an error.
+func purgeAudioArchive(root string, capBytes int64, now time.Time, log *logger.Logger) error {
+	days, err := os.ReadDir(root)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read audio archive: %w", err)
+	}
+	today := now.Local().Format("20060102")
+
+	type clip struct {
+		day, dir, name string
+		bytes          int64
+	}
+	var clips []clip
+	var total int64
+	for _, d := range days {
+		day := d.Name()
+		if !d.IsDir() {
+			total += sizeOf(filepath.Join(root, day))
+			continue
+		}
+		_, notADay := time.Parse("20060102", day)
+		err := filepath.WalkDir(filepath.Join(root, day), func(path string, e fs.DirEntry, err error) error {
+			if err != nil || e.IsDir() {
+				return nil
+			}
+			info, err := e.Info()
+			if err != nil {
+				return nil
+			}
+			total += info.Size()
+			rel, _ := filepath.Rel(filepath.Join(root, day), path)
+			// Exactly <frequency>/<clip>.wav, a regular file, in a past day.
+			if notADay == nil && day < today && e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".wav") &&
+				strings.Count(filepath.ToSlash(rel), "/") == 1 {
+				clips = append(clips, clip{day: day, dir: filepath.Dir(path), name: e.Name(), bytes: info.Size()})
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("read audio archive day %s: %w", day, err)
+		}
+	}
+	if total <= capBytes {
+		return nil
+	}
+
+	// Oldest first: by day, then by name, which the sidecar starts with the
+	// time of the transmission (t_YYYYMMDD_HHMMSS_mmm.wav), across frequencies.
+	sort.Slice(clips, func(i, j int) bool {
+		if clips[i].day != clips[j].day {
+			return clips[i].day < clips[j].day
+		}
+		if clips[i].name != clips[j].name {
+			return clips[i].name < clips[j].name
+		}
+		return clips[i].dir < clips[j].dir
+	})
+	type dayCount struct {
+		clips int
+		bytes int64
+	}
+	byDay := map[string]*dayCount{}
+	var order []string
+	dirs := map[string]bool{}
+	deleted, freed := 0, int64(0)
+	for _, c := range clips {
+		if total <= capBytes {
+			break
+		}
+		if err := os.Remove(filepath.Join(c.dir, c.name)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove archived clip: %w", err)
+		}
+		total -= c.bytes
+		deleted++
+		freed += c.bytes
+		dirs[c.dir] = true
+		if byDay[c.day] == nil {
+			byDay[c.day] = &dayCount{}
+			order = append(order, c.day)
+		}
+		byDay[c.day].clips++
+		byDay[c.day].bytes += c.bytes
+	}
+	for dir := range dirs {
+		os.Remove(dir) // only if empty: a folder with clips left stays
+	}
+	for _, day := range order {
+		log.Info("Deleted archived audio clips",
+			logger.String("day", day),
+			logger.Int("clips", byDay[day].clips),
+			logger.Int64("bytes", byDay[day].bytes))
+	}
+	if deleted > 0 {
+		log.Info("Audio archive purge complete",
+			logger.String("path", root),
+			logger.Int("deleted_clips", deleted),
+			logger.Int64("freed_bytes", freed),
+			logger.Int64("kept_bytes", total),
+			logger.Int64("cap_bytes", capBytes))
+	}
+	if total > capBytes {
+		// Today's clips, and whatever else is in the archive, are over the cap
+		// on their own: said, and kept.
+		log.Warn("Audio archive still over its cap with nothing older than today left to delete",
+			logger.String("path", root),
+			logger.Int64("kept_bytes", total),
+			logger.Int64("cap_bytes", capBytes))
+	}
+	return nil
+}
+
+// purgeRawLogs deletes the raw transcription logs older than maxDays, by the date
+// in their name (YYYY-MM-DD_<frequency>.log, internal/transcription/file_logger.go),
+// not by their modification time, which every line appended moves. Today's and
+// any later date are never deleted; a file named otherwise is not touched.
+func purgeRawLogs(dir string, maxDays int, now time.Time, log *logger.Logger) error {
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read raw log directory: %w", err)
+	}
+	y, m, d := now.Local().Date()
+	today := time.Date(y, m, d, 0, 0, 0, 0, time.Local)
+	oldest := today.AddDate(0, 0, -maxDays) // a file of this date is kept
+
+	deleted, freed := 0, int64(0)
+	for _, e := range entries {
+		name := e.Name()
+		if !e.Type().IsRegular() || !strings.HasSuffix(name, ".log") || len(name) < len("2006-01-02_") || name[10] != '_' {
+			continue
+		}
+		date, err := time.ParseInLocation("2006-01-02", name[:10], time.Local)
+		if err != nil || !date.Before(oldest) || !date.Before(today) {
+			continue
+		}
+		path := filepath.Join(dir, name)
+		size := sizeOf(path)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove raw log '%s': %w", path, err)
+		}
+		deleted++
+		freed += size
+		log.Info("Deleted raw transcription log",
+			logger.String("path", path),
+			logger.String("file_date", name[:10]),
+			logger.Int64("bytes", size))
+	}
+	if deleted > 0 {
+		log.Info("Raw transcription log purge complete",
+			logger.Int("deleted_files", deleted),
+			logger.Int64("freed_bytes", freed),
+			logger.Int("max_days", maxDays))
+	}
+	return nil
+}
+
+func sizeOf(path string) int64 {
+	if info, err := os.Stat(path); err == nil {
+		return info.Size()
+	}
+	return 0
 }

@@ -17,11 +17,7 @@ func newAudioArchive(cfg *config.Config) *audioarchive.Archive {
 	if cfg == nil {
 		return nil
 	}
-	dir := cfg.Transcription.Local.AudioArchiveDir
-	if dir == "" {
-		dir = audioarchive.FromSidecarCommand(cfg.Transcription.Local.Command)
-	}
-	return audioarchive.New(dir)
+	return audioarchive.New(audioarchive.DirOf(cfg.Transcription.Local.AudioArchiveDir, cfg.Transcription.Local.Command))
 }
 
 // GetTranscriptionAudio serves the clip of one transmission, as the sidecar

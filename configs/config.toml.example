@@ -112,6 +112,10 @@ transcribe_audio = true
 # honours upstream's docs/LOCAL-STT.md; no key, no audio leaves the host. ffmpeg decodes
 # each stream to 24 kHz mono s16le. language = "en" serves a source that names none.
 log_dir = "data/transcriptions"             # raw/{date}_{frequency}.log, append-only; empty to disable
+# Swept at start and every hour, never today's files; 0 keeps everything. The archive of clips
+# (--save-audio below, or audio_archive_dir) loses its oldest clips past the size; its manifests stay.
+audio_archive_max_gb = 2                    # one to two days on two frequencies
+raw_log_max_days = 30                       # raw logs older than this, by the date in their name
 
 # Keep this sub-table last in [transcription]: a key written below it lands in it.
 [transcription.local]
