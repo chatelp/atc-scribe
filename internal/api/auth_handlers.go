@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/yegors/co-atc/internal/auth"
 	"github.com/yegors/co-atc/pkg/logger"
 )
@@ -25,6 +27,11 @@ func (h *Handler) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
 			out["user"] = sess.User
 			out["expires_at"] = sess.ExpiresAt
 		}
+	}
+	// What the page may offer: "owner" or "viewer", and owner when sign-in is
+	// off. Absent for a visitor who has not signed in.
+	if role := h.auth.Role(r); role != "" {
+		out["role"] = role
 	}
 	WriteJSON(w, http.StatusOK, out)
 }
@@ -71,6 +78,43 @@ func (h *Handler) PostLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	h.auth.ClearCookie(w, r)
 	WriteJSON(w, http.StatusOK, map[string]interface{}{"authenticated": false})
+}
+
+// ViewerGuard keeps a viewer account to reading, behind the sign-in lock: GET
+// and HEAD everywhere except the audio, and nothing that writes -- not the
+// settings, not the sources, not the access mode. Signing out is outside the
+// lock and stays open to everyone. An owner, and everyone when sign-in is
+// off, goes through untouched.
+func (h *Handler) ViewerGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h.auth.Role(r) == auth.RoleViewer && !viewerMay(r) {
+			WriteJSON(w, http.StatusForbidden, map[string]string{"error": "this account is read-only"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// audioRoutes are the routes that hand out the receiver's audio: the live
+// stream and the archived clip of a transmission. A viewer is not given them:
+// rebroadcasting what the receiver hears is the owner's call.
+var audioRoutes = map[string]bool{
+	"/api/v1/stream/{id}":               true,
+	"/api/v1/transcriptions/{id}/audio": true,
+}
+
+// viewerMay says whether a viewer may make this request. The route is read
+// from chi's routing, already done when a group's middleware runs, rather
+// than from the path, so that a path spelled another way cannot slip past.
+func viewerMay(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	pattern := ""
+	if rctx := chi.RouteContext(r.Context()); rctx != nil {
+		pattern = rctx.RoutePattern()
+	}
+	return !audioRoutes[pattern]
 }
 
 // Auth exposes the service so the router can hang its middleware on it. The

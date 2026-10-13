@@ -58,6 +58,7 @@ type AuthConfig struct {
 type UserConfig struct {
 	Name         string `toml:"name"`
 	PasswordHash string `toml:"password_hash"`
+	Role         string `toml:"role"` // "owner" (the default) or "viewer", who reads and changes nothing
 }
 
 // ServerConfig contains HTTP server configuration settings
@@ -554,6 +555,11 @@ func (c *Config) Validate() error {
 		}
 		if named == 0 {
 			return fmt.Errorf("auth.enabled is true but no user has a password_hash; run: co-atc -add-user <name>")
+		}
+	}
+	for _, u := range c.Auth.Users {
+		if _, err := auth.NormalizeRole(u.Role); err != nil {
+			return fmt.Errorf("auth.users %q: %w", u.Name, err)
 		}
 	}
 	for _, o := range c.Server.AllowedOrigins {

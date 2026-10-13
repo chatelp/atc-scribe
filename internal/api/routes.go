@@ -107,6 +107,9 @@ func (r *Router) Routes() http.Handler {
 		// routes above -- chi refuses a Use() that follows a route on the same mux.
 		router.Group(func(router chi.Router) {
 			router.Use(r.handler.Auth().Require)
+			// A viewer account reads, and is not given the audio; see
+			// auth_handlers.go.
+			router.Use(r.handler.ViewerGuard)
 
 			// Aircraft routes
 			router.Get("/aircraft", r.handler.GetAllAircraft)

@@ -41,6 +41,11 @@ type UserRecord struct {
 	Name         string `json:"name"`
 	PasswordHash string `json:"password_hash"`
 	CreatedAt    string `json:"created_at"`
+
+	// Role is "owner" or "viewer" (see role.go). Absent in every file written
+	// before roles existed, and absent means owner; never written for the
+	// account the first-run page creates, which is the owner's.
+	Role string `json:"role,omitempty"`
 }
 
 // DefaultUserFile is the file the first-run page writes, next to config.toml.
