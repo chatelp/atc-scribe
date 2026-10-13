@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 
 	"context"
@@ -202,10 +201,9 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	var fs syscall.Statfs_t
-	if err := syscall.Statfs(dir, &fs); err == nil {
-		st.Storage.DiskFreeBytes = int64(fs.Bavail) * int64(fs.Bsize)
-		st.Storage.DiskTotalBytes = int64(fs.Blocks) * int64(fs.Bsize)
+	if free, total, ok := diskSpace(dir); ok {
+		st.Storage.DiskFreeBytes = free
+		st.Storage.DiskTotalBytes = total
 	}
 
 	// Growth is measured against a sample taken at start rather than divided by the
