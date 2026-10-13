@@ -154,7 +154,18 @@ class AircraftAnimationEngine {
         }
 
         const previousReal = state.lastReal;
-        const previousRendered = state.lastRendered || previousReal;
+        // Where the aircraft is drawn now: the last frame drawn carried
+        // forward over the few milliseconds since, at the velocity it was
+        // drawn with. The gap measured from the last frame as it stood made
+        // the first frame after each sample advance only the time left to
+        // it (13 ms of flight instead of 33 at 30 fps, measured on the replay
+        // bench): a nearly stopped frame on every sample.
+        // An aircraft not moved for longer than two frames was not moving on
+        // the map (stopped, or not animated): it is taken where it stands.
+        const frameMs = 1000 / Math.max(1, this.config.interpolationFps || 30);
+        const previousRendered = state.lastRendered && (now - state.lastRendered.timestamp) <= 2 * frameMs
+            ? this._carriedForward(state.lastRendered, state.velocity, now)
+            : (state.lastRendered || previousReal);
         let effectiveSnapshot = snapshot;
 
         // A real update whose position is the one already known is not a new
@@ -260,6 +271,19 @@ class AircraftAnimationEngine {
         if (!state.lastRendered) {
             state.lastRendered = { ...effectiveSnapshot };
         }
+    }
+
+    // A drawn point moved on to time `now` at a velocity.
+    _carriedForward(point, velocity, now) {
+        if (!point || !velocity || !Number.isFinite(point.timestamp)) return point;
+        const sec = Math.max(0, (now - point.timestamp) / 1000);
+        if (sec === 0) return point;
+        return {
+            ...point,
+            lat: point.lat + (velocity.northMps * sec) / 111320,
+            lon: point.lon + (velocity.eastMps * sec) / (111320 * Math.cos((point.lat * Math.PI) / 180)),
+            alt: point.alt + velocity.verticalMps * sec * 3.28084
+        };
     }
 
     // The sample repeats the known fix: its speed, track and vertical rate are
