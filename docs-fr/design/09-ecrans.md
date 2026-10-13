@@ -79,7 +79,7 @@ Présentées une à une, avant / après sur les écrans réels ; toutes retenues
 5. **Le téléphone à quatre onglets**, la radio en accueil.
 6. **Les consignes entendues sans verdict** : la colonne « Status » de la fiche (prévue pour
    issued / complied / deviation, mais qui n'affiche jamais que « issued » : rien n'écrit les deux
-   autres) devient « Then » et dit ce que l'avion a fait (« level at 4000 ft »), sans
+   autres) devient « Then » et dit ce que l'avion a fait (« level at 4 000 ft, 3 min later » ; « — » tant qu'une clairance n'a pas de suite visible ; phrases arrêtées par la fiche cloud K), sans
    qualifier l'écart. C'est le principe « constater, ne pas juger » appliqué à une fonction qui
    existe ; le propriétaire a confirmé qu'il s'applique ici.
 
