@@ -12,6 +12,9 @@
 // that improves them, rewrite it with
 //
 //     REPLAY_UPDATE_REFERENCE=1 node --test www/aircraft-replay.test.js
+//
+// and never worse at all than those of the upstream engine with the D79
+// fixes, measured before fiche L changed anything (step1.json, fixed).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -265,5 +268,13 @@ test('the replayed motion is no worse than the reference', () => {
     const ref = JSON.parse(fs.readFileSync(refPath, 'utf8'));
     for (const [k, tolerance] of Object.entries(GUARDED)) {
         assert.ok(m[k] <= ref[k] + tolerance, `${k}: ${m[k]}, reference ${ref[k]}`);
+    }
+});
+
+test('the replayed motion is no worse than before fiche L', () => {
+    const m = replay();
+    const before = JSON.parse(fs.readFileSync(path.join(DATA, 'step1.json'), 'utf8'));
+    for (const k of Object.keys(GUARDED)) {
+        assert.ok(m[k] <= before[k], `${k}: ${m[k]}, ${before[k]} before fiche L`);
     }
 });

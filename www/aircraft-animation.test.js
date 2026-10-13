@@ -86,3 +86,52 @@ test('a predicted sample never counts as the known fix', () => {
     assert.deepEqual(state.lastRealFix, { lat: 48.5, lon: 2.0028 });
     assert.equal(state.lastSampleSource, 'predicted');
 });
+
+// Fiche L, step 5: samples dated by their source.
+const metresEast = (lon, lon0) => (lon - lon0) * 111320 * Math.cos(48.5 * Math.PI / 180);
+const fix = (lon, at, sentAt = Date.now()) => ({ lat: 48.5, lon, gs: 400, track: 90, heading: 95, alt: 30000, baroRate: 0, at, sentAt });
+
+test('an observation is carried from when its position was decoded, not from its arrival', () => {
+    const { e } = engine();
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 2000));
+    e.observe('abc123', fix(2.0028, now - 1000));
+    const state = e.aircraftStates.get('abc123');
+    const pose = e._predictedPose(state, state.lastReal, performance.now(), 90);
+    // Decoded a second ago at ~205 m/s: drawn ~205 m on from the fix now.
+    const ahead = metresEast(pose.lon, 2.0028);
+    assert.ok(Math.abs(ahead - 400 * 0.514444) < 25, `carried ${ahead.toFixed(0)} m, want about 206 m`);
+});
+
+test('a server clock ahead of the page does not freeze the aircraft', () => {
+    const { e } = engine();
+    const server = Date.now() + 5000; // the server's clock reads 5 s more
+    e.observe('abc123', fix(2.0, server - 1000, server));
+    const state = e.aircraftStates.get('abc123');
+    const age = performance.now() - state.lastReal.timestamp;
+    assert.ok(Math.abs(age - 1000) < 50, `the sample is ${age.toFixed(0)} ms old on the page, want about 1000`);
+});
+
+test('an estimate based on an older poll than the last observation is left out', () => {
+    const { e } = engine();
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 1500, now - 1000));
+    e.observe('abc123', fix(2.0028, now - 500, now));
+    const state = e.aircraftStates.get('abc123');
+    e.estimate('abc123', { lat: 48.5, lon: 2.0035, gs: 400, track: 90, alt: 30000, confidence: 0.9, at: now, sentAt: now, basedOn: now - 1000 });
+    assert.equal(state.lastSampleSource, 'real', 'the observation stands');
+    e.estimate('abc123', { lat: 48.5, lon: 2.0035, gs: 400, track: 90, alt: 30000, confidence: 0.5, at: now, sentAt: now, basedOn: now });
+    assert.equal(state.lastSampleSource, 'real', 'under the confidence floor');
+    e.estimate('abc123', { lat: 48.5, lon: 2.0035, gs: 400, track: 90, alt: 30000, confidence: 0.9, at: now, sentAt: now, basedOn: now });
+    assert.equal(state.lastSampleSource, 'predicted', 'a current estimate is taken');
+});
+
+test("an aircraft's sample is dated as the server dates its position", () => {
+    const { e } = engine();
+    const observedAt = Date.parse('2026-10-13T12:00:00Z');
+    const s = e.sampleFromAircraft({ hex: 'abc123', adsb: { lat: 48.5, lon: 2.0, gs: 400, track: 90, seen: 1.4, seen_pos: 2.3 } }, observedAt);
+    // observed_at is the poll less the whole seconds of seen.
+    assert.equal(s.sentAt, observedAt + 1000);
+    assert.equal(s.at, observedAt + 1000 - 2300);
+    assert.equal(e.sampleFromAircraft({ hex: 'abc123', adsb: { lat: 0, lon: 0 } }), null, 'no position, no sample');
+});

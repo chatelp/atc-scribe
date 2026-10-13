@@ -2,6 +2,8 @@ package adsb
 
 import (
 	"math"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -251,5 +253,96 @@ func TestReceiverTimeDatesTheFile(t *testing.T) {
 	}
 	if !snap.Timestamp.Equal(read) {
 		t.Errorf("the snapshot is still ingested at the read: %v", snap.Timestamp)
+	}
+}
+
+// straightTrack feeds ten fixes a second apart, due east at 400 kt, and
+// returns the last.
+func straightTrack(tt *TrajectoryTracker, hex string, base time.Time) TrajectorySnapshot {
+	var fix TrajectorySnapshot
+	for i := 0; i < 10; i++ {
+		ts := base.Add(time.Duration(i) * time.Second)
+		fix = TrajectorySnapshot{Timestamp: ts, PosTimestamp: ts, Lat: 48.5, Lon: 2.0 + float64(i)*0.0028,
+			AltBaro: 30000, GS: 400, TAS: 400, Track: 90, Valid: true}
+		tt.Ingest(hex, fix)
+	}
+	return fix
+}
+
+func predictionFor(tt *TrajectoryTracker, hex string, at time.Time) (LivePrediction, bool) {
+	for _, p := range tt.GetLivePredictionsAt(at) {
+		if p.Hex == hex {
+			return p, true
+		}
+	}
+	return LivePrediction{}, false
+}
+
+// No prediction from a position decoded more than a minute ago, however
+// recent the poll that repeated it.
+func TestLivePredictionExpiresAMinuteAfterThePosition(t *testing.T) {
+	tt := newTestTracker(t, PhaseReference{Lat: receiverLat, Lon: receiverLon, Runways: testRunways()})
+	base := time.Now().UTC().Add(-2 * time.Minute)
+	fix := straightTrack(tt, "abc127", base)
+	// Polls go on for 55 s, repeating the fix: the position is not renewed.
+	for i := 1; i <= 55; i++ {
+		repeat := fix
+		repeat.Timestamp = fix.Timestamp.Add(time.Duration(i) * time.Second)
+		tt.Ingest("abc127", repeat)
+	}
+	tt.EnsureDerived("abc127")
+	if _, ok := predictionFor(tt, "abc127", fix.PosTimestamp.Add(50*time.Second)); !ok {
+		t.Error("no prediction 50 s after the fix")
+	}
+	if p, ok := predictionFor(tt, "abc127", fix.PosTimestamp.Add(61*time.Second)); ok {
+		t.Errorf("a prediction 61 s after the fix, 6 s after the last poll: %+v", p)
+	}
+}
+
+// The broadcast leaves out what falls under the confidence floor: an
+// aircraft in a tight turn, while a straight one goes out.
+func TestLivePredictionConfidenceFloor(t *testing.T) {
+	tt := newTestTracker(t, PhaseReference{Lat: receiverLat, Lon: receiverLon, Runways: testRunways()})
+	base := time.Now().UTC().Add(-30 * time.Second)
+	straightTrack(tt, "abc128", base.Add(10*time.Second))
+	turning := turningTrack(tt, "abc129", base, 6)
+	tt.EnsureDerived("abc128")
+	ws := &captureWS{}
+	lp := newLivePredictor(tt, ws)
+
+	at := turning.PosTimestamp.Add(3 * time.Second)
+	if p, ok := predictionFor(tt, "abc128", at); !ok || p.Confidence < minPredictionConfidence {
+		t.Fatalf("the straight aircraft's confidence %.2f (found %v), want one over the floor", p.Confidence, ok)
+	}
+	if p, ok := predictionFor(tt, "abc129", at); !ok || p.Confidence >= minPredictionConfidence {
+		t.Fatalf("the turning aircraft's confidence %.2f (found %v), want one under the floor", p.Confidence, ok)
+	}
+	lp.broadcast(at)
+	var sent []string
+	for _, m := range ws.msgs {
+		sent = append(sent, m.Data["hex"].(string))
+	}
+	if strings.Join(sent, " ") != "abc128" {
+		t.Errorf("broadcast %v, want the straight aircraft only", sent)
+	}
+}
+
+// The message of one prediction, value by value.
+func TestPredictedStateMessage(t *testing.T) {
+	at := time.Date(2026, 10, 13, 12, 0, 1, 500_000_000, time.UTC)
+	m := predictedStateMessage(LivePrediction{
+		Hex: "abc130", Lat: 48.12345678, Lon: 2.87654321, Altitude: 30012.4, Heading: 89.6, Speed: 401.4,
+		Confidence: 0.91234, Timestamp: at, BaseObserved: at.Add(-1500 * time.Millisecond),
+	})
+	want := map[string]interface{}{
+		"hex": "abc130", "predicted": true,
+		"based_on": "2026-10-13T12:00:00Z", "predicted_at": "2026-10-13T12:00:01.5Z",
+		"delta": map[string]interface{}{
+			"lat": 48.123457, "lon": 2.876543, "alt_baro": 30012.0, "gs": 401.0, "track": 90.0,
+			"confidence": 0.912, "source": "predicted",
+		},
+	}
+	if m.Type != "aircraft_predicted_state" || !reflect.DeepEqual(m.Data, want) {
+		t.Errorf("%s %#v\nwant %#v", m.Type, m.Data, want)
 	}
 }

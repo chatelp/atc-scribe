@@ -196,7 +196,7 @@ class AircraftAnimationEngine {
     observe(hex, sample) {
         if (!this.config.enabled || !hex || !sample) return;
         if (!this._hasPosition(sample)) return;
-        const snapshot = this._snapshot(sample, 'observed');
+        const snapshot = this._snapshot(sample, 'real');
         const state = this._ingest(hex, snapshot, sample.status);
         if (state && Number.isFinite(sample.sentAt)) {
             state.lastObservedAt = sample.sentAt;
