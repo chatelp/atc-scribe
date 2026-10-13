@@ -4852,6 +4852,22 @@ la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1
 La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
 validée contre `actual_runway_off`.
 
+### D77 — La structure de l'écran : le fil, le ciel, une colonne « Right now » / « Traffic » *(13/10)*
+
+**Esquisses validées par le propriétaire le 13/10** (`docs-fr/design/07-esquisses.md`, branche
+`design`), après l'état des lieux de ce que la page sait afficher aujourd'hui. **A, par
+défaut** : le fil unifié des échanges (toutes fréquences) au centre, le ciel (carte ou PAR) à
+côté, et une colonne à deux onglets : **« Right now »** (piste en service par aérodrome et
+depuis quand, séquence d'arrivée, « à savoir » des derniers événements, compteurs, antenne) et
+**« Traffic »**, la liste actuelle et ses filtres, **la carte suivant ces filtres**. **B** : la
+même page, colonne repliée. **C, suivre un vol** : son histoire remplace le contenu de la
+colonne ; son approche s'affiche dans le cadre de la PAR existant, et la séquence de « Right
+now » est le tableau « Arrivals » de la PAR. La contrainte « disposition gardée » du 09/10 est
+levée par ce choix. Ce qui en découle côté code, par étapes sous les garde-fous, après le
+système de design : la séquence d'arrivée calculée dans le store pour tous les aérodromes suivis
+(la PAR la relit), les gabarits français des consignes, puis la migration elle-même
+(`04-migration.md`).
+
 ### D76 — Le signe de Clairance est le scope radar *(13/10)*
 
 **Choisi par le propriétaire le 13/10** avec la session design, sur une planche de huit signes
