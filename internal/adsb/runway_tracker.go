@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -325,7 +326,15 @@ func (rt *RunwayInUseTracker) recompute(now time.Time) {
 
 	// Log on active runway change
 	if newActiveEnd != rt.lastActiveEnd && newActiveEnd != "" {
-		if rt.lastActiveEnd != "" {
+		if rt.lastActiveEnd != "" && sameDirection(rt.lastActiveEnd, newActiveEnd) {
+			// The lead passing between two runways flown the same way together
+			// (De Gaulle's 26L and 27R, 0.57 and 0.43 on 13/10, swapping every few
+			// minutes) is not a change of runway: "since" stays.
+			rt.logger.Debug("Lead passed within the same direction",
+				logger.String("previous", formatRunwayEnd(rt.lastActiveEnd)),
+				logger.String("current", formatRunwayEnd(newActiveEnd)),
+			)
+		} else if rt.lastActiveEnd != "" {
 			rt.lastChangeAt = now
 			rt.logger.Info("Active runway changed",
 				logger.String("previous", formatRunwayEnd(rt.lastActiveEnd)),
@@ -473,6 +482,41 @@ func (rt *RunwayInUseTracker) expandActiveSetForParallels() {
 
 // formatRunwayEnd extracts a human-readable runway name from "05-23/05" format.
 // Returns just the end identifier (e.g. "05") with the pair for context.
+// sameDirection says whether two runway ends are flown the same way: their
+// numbers (the magnetic heading in tens of degrees) differ by one at most,
+// around the compass. De Gaulle's doublets, 26L/26R and 27L/27R, land and take
+// off westward together; a change of runway is a change of direction. Ends
+// whose number cannot be read are never the same direction.
+func sameDirection(a, b string) bool {
+	na, okA := runwayNumber(a)
+	nb, okB := runwayNumber(b)
+	if !okA || !okB {
+		return false
+	}
+	d := na - nb
+	if d < 0 {
+		d = -d
+	}
+	if d > 18 {
+		d = 36 - d
+	}
+	return d <= 1
+}
+
+// runwayNumber reads the number of a runway end, "09L-27R/27R" -> 27.
+func runwayNumber(runwayID string) (int, bool) {
+	end := runwayID
+	if i := strings.LastIndex(runwayID, "/"); i >= 0 {
+		end = runwayID[i+1:]
+	}
+	end = strings.TrimRight(end, "LRC")
+	n, err := strconv.Atoi(end)
+	if err != nil || n < 1 || n > 36 {
+		return 0, false
+	}
+	return n, true
+}
+
 func formatRunwayEnd(runwayID string) string {
 	// RunwayID format: "pairKey/endIdent" e.g. "05-23/05"
 	parts := strings.SplitN(runwayID, "/", 2)

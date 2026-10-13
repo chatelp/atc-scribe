@@ -2,6 +2,7 @@ package adsb
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -196,5 +197,66 @@ func TestTheRunwayInUseSaysSinceWhen(t *testing.T) {
 	rt.RecordEvent("07-25/07", RunwayEventApproach, "third")
 	if scores := rt.GetTopScores(3); scores[0].Since != nil {
 		t.Errorf("after a reset: since %v, want none", scores[0].Since)
+	}
+}
+
+// "Since" resets on a change of direction, never on the lead passing between
+// two runways flown the same way together: on 13/10 De Gaulle's 26L and 27R,
+// 0.57 and 0.43, swapped the lead every few minutes and "since" with it.
+func TestSinceResetsOnAChangeOfDirectionOnly(t *testing.T) {
+	rt := newChoiceTracker(t, cdgRunways())
+	land := func(end string, n int, tag string) {
+		for i := 0; i < n; i++ {
+			rt.RecordEvent(end, RunwayEventLanding, fmt.Sprintf("%s%d", tag, i))
+		}
+	}
+	since := func() *time.Time {
+		s := rt.GetTopScores(1)
+		if len(s) == 0 {
+			t.Fatal("no runway in use")
+		}
+		return s[0].Since
+	}
+
+	land("08R-26L/26L", 3, "a")
+	if since() != nil {
+		t.Fatal("the first runway seen is not a change: since must stay unknown")
+	}
+	land("09L-27R/27R", 5, "b") // the lead passes to 27R, same direction
+	if top := rt.GetTopScores(1)[0].RunwayEnd; top != "09L-27R/27R" {
+		t.Fatalf("lead %s, want 27R", top)
+	}
+	if since() != nil {
+		t.Error("26L to 27R is the same direction: since must not be set")
+	}
+
+	land("08R-26L/08R", 20, "c") // the airport turns east
+	turned := since()
+	if turned == nil {
+		t.Fatal("west to east is a change of runway: since must be set")
+	}
+	land("09L-27R/09L", 30, "d") // the lead passes to 09L, still east
+	if s := since(); s == nil || !s.Equal(*turned) {
+		t.Errorf("08R to 09L is the same direction: since moved from %v to %v", turned, s)
+	}
+}
+
+func TestSameDirection(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want bool
+	}{
+		{"08R-26L/26L", "09L-27R/27R", true},
+		{"08R-26L/26L", "08L-26R/26R", true},
+		{"08R-26L/26L", "08R-26L/08R", false},
+		{"18-36/36", "01-19/01", true}, // around the compass
+		{"07-25/25", "06-24/24", true},
+		{"07-25/25", "02-20/20", false},
+		{"H1/H1", "07-25/25", false},
+	}
+	for _, c := range cases {
+		if got := sameDirection(c.a, c.b); got != c.want {
+			t.Errorf("sameDirection(%s, %s) = %v, want %v", c.a, c.b, got, c.want)
+		}
 	}
 }
