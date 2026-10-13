@@ -294,6 +294,9 @@ func (s *replayStorage) GetStaleActiveAircraft([]string, time.Time) ([]*Aircraft
 type replayRecorder struct {
 	now  func() time.Time
 	msgs []replayMessage
+	// forms holds, by message type, every key path the messages carried
+	// before anything was left out of the recording (message_form_test.go).
+	forms map[string]map[string]bool
 }
 
 type replayMessage struct {
@@ -319,6 +322,10 @@ func (r *replayRecorder) Broadcast(m *websocket.Message) {
 	if err := json.Unmarshal(b, &generic); err != nil {
 		panic(err)
 	}
+	if r.forms[m.Type] == nil {
+		r.forms[m.Type] = map[string]bool{}
+	}
+	keyPaths("", generic, r.forms[m.Type])
 	if data, ok := generic["data"].(map[string]any); ok {
 		if a, ok := data["aircraft"].(map[string]any); ok {
 			delete(a, "future")
@@ -342,10 +349,11 @@ type replayTruth struct {
 }
 
 type replayRecording struct {
-	Start    string          `json:"start"`
-	Station  [2]float64      `json:"station"`
-	Messages []replayMessage `json:"messages"`
-	Truth    []replayTruth   `json:"truth"`
+	Forms    map[string]map[string]bool `json:"-"`
+	Start    string                     `json:"start"`
+	Station  [2]float64                 `json:"station"`
+	Messages []replayMessage            `json:"messages"`
+	Truth    []replayTruth              `json:"truth"`
 }
 
 // recordReplay flies the aircraft and runs the server's chain over them.
@@ -376,7 +384,7 @@ func recordReplay(t *testing.T) replayRecording {
 
 	var simNow time.Time
 	clock := func() time.Time { return simNow }
-	rec := &replayRecorder{now: clock}
+	rec := &replayRecorder{now: clock, forms: map[string]map[string]bool{}}
 	phases := config.FlightPhasesConfig{
 		Enabled: true, CruiseAltitudeFt: 18000, DepartureAltitudeFt: 1000,
 		TaxiingMinSpeedKts: 1, TaxiingMaxSpeedKts: 50,
@@ -438,6 +446,7 @@ func recordReplay(t *testing.T) replayRecording {
 		Start:    replayStart.Format(time.RFC3339),
 		Station:  [2]float64{replayStationLat, replayStationLon},
 		Messages: rec.msgs,
+		Forms:    rec.forms,
 	}
 	for _, a := range fleet {
 		tr := replayTruth{Hex: a.f.hex, Flight: a.f.flight, Kind: a.f.kind, StepMs: replayTruthStep.Milliseconds(),
