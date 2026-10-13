@@ -201,13 +201,13 @@ def scope_svg(cls='', w=1440, h=900):
     labels = ''.join(f'<text x="{cx}" y="{cy - r - 6}" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#6b6b6b">{n} NM</text>'
                      for r, n in ((150, 5), (300, 10), (450, 15)))
     planes = ''.join([
-        aircraft('bireacteur', 330, 210, 78, 26, '#a8a8a8'),
-        aircraft('gros', 1150, 170, 250, 30, '#6b6b6b'),
-        aircraft('leger', 560, 640, -30, 20, '#f5f5f5'),
-        aircraft('turboprop', 1080, 690, 120, 24, '#cfcfcf'),
-        aircraft('bireacteur', 1260, 470, 200, 26, '#858585'),
-        aircraft('affaires', 200, 560, 40, 22, '#858585'),
-        aircraft('helico', 880, 760, 0, 22, '#f5f5f5'),
+        aircraft('bireacteur', 330, 210, 78, 26, '#c2a3ff'),
+        aircraft('gros', 1150, 170, 250, 30, '#6e7b8f'),
+        aircraft('leger', 560, 640, -30, 20, '#fff59a'),
+        aircraft('turboprop', 1080, 690, 120, 24, '#e68cba'),
+        aircraft('bireacteur', 1260, 470, 200, 26, '#61c9e3'),
+        aircraft('affaires', 200, 560, 40, 22, '#61c9e3'),
+        aircraft('helico', 880, 760, 0, 22, '#fff59a'),
     ])
     return f'<svg class="{cls}" viewBox="0 0 {w} {h}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">{rings}{labels}{planes}</svg>'
 

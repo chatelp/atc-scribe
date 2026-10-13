@@ -48,10 +48,10 @@ Désactivé (`text.disabled` #6b6b6b) : panel 3.3, hover 2.7 — exempté par WC
 
 ## Rampes d'altitude (icône d'avion sur la carte)
 
-- **fond sombre** (sur #000000) : very-low #f5f5f5 (L 97, 19.3) · low #cfcfcf (L 83, 13.5) · mid #a8a8a8 (L 69, 8.8) · high #858585 (L 56, 5.7) · cruise #6b6b6b (L 45, 3.9)
-  - clarté monotone : oui ; écart minimal entre bandes voisines ΔE 10.3 ; sans teinte, donc identique pour tous les daltonismes.
-- **fond clair** (sur #ffffff) : very-low #141414 (L 6, 18.4) · low #333333 (L 21, 12.6) · mid #4d4d4d (L 33, 8.5) · high #666666 (L 43, 5.7) · cruise #808080 (L 54, 3.9)
-  - clarté monotone : oui ; écart minimal entre bandes voisines ΔE 10.4 ; sans teinte, donc identique pour tous les daltonismes.
+- **fond sombre** (sur #000000) : very-low #fff59a (18.8) · low #e68cba (8.8) · mid #c2a3ff (10.0) · high #61c9e3 (11.0) · cruise #6e7b8f (4.9)
+  - toutes les paires : ΔE 34.1 en vision normale, 13.6 au pire daltonisme ; au rouge d'urgence 29.0 ; à une famille de phase 5.8 ; le plus bas le plus visible, la croisière la plus discrète : oui
+- **fond clair** (sur #ffffff) : very-low #33311f (13.1) · low #452a38 (12.8) · mid #746299 (5.3) · high #27505b (8.8) · cruise #6e7b8f (4.3)
+  - toutes les paires : ΔE 22.4 en vision normale, 12.7 au pire daltonisme ; au rouge d'urgence 29.1 ; à une famille de phase 14.5 ; le plus bas le plus visible, la croisière la plus discrète : oui
 
 ## Palettes porteuses de sens et daltonisme
 
