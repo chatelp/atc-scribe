@@ -18,6 +18,20 @@ les sept garde-fous de `32-audit-produit.md` ; la session design relit chaque é
 | D'où viennent les données | `07-esquisses.md` | tout est disponible dans le store depuis le 13/10 |
 | Les choix tranchés | `03-systeme.md` (fin), D77, D78 | police, cinq familles, rampe d'altitude, J / K ; les six décisions des écrans |
 
+## Qui fait quoi
+
+| Qui | Rôle |
+|---|---|
+| Le propriétaire | décide ; toute question nouvelle de comportement remonte à lui ; une soirée d'écoute clôt chaque étape visible |
+| La session atc-scribe | implémente : verse `design` dans `local`, code les étapes dans `www/` et le serveur (≈ 4 h 30), tient l'instance d'essai, publie, relance la production, tient `05-decisions.md` et `33-pilotage.md` |
+| La session design | garde la référence (`jetons.json`, le système, les écrans) et ses outils (`tools/design/`) ; relit chaque étape livrée ; complète le système quand un manque apparaît ; ne touche jamais `www/` |
+
+Le déroulé d'une étape : livraison sur l'instance d'essai → la session design compare à l'écran de
+référence et rejoue les mesures, répond « conforme » ou nomme les écarts → corrections → soirée
+d'écoute → versement dans `local`. Un composant manquant s'ajoute d'abord au système, par la session
+design, puis se recopie ; une valeur se change dans `jetons.json` ; un écart volontaire se consigne
+dans `09-ecrans.md` et l'écran se met à jour.
+
 ## Avant tout : où vit `www/`
 
 Mesuré le 12/10 : la production sert une copie figée (`runs/production/www`, réglage
@@ -31,8 +45,10 @@ En plus des sept garde-fous du doc 32 :
 
 1. **Le système entre dans `www/` par copie vérifiée.** `www/tokens.css` et `www/components.css`
    sont des copies de `systeme/project/tokens.css` et `components/bundle.css`, écrites par
-   `ds-export.mjs --www` ; le filet (`tools/www-check/check.mjs`) échoue si elles divergent. Une
-   valeur ne se corrige jamais dans `www/`.
+   `node tools/design/ds-export.mjs --www` (écrit par la session design le 13/10) ; le filet
+   (`tools/www-check/check.mjs`) appelle `ds-export.mjs --check`, qui n'écrit rien et échoue si
+   une copie manque, a été retouchée ou retarde sur sa source. Une valeur ne se corrige jamais
+   dans `www/`.
 2. **Pas de nouveau style hors du système.** Une étape qui a besoin d'une règle absente l'ajoute
    au système (`bundle.css` et une fiche), puis la recopie. `style.css` ne fait que rétrécir.
 3. **Remplacer, ne pas doubler** (garde-fou 7). Un composant nouveau remplace l'ancien dans le
@@ -73,7 +89,8 @@ seule et se défait par `git revert`.
 - **Change** :
   - une configuration d'essai dont `static_dir` désigne le `www/` d'un arbre de travail ;
   - la sonde de rendu, rejouable sans copier-coller (signet ou page de `tools/design/`) ;
-  - `ds-export.mjs --www` et sa vérification dans le filet.
+  - l'appel de `ds-export.mjs --check` dans le filet (le script et ses deux modes existent depuis
+    le 13/10).
 - **Ne change pas** : rien à l'écran, rien en production.
 - **Vérifier** : l'instance d'essai sert l'arbre de travail (commentaire témoin dans `index.html`).
 
