@@ -492,6 +492,25 @@ sur la carte.
 
 ## État
 
+- 13/10 (soir, tard) : **fiches H et I intégrées** (vague 3 cloud). H (`claude/quirky-ritchie-mfjscr`,
+  six commits) : le serveur démarre **sans transcription** quand aucune source ne transcrit et
+  qu'aucun sidecar n'est configuré (`Sidecar.Idle/Off/Ensure`, une source qui passe à
+  `transcribe_audio = true` sonde alors le sidecar et est refusée avec un message net s'il ne
+  répond pas, 503 sur `PUT /sources`) ; `/api/v1/status` et `/api/v1/server` disent `off` ;
+  le Docker de l'amont, qui ne compilait plus, est retiré. I (`cloud/i-dettes-securite`, six
+  commits) : CORS répond aux pages du serveur lui-même et à `[server] allowed_origins`, jamais
+  à toute origine ; le WebSocket applique la même règle ; **rôle `viewer`** (lecture seule,
+  `role` dans un compte, absent = propriétaire) ; `[server] audio_replay = "owner" | "all"`
+  (défaut : seul le propriétaire écoute par le serveur) ; purge de l'archive audio
+  (`audio_archive_max_gb`, défaut 2) et des journaux bruts (`raw_log_max_days`, défaut 30) —
+  **les deux à 0 dans les configurations de production et d'essai avant l'intégration**, rien
+  n'est purgé chez nous. Un conflit de fusion (deux tests ajoutés à la fin de
+  `sidecar_test.go`, gardés tous deux). Ici : le voyant « Transcription » dit **Off** (neutre)
+  quand le serveur tourne sans, au lieu de « Down » en rouge ; binaires reconstruits avec les
+  `-ldflags`. Vérifié : `go build/vet`, `go test -race` sur les seize paquets, filet `www-check`,
+  instance d'essai relancée sur le code fusionné. Reste des dettes de l'étude communauté : la
+  compilation Windows (fiche J) ; `allowed_origins` à renseigner seulement si un proxy réécrit
+  `Host` (VPN : en principe rien à déclarer, voir `I-rapport.md`).
 - 13/10 (fin d'après-midi) : **le mouvement des avions ne pulse plus (D79)**. Signalé par le
   propriétaire sur l'instance d'essai (pulsation, recul, grands sauts, glyphes mal orientés).
   Mesuré dans son onglet Chrome : 30–35 % des pas à reculons, 40 km de recul en 15 s. Bisect

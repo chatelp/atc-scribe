@@ -57,6 +57,10 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
   re-datait le point figé. Mesuré avant/après dans l'onglet du propriétaire : 33 % → 3,3 % de
   pas à reculons. Commit autonome contribuable (70c8eff). Reste la liste Trafic qui vole
   ~100 ms par seconde au fil principal (étape 5 ou commit dédié).
+- **Fiches H et I intégrées** (13/10 soir) : serveur sans transcription, Docker amont retiré ;
+  CORS et WebSocket fermés aux origines étrangères, rôle lecture seule, écoute par le serveur
+  réservée au propriétaire par défaut, purges réglables (à 0 chez nous). Le voyant
+  « Transcription » connaît l'état Off.
 
 ### En cours
 
@@ -151,11 +155,14 @@ l'interface, elle, reste sur le Mac.
 - **Secrets et données** : jamais de clé, de mot de passe, d'audio ni de base dans un dépôt ou
   dans le cloud (règles permanentes).
 - **Dettes à solder avant toute installation ailleurs** (vérifiées dans les sources le 12/10 pour
-  la fiche 04 de l'étude communauté) : CORS renvoie toute origine avec les identifiants, le
+  la fiche 04 de l'étude communauté) : ~~CORS renvoie toute origine avec les identifiants, le
   WebSocket accepte toute origine, aucun rôle (tout compte connecté réécoute l'audio) ; l'archive
-  audio et les journaux bruts n'ont pas de purge ; Docker est mort (compile un seul fichier) ;
-  pas de compilation Windows (trois sites). Sans gravité tant que D5 tient (réseau local
-  seulement) ; bloquants le jour où quelqu'un expose le serveur.
+  audio et les journaux bruts n'ont pas de purge ; Docker est mort (compile un seul fichier)~~
+  — **soldées le 13/10 par les fiches H et I** (CORS et WebSocket limités aux pages du serveur
+  et à `allowed_origins`, rôle `viewer`, `audio_replay`, purges réglables, Docker amont retiré,
+  serveur sans transcription) ; reste **la compilation Windows** (fiche J, à lancer). Sans
+  gravité tant que D5 tient (réseau local seulement) ; bloquante le jour où quelqu'un expose le
+  serveur.
 
 ## Comment ce document se tient
 
