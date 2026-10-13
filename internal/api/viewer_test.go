@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/yegors/co-atc/internal/config"
 )
 
 // A viewer account reads everything the page shows, and changes nothing; it
@@ -90,4 +92,22 @@ func TestAViewerReadsAndChangesNothing(t *testing.T) {
 			t.Errorf("owner PUT /server/settings: %d %s", rec.Code, rec.Body.String())
 		}
 	})
+}
+
+// server.audio_replay = "all" gives viewers the audio too -- the stream and
+// the clips -- and nothing else: they still change nothing.
+func TestAudioReplayAllGivesViewersTheAudio(t *testing.T) {
+	s := newStack(t, stackOptions{viewer: true})
+	s.cfg.Server.AudioReplay = config.AudioReplayAll
+	id := s.transcribe("mix", "AFR123 descend FL120", "AFR123", time.Now().Add(-time.Minute))
+	s.signInAs(viewerUser)
+	for _, req := range [][2]string{{"HEAD", "/api/v1/stream/mix"}, {"GET", "/api/v1/stream/x?id=page-1"},
+		{"GET", "/api/v1/transcriptions/" + itoa(id) + "/audio"}} {
+		if rec := s.do(req[0], req[1], ""); rec.Code == http.StatusForbidden {
+			t.Errorf("viewer %s %s with audio_replay = all: 403", req[0], req[1])
+		}
+	}
+	if rec := s.do("PUT", "/api/v1/server/settings", `{"db_retention_gb":1}`); rec.Code != http.StatusForbidden {
+		t.Errorf("viewer PUT /server/settings with audio_replay = all: %d, want 403", rec.Code)
+	}
 }

@@ -94,7 +94,18 @@ type ServerConfig struct {
 	// allowed and is not listed; any other page gets no CORS header and no
 	// WebSocket. EMPTY BY DEFAULT. "*" is refused.
 	AllowedOrigins []string `toml:"allowed_origins"`
+
+	// Who may listen to the receiver through the server -- the live streams
+	// and the archived clip of each transmission: "owner" (the default), or
+	// "all", viewer accounts included. See internal/auth/role.go.
+	AudioReplay string `toml:"audio_replay"`
 }
+
+// The two answers to server.audio_replay.
+const (
+	AudioReplayOwner = "owner"
+	AudioReplayAll   = "all"
+)
 
 // ADSBConfig contains ADS-B aircraft tracking data source configuration
 type ADSBConfig struct {
@@ -561,6 +572,11 @@ func (c *Config) Validate() error {
 		if _, err := auth.NormalizeRole(u.Role); err != nil {
 			return fmt.Errorf("auth.users %q: %w", u.Name, err)
 		}
+	}
+	switch c.Server.AudioReplay {
+	case "", AudioReplayOwner, AudioReplayAll:
+	default:
+		return fmt.Errorf("invalid server.audio_replay: %q (must be %q or %q)", c.Server.AudioReplay, AudioReplayOwner, AudioReplayAll)
 	}
 	for _, o := range c.Server.AllowedOrigins {
 		if _, err := auth.NormalizeOrigin(o); err != nil {

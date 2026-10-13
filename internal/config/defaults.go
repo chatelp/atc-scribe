@@ -20,6 +20,7 @@ func Defaults() Config {
 			Port:            8000,
 			Host:            "127.0.0.1",
 			IdleTimeoutSecs: 3600,
+			AudioReplay:     AudioReplayOwner,
 		},
 		ADSB: ADSBConfig{
 			ExternalSourceURL:            "https://adsbexchange-com1.p.rapidapi.com/v2/lat/%f/lon/%f/dist/%.0f/",

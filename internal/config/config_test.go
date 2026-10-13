@@ -367,6 +367,7 @@ func TestAValueOutOfBoundsIsStillRefused(t *testing.T) {
 		{"logging", `level = "loud"`, "invalid log level"},
 		{"server", `allowed_origins = ["*"]`, "server.allowed_origins"},
 		{"server", `allowed_origins = ["mac.local:8000"]`, "want scheme://host[:port]"},
+		{"server", `audio_replay = "everyone"`, "invalid server.audio_replay"},
 	} {
 		cfg, err := Load(writeConfig(t, withLines(minimalConfig, bad.section, bad.line)))
 		if err != nil {
