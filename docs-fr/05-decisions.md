@@ -4852,6 +4852,29 @@ la moitié des 383 m qui séparent deux parallèles. Variantes : 93 m et 10°, 1
 La piste de départ suit le même principe, sur la montée initiale dans l'axe. Elle n'est pas encore
 validée contre `actual_runway_off`.
 
+### D78 — Les écrans finaux de Clairance, et six décisions d'interface *(13/10)*
+
+**Validés par le propriétaire le 13/10** avec la session design : les **quatorze écrans finaux**
+(`docs-fr/design/09-ecrans.md` et `ecrans/`, branche `design` ; galerie
+https://claude.ai/artifact/2gZSBGbTkEySxThbNRYhMF), dessinés sur le système de composants
+(`08-design-system.md`) et la structure de D77. Six décisions qui en découlent :
+
+1. **La barre du bas disparaît.** Le volume de chaque fréquence passe dans son menu (▾ à côté
+   du bouton de la fréquence, en tête du fil).
+2. **Un seul fil pour toutes les fréquences**, avec un filtre « Show » et une recherche ; une
+   seule pastille « ↓ N new » remplace les compteurs par fréquence.
+3. **METAR, TAF et NOTAM passent dans « Right now »**, le METAR lu en clair en une phrase.
+4. **Les deux horloges restent en haut** ; le choix UTC / heure locale passe dans Réglages ›
+   Display.
+5. **Téléphone : quatre onglets** (Radio en accueil, Sky, Traffic, Right now), commandes à 44 px.
+6. **Fiche avion, consignes entendues : « Then »** décrit ce que l'avion a fait (« level at
+   4000 ft ») à la place de « Status issued / complied / deviation » : **sans verdict**, dans
+   la ligne de ce que le projet s'interdit (rien qui juge qui que ce soit).
+
+Suite : la session design réécrit `04-migration.md` (étapes, critères d'acceptation) ; la
+migration commence sur ce plan, étape par étape, sous les garde-fous, avec la session
+Clairance.
+
 ### D77 — La structure de l'écran : le fil, le ciel, une colonne « Right now » / « Traffic » *(13/10)*
 
 **Esquisses validées par le propriétaire le 13/10** (`docs-fr/design/07-esquisses.md`, branche
