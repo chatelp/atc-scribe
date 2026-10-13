@@ -163,7 +163,7 @@
 
         // Why no aircraft was named, from the matcher's own words.
         unmatchedReason(t) {
-            const r = (t.match_reason || '').replace(/^unmatched:\s*/, '');
+            const r = (t.match_reason || '').replace(/^unmatched:\s*/, '').replace(/^nobody in range/, 'no aircraft in range');
             return r || 'no aircraft in range was named';
         },
 
@@ -202,26 +202,40 @@
 // The thread's scroll: it follows the newest exchange while the reader is at
 // the bottom; scrolled up, the new ones gather in "↓ N new" (decision 2).
 window.threadView = function () {
+    // The reader's intent decides, not the scroll position: an exchange grows
+    // after it arrives (matched, chips, explanation) and the cap removes one
+    // at the top, both of which move scrollTop without the reader (design
+    // review of step 6: 290 px off the bottom in 12 s, untouched). Only a
+    // wheel, a touch, a key or a drag of the scrollbar lets go of the bottom.
     return {
         atBottom: true,
         newCount: 0,
         lastLength: 0,
+        _userUntil: 0,
         init() {
+            const el = this.$refs.scroller;
             this.lastLength = this.$store.atc.threadExchanges.length;
+            const byReader = () => { this._userUntil = Date.now() + 800; };
+            for (const ev of ['wheel', 'touchstart', 'touchmove', 'keydown', 'pointerdown']) {
+                el.addEventListener(ev, byReader, { passive: true });
+            }
+            // Whatever changes inside the list, the bottom is kept while the
+            // reader wants it.
+            new MutationObserver(() => { if (this.atBottom) this.toBottom(false); })
+                .observe(el, { childList: true, subtree: true, characterData: true });
             this.$nextTick(() => this.toBottom(false));
             this.$watch(() => this.$store.atc.threadExchanges.length, (n) => {
                 const added = Math.max(0, n - this.lastLength);
                 this.lastLength = n;
-                if (this.atBottom) this.$nextTick(() => this.toBottom(false));
-                else this.newCount += added;
+                if (!this.atBottom) this.newCount += added;
             });
-            // A new filter or search shows another list: start at its end.
             this.$watch(() => this.$store.atc.threadShow + '|' + this.$store.atc.threadSearch, () => {
                 this.newCount = 0;
                 this.$nextTick(() => this.toBottom(false));
             });
         },
         onScroll() {
+            if (Date.now() > this._userUntil) return;
             const el = this.$refs.scroller;
             this.atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
             if (this.atBottom) this.newCount = 0;
