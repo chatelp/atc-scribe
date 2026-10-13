@@ -24,6 +24,16 @@ test('without a page, the colours are the tokens\' hex values', () => {
     assert.equal(P.colorOf('nope'), '#969696');
 });
 
+test('each family has its short modifier, its label and its codes', () => {
+    assert.deepEqual(P.FAMILIES, ['ground', 'departure', 'cruise', 'arrival', 'unknown']);
+    assert.equal(P.modifierOf('APP'), 'arr');
+    assert.equal(P.modifierOf('TAX'), 'gnd');
+    assert.equal(P.modifierOf('???'), 'unk');
+    assert.deepEqual(P.codesOf('departure'), ['T/O', 'CLB', 'DEP']);
+    assert.deepEqual(P.codesOf('unknown'), ['NEW', 'UNK']);
+    assert.equal(P.LABEL.arrival, 'Arrival');
+});
+
 test('T/O and T/D have a solid badge, the other codes an outlined one', () => {
     assert.ok(P.isSolid('T/O') && P.isSolid('T/D'));
     for (const c of ['NEW', 'TAX', 'CLB', 'DEP', 'CRZ', 'ARR', 'APP', 'UNK']) assert.ok(!P.isSolid(c), c);

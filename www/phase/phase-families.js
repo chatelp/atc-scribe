@@ -56,6 +56,19 @@
         arrival: 'text-phase-arrival', unknown: 'text-phase-unknown',
     });
 
+    // The short modifier the components use: cl-strip--arr, cl-phase--arr, cl-dot--arr.
+    const MODIFIER = Object.freeze({ ground: 'gnd', departure: 'dep', cruise: 'crz', arrival: 'arr', unknown: 'unk' });
+    const LABEL = Object.freeze({ ground: 'Ground', departure: 'Departure', cruise: 'Cruise', arrival: 'Arrival', unknown: 'Unknown' });
+    const FAMILIES = Object.freeze(['ground', 'departure', 'cruise', 'arrival', 'unknown']);
+
+    function codesOf(family) {
+        return Object.keys(FAMILY_OF).filter((c) => FAMILY_OF[c] === family);
+    }
+
+    function modifierOf(phase) {
+        return MODIFIER[familyOf(phase)];
+    }
+
     function code(phase) {
         return String(phase || '').trim().toUpperCase();
     }
@@ -97,5 +110,5 @@
         return TEXT[familyOf(phase)];
     }
 
-    return { FAMILY_OF, HEX, familyOf, colorOf, isSolid, badgeClasses, textClass };
+    return { FAMILY_OF, HEX, FAMILIES, MODIFIER, LABEL, familyOf, codesOf, modifierOf, colorOf, isSolid, badgeClasses, textClass };
 });

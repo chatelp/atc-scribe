@@ -446,6 +446,99 @@
         },
 
         // Get phase color class (matches navigation bar colors)
+        // --- The context column (migration step 4, TrafficColumn) -------------
+        // Which tab the column shows: "traffic" (the list and its filters) or
+        // "now" (Right now, filled at step 5).
+        columnTab: 'traffic',
+
+        // A family's filter is on when every one of its phase codes is on; the
+        // codes keep their own keys and shortcuts (0 to 9), so a family can be
+        // mixed: some codes on, some off.
+        familyIsOn(family) {
+            const P = window.PhaseFamilies;
+            if (!P) return true;
+            const f = this.settings.phaseFilters || {};
+            return P.codesOf(family).every((c) => f[c] !== false);
+        },
+        familyIsMixed(family) {
+            const P = window.PhaseFamilies;
+            if (!P) return false;
+            const f = this.settings.phaseFilters || {};
+            const on = P.codesOf(family).filter((c) => f[c] !== false).length;
+            return on > 0 && on < P.codesOf(family).length;
+        },
+        // Click: all the family's codes go to the opposite of "all on".
+        toggleFamily(family) {
+            const P = window.PhaseFamilies;
+            if (!P) return;
+            if (!this.settings.phaseFilters) {
+                this.settings.phaseFilters = { CRZ: true, CLB: true, DEP: true, APP: true, ARR: true, TAX: true, 'T/O': true, 'T/D': true, NEW: true, UNK: true };
+            }
+            const to = !this.familyIsOn(family);
+            for (const c of P.codesOf(family)) this.settings.phaseFilters[c] = to;
+            this.saveSettings();
+            this.applyFilters();
+            if (this.mapManager) this.mapManager.applyFiltersAndRefreshView();
+        },
+        // Aircraft of the family among those the receiver hears now.
+        familyCount(family) {
+            const P = window.PhaseFamilies;
+            if (!P) return 0;
+            let n = 0;
+            for (const a of Object.values(this.aircraft || {})) {
+                if (a && a.status === 'active' && P.familyOf(this.getCurrentPhase(a)) === family) n++;
+            }
+            return n;
+        },
+        familyHelp(family) {
+            const P = window.PhaseFamilies;
+            const codes = P ? P.codesOf(family).join(', ') : '';
+            const state = this.familyIsMixed(family) ? ' Some of its phases are off (keys 0 to 9 toggle one phase).' : '';
+            return `Show or hide the aircraft in this family of flight phases: ${codes}.${state}`;
+        },
+
+        // The strip's classes: its family's bar, selected, signal lost.
+        stripClasses(aircraft) {
+            const P = window.PhaseFamilies;
+            const fam = P ? P.modifierOf(this.getCurrentPhase(aircraft)) : 'unk';
+            return {
+                ['cl-strip--' + fam]: true,
+                'is-selected': this.selectedAircraft?.hex === aircraft.hex,
+                'is-lost': this.isSignalLostForSidebar(aircraft),
+            };
+        },
+        phaseClasses(aircraft) {
+            const P = window.PhaseFamilies;
+            const code = this.getCurrentPhase(aircraft);
+            const fam = P ? P.modifierOf(code) : 'unk';
+            return { ['cl-phase--' + fam]: true, 'cl-phase--fill': !!(P && P.isSolid(code)) };
+        },
+
+        // "heard 8 s": the last transmission matched to the aircraft, under a minute.
+        heardAgoText(aircraft) {
+            const v = aircraft && aircraft.voice;
+            if (!v || !v.last_heard) return '';
+            const s = Math.round((Date.now() - Date.parse(v.last_heard)) / 1000);
+            if (!Number.isFinite(s) || s < 0 || s >= 60) return '';
+            return `heard ${s} s`;
+        },
+
+        // "Showing 64 of 107 · up to FL 100": what the map shows while a filter
+        // narrows it; empty when no filter is on.
+        get filterSummary() {
+            const s = this.settings || {};
+            const f = s.phaseFilters || {};
+            const phasesOff = Object.values(f).some((v) => v === false);
+            const band = (Number(s.minAltitude) || 0) > 0 || (Number(s.maxAltitude) || 60000) < 60000;
+            const on = phasesOff || band || s.showAirAircraft === false || s.showGroundAircraft === false || !!s.voiceOnly || !!(this.searchTerm || '').trim();
+            if (!on) return '';
+            const shown = this.visibleAircraftOnMap ? this.visibleAircraftOnMap.size : this.visibleSidebarAircraft.length;
+            let text = `Showing ${shown} of ${this.activeAircraftCount}`;
+            const A = window.AltitudeScale;
+            if (band && A && typeof A.bandLabel === 'function') text += ` · ${A.bandLabel(Number(s.minAltitude) || 0, Number(s.maxAltitude) || 60000)}`;
+            return text;
+        },
+
         // The five families of the design system (www/phase/phase-families.js,
         // migration step 2): the text colour of a phase code, and the badge's
         // classes, outlined, or solid for T/O and T/D.
