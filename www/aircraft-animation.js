@@ -24,7 +24,12 @@ class AircraftAnimationEngine {
         this.config = {
             enabled: true,
             interpolationFps: 30,
-            maxPredictionSeconds: 3.0,
+            // How long a sample is carried forward before the aircraft
+            // stops, in seconds. The receiver decodes ~0.6 positions a second
+            // (13/10/2026), so one interval in six is longer than 3 s (the
+            // value before) and the aircraft stopped there until the next
+            // fix; one in forty is longer than 6 s.
+            maxPredictionSeconds: 6.0,
             // At the aircraft's own speed: below one (0.72 before) the aircraft
             // flew at 72 % of its speed between two samples and caught up the
             // rest on each one, a sawtooth of speed once a second. An overshoot
