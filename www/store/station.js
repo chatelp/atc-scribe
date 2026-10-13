@@ -169,10 +169,15 @@
             }
             if (st.transcription) {
                 const t = st.transcription;
-                const level = !t.reachable ? 'bad' : t.status === 'ok' ? 'ok' : t.status === 'degraded' ? 'warn' : 'unknown';
-                const text = !t.reachable ? 'Down' : t.status === 'ok' ? 'OK' : t.status === 'degraded' ? 'Degraded' : '?';
+                // A server that runs without transcription (no source transcribes,
+                // no sidecar configured; fiche H, 13/10) says status "off" without
+                // "reachable": neutral, not a failure.
+                const off = t.status === 'off';
+                const level = off ? 'off' : !t.reachable ? 'bad' : t.status === 'ok' ? 'ok' : t.status === 'degraded' ? 'warn' : 'unknown';
+                const text = off ? 'Off' : !t.reachable ? 'Down' : t.status === 'ok' ? 'OK' : t.status === 'degraded' ? 'Degraded' : '?';
                 lights.push({ key: 'stt', label: 'Transcription', level, text,
-                    help: !t.reachable ? 'The transcription sidecar does not answer: transmissions are not transcribed. co-atc restarts it if it crashed.'
+                    help: off ? 'The server runs without transcription: no source transcribes and no sidecar is configured. Turn "transcribe audio" on for a source once a sidecar answers.'
+                        : !t.reachable ? 'The transcription sidecar does not answer: transmissions are not transcribed. co-atc restarts it if it crashed.'
                         : t.status === 'degraded' ? `The sidecar runs without some of its models (${(t.degraded || []).join(', ')}): fewer aircraft are identified.`
                         : 'The transcription sidecar answers with all its models.' });
             }
