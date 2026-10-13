@@ -51,8 +51,9 @@ type TranscriptionRecord struct {
 // PlainInstruction is one instruction of a transmission in plain words; its
 // role is the value's ("flight_level", "frequency"…) or "clearance".
 type PlainInstruction struct {
-	Role string `json:"role"`
-	Text string `json:"text"`
+	Role   string `json:"role"`
+	Text   string `json:"text"`
+	TextFR string `json:"text_fr,omitempty"` // the same in plain French (13/10)
 }
 
 // TranscriptionStorage handles storage of transcription records

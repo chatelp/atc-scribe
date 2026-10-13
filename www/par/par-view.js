@@ -331,71 +331,16 @@
         }
 
         function draw(apt, runways) {
-            const opts = G.DEFAULTS;
-            const frames = G.buildFrames(apt.code, runways, opts);
-            if (!frames.length) {
+            // The placement is shared with the store's arrival sequence
+            // (par-arrivals.js, 13/10): one logic, drawn here, listed there.
+            const placement = window.ParArrivals.place(G, store, apt, runways, { previousFrame },
+                { list: visibleAircraft(), inUseMinProbability: IN_USE_MIN_PROBABILITY, staleSeconds: STALE_SECONDS });
+            if (!placement) {
                 container.innerHTML = message(`${esc(apt.code)} has no runway with both ends located.`);
                 return;
             }
-            const byIdent = {};
-            for (const f of frames) { byIdent[f.le.ident] = f.le; byIdent[f.he.ident] = f.he; }
-            const inUse = (apt.runway_in_use || [])
-                .map((r) => Object.assign({}, r, { end: endIdent(r) }))
-                .filter((r) => byIdent[r.end])
-                .map((r) => Object.assign(r, { bearing: byIdent[r.end].landingBearing }))
-                .filter((r) => r.probability >= IN_USE_MIN_PROBABILITY);
-
-            const list = visibleAircraft();
+            const { opts, frames, inUse, list, est, qnh, tl, placed } = placement;
             recordTrails(list);
-            const est = G.estimateQnh(Object.values(store.aircraft || {}), apt.latitude, apt.longitude, opts);
-            const qnh = est ? est.qnh : G.STD_HPA;
-            const tl = G.transitionLevel(opts.transitionAltitudeFt, qnh);
-
-            const placed = new Map(frames.map((f) => [f.id, []]));
-            for (const a of list) {
-                const t = a.adsb;
-                // co-atc ties each aircraft to one followed airport (D62): one it
-                // gives to another airport is not this one's, whatever its place
-                // in the cones -- De Gaulle's finals lie in Orly's northern one.
-                const ph = a.phase && a.phase.current && a.phase.current[0];
-                if (ph && ph.airport && ph.airport !== apt.code) {
-                    previousFrame.delete(a.hex);
-                    continue;
-                }
-                // The server's runway judge (D69) has the last word: an aircraft it
-                // puts on another airport's runway is not this one's.
-                const rw = a.runway || {};
-                const arrival = rw.arrival && rw.arrival.airport === apt.code ? rw.arrival.runway : null;
-                const departure = rw.departure && rw.departure.airport === apt.code ? rw.departure.runway : null;
-                if (!arrival && !departure && (rw.arrival || rw.departure)) {
-                    previousFrame.delete(a.hex);
-                    continue;
-                }
-                const onGround = !!a.on_ground;
-                if (typeof t.alt_baro !== 'number' && !onGround) continue;
-                const altFt = onGround ? null : G.qnhAltitude(t.alt_baro, qnh);
-                const input = { lat: t.lat, lon: t.lon, altFt, track: t.track, onGround };
-                let p = G.classify(frames, input, opts, previousFrame.get(a.hex));
-                // An aircraft judged on a runway goes to that runway's frame while
-                // its cone holds it, even as it crosses the neighbouring axis on
-                // its way in: arriving on the approach side, departing past the
-                // far end.
-                const judged = (ident, departing) => {
-                    const f = ident && frames.find((q) => q.le.ident === ident || q.he.ident === ident);
-                    if (!f) return null;
-                    const key = f.le.ident === ident ? 'le' : 'he';
-                    const q = G.placeInFrame(f, input, opts);
-                    if (!q) return null;
-                    const ok = departing
-                        ? q.side === (key === 'le' ? 'he' : 'le') && q.movingAway
-                        : (q.side === key && !q.movingAway) || q.side === 'rwy';
-                    return ok ? Object.assign(q, { judged: departing ? 'departure' : 'arrival', runway: ident }) : null;
-                };
-                p = judged(arrival, false) || judged(departure, true) || p;
-                if (!p) { previousFrame.delete(a.hex); continue; }
-                previousFrame.set(a.hex, p.frame);
-                placed.get(p.frame).push({ a, p, altFt });
-            }
 
             // Frames carrying a runway in use come first, in the order of the
             // runway names, not of their scores: at De Gaulle 08R and 09L land

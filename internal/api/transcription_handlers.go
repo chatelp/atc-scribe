@@ -259,7 +259,7 @@ func explainTranscriptions(list []*sqlite.TranscriptionRecord) {
 func plainOf(content string) []sqlite.PlainInstruction {
 	var out []sqlite.PlainInstruction
 	for _, in := range phraseology.Parse(content).Plain() {
-		out = append(out, sqlite.PlainInstruction{Role: in.Role, Text: in.Text})
+		out = append(out, sqlite.PlainInstruction{Role: in.Role, Text: in.Text, TextFR: in.TextFR})
 	}
 	return out
 }

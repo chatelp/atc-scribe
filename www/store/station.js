@@ -37,6 +37,14 @@
         weatherLastUpdated: null,
         weatherFetchErrors: [],
         runwayData: null, // Store runway data
+        // The arrival sequence of every followed airport, PAR open or not
+        // (par/par-arrivals.js, 13/10, D77): airport code -> [{ runway, inUse,
+        // items: [{ hex, callsign, distNM, etaSec, eta, gapNM, tight }] }].
+        arrivals: {},
+        arrivalsInterval: null,
+        _arrivalState: {},        // airport code -> { previousFrame }
+        _arrivalRunways: {},      // airport code -> Promise<runways>
+
         runwayInUse: null, // Active runway scores from traffic analysis
         followedAirports: [], // every airport followed, the reference one first, from /station (Q40)
         // The main screen shows the radar map or the PAR view of one followed
@@ -257,6 +265,10 @@
                 if (!this.runwayInUseInterval) {
                     this.runwayInUseInterval = setInterval(() => this.fetchRunwayInUse(), 60000);
                 }
+                if (!this.arrivalsInterval) {
+                    this.arrivalsInterval = setInterval(() => this.updateArrivals(), 5000);
+                    setTimeout(() => this.updateArrivals(), 3000);
+                }
                 if (!this.altimetryInterval) {
                     this.altimetryInterval = setInterval(() => this.updateAltimetry(), 30000);
                     setTimeout(() => this.updateAltimetry(), 5000);
@@ -374,6 +386,46 @@
             if (!this.parView) return;
             if (this.mainView === 'par') this.parView.show(this.parAirport);
             else this.parView.hide();
+        },
+
+        // The runways of a followed airport, as the PAR reads them, fetched once.
+        runwaysOf(code) {
+            if (!this._arrivalRunways[code]) {
+                this._arrivalRunways[code] = fetch(`${API_BASE_URL}/airports/${encodeURIComponent(code)}`, { credentials: 'same-origin' })
+                    .then((r) => (r.ok ? r.json() : null))
+                    .then((d) => (d && Array.isArray(d.runways) ? d.runways : []))
+                    .catch(() => { delete this._arrivalRunways[code]; return []; });
+            }
+            return this._arrivalRunways[code];
+        },
+
+        // Who lands next, for every followed airport: the same placement the
+        // PAR draws, run every few seconds whether the PAR is open or not.
+        async updateArrivals() {
+            const A = window.ParArrivals, G = window.ParGeometry;
+            if (!A || !G) return;
+            const next = {};
+            for (const apt of this.followedAirports || []) {
+                if (!apt || !apt.code) continue;
+                const runways = await this.runwaysOf(apt.code);
+                if (!runways.length) continue;
+                const state = this._arrivalState[apt.code] || (this._arrivalState[apt.code] = {});
+                const placement = A.place(G, this, apt, runways, state, { rules: window.MapVisibilityRules });
+                next[apt.code] = A.sequences(G, placement);
+            }
+            this.arrivals = next;
+        },
+
+        // The earliest estimated touchdown among the followed airports, or null.
+        get nextTouchdown() {
+            const A = window.ParArrivals;
+            if (!A) return null;
+            let best = null;
+            for (const [code, seqs] of Object.entries(this.arrivals || {})) {
+                const n = A.nextTouchdown(seqs);
+                if (n && (!best || n.etaSec < best.etaSec)) best = Object.assign({ airport: code }, n);
+            }
+            return best;
         },
 
         async fetchRunwayInUse() {

@@ -334,7 +334,27 @@
             const who = t.speaker_type === 'ATC' ? 'What the controller says'
                 : t.speaker_type === 'PILOT' ? 'What the pilot reads back or reports'
                 : 'What the transmission says';
-            return `${who}, in plain words, as the phraseology grammar reads it from the transcript: green for a clearance, amber for a level, heading, speed, frequency or setting. A misheard word can make it wrong: listen again to check.`;
+            const fr = this.plainFrench(t);
+            return `${who}, in plain words, as the phraseology grammar reads it from the transcript: green for a clearance, amber for a level, heading, speed, frequency or setting. A misheard word can make it wrong: listen again to check.`
+                + (fr ? `\nEn français : ${fr}` : '');
+        },
+
+        // The same instructions in plain French, one sentence (13/10, D77): the
+        // server's template per role, and the name of a frequency the station
+        // listens to when the instruction is a hand-off ("Contactez 119.255, la
+        // tour de Toussus").
+        plainFrench(t) {
+            if (!t || !Array.isArray(t.plain)) return '';
+            const parts = t.plain.map((p) => {
+                let s = p.text_fr || '';
+                if (s && p.role === 'frequency') {
+                    const mhz = (p.text.match(/\d{3}\.\d{1,3}/) || [])[0];
+                    const f = mhz && (this.audioFrequencies || []).find((q) => Math.abs(Number(q.frequency_mhz) - Number(mhz)) < 0.0005);
+                    if (f && f.name) s += `, ${f.name}`;
+                }
+                return s;
+            }).filter(Boolean);
+            return parts.join(' ; ');
         },
 
         // The aircraft in sight with this callsign, or null.

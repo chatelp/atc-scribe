@@ -11,6 +11,9 @@ import (
 type Instruction struct {
 	Role string `json:"role"`
 	Text string `json:"text"`
+	// The same instruction in plain French, from a template per role (13/10,
+	// D77): the interface stays in English, the reading follows the listener.
+	TextFR string `json:"text_fr,omitempty"`
 }
 
 // verbs that give a value its instruction. A value's keyword starts at
@@ -40,12 +43,12 @@ func (r Result) Plain() []Instruction {
 	toks, _ := tokenSpans(r.Raw)
 	var out []Instruction
 	seen := map[string]bool{}
-	add := func(role, text string) {
+	add := func(role, text, fr string) {
 		if text == "" || seen[text] {
 			return
 		}
 		seen[text] = true
-		out = append(out, Instruction{Role: role, Text: text})
+		out = append(out, Instruction{Role: role, Text: text, TextFR: fr})
 	}
 	// One instruction per value: "right heading 024 … heading 024" is one.
 	said := map[string]bool{}
@@ -60,11 +63,17 @@ func (r Result) Plain() []Instruction {
 		if what == "" {
 			continue
 		}
+		fr := map[string]string{
+			"takeoff":  "Autorisé à décoller",
+			"landing":  "Autorisé à atterrir",
+			"approach": "Autorisé à l'approche",
+		}[c.Type]
 		if c.Runway != "" {
 			what += ", runway " + c.Runway
+			fr += ", piste " + c.Runway
 			runways[c.Runway] = true
 		}
-		add("clearance", what)
+		add("clearance", what, fr)
 	}
 
 	values := append([]Value(nil), r.Values...)
@@ -81,53 +90,60 @@ func (r Result) Plain() []Instruction {
 			if v.Role == RoleAltitude {
 				level = noLeadingZeros(v.Text) + " ft"
 			}
+			// "niveau 100" for a flight level, "3000 ft" for an altitude: the
+			// French phraseology says "niveau", never "FL".
+			levelFR := level
+			if v.Role == RoleFlightLevel {
+				levelFR = "niveau " + strings.TrimPrefix(level, "FL")
+			}
 			switch verb {
 			case "descend":
-				add(string(v.Role), "Descend to "+level)
+				add(string(v.Role), "Descend to "+level, "Descendez au "+levelFR)
 			case "climb":
-				add(string(v.Role), "Climb to "+level)
+				add(string(v.Role), "Climb to "+level, "Montez au "+levelFR)
 			case "maintain":
-				add(string(v.Role), "Maintain "+level)
+				add(string(v.Role), "Maintain "+level, "Maintenez le "+levelFR)
 			case "passing":
-				add(string(v.Role), "Passing "+level)
+				add(string(v.Role), "Passing "+level, "En passant le "+levelFR)
 			case "leaving":
-				add(string(v.Role), "Leaving "+level)
+				add(string(v.Role), "Leaving "+level, "En quittant le "+levelFR)
 			default:
-				add(string(v.Role), level)
+				add(string(v.Role), level, levelFR)
 			}
 		case RoleHeading:
 			switch verb {
 			case "left":
-				add(string(v.Role), "Turn left heading "+v.Text)
+				add(string(v.Role), "Turn left heading "+v.Text, "Tournez à gauche au cap "+v.Text)
 			case "right":
-				add(string(v.Role), "Turn right heading "+v.Text)
+				add(string(v.Role), "Turn right heading "+v.Text, "Tournez à droite au cap "+v.Text)
 			default:
-				add(string(v.Role), "Heading "+v.Text)
+				add(string(v.Role), "Heading "+v.Text, "Cap "+v.Text)
 			}
 		case RoleSpeed:
+			kt := noLeadingZeros(v.Text) + " kt"
 			switch verb {
 			case "reduce":
-				add(string(v.Role), "Reduce speed to "+noLeadingZeros(v.Text)+" kt")
+				add(string(v.Role), "Reduce speed to "+kt, "Réduisez la vitesse à "+kt)
 			case "increase":
-				add(string(v.Role), "Increase speed to "+noLeadingZeros(v.Text)+" kt")
+				add(string(v.Role), "Increase speed to "+kt, "Augmentez la vitesse à "+kt)
 			case "maintain":
-				add(string(v.Role), "Maintain "+noLeadingZeros(v.Text)+" kt")
+				add(string(v.Role), "Maintain "+kt, "Maintenez "+kt)
 			default:
-				add(string(v.Role), "Speed "+noLeadingZeros(v.Text)+" kt")
+				add(string(v.Role), "Speed "+kt, "Vitesse "+kt)
 			}
 		case RoleFrequency:
 			if verb == "contact" {
-				add(string(v.Role), "Contact "+v.Text)
+				add(string(v.Role), "Contact "+v.Text, "Contactez "+v.Text)
 			} else {
-				add(string(v.Role), "Frequency "+v.Text)
+				add(string(v.Role), "Frequency "+v.Text, "Fréquence "+v.Text)
 			}
 		case RoleQNH:
-			add(string(v.Role), "QNH "+v.Text)
+			add(string(v.Role), "QNH "+v.Text, "QNH "+v.Text)
 		case RoleSquawk:
-			add(string(v.Role), "Squawk "+v.Text)
+			add(string(v.Role), "Squawk "+v.Text, "Transpondeur "+v.Text)
 		case RoleRunway:
 			if !runways[v.Text] {
-				add(string(v.Role), "Runway "+v.Text)
+				add(string(v.Role), "Runway "+v.Text, "Piste "+v.Text)
 			}
 		}
 	}

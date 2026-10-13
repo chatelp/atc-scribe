@@ -500,8 +500,17 @@ sur la carte.
   derniers relevés, 0 sans compteur ; remise à zéro du récepteur gérée ; test unitaire) et dans
   le voyant ADS-B du bandeau ; (3) **la raison d'un non-appariement** gardée avec la
   transmission (D72 complétée : `unmatched: …`, sans score ; le matcher rend le meilleur
-  candidat refusé). Deux autres attendent la validation des esquisses : séquence d'arrivée
-  hors PAR, gabarits français des consignes. Binaires reconstruits. Dans la foulée, un défaut
+  candidat refusé). Puis, les esquisses validées (D77), **les deux autres** : (4) la **séquence
+  d'arrivée hors de la PAR** : le placement des avions dans les cadres de piste sort de la vue
+  dans `www/par/par-arrivals.js` (fonctions pures, testées en node, 3 tests) ; le store la calcule
+  toutes les 5 s pour tous les aérodromes suivis (`store.arrivals`, `store.nextTouchdown`) et la
+  PAR dessine depuis le même calcul, à l'identique. Vérifié sur l'instance d'essai, PAR fermée :
+  Orly 25 en service, prochain toucher à 2,9 NM dans 80 s, le suivant 9 NM derrière ; la PAR
+  ouverte ensuite dessine De Gaulle à pleine largeur. (5) **Gabarits français des consignes** :
+  chaque consigne en clair porte `text_fr` (serveur, un gabarit par rôle, « niveau 100 » pour un
+  niveau de vol ; 9 cas testés) ; la page les assemble en une phrase (`plainFrench`) avec le nom
+  de la fréquence quand c'est une fréquence écoutée, montrée dans la bulle d'aide en attendant la
+  migration. Binaires reconstruits. Dans la foulée, un défaut
   de la PAR relevé par le propriétaire et diagnostiqué par la session design : les cadres
   prenaient leur largeur au premier rendu, conteneur encore caché (plancher 480 px dans une
   colonne de 949), et un onglet en arrière-plan ne se rattrapait pas ; un rendu à l'image
