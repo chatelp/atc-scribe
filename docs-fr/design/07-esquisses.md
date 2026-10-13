@@ -33,7 +33,7 @@ du bas de la première esquisse B est abandonnée. Ce partage A/B est la proposi
 
 **Suivre un vol** (C) remplace le contenu de la même colonne par l'histoire de l'avion, « ‹ » pour
 revenir à l'onglet d'où l'on vient ; le fil se restreint à ses échanges sur toutes les fréquences.
-Le principe est à valider par le propriétaire.
+**Principe validé par le propriétaire le 13/10.**
 
 **La PAR existe et ne se redessine pas.** Son approche, sous la carte de C, est le cadre de la vue
 PAR (`www/par/par-view.js`) réduit à la piste où il atterrit : échelle d'altitude en racine
@@ -80,6 +80,5 @@ la séquence d'arrivée.
 
 ## Ce qui reste
 
-- valider le principe de « Suivre un vol » (C) ;
 - puis construire le design system (composants du canevas : échange, bande d'avion, voyant,
   bascule, onglets, carte) et refaire les maquettes à partir de lui.
