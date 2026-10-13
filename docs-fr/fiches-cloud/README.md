@@ -23,8 +23,13 @@ seule.*
 | [D — configuration réduite](D-config-reduite.md) | 2 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/D-config-reduite.md, et exécute la fiche D en entier.` | `cloud/d-config-reduite` | F |
 | [F — tests de l'API](F-tests-api.md) | 2 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/F-tests-api.md, et exécute la fiche F en entier.` | `cloud/f-tests-api` | D |
 | [E — découpage de main() et handlers.go](E-decoupage-serveur.md) | 2, **après D** | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/E-decoupage-serveur.md, et exécute la fiche E en entier.` | `cloud/e-decoupage-serveur` | — |
+| [G — la route publique des chiffres avant connexion](G-chiffres-avant-connexion.md) | 3 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/G-chiffres-avant-connexion.md, et exécute la fiche G en entier.` | `cloud/g-chiffres-avant-connexion` | H, I, J, K |
+| [H — le serveur sans transcription, le Docker amont retiré](H-sans-transcription.md) | 3 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/H-sans-transcription.md, et exécute la fiche H en entier.` | `cloud/h-sans-transcription` | G, I, J, K |
+| [I — les dettes de sécurité (CORS, WebSocket, rôle lecture seule, purges)](I-dettes-securite.md) | 3 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/I-dettes-securite.md, et exécute la fiche I en entier.` | `cloud/i-dettes-securite` | G, H, J, K |
+| [J — la compilation Windows](J-compilation-windows.md) | 3 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/J-compilation-windows.md, et exécute la fiche J en entier.` | `cloud/j-compilation-windows` | G, H, I, K |
+| [K — « Then », ce que l'avion a fait, sans verdict](K-then-sans-verdict.md) | 3 | `Lis docs-fr/fiches-cloud/README.md puis docs-fr/fiches-cloud/K-then-sans-verdict.md, et exécute la fiche K en entier.` | `cloud/k-then-sans-verdict` | G, H, I, J |
 
-**Vague 1 intégrée le 10/10** (doc 32, « Retour de la vague 1 »). **Vague 2 écrite le 10/10** : D et F intégrées le 10/10 ; **E intégrée le 10/10** (doc 32, « Retour de la fiche E ») ; son étape 4 n'est pas faite.
+**Vague 1 intégrée le 10/10** (doc 32, « Retour de la vague 1 »). **Vague 2 écrite le 10/10** : D et F intégrées le 10/10 ; **E intégrée le 10/10** (doc 32, « Retour de la fiche E ») ; son étape 4 n'est pas faite. **Vague 3 écrite le 13/10**, validée par le propriétaire : du serveur et de la logique pure, en parallèle de la migration de l'interface qui, elle, reste sur le Mac (instance d'essai, relecture de la session design, soirées d'écoute). Les cinq fiches sont indépendantes et peuvent tourner en même temps ; G et K touchent toutes deux `explain.go` (G ajoute `value`/`unit`, K les lit ou les déduit) : K marche sans G.
 
 ## Pour la session cloud : règles communes, à respecter sans exception
 
