@@ -299,31 +299,48 @@
         return BRIGHT_MAP_STYLES.includes((store?.settings?.mapStyle || 'none').toLowerCase());
     }
 
+    // The altitude of an aircraft on the map, by hue, as before the migration.
+    // The design system's ramp of lightness without hue (tokens
+    // color.altitude.*) was tried at step 2 on 13/10 and refused by the owner
+    // at a glance: the five greys could not be told apart. Kept here until the
+    // design session proposes a measured alternative (09-ecrans.md records
+    // the deliberate departure).
+    const ALTITUDE_PALETTE = {
+        dark: { 'very-low': '#D35A48', low: '#EA8A4A', mid: '#F4B55A', high: '#F8D857', cruise: '#E8ECEF' },
+        light: { 'very-low': '#B91C1C', low: '#C2410C', mid: '#B45309', high: '#0E7490', cruise: '#1D4ED8' },
+    };
+
     function getAltitudeBandColor(aircraft, store) {
         const band = getAltitudeColorBand(aircraft, store);
-        const isBrightMap = isBrightMapStyle(store);
+        const palette = ALTITUDE_PALETTE[isBrightMapStyle(store) ? 'light' : 'dark'];
+        return palette[band] || palette.cruise;
+    }
 
-        if (isBrightMap) {
-            switch (band) {
-                case 'high': return '#0E7490';
-                case 'mid': return '#B45309';
-                case 'low': return '#C2410C';
-                case 'very-low': return '#B91C1C';
-                case 'cruise':
-                default:
-                    return '#1D4ED8';
+    // The text colours of the design system (color.text.primary / tertiary),
+    // read once from the page's variables, the tokens' hex as fallbacks.
+    const TEXT_COLORS = { primary: '#e0e0e0', secondary: '#b8b8b8', tertiary: '#949494' };
+    let textColorCache = null;
+
+    function accentColor() {
+        if (typeof document !== 'undefined' && document.documentElement) {
+            const v = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-default').trim();
+            if (v) return v;
+        }
+        return '#4CAF50';
+    }
+
+    function labelTextColor(level) {
+        if (!textColorCache) {
+            textColorCache = { ...TEXT_COLORS };
+            if (typeof document !== 'undefined' && document.documentElement) {
+                const cs = getComputedStyle(document.documentElement);
+                for (const k of Object.keys(textColorCache)) {
+                    const v = cs.getPropertyValue(`--color-text-${k}`).trim();
+                    if (v) textColorCache[k] = v;
+                }
             }
         }
-
-        switch (band) {
-            case 'high': return '#F8D857';
-            case 'mid': return '#F4B55A';
-            case 'low': return '#EA8A4A';
-            case 'very-low': return '#D35A48';
-            case 'cruise':
-            default:
-                return '#E8ECEF';
-        }
+        return textColorCache[level] || textColorCache.primary;
     }
 
     function getAircraftSymbolColor(aircraft, visualState, store) {
@@ -376,20 +393,11 @@
         return '↔';
     }
 
+    // The five families of the design system (www/phase/phase-families.js,
+    // migration step 2): one colour per family, the code written on the label.
     function getPhaseLabelColor(phase) {
-        const phaseColorMap = {
-            'NEW': '#9CA3AF',
-            'TAX': '#C084FC',
-            'T/O': '#FB923C',
-            'CLB': '#A3E635',
-            'DEP': '#4ADE80',
-            'CRZ': '#60A5FA',
-            'ARR': '#F9A8D4',
-            'APP': '#FACC15',
-            'T/D': '#2DD4BF',
-            'UNK': '#94A3B8',
-        };
-        return phaseColorMap[phase] || '#9CA3AF';
+        const P = window.PhaseFamilies;
+        return P ? P.colorOf(phase) : '#969696';
     }
 
     function getAircraftLabelParts(aircraft, store) {
@@ -514,8 +522,12 @@
                 ? { callsignText: '', typeText: '', detailsText: '', ageText: '', voiceText: '' }
                 : getAircraftLabelParts(aircraft, store);
 
+            // The label's text reads in the page's primary text colour, tertiary
+            // once the signal is lost (design system, migration step 2): green is
+            // the tool's own voice, chosen or just heard, never "active". The phase
+            // prefix alone carries its family's colour; the rings carry the green.
             const isActiveAircraft = aircraft?.status === 'active';
-            let labelColor = isActiveAircraft ? '#4CAF50' : '#FFFFFF';
+            let labelColor = labelTextColor(isActiveAircraft ? 'primary' : 'tertiary');
             let staleAgeSeconds = 0;
             let staleAgeFromStore = false;
             if (store && typeof store.getSecondsSinceLastSeen === 'function') {
@@ -669,7 +681,9 @@
                     symbol: {
                         symbolType: 'circle',
                         size: 12,
-                        color: '#4CAF50',
+                        // The accent token (the tool's own green), read from the
+                        // page; the WebGLPoints path itself is judged at step 13.
+                        color: accentColor(),
                         rotateWithView: false,
                         rotation: 0,
                         opacity: 1,

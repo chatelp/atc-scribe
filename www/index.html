@@ -47,6 +47,8 @@
     <script defer src="audio-client.js"></script>
 
     <!-- 4) Map foundation (core primitives and perf metrics) -->
+    <!-- The five families of flight phase, one source for the map, the PAR and the list (migration step 2). -->
+    <script defer src="phase/phase-families.js"></script>
     <script defer src="map/core/layer-registry.js"></script>
     <script defer src="map/core/event-bus.js"></script>
     <script defer src="map/core/visibility-rules.js"></script>
@@ -1255,23 +1257,12 @@
                                                 <span x-show="aircraft.phase && aircraft.phase.current && aircraft.phase.current.length > 0"
                                                       x-text="$store.atc.getCurrentPhase(aircraft)"
                                                       class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center"
-                                                      :class="{
-                                                          'bg-blue-500/20 text-blue-400 border border-blue-500/30': $store.atc.getCurrentPhase(aircraft) === 'CRZ',
-                                                          'bg-green-500/20 text-green-400 border border-green-500/30': $store.atc.getCurrentPhase(aircraft) === 'DEP',
-                                                          'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': $store.atc.getCurrentPhase(aircraft) === 'APP',
-                                                          'bg-pink-400/15 text-pink-300 border border-pink-400/25': $store.atc.getCurrentPhase(aircraft) === 'ARR',
-                                                          'bg-purple-500/20 text-purple-400 border border-purple-500/30': $store.atc.getCurrentPhase(aircraft) === 'TAX',
-                                                          'bg-orange-500/20 text-orange-400 border border-orange-500/30': $store.atc.getCurrentPhase(aircraft) === 'T/O',
-                                                          'bg-lime-500/20 text-lime-400 border border-lime-500/30': $store.atc.getCurrentPhase(aircraft) === 'CLB',
-                                                          'bg-teal-500/20 text-teal-400 border border-teal-500/30': $store.atc.getCurrentPhase(aircraft) === 'T/D',
-                                                          'bg-gray-500/20 text-gray-400 border border-gray-500/30': $store.atc.getCurrentPhase(aircraft) === 'NEW',
-                                                          'bg-slate-500/15 text-slate-400 border border-slate-500/30': $store.atc.getCurrentPhase(aircraft) === 'UNK'
-                                                      }"></span>
+                                                      :class="$store.atc.phaseBadgeClasses(aircraft)"></span>
                                                 <span x-show="$store.atc.getPhaseAirport(aircraft)" x-text="$store.atc.getPhaseAirport(aircraft)"
                                                       class="text-[8px] font-mono opacity-60 mt-0.5"></span>
                                                 <span x-show="!aircraft.phase || !aircraft.phase.current || aircraft.phase.current.length === 0"
                                                       x-text="'NEW'"
-                                                      class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-gray-500/20 text-gray-400 border border-gray-500/30"></span>
+                                                      class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-surface-raised text-phase-unknown border border-phase-unknown"></span>
                                             </div>
                                             
                                             <!-- Callsign cell -->
@@ -1382,23 +1373,12 @@
                                     <span x-show="$store.atc.selectedAircraft.phase && $store.atc.selectedAircraft.phase.current && $store.atc.selectedAircraft.phase.current.length > 0"
                                           x-text="$store.atc.getCurrentPhase($store.atc.selectedAircraft)"
                                           class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center"
-                                          :class="{
-                                              'bg-blue-500/20 text-blue-400 border border-blue-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'CRZ',
-                                              'bg-lime-500/20 text-lime-400 border border-lime-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'CLB',
-                                              'bg-green-500/20 text-green-400 border border-green-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'DEP',
-                                              'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'APP',
-                                              'bg-pink-400/15 text-pink-300 border border-pink-400/25': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'ARR',
-                                              'bg-purple-500/20 text-purple-400 border border-purple-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'TAX',
-                                              'bg-orange-500/20 text-orange-400 border border-orange-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'T/O',
-                                              'bg-teal-500/20 text-teal-400 border border-teal-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'T/D',
-                                              'bg-gray-500/20 text-gray-400 border border-gray-500/30': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'NEW',
-                                              'bg-slate-500/15 text-slate-400 border border-slate-500/25': $store.atc.getCurrentPhase($store.atc.selectedAircraft) === 'UNK'
-                                          }"></span>
+                                          :class="$store.atc.phaseBadgeClasses($store.atc.selectedAircraft)"></span>
                                     <span x-show="$store.atc.getPhaseAirport($store.atc.selectedAircraft)" x-text="$store.atc.getPhaseAirport($store.atc.selectedAircraft)"
                                           class="text-[8px] font-mono opacity-60 mt-0.5"></span>
                                     <span x-show="!$store.atc.selectedAircraft.phase || !$store.atc.selectedAircraft.phase.current || $store.atc.selectedAircraft.phase.current.length === 0"
                                           x-text="'NEW'"
-                                          class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-gray-500/20 text-gray-400 border border-gray-500/30"></span>
+                                          class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-surface-raised text-phase-unknown border border-phase-unknown"></span>
                                 </div>
                                 
                                 <!-- Callsign cell -->
@@ -1779,18 +1759,7 @@
                                                 <td class="p-1.5 text-left border-b border-border">
                                                     <div class="flex items-center gap-2">
                                                         <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
-                                                              :class="{
-                                                                  'bg-blue-500/20 text-blue-400 border border-blue-500/30': phase.phase === 'CRZ',
-                                                                  'bg-green-500/20 text-green-400 border border-green-500/30': phase.phase === 'DEP',
-                                                                  'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': phase.phase === 'APP',
-                                                                  'bg-pink-400/15 text-pink-300 border border-pink-400/25': phase.phase === 'ARR',
-                                                                  'bg-purple-500/20 text-purple-400 border border-purple-500/30': phase.phase === 'TAX',
-                                                                  'bg-orange-500/20 text-orange-400 border border-orange-500/30': phase.phase === 'T/O',
-                                                                  'bg-lime-500/20 text-lime-400 border border-lime-500/30': phase.phase === 'CLB',
-                                                                  'bg-teal-500/20 text-teal-400 border border-teal-500/30': phase.phase === 'T/D',
-                                                                  'bg-gray-500/20 text-gray-400 border border-gray-500/30': phase.phase === 'NEW',
-                                                                  'bg-slate-500/15 text-slate-400 border border-slate-500/30': phase.phase === 'UNK'
-                                                              }"
+                                                              :class="$store.atc.phaseCodeBadgeClasses(phase.phase)"
                                                               x-text="phase.phase"></span>
                                                     </div>
                                                 </td>
