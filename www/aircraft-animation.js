@@ -397,11 +397,13 @@ class AircraftAnimationEngine {
         return pose;
     }
 
-    // Where the last sample says the aircraft is now: the sample itself when it
-    // came from the server's prediction or carries no velocity, else the sample
-    // carried forward by the velocity over a bounded horizon.
+    // Where the last sample says the aircraft is now: the sample carried forward
+    // by the velocity over a bounded horizon, whether it was observed or
+    // predicted by the server (a predicted sample left where it stood, as
+    // before, stopped the aircraft for a second, then the next real sample
+    // made it jump); the sample itself when there is no velocity.
     _predictedPose(state, real, now, heading) {
-        if (state.lastSampleSource === 'predicted' || !state.velocity) {
+        if (!state.velocity) {
             return { lat: real.lat, lon: real.lon, alt: real.alt, heading };
         }
 
