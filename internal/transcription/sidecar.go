@@ -66,7 +66,10 @@ type Health struct {
 	SecondOpinionOK     int      `json:"second_opinion_ok"`
 	SecondOpinionFailed int      `json:"second_opinion_failed"`
 	PID                 int      `json:"pid"`
-	Models              map[string]struct {
+	// The English model's name as configured -- a Hugging Face id or a local
+	// path. The sign-in page shows its family, never the name itself.
+	ModelEN string `json:"model_en"`
+	Models  map[string]struct {
 		ID        string `json:"id"`
 		Kind      string `json:"kind"`
 		Available bool   `json:"available"`

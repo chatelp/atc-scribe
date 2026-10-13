@@ -316,6 +316,9 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 	if next.Matching == nil {
 		next.Matching = current.Matching
 	}
+	if next.Vitals == nil {
+		next.Vitals = current.Vitals
+	}
 
 	if err := h.runtime.Apply(next); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -340,7 +343,8 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 		logger.Bool("match_one_digit_off", next.Matching.OneDigitOff),
 		logger.Bool("match_context_letters", next.Matching.ContextLetters),
 		logger.Bool("match_context_digits", next.Matching.ContextDigits),
-		logger.Bool("match_context_names", next.Matching.ContextNames))
+		logger.Bool("match_context_names", next.Matching.ContextNames),
+		logger.Bool("vitals_enabled", next.Vitals == nil || next.Vitals.Enabled))
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(h.runtime.Settings()); err != nil {

@@ -272,6 +272,19 @@ func (s *TranscriptionStorage) GetTranscriptions(limit, offset int) ([]*Transcri
 	return readTranscriptions(rows)
 }
 
+// CountTransmissions counts the transmissions of the open daily database and
+// those tied to an aircraft, in one query: the file rotates at midnight, so
+// these are today's. NULLIF rather than a comparison with the empty string:
+// COUNT counts every non-NULL value, and the comparison is 0, not NULL, for an
+// empty callsign.
+func (s *TranscriptionStorage) CountTransmissions() (total, matched int, err error) {
+	err = s.db.QueryRow(`SELECT COUNT(*), COUNT(NULLIF(callsign, '')) FROM transcriptions`).Scan(&total, &matched)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to count transcriptions: %w", err)
+	}
+	return total, matched, nil
+}
+
 // GetTranscriptionByID returns one transmission, or nil when there is none.
 func (s *TranscriptionStorage) GetTranscriptionByID(id int64) (*TranscriptionRecord, error) {
 	rows, err := s.db.Query(`SELECT `+transcriptionColumns+` FROM transcriptions WHERE id = ?`, id)

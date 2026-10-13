@@ -252,3 +252,25 @@ func TestPhraseologyValuesFollowTheirTransmission(t *testing.T) {
 		t.Errorf("no ids: %v, %v", empty, err)
 	}
 }
+
+// The day's figures for the sign-in page: every transmission, and those tied
+// to an aircraft. An empty callsign and a NULL one are both unmatched -- the
+// count of a comparison with the empty string would have counted the empty one.
+func TestTransmissionsAreCountedWithTheMatchedOnes(t *testing.T) {
+	s := newTranscriptionStore(t)
+	if total, matched, err := s.CountTransmissions(); err != nil || total != 0 || matched != 0 {
+		t.Fatalf("empty: %d %d %v, want 0 0", total, matched, err)
+	}
+	matchedRec := heard("125825", t0, "air france one zero eight one")
+	matchedRec.Callsign = "AFR1081"
+	store(t, s, matchedRec)
+	store(t, s, heard("125825", t0.Add(time.Second), "empty callsign"))
+	nullID := store(t, s, heard("125825", t0.Add(2*time.Second), "null callsign"))
+	if _, err := s.db.Exec(`UPDATE transcriptions SET callsign = NULL WHERE id = ?`, nullID); err != nil {
+		t.Fatal(err)
+	}
+	total, matched, err := s.CountTransmissions()
+	if err != nil || total != 3 || matched != 1 {
+		t.Errorf("got %d transmissions, %d matched (%v), want 3 and 1", total, matched, err)
+	}
+}

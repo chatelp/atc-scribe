@@ -210,6 +210,20 @@ func (rt *RunwayInUseTracker) GetTopScores(n int) []RunwayScore {
 	return result
 }
 
+// RunwaysInUse counts the runways in the active set, a runway used in both
+// directions once: "06L-24R/06L" and "06L-24R/24R" are one runway. Zero until
+// the first evidence; the last known set is kept through quiet hours, as
+// IsActiveRunway keeps it.
+func (rt *RunwayInUseTracker) RunwaysInUse() int {
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+	pairs := make(map[string]bool, len(rt.activeSet))
+	for id := range rt.activeSet {
+		pairs[strings.SplitN(id, "/", 2)[0]] = true
+	}
+	return len(pairs)
+}
+
 // recompute prunes old events, recalculates time-decayed scores, and updates
 // the active set. Must be called with rt.mu held for writing.
 func (rt *RunwayInUseTracker) recompute(now time.Time) {

@@ -372,6 +372,17 @@ func (tt *TrajectoryTracker) GetRunwayScoresFor(airport string, n int) []RunwayS
 	return nil
 }
 
+// RunwaysInUse counts the runways in use at every followed airport.
+func (tt *TrajectoryTracker) RunwaysInUse() int {
+	tt.runwayMu.RLock()
+	defer tt.runwayMu.RUnlock()
+	n := 0
+	for _, rt := range tt.runwayTrackers {
+		n += rt.RunwaysInUse()
+	}
+	return n
+}
+
 // AlignedAirport returns the followed airport on one of whose runway axes the
 // aircraft was seen, "" if none -- the stronger of the two ways an aircraft is
 // given an airport (airportFor).

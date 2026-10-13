@@ -140,3 +140,23 @@ func TestRunwaysTwelveDegreesApartStaySeparate(t *testing.T) {
 		t.Error("Orly 24 is 12 degrees from 25: not a parallel")
 	}
 }
+
+// The sign-in page counts runways, not runway ends: De Gaulle landing on 09L
+// uses its four runways, Orly on 25 one, and nothing is counted before the
+// first evidence.
+func TestRunwaysInUseCountsRunwaysNotEnds(t *testing.T) {
+	cdg := newChoiceTracker(t, cdgRunways())
+	if n := cdg.RunwaysInUse(); n != 0 {
+		t.Errorf("before any evidence: %d runways, want 0", n)
+	}
+	cdg.RecordEvent("09L-27R/09L", RunwayEventApproach, "abc123")
+	if n := cdg.RunwaysInUse(); n != 4 {
+		t.Errorf("De Gaulle on 09L: %d runways, want 4 (its parallels)", n)
+	}
+	orly := newChoiceTracker(t, orlyRunways())
+	orly.RecordEvent("07-25/25", RunwayEventApproach, "abc123")
+	orly.RecordEvent("07-25/07", RunwayEventClimb, "def456")
+	if n := orly.RunwaysInUse(); n != 1 {
+		t.Errorf("Orly on 25 and 07: %d runways, want 1 (both ends of one runway)", n)
+	}
+}
