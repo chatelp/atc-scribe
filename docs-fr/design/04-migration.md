@@ -213,7 +213,9 @@ Indépendante de la disposition, elle passe en premier.
 
 ### 9. Fenêtres et pages — 1,5 j
 
-- **Change** : les calques de la carte (`MapControls`), les fiches d'aérodrome et de balise
+- **Change** : les calques de la carte (`MapControls`) ; la bascule Map / PAR en
+  `SegmentedControl` dans `cl-sky__top` (« Map », « PAR · LFPG »…), où la carte « Right now »
+  repliée la rejoint au bout de la rangée (oubli du plan relevé à l'étape 5) ; les fiches d'aérodrome et de balise
   (`KeyValues`), le journal (`cl-menu` : six sortes, sons, effacer), la page des réglages
   (`SettingsPage` : Listening, Callsign matching, Display, Account, System), la connexion et le
   premier lancement (`SignIn`, variante « ciel », palette propre de `login.js` retirée), avec la
