@@ -52,6 +52,13 @@ type Sidecar struct {
 	waitErr error
 
 	lastHealth Health
+
+	// The server started with nothing to transcribe and no sidecar to run
+	// (Idle): nothing was started or probed, and nothing vouches for a sidecar
+	// at the URL. reached is set once a source asking for transcription found
+	// one answering there (Ensure).
+	idle    bool
+	reached bool
 }
 
 // Health is what the sidecar says about itself. The field that matters is
@@ -185,6 +192,53 @@ func (s *Sidecar) Start(ctx context.Context) error {
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
+}
+
+// Idle records that the server runs without transcription: no source asks for
+// it and no command starts a sidecar, so there is nothing to start and nothing
+// to wait for. Refusing to start there, as Start does, would keep someone with
+// no sidecar yet -- no Apple Silicon, no GPU -- from the map and the audio,
+// which need none. A source that asks for transcription later goes through
+// Ensure.
+func (s *Sidecar) Idle() {
+	s.mu.Lock()
+	s.idle = true
+	s.mu.Unlock()
+}
+
+// Off reports that the server runs without transcription: it started Idle and
+// no source has found a sidecar answering since.
+func (s *Sidecar) Off() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.idle && !s.reached
+}
+
+// Ensure is asked before a source that transcribes is started. A sidecar Start
+// reached with the server is taken as it is: it was probed then and is
+// supervised now, and refusing a source while it restarts would cost that
+// source its audio as well. After Idle nothing vouches for one, so it is probed
+// now, each time, and an error says what to do when nothing answers.
+func (s *Sidecar) Ensure(ctx context.Context) error {
+	s.mu.Lock()
+	idle := s.idle
+	s.mu.Unlock()
+	if !idle {
+		return nil
+	}
+	if err := s.probe(ctx); err != nil {
+		return fmt.Errorf("no local STT sidecar answers at %s/health (%v): "+
+			"start one (see sidecar/README.md), or set transcribe_audio to false for this source", s.url, err)
+	}
+	s.mu.Lock()
+	first := !s.reached
+	s.reached = true
+	s.mu.Unlock()
+	if first {
+		s.logger.Info("Local STT sidecar reached: transcription is on", logger.String("url", s.url))
+		s.warnIfDegraded()
+	}
+	return nil
 }
 
 // Stop terminates a sidecar we started. One that was already running when we

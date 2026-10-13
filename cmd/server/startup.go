@@ -96,6 +96,15 @@ func startSidecar(signalCtx context.Context, cfg *config.Config, log *logger.Log
 		Command:               cfg.Transcription.Local.Command,
 		StartupTimeoutSeconds: cfg.Transcription.Local.StartupTimeoutSeconds,
 	}, log)
+	// Unless nothing asks for it. Then the map and the audio need no sidecar,
+	// and a source that asks for transcription later has it probed then.
+	if !transcriptionWanted(cfg) {
+		log.Info("No source transcribes and no sidecar is configured: running without transcription",
+			logger.String("server_url", cfg.Transcription.Local.ServerURL),
+			logger.String("to_transcribe", "set transcribe_audio = true on a source and run a sidecar at server_url, see sidecar/README.md"))
+		sttSidecar.Idle()
+		return sttSidecar
+	}
 	sidecarCtx, sidecarCancel := context.WithTimeout(signalCtx, 5*time.Minute)
 	if err := sttSidecar.Start(sidecarCtx); err != nil {
 		sidecarCancel()
@@ -107,6 +116,21 @@ func startSidecar(signalCtx context.Context, cfg *config.Config, log *logger.Log
 	// transcribing nothing until someone notices (28/09).
 	sttSidecar.Supervise(signalCtx)
 	return sttSidecar
+}
+
+// transcriptionWanted reports whether the server needs its sidecar from the
+// start: a configured source transcribes, or [transcription.local] command asks
+// for one to be run.
+func transcriptionWanted(cfg *config.Config) bool {
+	if len(cfg.Transcription.Local.Command) > 0 {
+		return true
+	}
+	for _, src := range cfg.Frequencies.Sources {
+		if src.TranscribeAudio {
+			return true
+		}
+	}
+	return false
 }
 
 // dailyStorage is today's database and the stores that share it.
@@ -296,7 +320,7 @@ func startWeather(cfg *config.Config, effectiveAirport string, refAirport *refer
 // startFrequencies creates the frequencies service -- the audio streams, their
 // transcription and the association of what is said with the aircraft -- and
 // starts it.
-func startFrequencies(ctx context.Context, cfg *config.Config, adsbService *adsb.Service, refService *reference.Service, runtimeSettings *config.Runtime, wsServer *websocket.Server, store *dailyStorage, log *logger.Logger) *frequencies.Service {
+func startFrequencies(ctx context.Context, cfg *config.Config, adsbService *adsb.Service, refService *reference.Service, runtimeSettings *config.Runtime, wsServer *websocket.Server, store *dailyStorage, sttSidecar *transcription.Sidecar, log *logger.Logger) *frequencies.Service {
 	// Create frequencies service.
 	// The fleet adapter is what lets a spoken callsign be attached to a real
 	// target.
@@ -333,6 +357,11 @@ func startFrequencies(ctx context.Context, cfg *config.Config, adsbService *adsb
 			ContextLetters: m.ContextLetters, ContextDigits: m.ContextDigits, ContextNames: m.ContextNames,
 			PrefixDigits: m.PrefixDigits, MinScore: m.MinScore}
 	})
+
+	// A source added while the server runs and asking for transcription is
+	// refused when nothing answers for it, instead of being transcribed by
+	// nobody.
+	frequenciesService.SetTranscriptionGate(sttSidecar.Ensure)
 
 	// Start frequencies service
 	if err := frequenciesService.Start(ctx); err != nil {

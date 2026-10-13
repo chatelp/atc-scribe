@@ -97,7 +97,11 @@ func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	h.status.mu.Unlock()
 
-	if h.sttSidecar != nil {
+	if h.sttSidecar != nil && h.sttSidecar.Off() {
+		// Nothing asks for transcription and nothing was started: not a
+		// sidecar that is down, a server running without one.
+		out["transcription"] = map[string]any{"status": "off", "reason": "no source transcribes"}
+	} else if h.sttSidecar != nil {
 		h.status.mu.Lock()
 		if time.Since(h.status.sidecarAt) > 15*time.Second {
 			ctx, cancel := context.WithTimeout(r.Context(), 1500*time.Millisecond)

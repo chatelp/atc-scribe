@@ -381,3 +381,58 @@ func TestTheProbeReadsTheBackend(t *testing.T) {
 		t.Errorf("a sidecar that does not say: backend %q, want empty", h.Backend)
 	}
 }
+
+// A server that started with nothing to transcribe is off, and stays off while
+// nothing answers; a source that asks is told what to do. Once a sidecar
+// answers, it is on.
+func TestAnIdleSidecarIsOffUntilOneAnswers(t *testing.T) {
+	s := NewSidecar(SidecarConfig{ServerURL: "http://127.0.0.1:1"}, testLogger(t))
+	s.Idle()
+	if !s.Off() {
+		t.Fatal("an idle sidecar must say the server runs without transcription")
+	}
+	err := s.Ensure(context.Background())
+	if err == nil {
+		t.Fatal("nothing answers: Ensure must refuse")
+	}
+	for _, want := range []string{"127.0.0.1:1/health", "sidecar/README.md", "transcribe_audio"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal should mention %q, got: %v", want, err)
+		}
+	}
+	if !s.Off() {
+		t.Error("a refused source must not turn transcription on")
+	}
+
+	srv := healthServer(t)
+	on := NewSidecar(SidecarConfig{ServerURL: srv.URL}, testLogger(t))
+	on.Idle()
+	if err := on.Ensure(context.Background()); err != nil {
+		t.Fatalf("a sidecar answers: Ensure: %v", err)
+	}
+	if on.Off() {
+		t.Error("a sidecar was reached: transcription is on")
+	}
+	// Unsupervised, so asked again for the next source.
+	srv.Close()
+	if err := on.Ensure(context.Background()); err == nil {
+		t.Error("after Idle the sidecar is probed for each source: it has gone")
+	}
+}
+
+// A sidecar reached at startup is supervised: a source is not refused because
+// it happens to be restarting, as before.
+func TestASidecarStartedWithTheServerIsNotProbedForASource(t *testing.T) {
+	srv := healthServer(t)
+	s := NewSidecar(SidecarConfig{ServerURL: srv.URL, StartupTimeoutSeconds: 5}, testLogger(t))
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	srv.Close()
+	if err := s.Ensure(context.Background()); err != nil {
+		t.Errorf("Ensure after Start: %v, want nil", err)
+	}
+	if s.Off() {
+		t.Error("a started sidecar is not off")
+	}
+}

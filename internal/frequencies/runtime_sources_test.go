@@ -1,6 +1,7 @@
 package frequencies
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -194,5 +195,49 @@ func TestASectorIsSetAndChangedWithoutReconnecting(t *testing.T) {
 		if err := s.AddSource(f); err == nil {
 			t.Errorf("%s: should be refused", name)
 		}
+	}
+}
+
+// A source asking for transcription is refused when the gate says there is
+// none; what was running under its id keeps running, and a source that does
+// not transcribe never asks.
+func TestATranscribingSourceIsRefusedWithoutTranscription(t *testing.T) {
+	s, base := newSourcesService(t)
+	asked := 0
+	s.SetTranscriptionGate(func(context.Context) error {
+		asked++
+		return errors.New("no sidecar")
+	})
+
+	listen := channel(base, "125825")
+	if err := s.AddSource(listen); err != nil {
+		t.Fatalf("a source that does not transcribe: %v", err)
+	}
+	if asked != 0 {
+		t.Errorf("a source that does not transcribe asked the gate %d times", asked)
+	}
+	before := processorOf(s, "125825")
+
+	transcribe := listen
+	transcribe.TranscribeAudio = true
+	err := s.AddSource(transcribe)
+	if !errors.Is(err, ErrNoTranscription) {
+		t.Fatalf("the same source asking for transcription: %v, want ErrNoTranscription", err)
+	}
+	if asked != 1 {
+		t.Errorf("the gate was asked %d times, want 1", asked)
+	}
+	f, ok := s.GetFrequencyByID("125825")
+	if !ok || f.TranscribeAudio || processorOf(s, "125825") != before {
+		t.Errorf("a refused source must leave the running one as it was: %+v", f)
+	}
+
+	other := channel(base, "118700")
+	other.TranscribeAudio = true
+	if err := s.AddSource(other); !errors.Is(err, ErrNoTranscription) {
+		t.Fatalf("a new source asking for transcription: %v, want ErrNoTranscription", err)
+	}
+	if _, ok := s.GetFrequencyByID("118700"); ok {
+		t.Error("a refused new source must not be listed")
 	}
 }

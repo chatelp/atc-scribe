@@ -1,12 +1,14 @@
 package frequencies
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	cfg "github.com/yegors/co-atc/internal/config"
 	"github.com/yegors/co-atc/internal/transcription/phraseology"
@@ -31,6 +33,10 @@ import (
 // ErrConfiguredSource is returned when an added source would replace, or a
 // removal would drop, a frequency that comes from the configuration.
 var ErrConfiguredSource = errors.New("frequency comes from the configuration")
+
+// ErrNoTranscription is returned when an added source asks for transcription
+// and the transcription gate says there is none to be had.
+var ErrNoTranscription = errors.New("transcription unavailable")
 
 // ErrUnknownSource is returned when removing a source that was never added.
 var ErrUnknownSource = errors.New("no added source with this id")
@@ -126,6 +132,16 @@ func (s *Service) AddSource(fc cfg.FrequencyConfig) error {
 		}
 		return nil
 	}
+	// Asked before the old version is stopped: a refused source leaves what
+	// was running as it was.
+	if fc.TranscribeAudio && s.transcriptionGate != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		err := s.transcriptionGate(ctx)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrNoTranscription, err)
+		}
+	}
 	if exists {
 		s.removeSource(fc.ID)
 	}
@@ -198,6 +214,14 @@ func (s *Service) announceSources() {
 		Type: websocket.MessageTypeFrequenciesChanged,
 		Data: map[string]interface{}{},
 	})
+}
+
+// SetTranscriptionGate gives AddSource what to ask before it starts a source
+// that transcribes: the server may run without transcription, and a source
+// that asks for it there must be refused rather than transcribed by nobody.
+// Called before Start.
+func (s *Service) SetTranscriptionGate(gate func(context.Context) error) {
+	s.transcriptionGate = gate
 }
 
 // SetSectors gives transcription the sector of each frequency, read for every

@@ -470,6 +470,10 @@ type Service struct {
 	sourcesMu sync.RWMutex
 	runtime   map[string]bool
 	changeMu  sync.Mutex // one add or remove at a time
+
+	// Asked before an added source that transcribes is started; nil lets every
+	// source through. See SetTranscriptionGate.
+	transcriptionGate func(context.Context) error
 }
 
 // connectionStatusInfo stores the current connection status and error for a frequency
