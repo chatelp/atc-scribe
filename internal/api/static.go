@@ -1,11 +1,15 @@
 package api
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/yegors/co-atc/pkg/logger"
 )
@@ -109,14 +113,29 @@ func (h *StaticFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Always revalidated, never served from the cache without asking: a file
 	// changed on disk is seen on the next load, and an unchanged one costs a 304
-	// instead of its bytes (ServeFile answers If-Modified-Since). Upstream's
-	// no-store made every reload fetch the whole page again (audit 4.3).
+	// instead of its bytes. Upstream's no-store made every reload fetch the
+	// whole page again (audit 4.3).
+	//
+	// "Unchanged" is judged on the content, not on the file's date: a checkout
+	// of an older version gives every file a newer date, and a browser that
+	// had cached the newer version was then told "not modified" and kept a mix
+	// of the two (13/10/2026, switching the served directory between branches:
+	// an old index.html with new scripts, the store never built, the page
+	// "Connection lost"). The ETag is the content's hash; no Last-Modified.
 	w.Header().Set("Cache-Control", "no-cache")
 
-	// Serve the file
+	data, err := os.ReadFile(fullPath)
+	if err != nil {
+		h.logger.Debug("Static file not readable", logger.String("path", fullPath), logger.Error(err))
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+	sum := sha256.Sum256(data)
+	w.Header().Set("ETag", `"`+hex.EncodeToString(sum[:16])+`"`)
+
 	h.logger.Debug("Serving static file",
 		logger.String("requested_path", r.URL.Path),
 		logger.String("file_path", fullPath))
 
-	http.ServeFile(w, r, fullPath)
+	http.ServeContent(w, r, filepath.Base(fullPath), time.Time{}, bytes.NewReader(data))
 }
