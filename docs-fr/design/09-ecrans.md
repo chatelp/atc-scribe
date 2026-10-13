@@ -56,7 +56,10 @@ que celles qui changent de place ; le reste garde la sienne (carte, PAR, liste, 
 | Téléphone : Map, PAR, List | Radio (accueil), Sky (carte ou PAR), Traffic, Right now |
 | Écran « Connection Lost » plein écran | `ErrorBanner` en haut du ciel, la carte reste utilisable |
 
-## Ce que je propose et qui attend ta validation
+## Six propositions, validées par le propriétaire le 13/10
+
+Présentées une à une, avant / après sur les écrans réels ; toutes retenues telles quelles.
+
 
 1. **Le volume dans le menu de chaque fréquence** (▾), puisque la barre du bas disparaît.
 2. **Un seul fil et une seule pastille de nouveaux échanges**, au lieu d'un fil et d'un compteur
@@ -67,7 +70,7 @@ que celles qui changent de place ; le reste garde la sienne (carte, PAR, liste, 
 6. **Les consignes entendues sans verdict** : la colonne « Status (issued / complied / deviation) »
    de la fiche devient « Then » et dit ce que l'avion a fait (« level at 4000 ft »), sans
    qualifier l'écart. C'est le principe « constater, ne pas juger » appliqué à une fonction qui
-   existe ; à toi de dire s'il s'applique ici.
+   existe ; le propriétaire a confirmé qu'il s'applique ici.
 
 ## Ce qui n'est pas dessiné
 
