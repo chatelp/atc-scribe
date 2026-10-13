@@ -71,7 +71,7 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
    étapes, chacune livrable et vérifiée (filet `www-check`, styles calculés, captures).
    Demande du propriétaire du 13/10, à traiter à l'étape de la carte avec la session design :
    **à faible zoom, les cartouches d'avion envahissent l'écran** ; il faut un affichage allégé
-   (par exemple l'indicatif seul sous un seuil de zoom, la cartouche complète en zoomant).
+   (par exemple l'indicatif seul sous un seuil de zoom, la cartouche complète en zoomant). Consignée par la session design dans `09-ecrans.md` (§ Demandes ouvertes) : elle mesurera d'abord étiquettes et recouvrements par niveau de zoom sur l'instance, puis proposera une variante compacte de l'étiquette et son seuil.
 3. **Les prérequis pour être installable ailleurs** (communauté, question 4) → liste
    hiérarchisée → chantier technique dans cette session.
 4. **La recommandation d'un premier pas communautaire** (communauté, question 5) → décision du
