@@ -51,6 +51,12 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
   d'édition ; l'instance d'essai reste la vérification en direct.
 - Trois études lancées en parallèle (12/10) ; cadre légal, existant, communautés, inventaire
   visuel livrés.
+- **D79** (13/10) : le mouvement des avions ne pulse plus. Deux défauts de l'amont révélés par
+  la cadence de la station (une position toutes les ~1,7 s par avion, sondée chaque seconde) :
+  prédiction serveur ancrée sur le relevé et non sur la position, moteur de la page qui
+  re-datait le point figé. Mesuré avant/après dans l'onglet du propriétaire : 33 % → 3,3 % de
+  pas à reculons. Commit autonome contribuable (70c8eff). Reste la liste Trafic qui vole
+  ~100 ms par seconde au fil principal (étape 5 ou commit dédié).
 
 ### En cours
 

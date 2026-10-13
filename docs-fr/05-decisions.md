@@ -4891,6 +4891,46 @@ système de design : la séquence d'arrivée calculée dans le store pour tous l
 (la PAR la relit), les gabarits français des consignes, puis la migration elle-même
 (`04-migration.md`).
 
+### D79 — Un relevé sans position neuve n'est pas une observation *(13/10)*
+
+**Le symptôme.** Le propriétaire voit les avions « pulser », reculer puis avancer, faire de
+grands sauts d'un coup, et des glyphes mal orientés ; très net dans un onglet Chrome visible.
+Mesuré dans cet onglet (sonde sur les poses que le moteur d'animation envoie à la carte, 15 s,
+60 avions) : **30 à 35 % des pas de mouvement vont à reculons**, 40 km de recul cumulé en 15 s,
+moteur à 21 images/s au lieu de 30.
+
+**Ce que le bisect établit.** Même oscillation avec la page de la migration, celle d'avant la
+migration (37f2fa0) et celle d'avant la scission du store (85af93c, 11/10), et avec le
+serveur de ce même 11/10 : rien dans Clairance ne l'a introduite. La station répond
+(historique graphs1090 du 25/09 au 13/10) que sa cadence est **inchangée : 0,55 à 0,61 position
+par seconde et par avion**, soit une position toutes les 1,6 à 1,8 s ; sondée chaque seconde,
+elle livre **la même position à la moitié des relevés** (48 % sous 30 NM, mesuré sur 30
+relevés). Un sondage à 2 s divise l'oscillation par deux sans la supprimer. Le moment où le
+propriétaire ne voyait pas ce défaut n'a pas été retrouvé : ni la page, ni le serveur, ni la
+configuration, ni la cadence de la station ne diffèrent de ce qui est mesuré. Hypothèse non
+vérifiable : un regard plus attentif ou plus zoomé depuis la migration.
+
+**Le mécanisme, lu dans le flux WebSocket.** Deux défauts de l'amont, révélés par ce régime
+de positions : (1) la prédiction serveur interpole depuis l'heure du **relevé** qui répète la
+position, pas depuis l'heure où la position a été **décodée** (`seen_pos`) ; elle reste donc
+collée au point figé pendant que la page extrapole, et la page y est ramenée chaque seconde ;
+(2) le moteur d'animation de la page prend chaque mise à jour réelle (altitude, vitesse) pour
+une observation neuve datée de maintenant, position figée comprise, et ramène l'avion dessus.
+Ignorer les états prédits du serveur ne suffit pas (37 % de recul) : le second défaut suffit
+seul. S'y ajoute un cap envoyé dans les états prédits égal à la route (`true_heading = track`)
+alors que les relevés réels portent le vrai cap avec la dérive : le glyphe alternait.
+
+**Décision.** Correctif en un commit autonome, contribuable (70c8eff) : le serveur date la
+position de `seen_pos` et ancre prévision et prédiction dessus (expiration 60 s après la
+position, non après le relevé) ; le moteur garde la date du point connu quand une mise à jour
+le répète (vitesse, route et taux verticaux rafraîchis, cap lissé) ; le delta prédit ne porte
+plus de cap, seulement la route. Tests Go (ancrage) et node (règle du point répété), le filet
+`www-check` exécute aussi `www/*.test.js`. **Mesuré après, même onglet, même trafic : 3,3 % de
+pas à reculons, 3,2 km en 15 s, deux sauts de cap de plus de 3°.** Ce qui reste et se traite à
+part : la liste Trafic reconstruit ses lignes chaque seconde et vole ~100 ms au fil principal
+(moteur à 21 images/s) ; vrai avant la migration, à corriger à l'étape 5 (colonne) ou dans un
+commit dédié.
+
 ### D76 — Le signe de Clairance est le scope radar *(13/10)*
 
 **Choisi par le propriétaire le 13/10** avec la session design, sur une planche de huit signes

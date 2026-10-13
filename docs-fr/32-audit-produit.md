@@ -492,6 +492,17 @@ sur la carte.
 
 ## État
 
+- 13/10 (fin d'après-midi) : **le mouvement des avions ne pulse plus (D79)**. Signalé par le
+  propriétaire sur l'instance d'essai (pulsation, recul, grands sauts, glyphes mal orientés).
+  Mesuré dans son onglet Chrome : 30–35 % des pas à reculons, 40 km de recul en 15 s. Bisect
+  sur quatre pages et deux serveurs (jusqu'au 11/10) : identique partout ; la station confirme
+  une cadence inchangée depuis le 25/09 (0,6 position/s par avion, soit la même position à la
+  moitié des relevés). Correctif contribuable en un commit (70c8eff) : prédiction serveur
+  ancrée sur `seen_pos`, moteur qui ne re-date plus un point répété, delta prédit sans cap.
+  Après : 3,3 % de recul, 3,2 km en 15 s. Garde-fou 4 tenu (mesure avant/après sur le même
+  trafic). Second chantier mesuré au passage, antérieur à la migration : la liste Trafic
+  reconstruit ses lignes chaque seconde (14 000 mutations DOM en 10 s, ~100 ms de blocage par
+  seconde, moteur à 21 images/s) — à traiter à l'étape 5.
 - 13/10 (soir) : **fiche G intégrée** (vague 3 cloud, branche
   `cloud/g-chiffres-avant-connexion`, six commits, 1 229 lignes dont 540 de tests) : la route
   publique `GET /api/v1/vitals` (agrégats seulement, cache de 10 s sous mutex, coupable par
