@@ -4926,7 +4926,25 @@ position, non après le relevé) ; le moteur garde la date du point connu quand 
 le répète (vitesse, route et taux verticaux rafraîchis, cap lissé) ; le delta prédit ne porte
 plus de cap, seulement la route. Tests Go (ancrage) et node (règle du point répété), le filet
 `www-check` exécute aussi `www/*.test.js`. **Mesuré après, même onglet, même trafic : 3,3 % de
-pas à reculons, 3,2 km en 15 s, deux sauts de cap de plus de 3°.** Ce qui reste et se traite à
+pas à reculons, 3,2 km en 15 s, deux sauts de cap de plus de 3°.**
+
+**Suite, le « tremblotement » (même soir).** Le mouvement débarrassé de l'oscillation, le
+propriétaire voit encore un tremblement. Mesuré pas par pas sur un avion à 140 m/s : 7 m,
+5 m, 2 m, 0,2 m puis **76 m en une image**, une fois par seconde, sur tous les avions. Trois
+défauts de conception du moteur amont, corrigés en trois commits autonomes (80ce11b, 6f89f38,
+2a0d4e0) : (1) la correction glissait vers un **point fixe** (la position du relevé) pendant
+que la prédiction avançait, l'avion s'arrêtait dessus puis sautait pour rattraper ; elle est
+maintenant un **écart qui s'efface** par-dessus la prédiction, et sa durée borne la vitesse de
+rattrapage à la moitié de la vitesse propre (trois fois l'écart sur la vitesse, entre 180 ms et
+2,5 s) ; (2) le gain de prédiction de 0,72 faisait voler l'avion à 72 % de sa vitesse entre
+deux relevés puis rattraper le reste à chacun (dent de scie) ; il vaut 1, et l'horizon ne
+rétrécit plus avec le niveau de qualité adaptatif (chaque variation déplaçait tous les avions) ;
+(3) un échantillon **prédit** du serveur n'était pas prolongé par la vitesse : l'avion
+s'arrêtait dessus une seconde puis sautait au relevé suivant. Caps vérifiés au passage : les
+écarts cap/route sont ceux du vent (11° de dérive en altitude ce jour-là), pas une erreur.
+**Mesuré à la fin, même onglet, 48 avions rapides : 0 % de pas à reculons (33 % au départ),
+4 % d'images lentes (22 %), 5 % de sauts (10 %)**, les pas réguliers (6,6 m par 33 ms, 9,9 m
+par 50 ms, 200 m/s constants). Ce qui reste et se traite à
 part : la liste Trafic reconstruit ses lignes chaque seconde et vole ~100 ms au fil principal
 (moteur à 21 images/s) ; vrai avant la migration, à corriger à l'étape 5 (colonne) ou dans un
 commit dédié.
