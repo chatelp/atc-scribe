@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Clairance">
+  <title>Clairance — the sign: a radar scope, its sweep and the blip it has just painted</title>
+  <!-- 64 grid, centre (32, 32). The screen's ring (r 26.5, stroke 4), one
+       range ring (r 13, stroke 2, 55 %), the sweep at 45° (north-east) with the
+       afterglow it leaves behind it (0° to 45°, green at 35 %: the sweep turns
+       clockwise), and one blip at 25°, 17 from the centre, inside the glow. -->
+  <circle cx="32" cy="32" r="26.5" fill="none" stroke="#e0e0e0" stroke-width="4"/>
+  <circle cx="32" cy="32" r="13" fill="none" stroke="#e0e0e0" stroke-width="2" opacity="0.55"/>
+  <path d="M32 32 L32 6 A26 26 0 0 1 50.385 13.615 Z" fill="#4caf50" fill-opacity="0.35"/>
+  <path d="M32 32 L50.385 13.615" fill="none" stroke="#4caf50" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="39.18" cy="16.59" r="3.8" fill="#4caf50"/>
+</svg>

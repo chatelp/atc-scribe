@@ -1,0 +1,65 @@
+[
+  {
+    "file": "leger.svg",
+    "key": "leger",
+    "label": "Monomoteur léger",
+    "type": "Robin DR400 · Cessna 172 · Tecnam P2002",
+    "mapPx": 20
+  },
+  {
+    "file": "turboprop.svg",
+    "key": "turboprop",
+    "label": "Turbopropulseur",
+    "type": "ATR 72 · Dash 8 · King Air",
+    "mapPx": 24
+  },
+  {
+    "file": "affaires.svg",
+    "key": "affaires",
+    "label": "Jet d'affaires",
+    "type": "Falcon 2000 · Gulfstream · Global · Citation",
+    "mapPx": 22
+  },
+  {
+    "file": "bireacteur.svg",
+    "key": "biréacteur",
+    "label": "Biréacteur moyen-courrier",
+    "type": "A320 · B737 · A220 · E190 · CRJ",
+    "mapPx": 26
+  },
+  {
+    "file": "gros.svg",
+    "key": "gros",
+    "label": "Gros-porteur biréacteur",
+    "type": "A350 · B787 · B777 · A330",
+    "mapPx": 30
+  },
+  {
+    "file": "quadri.svg",
+    "key": "quadri",
+    "label": "Gros-porteur quadriréacteur",
+    "type": "A380 · B747 · A340",
+    "mapPx": 32
+  },
+  {
+    "file": "helico.svg",
+    "key": "helico",
+    "label": "Hélicoptère",
+    "type": "H125 · EC135 · H145",
+    "mapPx": 22
+  },
+  {
+    "file": "planeur.svg",
+    "key": "planeur",
+    "label": "Planeur",
+    "type": "ASK 21 · Duo Discus",
+    "mapPx": 22
+  },
+  {
+    "file": "inconnu.svg",
+    "key": "inconnu",
+    "label": "Inconnu",
+    "type": "ni type ni catégorie : un chevron qui donne le cap, pas un avion",
+    "mapPx": 18
+  }
+]

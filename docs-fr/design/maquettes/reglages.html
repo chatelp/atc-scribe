@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Settings — mock-up</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="base.css">
+<style>
+    body { background: #050505; }
+    .frame { width: 1440px; height: 900px; position: relative; overflow: hidden; background: var(--color-surface-page); display: grid; grid-template-rows: 1fr 80px; }
+    .page { display: grid; grid-template-columns: 220px 1fr; min-height: 0; }
+    nav { border-right: 1px solid var(--color-border-default); padding: var(--space-4) var(--space-2); display: flex; flex-direction: column; gap: 2px; }
+    nav a { display: flex; align-items: center; height: 32px; padding: 0 var(--space-3); border-radius: var(--radius-md); color: var(--color-text-secondary); text-decoration: none; font-size: var(--font-size-body); }
+    nav a:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+    nav a.on { background: var(--color-surface-selected); color: var(--color-accent-strong); }
+    nav .head { padding: 0 var(--space-3) var(--space-3); }
+    main { overflow: hidden; display: flex; justify-content: center; }
+    .col { width: 640px; padding: var(--space-4) 0; display: flex; flex-direction: column; gap: var(--space-6); }
+    .top { display: flex; align-items: center; gap: var(--space-2); }
+    section { display: flex; flex-direction: column; gap: var(--space-3); }
+    section h2 { margin: 0; padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border-default); }
+    .field { display: flex; flex-direction: column; gap: var(--space-1); }
+    .field .hint { font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-tertiary); }
+    .field .value { font-size: var(--font-size-body); line-height: var(--font-line-height-body); }
+    .select { height: 32px; padding: 0 var(--space-2); background: var(--color-surface-page); border: 1px solid var(--color-border-control); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; font-size: var(--font-size-body); }
+    .airports { border: 1px solid var(--color-border-default); border-radius: var(--radius-md); max-height: 132px; overflow: hidden; }
+    .airports .check { display: flex; height: 32px; padding: 0 var(--space-3); border-bottom: 1px solid var(--color-border-subtle); font-size: var(--font-size-body); }
+    .rule { display: grid; grid-template-columns: 20px 1fr; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border-subtle); }
+    .rule p { margin: 0; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
+    .rule b { font-weight: var(--font-weight-strong); color: var(--color-text-primary); font-size: var(--font-size-body); }
+    .preset { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+    .preset > div { border: 1px solid var(--color-border-control); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: 2px; }
+    .preset > div.on { border-color: var(--color-accent-default); background: var(--color-surface-selected); }
+    .preset .num { font-size: var(--font-size-small); color: var(--color-text-secondary); }
+    .switch-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border-subtle); }
+    .switch-row .t { display: flex; flex-direction: column; }
+    .switch-row .t span:first-child { font-size: var(--font-size-body); }
+    details summary { cursor: pointer; color: var(--color-text-secondary); font-size: var(--font-size-small); list-style: none; display: flex; align-items: center; gap: var(--space-1); }
+    .radio { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); background: var(--color-surface-panel); border-top: 1px solid var(--color-border-default); }
+    .notes { width: 1440px; padding: var(--space-6) 0; color: var(--color-text-secondary); font-size: var(--font-size-body); line-height: var(--font-line-height-body); }
+    .notes h2 { font-size: var(--font-size-title); color: var(--color-text-primary); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+    <symbol id="i-close" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="m4 4 8 8m0-8-8 8"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="m4 6 4 4 4-4"/></symbol>
+</svg>
+<div class="frame">
+    <div class="page">
+        <nav>
+            <div class="head"><span class="t-display">Settings</span></div>
+            <a href="#" class="on">Listening</a>
+            <a href="#">Callsign matching</a>
+            <a href="#">Display <span class="t-caption c3" style="margin-left:auto">this browser</span></a>
+            <a href="#">Account</a>
+            <a href="#">System</a>
+        </nav>
+        <main>
+            <div class="col">
+                <div class="top">
+                    <span class="t-caption c3">Changes apply at once; the server keeps them.</span>
+                    <button class="btn btn-icon" title="Close (Esc)" style="margin-left:auto"><svg><use href="#i-close"/></svg></button>
+                </div>
+
+                <section>
+                    <h2 class="t-title">Listening</h2>
+                    <div class="field">
+                        <span class="label">On air</span>
+                        <span class="value mono">124.350 <span style="font-family: var(--font-family-text)">Approche De Gaulle + Le Bourget</span></span>
+                        <span class="value mono">126.425 <span style="font-family: var(--font-family-text)">De Gaulle Approche (L)</span></span>
+                        <span class="hint">Chosen at the station since 11:35; this follows it. <span class="light ok" style="margin-left: var(--space-2)">station reporting</span></span>
+                    </div>
+                    <div class="field">
+                        <span class="label"><span class="help">Reference airport</span></span>
+                        <div class="select"><span><span class="mono">LFPZ</span> · Saint-Cyr-l'École · <span class="c3">0.8 NM</span></span><svg width="14" height="14" class="c2"><use href="#i-chev"/></svg></div>
+                        <span class="hint">Approach, departure, take-off, landing, runway in use and weather are judged against this airport. Distances and range rings stay on the receiver.</span>
+                    </div>
+                    <div class="field">
+                        <span class="label">Also follow <span class="c3" style="text-transform:none; letter-spacing:0">· three at most</span></span>
+                        <div class="airports">
+                            <label class="check on"><i></i><span class="mono">LFPG</span>&nbsp;Paris-Charles de Gaulle <span class="c3" style="margin-left:auto">12.6 NM</span></label>
+                            <label class="check on"><i></i><span class="mono">LFPO</span>&nbsp;Paris-Orly <span class="c3" style="margin-left:auto">14.0 NM</span></label>
+                            <label class="check"><i></i><span class="mono">LFPN</span>&nbsp;Toussus-le-Noble <span class="c3" style="margin-left:auto">3.9 NM</span></label>
+                            <label class="check"><i></i><span class="mono">LFPV</span>&nbsp;Vélizy-Villacoublay <span class="c3" style="margin-left:auto">6.4 NM</span></label>
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="t-title">Callsign matching</h2>
+                    <span class="hint c2" style="font-size: var(--font-size-small)">How a transmission is tied to an aircraft. Figures measured on two recorded days (D73).</span>
+                    <div class="preset">
+                        <div class="on"><span class="strong">Measured</span><span class="num">95 % right</span><span class="t-caption c3">default</span></div>
+                        <div><span class="strong">Cautious</span><span class="num">97 % right, −27 % matched</span><span class="t-caption c3">fewer, surer</span></div>
+                        <div><span class="strong">Experimental</span><span class="num">95 % right, +25 % matched</span><span class="t-caption c3">judge by ear</span></div>
+                    </div>
+                    <details open>
+                        <summary><svg width="12" height="12"><use href="#i-chev"/></svg>The nine rules of “Measured”</summary>
+                        <div class="rule"><span class="check on"><i></i></span><div><b>Letters in flight numbers</b><p>“seven uniform echo” read as 7UE. 59 % of callsigns have letters. +27 % matched aircraft.</p></div></div>
+                        <div class="rule"><span class="check on"><i></i></span><div><b>Airline heard roughly</b><p>“welling” taken for Vueling, among the airlines in the sky only.</p></div></div>
+                        <div class="rule"><span class="check"><i></i></span><div><b>Accept one digit off</b><p class="c-warn">▲ Measured 81 % noise. For experiments only.</p></div></div>
+                    </details>
+                </section>
+            </div>
+        </main>
+    </div>
+    <div class="radio"><span class="t-caption c3">The radio bar stays usable under the settings page.</span></div>
+</div>
+<div class="notes" lang="fr">
+    <h2>À lire (hors interface)</h2>
+    <ol>
+        <li>Une page, une colonne de 640 px, navigation à gauche : la structure du 10/10 est gardée. Ce qui change : le texte des réglages à 14 px en police système, les explications à 12 px en gris discret (4,7:1 au pire), les titres en 16 px et non plus en vert (le vert dit « choisi », pas « titre »).</li>
+        <li>Les préréglages d'appariement deviennent trois cartes qui affichent leur mesure (D73) ; le choisi a la surface verte. Une règle déconseillée porte un triangle ambre et un mot, pas seulement une couleur.</li>
+        <li>« Display » porte « this browser » à droite, en gris discret : ce qui reste dans le navigateur se distingue de ce que garde le serveur.</li>
+    </ol>
+</div>
+</body>
+</html>

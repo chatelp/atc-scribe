@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Phone — mock-up</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="base.css">
+<style>
+    body { background: #050505; padding: var(--space-6); }
+    .row-of-phones { display: flex; gap: var(--space-6); align-items: flex-start; }
+    .phone-wrap { display: flex; flex-direction: column; gap: var(--space-2); }
+    .phone { width: 375px; height: 812px; position: relative; overflow: hidden; background: var(--color-surface-page); border: 1px solid var(--color-border-default); border-radius: 28px; display: flex; flex-direction: column; }
+    .status-bar { height: 44px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-6); font: var(--font-weight-strong) var(--font-size-small) / 1 var(--font-family-text); color: var(--color-text-primary); }
+    .pane { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+    /* touch density: every control at least 44 px */
+    .phone .btn, .phone .toggle, .phone .input { height: var(--size-control-touch); font-size: var(--font-size-body); }
+    .phone .btn-icon { width: var(--size-target-touch); height: var(--size-target-touch); }
+    .phone .btn-icon svg { width: 18px; height: 18px; }
+    .phone .tabs { gap: var(--space-2); }
+    .phone .tabs > * { min-width: 72px; }
+    .ph-tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--color-border-default); background: var(--color-surface-panel); flex: none; }
+    .ph-tabs button { height: 48px; border: 0; background: none; color: var(--color-text-secondary); font-size: var(--font-size-small); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-top: 2px solid transparent; margin-top: -1px; }
+    .ph-tabs button svg { width: 18px; height: 18px; }
+    .ph-tabs button.on { color: var(--color-accent-strong); border-top-color: var(--color-accent-default); }
+    .ph-radio { flex: none; display: flex; gap: var(--space-2); padding: var(--space-2) var(--space-3) var(--space-6); background: var(--color-surface-panel); overflow: hidden; }
+    .ph-tile { flex: none; width: 168px; height: 56px; border: 1px solid var(--color-border-default); border-radius: var(--radius-md); display: grid; grid-template-columns: 44px 1fr; align-items: center; }
+    .ph-tile.on { border-color: var(--color-accent-default); }
+    .ph-tile .spk { height: 100%; display: grid; place-items: center; border-right: 1px solid var(--color-border-subtle); }
+    .ph-tile .spk svg { width: 18px; height: 18px; }
+    .ph-tile .txt { padding: 0 var(--space-2); display: flex; flex-direction: column; min-width: 0; }
+    .ph-tile .txt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ph-all { flex: none; width: 56px; height: 56px; border: 1px solid var(--color-border-default); border-radius: var(--radius-md); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--color-text-secondary); }
+    .ph-map { flex: 1; position: relative; background: var(--color-surface-map); overflow: hidden; }
+    .ph-map .top { position: absolute; top: var(--space-2); left: var(--space-2); right: var(--space-2); display: flex; gap: var(--space-2); }
+    .ph-map .top .btn-icon { background: var(--color-surface-panel); border: 1px solid var(--color-border-default); position: relative; }
+    .ph-map .top .counter { position: absolute; top: -4px; right: -4px; }
+    .ac-label { font: var(--font-size-caption)/14px var(--font-family-mono); }
+    .ph-head { padding: var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); border-bottom: 1px solid var(--color-border-default); background: var(--color-surface-panel); }
+    .ph-filters { display: flex; gap: var(--space-2); overflow: hidden; }
+    .ph-filters .toggle { flex: none; }
+    .ph-rows { flex: 1; overflow: hidden; background: var(--color-surface-panel); }
+    .ph-strip { position: relative; height: var(--size-row-touch); display: grid; grid-template-columns: 44px 1fr auto auto; column-gap: var(--space-3); align-items: center; padding: 0 var(--space-3) 0 var(--space-4); border-bottom: 1px solid var(--color-border-subtle); }
+    .ph-strip::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--fam); }
+    .ph-strip .v { font: var(--font-size-body)/20px var(--font-family-mono); white-space: nowrap; }
+    .ph-strip .s { font-size: var(--font-size-caption); line-height: 14px; color: var(--color-text-tertiary); white-space: nowrap; }
+    .ph-strip .cell { display: flex; flex-direction: column; min-width: 0; }
+    .ph-strip .r { align-items: flex-end; }
+    .ph-strip.sel { background: var(--color-surface-selected); box-shadow: inset 0 0 0 1px var(--color-accent-default); }
+    .ph-strip .heard { color: var(--color-accent-default); }
+    .card-keys { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2) var(--space-3); }
+    .card-keys > div { display: flex; flex-direction: column; }
+    .card-keys .v { font: var(--font-size-body)/20px var(--font-family-mono); }
+    .tl-item { display: grid; grid-template-columns: 58px 1fr; column-gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--color-border-subtle); }
+    .tl-item .time { font: var(--font-size-caption)/20px var(--font-family-mono); color: var(--color-text-tertiary); }
+    .tl-item .body { display: flex; flex-direction: column; gap: var(--space-1-5); min-width: 0; }
+    .tl-item p { margin: 0; font-size: var(--font-size-body); line-height: var(--font-line-height-body); }
+    .tl-item .row { display: flex; align-items: center; gap: var(--space-1-5); flex-wrap: wrap; }
+    .caption-under { color: var(--color-text-secondary); font-size: var(--font-size-small); max-width: 375px; }
+    .notes { max-width: 1200px; padding-top: var(--space-6); color: var(--color-text-secondary); font-size: var(--font-size-body); line-height: var(--font-line-height-body); }
+    .notes h2 { font-size: var(--font-size-title); color: var(--color-text-primary); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+    <symbol id="i-gear" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M4 11V7a4 4 0 0 1 8 0v4l1.5 1.5h-11L4 11ZM6.5 14h3"/></symbol>
+    <symbol id="i-spk" viewBox="0 0 16 16"><path fill="currentColor" d="M2 6h3l4-3v10L5 10H2z"/><path fill="none" stroke="currentColor" stroke-width="1.5" d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6 6 0 0 1 0 9"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 16 16"><path fill="currentColor" d="M2 6h3l4-3v10L5 10H2z"/><path fill="none" stroke="currentColor" stroke-width="1.5" d="m11 6 4 4m0-4-4 4"/></symbol>
+    <symbol id="i-map" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M1.5 3.5 5.5 2l5 2 4-1.5v10.5l-4 1.5-5-2-4 1.5zM5.5 2v10.5M10.5 4v10.5"/></symbol>
+    <symbol id="i-par" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M1.5 13.5h13M2 4l11 8.5"/><path fill="currentColor" d="m6 6 3 1-2 2z"/></symbol>
+    <symbol id="i-list" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M5 4h9M5 8h9M5 12h9M2 4h.5M2 8h.5M2 12h.5"/></symbol>
+    <symbol id="i-back" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M10 3 5 8l5 5"/></symbol>
+    <symbol id="i-radio" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M8 9.5v4M5.5 6.5a3.5 3.5 0 0 1 5 0M3.5 4.5a6.4 6.4 0 0 1 9 0"/><circle cx="8" cy="8.5" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-play" viewBox="0 0 16 16"><path fill="currentColor" d="M5 3.5v9l7-4.5z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M7 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Zm3.2 7.7 3.3 3.3"/></symbol>
+    <defs><path id="i-plane" d="M0-7 1.3-2 6 0.5v1.6L1.3 1 0.9 4.6 2.6 6v1.2L0 6.4l-2.6.8V6l1.7-1.4-.4-3.6L-6 2.1V.5L-1.3-2Z"/></defs>
+</svg>
+
+<div class="row-of-phones">
+    <!-- ======================================================== MAP -->
+    <div class="phone-wrap">
+        <div class="phone">
+            <div class="status-bar"><span>15:13</span><span class="t-caption">VPN</span></div>
+            <div class="pane">
+                <div class="ph-map">
+                    <svg viewBox="0 0 375 560" width="375" height="560" style="position:absolute; inset: 0">
+                        <g fill="none" stroke="var(--color-border-default)"><circle cx="188" cy="300" r="90"/><circle cx="188" cy="300" r="180"/></g>
+                        <g font-family="var(--font-family-mono)" font-size="11" fill="var(--color-text-tertiary)" text-anchor="middle"><text x="188" y="206">5 NM</text><text x="188" y="116">10 NM</text></g>
+                        <line x1="168" y1="306" x2="214" y2="296" stroke="var(--color-text-secondary)" stroke-width="3" stroke-linecap="round"/>
+                        <g transform="translate(270 180) rotate(78)"><circle r="13" fill="none" stroke="var(--color-accent-default)" stroke-width="2"/><use href="#i-plane" fill="var(--color-altitude-dark-low)"/></g>
+                        <g transform="translate(178 196)"><rect width="104" height="34" rx="4" fill="#0a0a0ad9" stroke="var(--color-accent-default)"/>
+                            <text class="ac-label" x="6" y="14"><tspan fill="var(--color-phase-arrival)" font-weight="600">APP</tspan><tspan fill="var(--color-text-primary)" font-weight="600"> AFR47KX</tspan></text>
+                            <text class="ac-label" x="6" y="28" fill="var(--color-text-secondary)">2 400 ft ↓</text></g>
+                        <g transform="translate(120 330) rotate(30)"><use href="#i-plane" fill="var(--color-altitude-dark-very-low)" transform="scale(.8)"/></g>
+                        <g transform="translate(40 344)"><rect width="74" height="20" rx="4" fill="#0a0a0ad9"/><text class="ac-label" x="6" y="14"><tspan fill="var(--color-phase-arrival)" font-weight="600">ARR</tspan><tspan fill="var(--color-text-primary)"> F-GXQA</tspan></text></g>
+                        <g transform="translate(300 420) rotate(-40)"><use href="#i-plane" fill="var(--color-altitude-dark-low)"/></g>
+                        <g transform="translate(222 436)"><rect width="104" height="20" rx="4" fill="#0a0a0ad9"/><text class="ac-label" x="6" y="14"><tspan fill="var(--color-phase-departure)" font-weight="600">CLB</tspan><tspan fill="var(--color-text-primary)"> TVF61WB</tspan></text></g>
+                        <g transform="translate(70 120) rotate(120)"><use href="#i-plane" fill="var(--color-altitude-dark-cruise)"/></g>
+                        <g transform="translate(84 112)"><rect width="104" height="20" rx="4" fill="#0a0a0ad9"/><text class="ac-label" x="6" y="14"><tspan fill="var(--color-phase-cruise)" font-weight="600">CRZ</tspan><tspan fill="var(--color-text-secondary)"> DLH6TA</tspan></text></g>
+                    </svg>
+                    <div class="top">
+                        <button class="btn btn-icon" title="Settings"><svg><use href="#i-gear"/></svg></button>
+                        <button class="btn btn-icon" title="Event log"><svg><use href="#i-bell"/></svg><span class="counter">2</span></button>
+                    </div>
+                </div>
+                <div class="ph-tabs">
+                    <button class="on"><svg><use href="#i-map"/></svg>Map</button>
+                    <button><svg><use href="#i-par"/></svg>PAR</button>
+                    <button><svg><use href="#i-list"/></svg>List</button>
+                </div>
+                <div class="ph-radio">
+                    <div class="ph-all"><svg width="18" height="18"><use href="#i-spk"/></svg><span class="label" style="color:inherit">all</span></div>
+                    <div class="ph-tile on"><div class="spk c-accent"><svg><use href="#i-spk"/></svg></div><div class="txt"><span class="t-small strong">Approche De Gaulle</span><span class="t-caption num c2">124.350 · 8 s</span></div></div>
+                    <div class="ph-tile"><div class="spk c2"><svg><use href="#i-mute"/></svg></div><div class="txt"><span class="t-small c2">De Gaulle App. (L)</span><span class="t-caption num c3">126.425 · 1 min</span></div></div>
+                </div>
+            </div>
+        </div>
+        <p class="caption-under">Carte : deux boutons de 44 px, les onglets Map · PAR · List de 48 px, la barre radio défilable, une tuile = toute la tuile cliquable pour couper ou écouter.</p>
+    </div>
+
+    <!-- ======================================================== LIST -->
+    <div class="phone-wrap">
+        <div class="phone">
+            <div class="status-bar"><span>15:13</span><span class="t-caption">VPN</span></div>
+            <div class="pane">
+                <div class="ph-head">
+                    <div style="display:flex; align-items:baseline; justify-content: space-between"><span class="t-title">Traffic</span><span class="t-caption c3 num">107 airborne</span></div>
+                    <div style="position:relative"><input class="input" placeholder="Callsign, registration, type…" style="padding-left: 34px"><svg width="16" height="16" style="position:absolute; left:11px; top:14px; color: var(--color-text-tertiary)"><use href="#i-search"/></svg></div>
+                    <div class="ph-filters">
+                        <button class="toggle on">SFC – FL 195</button>
+                        <button class="toggle">Heard <span class="count">12</span></button>
+                        <button class="toggle on"><span class="dot arr"></span>Arrival</button>
+                        <button class="toggle on"><span class="dot dep"></span>Dep.</button>
+                    </div>
+                </div>
+                <div class="ph-rows">
+                    <div class="ph-strip sel" style="--fam: var(--color-phase-arrival)"><span class="phase arr">APP</span><div class="cell"><span class="v strong">AFR47KX</span><span class="s">A320 · 6.2 NM</span></div><div class="cell r"><span class="v">2 400<span class="unit">ft</span> ↓</span><span class="s">158 kt</span></div><span class="heard t-caption num">◉ 8 s</span></div>
+                    <div class="ph-strip" style="--fam: var(--color-phase-departure)"><span class="phase fill dep">T/O</span><div class="cell"><span class="v strong">AFR19ME</span><span class="s">A21N · 9.8 NM</span></div><div class="cell r"><span class="v">300<span class="unit">ft</span> ↑</span><span class="s">148 kt</span></div><span></span></div>
+                    <div class="ph-strip" style="--fam: var(--color-phase-arrival)"><span class="phase arr">ARR</span><div class="cell"><span class="v strong">F-GXQA</span><span class="s">DR40 · 2.4 NM</span></div><div class="cell r"><span class="v">1 600<span class="unit">ft</span> ↔</span><span class="s">92 kt</span></div><span class="heard t-caption num">◉ 41 s</span></div>
+                    <div class="ph-strip" style="--fam: var(--color-phase-ground)"><span class="phase gnd">TAX</span><div class="cell"><span class="v strong">F-HBZC</span><span class="s">C172 · LFPZ</span></div><div class="cell r"><span class="v">GND</span><span class="s">12 kt</span></div><span></span></div>
+                    <div class="ph-strip" style="--fam: var(--color-phase-arrival)"><span class="phase arr">ARR</span><div class="cell"><span class="v strong">EZY82QT</span><span class="s">A21N · 14.0 NM</span></div><div class="cell r"><span class="v">FL 070 ↓</span><span class="s">241 kt</span></div><span class="heard t-caption num">◉ 27 s</span></div>
+                    <div class="ph-strip" style="--fam: var(--color-phase-departure)"><span class="phase dep">CLB</span><div class="cell"><span class="v strong">TVF61WB</span><span class="s">B738 · 15.3 NM</span></div><div class="cell r"><span class="v">5 800<span class="unit">ft</span> ↑</span><span class="s">212 kt</span></div><span></span></div>
+                    <div class="ph-strip" style="--fam: var(--color-phase-departure)"><span class="phase dep">DEP</span><div class="cell"><span class="v strong">BAW3HP</span><span class="s">A320 · 22.7 NM</span></div><div class="cell r"><span class="v">FL 210 ↑</span><span class="s">388 kt</span></div><span></span></div>
+                    <div class="ph-strip" style="--fam: var(--color-phase-unknown)"><span class="phase unk">NEW</span><div class="cell"><span class="v strong">3c4b21</span><span class="s">31.0 NM</span></div><div class="cell r"><span class="v">FL 160</span><span class="s">—</span></div><span></span></div>
+                    <div class="ph-strip" style="--fam: var(--color-phase-cruise)"><span class="phase crz">CRZ</span><div class="cell"><span class="v strong">DLH6TA</span><span class="s">A20N · 33.1 NM</span></div><div class="cell r"><span class="v">FL 370 ↔</span><span class="s">462 kt</span></div><span></span></div>
+                </div>
+                <div class="ph-tabs">
+                    <button><svg><use href="#i-map"/></svg>Map</button>
+                    <button><svg><use href="#i-par"/></svg>PAR</button>
+                    <button class="on"><svg><use href="#i-list"/></svg>List</button>
+                </div>
+                <div class="ph-radio">
+                    <div class="ph-all"><svg width="18" height="18"><use href="#i-spk"/></svg><span class="label" style="color:inherit">all</span></div>
+                    <div class="ph-tile on"><div class="spk c-accent"><svg><use href="#i-spk"/></svg></div><div class="txt"><span class="t-small strong">Approche De Gaulle</span><span class="t-caption num c2">124.350 · 8 s</span></div></div>
+                    <div class="ph-tile"><div class="spk c2"><svg><use href="#i-mute"/></svg></div><div class="txt"><span class="t-small c2">De Gaulle App. (L)</span><span class="t-caption num c3">126.425 · 1 min</span></div></div>
+                </div>
+            </div>
+        </div>
+        <p class="caption-under">Liste : une ligne de 56 px, toute la ligne est la cible ; quatre valeurs au lieu de six (cap et TAS cachés, comme depuis le 11/10) ; les filtres défilent sur une ligne.</p>
+    </div>
+
+    <!-- ======================================================== CARD -->
+    <div class="phone-wrap">
+        <div class="phone">
+            <div class="status-bar"><span>15:13</span><span class="t-caption">VPN</span></div>
+            <div class="pane" style="background: var(--color-surface-panel)">
+                <div class="ph-head" style="gap: var(--space-3)">
+                    <div style="display:flex; align-items:center; gap: var(--space-2); margin-left: calc(-1 * var(--space-2))">
+                        <button class="btn btn-quiet" style="padding: 0 var(--space-2)"><svg width="16" height="16"><use href="#i-back"/></svg>List</button>
+                    </div>
+                    <div style="display:flex; align-items:center; gap: var(--space-2)"><span class="phase arr">APP</span><span class="t-display mono">AFR47KX</span><span class="t-small c2">A320 · Air France</span></div>
+                    <div class="card-keys">
+                        <div><span class="label">Altitude</span><span class="v">2 400<span class="unit">ft</span> ↓</span></div>
+                        <div><span class="label">To LFPG 26L</span><span class="v">6.2<span class="unit">NM</span></span></div>
+                        <div><span class="label">Heading</span><span class="v">262°</span></div>
+                        <div><span class="label">Ground speed</span><span class="v">158<span class="unit">kt</span></span></div>
+                    </div>
+                </div>
+                <div class="tabs" style="padding: 0 var(--space-3)"><button class="on" style="height:44px">Timeline</button><button style="height:44px">Details</button><button style="height:44px">Tracks</button></div>
+                <div style="flex:1; overflow:hidden">
+                    <div class="tl-item"><span class="time">13:12:31</span><div class="body">
+                        <div class="row"><span class="chip atc">ATC</span><span class="c3">on</span><span class="mono c2">124.350</span><span class="strength s2"><i></i><i></i><i></i></span><button class="btn btn-icon" title="Play" style="margin-left:auto"><svg><use href="#i-play"/></svg></button></div>
+                        <p lang="fr">Air France quatre sept Kilo X-ray, autorisé ILS piste deux six gauche, contactez la tour un deux zéro décimal six cinq.</p>
+                        <div class="row"><span class="chip instr clr">Cleared ILS runway 26L</span><span class="chip instr">Contact 120.650</span></div></div></div>
+                    <div class="tl-item"><span class="time">13:08:47</span><div class="body"><div class="row"><span class="phase arr">APP</span><span class="c2">Approach, 12 NM from 26L</span></div></div></div>
+                    <div class="tl-item"><span class="time">13:04:12</span><div class="body">
+                        <div class="row"><span class="chip atc">ATC</span><span class="c3">on</span><span class="mono c2">124.350</span><span class="strength s3"><i></i><i></i><i></i></span><button class="btn btn-icon" title="Play" style="margin-left:auto"><svg><use href="#i-play"/></svg></button></div>
+                        <p lang="fr">Air France quatre sept Kilo X-ray, descendez quatre mille pieds, QNH un zéro un huit.</p>
+                        <div class="row"><span class="chip instr">Descend to 4000 ft</span><span class="chip instr">QNH 1018</span></div></div></div>
+                </div>
+                <div class="ph-tabs">
+                    <button><svg><use href="#i-map"/></svg>Map</button>
+                    <button><svg><use href="#i-par"/></svg>PAR</button>
+                    <button class="on"><svg><use href="#i-list"/></svg>List</button>
+                </div>
+                <div class="ph-radio">
+                    <div class="ph-all"><svg width="18" height="18"><use href="#i-spk"/></svg><span class="label" style="color:inherit">all</span></div>
+                    <div class="ph-tile on"><div class="spk c-accent"><svg><use href="#i-spk"/></svg></div><div class="txt"><span class="t-small strong">Approche De Gaulle</span><span class="t-caption num c2">124.350 · 8 s</span></div></div>
+                    <div class="ph-tile"><div class="spk c2"><svg><use href="#i-mute"/></svg></div><div class="txt"><span class="t-small c2">De Gaulle App. (L)</span><span class="t-caption num c3">126.425 · 1 min</span></div></div>
+                </div>
+            </div>
+        </div>
+        <p class="caption-under">Fiche : « ‹ List » en haut à gauche, à l'endroit où le pouce l'attend ; les quatre valeurs clés en deux colonnes ; la chronologie la plus récente en haut ; la réécoute en 44 px.</p>
+    </div>
+</div>
+<div class="notes" lang="fr">
+    <h2>À lire (hors interface)</h2>
+    <p>Mêmes jetons que le bureau, seconde densité (principe 9) : contrôles et cibles de 44 px, lignes de 56 px, texte aux mêmes cinq tailles. Indicatifs et géométrie inventés. Vue PAR au téléphone : celle du bureau, un cadre de piste par écran, non dessinée ici.</p>
+</div>
+</body>
+</html>

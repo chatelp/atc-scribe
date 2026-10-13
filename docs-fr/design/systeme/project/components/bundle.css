@@ -1,0 +1,512 @@
+/* Clairance components. Colours, type, spacing, radii, control sizes and
+   durations are tokens from tokens.json (the artifact's tokens.css, or
+   www/tokens.css after migration step 1); the literals left are the geometry
+   of marks (dots, badges, level bars, chip heights from 03-systeme.md) and the
+   column widths of a row. Classes carry the cl- prefix so
+   they never collide with Tailwind utilities or style.css in www/. States are
+   classes (is-on, is-selected...) so Alpine can bind them with :class. */
+
+.cl-root, .cl-root * { box-sizing: border-box; }
+.cl-root {
+    background: var(--color-surface-page); color: var(--color-text-primary);
+    font: var(--font-weight-regular) var(--font-size-small) / var(--font-line-height-small) var(--font-family-text);
+    -webkit-font-smoothing: antialiased;
+}
+/* the base reset weighs nothing (:where), so every cl- class wins over it */
+:where(.cl-root) :where(button, input) { font: inherit; color: inherit; }
+:where(.cl-root) :where(button) { background: none; border: 0; padding: 0; }
+.cl-mono { font-family: var(--font-family-mono); }
+.cl-num { font-family: var(--font-family-mono); font-variant-numeric: tabular-nums; }
+.cl-label {
+    font-size: var(--font-size-caption); line-height: var(--font-line-height-caption);
+    text-transform: uppercase; letter-spacing: var(--font-tracking-label); color: var(--color-text-secondary);
+}
+.cl-unit { font-size: var(--font-size-caption); color: var(--color-text-tertiary); margin-left: 2px; }
+.cl-plain { font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
+.cl-help { text-decoration: underline dotted var(--color-text-tertiary); text-underline-offset: 3px; cursor: help; }
+.cl-focus:focus-visible, .cl-root :focus-visible { outline: var(--border-width-strong) solid var(--color-border-focus); outline-offset: 2px; }
+
+/* ------------------------------------------------------------ Button */
+.cl-btn {
+    display: inline-flex; align-items: center; gap: var(--space-1-5);
+    height: var(--size-control-desk); padding: 0 var(--space-2);
+    border-radius: var(--radius-md); border: var(--border-width-default) solid var(--color-border-control);
+    background: transparent; color: var(--color-text-primary); cursor: pointer;
+    font-family: var(--font-family-text); font-size: var(--font-size-small); white-space: nowrap;
+    transition: background var(--motion-duration-fast) var(--motion-easing-standard);
+}
+.cl-btn:hover { background: var(--color-surface-hover); }
+.cl-btn.cl-mono { font-family: var(--font-family-mono); }
+.cl-btn--primary { background: var(--color-accent-fill); border-color: var(--color-accent-fill); color: var(--color-text-on-accent); font-weight: var(--font-weight-strong); }
+.cl-btn--primary:hover { background: var(--color-accent-fill); filter: brightness(0.92); }
+.cl-btn--quiet { border-color: transparent; color: var(--color-text-secondary); }
+.cl-btn--quiet:hover { color: var(--color-text-primary); }
+.cl-btn--icon { width: var(--size-target-desk); padding: 0; justify-content: center; color: var(--color-text-secondary); border-color: var(--color-border-default); }
+.cl-btn--icon:hover { color: var(--color-text-primary); }
+.cl-btn--icon svg { width: 14px; height: 14px; }
+.cl-btn:disabled { color: var(--color-text-disabled); border-color: var(--color-border-subtle); background: transparent; cursor: default; filter: none; }
+@media (max-width: 767px) { .cl-btn { height: var(--size-control-touch); } .cl-btn--icon { width: var(--size-target-touch); } }
+
+/* ------------------------------------------------------------ FilterToggle */
+.cl-toggle {
+    display: inline-flex; align-items: center; gap: var(--space-1);
+    height: var(--size-control-desk); padding: 0 var(--space-2);
+    border-radius: var(--radius-md); border: var(--border-width-default) solid var(--color-border-control);
+    color: var(--color-text-secondary); background: transparent; cursor: pointer; font-size: var(--font-size-small);
+}
+.cl-toggle:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+.cl-toggle.is-on { background: var(--color-surface-selected); border-color: var(--color-accent-default); color: var(--color-accent-strong); }
+.cl-toggle__count { font-family: var(--font-family-mono); font-size: var(--font-size-caption); color: var(--color-text-tertiary); }
+.cl-toggle.is-on .cl-toggle__count { color: var(--color-accent-strong); }
+
+/* ------------------------------------------------------------ Checkbox, Switch */
+.cl-check { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; }
+.cl-check__box { width: 14px; height: 14px; border-radius: var(--radius-sm); border: var(--border-width-default) solid var(--color-border-control); display: inline-grid; place-items: center; flex: none; }
+.cl-check.is-on .cl-check__box { background: var(--color-accent-default); border-color: var(--color-accent-default); }
+.cl-check.is-on .cl-check__box::after { content: ""; width: 7px; height: 4px; border: 2px solid var(--color-text-on-accent); border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+.cl-switch { width: 28px; height: 16px; border-radius: var(--radius-full); background: var(--color-border-control); position: relative; display: inline-block; flex: none; }
+.cl-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--color-surface-page); transition: left var(--motion-duration-fast) var(--motion-easing-standard); }
+.cl-switch.is-on { background: var(--color-accent-default); }
+.cl-switch.is-on::after { left: 14px; background: var(--color-text-on-accent); }
+
+/* ------------------------------------------------------------ Tabs */
+.cl-tabs { display: flex; align-items: stretch; gap: var(--space-4); border-bottom: var(--border-width-default) solid var(--color-border-default); }
+.cl-tabs__tab {
+    display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-1-5) 0;
+    border: 0; background: none; cursor: pointer; color: var(--color-text-secondary); font-size: var(--font-size-small);
+    border-bottom: var(--border-width-strong) solid transparent; margin-bottom: -1px;
+}
+.cl-tabs__tab:hover { color: var(--color-text-primary); }
+.cl-tabs__tab[aria-selected="true"] { color: var(--color-text-primary); border-bottom-color: var(--color-accent-default); }
+.cl-tabs__count { font-family: var(--font-family-mono); font-size: var(--font-size-caption); color: var(--color-text-tertiary); }
+/* the context column's header: larger tabs, a fold button at the end */
+.cl-tabs--column { height: var(--size-tabs-head); padding: 0 var(--space-2) 0 var(--space-4); gap: var(--space-4); }
+.cl-tabs--column .cl-tabs__tab { font-size: var(--font-size-body); padding: 0; }
+.cl-tabs--column .cl-tabs__tab[aria-selected="true"] { font-weight: var(--font-weight-strong); }
+.cl-tabs__end { margin-left: auto; align-self: center; }
+
+/* ------------------------------------------------------------ SegmentedControl */
+.cl-seg { display: inline-flex; border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); background: var(--color-surface-panel); padding: var(--space-0-5); gap: var(--space-0-5); }
+.cl-seg__item {
+    height: var(--size-target-desk); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent;
+    color: var(--color-text-secondary); font-size: var(--font-size-small); cursor: pointer; display: inline-flex; align-items: center; gap: var(--space-1);
+}
+.cl-seg__item:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+.cl-seg__item[aria-pressed="true"] { background: var(--color-surface-selected); color: var(--color-accent-strong); }
+
+/* ------------------------------------------------------------ SearchField */
+.cl-input {
+    height: var(--size-control-large); padding: 0 var(--space-2); width: 100%;
+    background: var(--color-surface-page); border: var(--border-width-default) solid var(--color-border-control);
+    border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-small);
+}
+.cl-input::placeholder { color: var(--color-text-tertiary); }
+
+/* ------------------------------------------------------------ Slider, AltitudeRange */
+.cl-slider { position: relative; height: 24px; display: flex; align-items: center; }
+.cl-slider__rail { position: absolute; left: 0; right: 0; height: 2px; background: var(--color-border-control); border-radius: 1px; }
+.cl-slider__fill { position: absolute; height: 2px; background: var(--color-accent-default); border-radius: 1px; }
+.cl-slider__thumb { position: absolute; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--color-text-primary); box-shadow: 0 0 0 1px var(--color-accent-default); }
+.cl-altrange { display: flex; flex-direction: column; gap: var(--space-0-5); }
+.cl-altrange__head { display: flex; justify-content: space-between; align-items: baseline; }
+.cl-altrange__value { font-family: var(--font-family-mono); font-size: var(--font-size-small); color: var(--color-text-primary); }
+.cl-altrange__value small { font-size: inherit; color: var(--color-text-tertiary); }
+.cl-altrange__histo { display: flex; align-items: flex-end; gap: 2px; height: 18px; }
+.cl-altrange__histo i { flex: 1; background: var(--color-surface-hover); }
+.cl-altrange__histo i.is-in { background: var(--color-accent-default); opacity: 0.4; }
+.cl-altrange__marks { display: flex; justify-content: space-between; font-family: var(--font-family-mono); font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); }
+
+/* ------------------------------------------------------------ StatusLight */
+.cl-light { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); color: var(--color-text-secondary); white-space: nowrap; }
+.cl-light::before { content: ""; width: 8px; height: 8px; flex: none; }
+.cl-light--ok::before { background: var(--color-status-ok); border-radius: 50%; }
+.cl-light--warn::before { width: 9px; background: var(--color-status-warn); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.cl-light--bad::before { background: var(--color-status-urgent); border-radius: 1px; }
+.cl-light--unknown::before { border: 1.5px solid var(--color-status-unknown); border-radius: 50%; }
+.cl-light--off::before { height: 2px; background: var(--color-text-tertiary); }
+.cl-light--switching::before { border-radius: 50%; background: linear-gradient(90deg, var(--color-status-ok) 50%, transparent 50%); box-shadow: inset 0 0 0 1.5px var(--color-status-ok); }
+.cl-light--bad { color: var(--color-text-primary); }
+
+/* ------------------------------------------------------------ Counter, UrgentBadge */
+.cl-counter {
+    display: inline-block; min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--radius-full);
+    background: var(--color-accent-fill); color: var(--color-text-on-accent); text-align: center;
+    font: var(--font-weight-strong) var(--font-size-caption) / 16px var(--font-family-mono);
+}
+.cl-counter--urgent { background: var(--color-status-urgent-fill); color: var(--color-text-on-urgent); box-shadow: 0 0 0 1px var(--color-status-urgent); }
+.cl-urgent-badge {
+    display: inline-flex; align-items: center; gap: var(--space-1); height: 18px; padding: 0 var(--space-1-5);
+    background: var(--color-status-urgent-fill); color: var(--color-text-on-urgent);
+    border: var(--border-width-default) solid var(--color-status-urgent); border-radius: var(--radius-sm);
+    font: var(--font-weight-strong) var(--font-size-caption) / 1 var(--font-family-mono);
+}
+.cl-urgent-badge::before { content: "■"; }
+.cl-squawk { font: var(--font-weight-strong) var(--font-size-caption) / 1 var(--font-family-mono); color: var(--color-status-urgent); }
+
+/* ------------------------------------------------------------ PhaseBadge */
+.cl-phase {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 16px; padding: 0 var(--space-1);
+    font: var(--font-weight-strong) var(--font-size-caption) / 1 var(--font-family-mono);
+    border-radius: var(--radius-sm); border: var(--border-width-default) solid currentColor; background: var(--color-surface-raised);
+}
+.cl-phase--gnd { color: var(--color-phase-ground); }
+.cl-phase--dep { color: var(--color-phase-departure); }
+.cl-phase--crz { color: var(--color-phase-cruise); }
+.cl-phase--arr { color: var(--color-phase-arrival); }
+.cl-phase--unk { color: var(--color-phase-unknown); }
+.cl-phase--fill { color: var(--color-text-on-warn); border-color: transparent; }
+.cl-phase--fill.cl-phase--dep { background: var(--color-phase-departure); }
+.cl-phase--fill.cl-phase--arr { background: var(--color-phase-arrival); }
+.cl-phase--small { min-width: 26px; height: 14px; }
+.cl-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.cl-dot--gnd { background: var(--color-phase-ground); }
+.cl-dot--dep { background: var(--color-phase-departure); }
+.cl-dot--crz { background: var(--color-phase-cruise); }
+.cl-dot--arr { background: var(--color-phase-arrival); }
+.cl-dot--unk { background: var(--color-phase-unknown); }
+
+/* ------------------------------------------------------------ Chips */
+.cl-chip {
+    display: inline-flex; align-items: center; gap: var(--space-1); height: 20px; padding: 0 var(--space-1-5);
+    border-radius: var(--radius-md); border: var(--border-width-default) solid var(--color-border-default);
+    background: var(--color-surface-raised); font-size: var(--font-size-small); white-space: nowrap; color: var(--color-text-primary);
+}
+.cl-chip--callsign { font-family: var(--font-family-mono); font-weight: var(--font-weight-strong); cursor: pointer; }
+.cl-chip--callsign:hover { border-color: var(--color-border-control); }
+.cl-chip--callsign.is-selected { border-color: var(--color-accent-default); }
+.cl-chip--callsign.is-away { color: var(--color-text-tertiary); border-style: dashed; cursor: default; font-weight: var(--font-weight-regular); }
+.cl-chip--callsign.is-guess { border-color: var(--color-status-warn); font-weight: var(--font-weight-regular); }
+.cl-chip--instr { border-color: var(--color-border-subtle); }
+.cl-chip--clearance { font-weight: var(--font-weight-strong); }
+.cl-chip--clearance::before { content: "✓"; color: var(--color-text-secondary); }
+.cl-chip--atc { height: 18px; padding: 0 var(--space-1); background: transparent; border-color: var(--color-border-control); color: var(--color-text-secondary); font-size: var(--font-size-caption); letter-spacing: var(--font-tracking-label); }
+.cl-value { font-family: var(--font-family-mono); font-size: var(--font-size-small); color: var(--color-text-primary); white-space: nowrap; }
+
+/* ------------------------------------------------------------ MatchStrength */
+.cl-strength { display: inline-flex; gap: 2px; align-items: flex-end; height: 10px; }
+.cl-strength i { width: 3px; background: var(--color-border-control); border-radius: 1px; }
+.cl-strength i:nth-child(1) { height: 5px; } .cl-strength i:nth-child(2) { height: 7px; } .cl-strength i:nth-child(3) { height: 10px; }
+.cl-strength--1 i:nth-child(1) { background: var(--color-status-warn); }
+.cl-strength--2 i:nth-child(-n+2), .cl-strength--3 i { background: var(--color-text-secondary); }
+
+/* ------------------------------------------------------------ LevelMeter */
+.cl-level { display: inline-flex; gap: 2px; align-items: center; height: 14px; }
+.cl-level i { width: 2px; background: var(--color-accent-default); }
+
+/* ------------------------------------------------------------ ChannelButton */
+.cl-channel {
+    display: inline-flex; align-items: center; gap: var(--space-2); height: var(--size-control-large); padding: 0 var(--space-2);
+    border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md);
+    background: var(--color-surface-panel); color: var(--color-text-secondary); font-size: var(--font-size-small); cursor: pointer; white-space: nowrap;
+}
+.cl-channel:hover { background: var(--color-surface-hover); }
+.cl-channel__freq { font-family: var(--font-family-mono); }
+.cl-channel__age { font-family: var(--font-family-mono); font-size: var(--font-size-caption); color: var(--color-text-tertiary); }
+.cl-channel svg { width: 14px; height: 14px; flex: none; }
+.cl-channel.is-on { border-color: var(--color-accent-default); color: var(--color-text-primary); }
+.cl-channel.is-on svg { color: var(--color-accent-default); }
+.cl-channel.is-off-air { border-style: dashed; color: var(--color-text-tertiary); cursor: default; background: transparent; }
+.cl-channel.is-failed { border-color: var(--color-status-urgent); color: var(--color-text-primary); }
+.cl-channel__status { font-size: var(--font-size-caption); }
+.cl-channel.is-failed .cl-channel__status { color: var(--color-status-urgent); }
+.cl-channel.is-connecting .cl-channel__status { color: var(--color-status-warn); }
+
+/* ------------------------------------------------------------ Exchange */
+.cl-exchange { display: flex; flex-direction: column; gap: var(--space-1-5); padding: var(--space-2) var(--space-3); border-bottom: var(--border-width-default) solid var(--color-border-subtle); background: var(--color-surface-panel); }
+.cl-exchange__head { display: flex; align-items: center; gap: var(--space-1-5); flex-wrap: wrap; }
+.cl-exchange__when { font-family: var(--font-family-mono); font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); }
+.cl-exchange__to { color: var(--color-text-tertiary); }
+.cl-exchange__play { margin-left: auto; width: var(--size-target-desk); height: var(--size-target-desk); border: 0; background: none; color: var(--color-text-secondary); display: inline-grid; place-items: center; border-radius: var(--radius-md); cursor: pointer; }
+.cl-exchange__play:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+.cl-exchange__text { margin: 0; font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
+.cl-exchange__instr { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+.cl-exchange__explain { font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
+.cl-exchange__explain--boxed { padding: var(--space-2) var(--space-3); background: var(--color-surface-raised); border-radius: var(--radius-md); }
+.cl-exchange__reply { display: flex; gap: var(--space-1-5); font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
+.cl-exchange__reply q { color: var(--color-text-primary); }
+.cl-exchange.is-selected { background: var(--color-surface-selected); box-shadow: inset var(--border-width-strong) 0 0 var(--color-accent-default); }
+.cl-exchange.is-unmatched .cl-exchange__text { color: var(--color-text-secondary); }
+.cl-exchange.is-urgent { background: var(--color-surface-urgent); box-shadow: inset var(--border-width-strong) 0 0 var(--color-status-urgent); }
+.cl-exchange.is-urgent .cl-exchange__text { font-weight: var(--font-weight-strong); }
+.cl-exchange.is-live { border-bottom: 0; }
+/* the wide thread (column folded): who on the left, what on the right */
+.cl-exchange--wide { display: grid; grid-template-columns: 72px 1fr; column-gap: var(--space-3); padding: var(--space-3) var(--space-4); }
+.cl-exchange__who { display: flex; flex-direction: column; gap: var(--space-1); }
+.cl-exchange__what { display: flex; flex-direction: column; gap: var(--space-1-5); min-width: 0; }
+
+/* ------------------------------------------------------------ AircraftStrip */
+.cl-strip {
+    position: relative; display: grid; grid-template-columns: 36px 1fr 86px 40px 44px; column-gap: var(--space-2); align-items: center;
+    height: var(--size-row-desk); padding: 0 var(--space-2) 0 var(--space-4); border-bottom: var(--border-width-default) solid var(--color-border-subtle);
+    background: var(--color-surface-panel); cursor: pointer;
+}
+.cl-strip::before { content: ""; position: absolute; left: 4px; top: 7px; bottom: 7px; width: 3px; border-radius: 2px; background: var(--cl-fam, var(--color-phase-unknown)); }
+.cl-strip:hover { background: var(--color-surface-hover); }
+.cl-strip__col { display: flex; flex-direction: column; min-width: 0; }
+.cl-strip__col--end { align-items: flex-end; text-align: right; }
+.cl-strip__v { font-family: var(--font-family-mono); font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); white-space: nowrap; }
+.cl-strip__v--callsign { font-weight: var(--font-weight-strong); }
+.cl-strip__s { font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl-strip__heard { color: var(--color-accent-default); }
+.cl-strip.is-selected { background: var(--color-surface-selected); box-shadow: inset 0 0 0 1px var(--color-accent-default); }
+.cl-strip.is-lost .cl-strip__v { color: var(--color-text-tertiary); }
+.cl-strip.is-urgent { background: var(--color-surface-urgent); }
+.cl-strip--gnd { --cl-fam: var(--color-phase-ground); }
+.cl-strip--dep { --cl-fam: var(--color-phase-departure); }
+.cl-strip--crz { --cl-fam: var(--color-phase-cruise); }
+.cl-strip--arr { --cl-fam: var(--color-phase-arrival); }
+.cl-strip--unk { --cl-fam: var(--color-phase-unknown); }
+@media (max-width: 767px) { .cl-strip { height: var(--size-row-touch); } }
+
+/* ------------------------------------------------------------ ArrivalSequence (a table) */
+.cl-table { width: 100%; border-collapse: collapse; font-family: var(--font-family-mono); font-size: var(--font-size-small); line-height: var(--font-line-height-small); }
+.cl-table th { text-align: left; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-text); text-transform: uppercase; letter-spacing: var(--font-tracking-label); color: var(--color-text-secondary); padding: 0 var(--space-2) var(--space-1) 0; }
+.cl-table td { padding: var(--space-1) var(--space-2) var(--space-1) 0; border-top: var(--border-width-default) solid var(--color-border-subtle); color: var(--color-text-primary); white-space: nowrap; }
+.cl-table .is-num { text-align: right; }
+.cl-table .is-dim { color: var(--color-text-tertiary); }
+.cl-table tr:hover td { background: var(--color-surface-hover); }
+.cl-table .is-tight { color: var(--color-status-warn); }
+
+/* ------------------------------------------------------------ SummarySentence */
+.cl-summary { margin: 0; font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
+.cl-summary b { font-family: var(--font-family-mono); font-weight: var(--font-weight-strong); }
+.cl-summary__source { margin: var(--space-1) 0 0; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
+
+/* ------------------------------------------------------------ EventList (Worth knowing) */
+.cl-events { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.cl-events li { display: flex; gap: var(--space-2); font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-primary); }
+.cl-events time { font-family: var(--font-family-mono); color: var(--color-text-tertiary); flex: none; }
+.cl-events .is-warn { color: var(--color-status-warn); }
+
+/* ------------------------------------------------------------ Section (a block of a column) */
+.cl-section { padding: var(--space-3) var(--space-4); border-bottom: var(--border-width-default) solid var(--color-border-default); display: flex; flex-direction: column; gap: var(--space-2); }
+.cl-stats { display: flex; gap: var(--space-4); font-size: var(--font-size-small); color: var(--color-text-secondary); }
+.cl-stats b { font: var(--font-weight-regular) var(--font-size-body) / 1 var(--font-family-mono); color: var(--color-text-primary); }
+
+/* ------------------------------------------------------------ AircraftStory */
+.cl-story__head { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: var(--border-width-default) solid var(--color-border-default); }
+.cl-story__id { display: flex; align-items: center; gap: var(--space-2); }
+.cl-story__callsign { font: var(--font-weight-strong) var(--font-size-display) / var(--font-line-height-display) var(--font-family-mono); }
+.cl-story__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2) var(--space-3); }
+.cl-story__val { font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-body) var(--font-family-mono); }
+.cl-story__events { list-style: none; margin: 0; padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
+.cl-story__events li { display: grid; grid-template-columns: 44px 12px 1fr; gap: var(--space-1-5); font-size: var(--font-size-small); line-height: var(--font-line-height-small); }
+.cl-story__events time { font-family: var(--font-family-mono); color: var(--color-text-tertiary); }
+.cl-story__events i { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; background: var(--color-border-control); }
+.cl-story__events i.is-radio { background: var(--color-status-info); }
+.cl-story__events i.is-now { background: var(--color-accent-default); }
+.cl-story__events li.is-next { color: var(--color-text-secondary); }
+.cl-story__events li.is-next i { background: transparent; box-shadow: inset 0 0 0 1px var(--color-border-control); }
+
+/* ------------------------------------------------------------ MapLabel */
+.cl-maplabel { display: inline-flex; flex-direction: column; gap: var(--space-0-5); padding: var(--space-0-5) var(--space-1-5); background: color-mix(in srgb, var(--color-surface-page) 85%, transparent); border: var(--border-width-default) solid transparent; border-radius: var(--radius-md); font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); color: var(--color-text-secondary); white-space: nowrap; }
+.cl-maplabel b { font-weight: var(--font-weight-strong); color: var(--color-text-primary); }
+.cl-maplabel.is-selected { border-color: var(--color-accent-default); }
+.cl-maplabel__ph--gnd { color: var(--color-phase-ground); } .cl-maplabel__ph--dep { color: var(--color-phase-departure); }
+.cl-maplabel__ph--crz { color: var(--color-phase-cruise); } .cl-maplabel__ph--arr { color: var(--color-phase-arrival); } .cl-maplabel__ph--unk { color: var(--color-phase-unknown); }
+
+/* ------------------------------------------------------------ ParFrame (the frame drawn by www/par/par-view.js) */
+.cl-parframe { background: var(--color-surface-page); border-top: var(--border-width-default) solid var(--color-border-default); padding: var(--space-2) var(--space-2) var(--space-1-5); display: flex; flex-direction: column; gap: var(--space-1); }
+.cl-parframe__head { display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-family-mono); font-size: var(--font-size-small); }
+.cl-parframe__inuse { height: 16px; padding: 0 var(--space-1); border: var(--border-width-default) solid var(--color-accent-default); border-radius: var(--radius-sm); color: var(--color-accent-default); font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); }
+.cl-parframe svg { display: block; width: 100%; height: auto; }
+
+/* ------------------------------------------------------------ Panel, FloatingCard, Popover */
+.cl-panel { background: var(--color-surface-panel); border: var(--border-width-default) solid var(--color-border-default); }
+.cl-panel__head { height: var(--size-panel-head); display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); border-bottom: var(--border-width-default) solid var(--color-border-default); }
+.cl-panel__title { font-size: var(--font-size-title); line-height: var(--font-line-height-title); font-weight: var(--font-weight-strong); margin: 0; }
+.cl-card { background: var(--color-surface-raised); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-1-5); }
+
+/* ------------------------------------------------------------ HelpBubble */
+.cl-bubble { max-width: 280px; padding: var(--space-2) var(--space-3); background: var(--color-surface-raised); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); box-shadow: var(--shadow-overlay); z-index: var(--z-popover); }
+.cl-bubble__title { display: block; margin-bottom: var(--space-1); }
+.cl-bubble p { margin: 0; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-primary); }
+
+/* ------------------------------------------------------------ EmptyState, ErrorBanner */
+.cl-empty { display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-4); color: var(--color-text-secondary); font-size: var(--font-size-small); line-height: var(--font-line-height-small); }
+.cl-empty svg { width: 16px; height: 16px; color: var(--color-text-tertiary); flex: none; margin-top: 2px; }
+.cl-banner { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--color-surface-urgent); box-shadow: inset var(--border-width-strong) 0 0 var(--color-status-urgent); font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
+.cl-banner::before { content: "■"; color: var(--color-status-urgent); }
+.cl-inline-error { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-small); color: var(--color-text-primary); }
+.cl-inline-error::before { content: "■"; color: var(--color-status-urgent); }
+
+/* ------------------------------------------------------------ TopBar */
+.cl-topbar { height: var(--size-bar); display: flex; align-items: center; gap: var(--space-4); padding: 0 var(--space-4); background: var(--color-surface-panel); border-bottom: var(--border-width-default) solid var(--color-border-default); }
+.cl-topbar__brand { display: flex; align-items: center; gap: var(--space-2); font: var(--font-weight-strong) var(--font-size-body) / 1 var(--font-family-mono); color: var(--color-text-primary); }
+.cl-topbar__brand svg { width: 20px; height: 20px; }
+.cl-topbar__utc { margin-left: auto; font: var(--font-weight-strong) var(--font-size-body) / 1 var(--font-family-mono); color: var(--color-accent-default); }
+.cl-topbar__local { font: var(--font-weight-regular) var(--font-size-small) / 1 var(--font-family-mono); color: var(--color-text-tertiary); }
+
+/* ------------------------------------------------------------ AppShell: the screen's layout (A, B, C) */
+.cl-app { height: 100%; display: flex; flex-direction: column; background: var(--color-surface-page); }
+.cl-app__main { flex: 1; min-height: 0; display: flex; }
+.cl-app__thread { flex: 0 1 440px; min-width: 320px; display: flex; flex-direction: column; background: var(--color-surface-panel); border-right: var(--border-width-default) solid var(--color-border-default); }
+.cl-app__sky { flex: 1 1 420px; min-width: 0; position: relative; background: var(--color-surface-map); overflow: hidden; }
+.cl-app__column { flex: 0 1 380px; min-width: 300px; display: flex; flex-direction: column; background: var(--color-surface-panel); border-left: var(--border-width-default) solid var(--color-border-default); overflow: hidden; }
+.cl-app.is-folded .cl-app__thread { flex-basis: 640px; }
+.cl-app.is-folded .cl-app__column { display: none; }
+.cl-app__scroll { flex: 1; min-height: 0; overflow: hidden; }
+.cl-app__bottom { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.cl-sky__top { position: absolute; top: var(--space-3); left: var(--space-3); right: var(--space-3); display: flex; gap: var(--space-2); align-items: flex-start; z-index: var(--z-map-overlay); }
+.cl-sky__end { margin-left: auto; display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-end; }
+.cl-sky__corner { position: absolute; bottom: var(--space-3); right: var(--space-3); display: flex; gap: var(--space-1-5); z-index: var(--z-map-overlay); }
+.cl-sky__note { padding: var(--space-1-5) var(--space-2); background: color-mix(in srgb, var(--color-surface-page) 85%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); font-size: var(--font-size-small); color: var(--color-text-secondary); }
+.cl-sky__note b { font-family: var(--font-family-mono); color: var(--color-text-primary); font-weight: var(--font-weight-regular); }
+.cl-sky > svg.cl-sky__map { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------ ThreadHead: title, listen to all, channels, search */
+.cl-threadhead { padding: var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); border-bottom: var(--border-width-default) solid var(--color-border-default); }
+.cl-threadhead__row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.cl-threadhead__title { margin: 0; font-size: var(--font-size-title); line-height: var(--font-line-height-title); font-weight: var(--font-weight-strong); }
+.cl-threadhead__end { margin-left: auto; display: flex; gap: var(--space-1-5); align-items: center; }
+
+/* ChannelButton, split: the frequency toggles listening, the caret opens its menu */
+.cl-channel--split { padding: 0; gap: 0; cursor: default; }
+.cl-channel--split:hover { background: var(--color-surface-panel); }
+.cl-channel__main { display: inline-flex; align-items: center; gap: var(--space-2); height: 100%; padding: 0 var(--space-2); border-radius: var(--radius-md) 0 0 var(--radius-md); color: inherit; cursor: pointer; }
+.cl-channel__main:hover { background: var(--color-surface-hover); }
+.cl-channel__caret { height: 100%; width: var(--size-target-desk); display: inline-grid; place-items: center; border: 0; border-left: var(--border-width-default) solid var(--color-border-default); background: none; color: var(--color-text-secondary); cursor: pointer; border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.cl-channel__caret:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+.cl-channel.is-on .cl-channel__caret { border-left-color: var(--color-accent-default); }
+.cl-channel.is-menu-open .cl-channel__caret { background: var(--color-surface-hover); color: var(--color-text-primary); }
+
+/* ChannelMenu: one frequency's popover */
+.cl-menu { width: 280px; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); background: var(--color-surface-raised); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay); z-index: var(--z-popover); }
+.cl-menu__head { display: flex; align-items: baseline; gap: var(--space-2); }
+.cl-menu__title { font-size: var(--font-size-small); font-weight: var(--font-weight-strong); }
+.cl-menu__row { display: flex; align-items: center; gap: var(--space-2); }
+.cl-menu__row .cl-slider { flex: 1; }
+.cl-menu__sep { height: 1px; background: var(--color-border-default); margin: 0 calc(-1 * var(--space-3)); }
+
+/* NewBelow: the thread was scrolled up and new exchanges came */
+.cl-newbelow { align-self: center; margin: var(--space-2) 0; display: inline-flex; align-items: center; gap: var(--space-1-5); height: var(--size-control-desk); padding: 0 var(--space-3); border-radius: var(--radius-full); border: var(--border-width-default) solid var(--color-accent-default); background: var(--color-surface-selected); color: var(--color-accent-strong); font-size: var(--font-size-small); cursor: pointer; }
+
+/* Weather: METAR in one line, TAF and NOTAM behind their buttons */
+.cl-metar { font-family: var(--font-family-mono); font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-primary); }
+.cl-metar__plain { font-family: var(--font-family-text); color: var(--color-text-secondary); }
+
+/* ResumeBanner: the browser waits for a click before it plays sound */
+.cl-resume { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--color-surface-raised); border: var(--border-width-default) solid var(--color-accent-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay); font-size: var(--font-size-body); }
+.cl-resume svg { width: 20px; height: 20px; flex: none; }
+
+/* ------------------------------------------------------------ small helpers */
+.cl-row { display: flex; align-items: center; gap: var(--space-1-5); flex-wrap: wrap; }
+.cl-warn { color: var(--color-status-warn); }
+.cl-card--sky { width: 320px; }
+.cl-tabs--inset { padding: 0 var(--space-3); }
+.cl-card > .cl-btn { align-self: flex-start; }
+
+/* ------------------------------------------------------------ Popover rows (map controls, menus) */
+.cl-menu--wide { width: 300px; }
+.cl-menu__label { flex: 1; min-width: 0; }
+.cl-menu__row .cl-slider--short { flex: 0 0 72px; }
+.cl-menu__group { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* ------------------------------------------------------------ KeyValues: label / value pairs (details, popups) */
+.cl-kv { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-3); margin: 0; font-size: var(--font-size-small); line-height: var(--font-line-height-small); }
+.cl-kv dt { color: var(--color-text-secondary); }
+.cl-kv dd { margin: 0; font-family: var(--font-family-mono); color: var(--color-text-primary); }
+.cl-kv dd.is-none { color: var(--color-text-tertiary); }
+
+/* ------------------------------------------------------------ Disclosure: a section that folds */
+.cl-disclosure { display: flex; align-items: center; gap: var(--space-1-5); width: 100%; height: var(--size-control-desk); color: var(--color-text-secondary); cursor: pointer; text-align: left; }
+.cl-disclosure::before { content: "▸"; font-size: var(--font-size-caption); color: var(--color-text-tertiary); }
+.cl-disclosure[aria-expanded="true"]::before { content: "▾"; }
+.cl-disclosure:hover { color: var(--color-text-primary); }
+
+/* ------------------------------------------------------------ Badge: a tiny code on a row (LP, S, a followed airport) */
+.cl-badge { display: inline-flex; align-items: center; height: 14px; padding: 0 3px; border: var(--border-width-default) solid var(--color-border-control); border-radius: var(--radius-sm); font: var(--font-weight-strong) var(--font-size-caption) / 1 var(--font-family-mono); color: var(--color-text-secondary); }
+.cl-age { font-family: var(--font-family-mono); font-size: var(--font-size-caption); color: var(--color-text-tertiary); }
+
+/* ------------------------------------------------------------ EventLog: the bell's list */
+.cl-events .is-urgent { color: var(--color-status-urgent); }
+.cl-events .is-info { color: var(--color-status-info); }
+.cl-events li.is-clickable { cursor: pointer; }
+
+/* ------------------------------------------------------------ ParHead: the PAR view's header */
+.cl-parhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); padding: 60px var(--space-4) var(--space-2); font-size: var(--font-size-small); color: var(--color-text-primary); }
+.cl-parhead__airport { font: var(--font-weight-strong) var(--font-size-title) / 1 var(--font-family-mono); color: var(--color-accent-default); }
+.cl-parhead__sep { color: var(--color-text-tertiary); }
+.cl-parhead b { font-family: var(--font-family-mono); font-weight: var(--font-weight-strong); }
+.cl-link { color: var(--color-accent-strong); text-decoration: none; border: var(--border-width-default) solid var(--color-accent-default); border-radius: var(--radius-sm); padding: 0 var(--space-1); font-size: var(--font-size-caption); }
+.cl-link:hover { background: var(--color-surface-selected); }
+.cl-parview { position: absolute; inset: 0; overflow: hidden; background: var(--color-surface-page); z-index: var(--z-map-overlay); }
+.cl-parview .cl-parframe { margin: 0 var(--space-4) var(--space-3); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); }
+.cl-parview .cl-parframe.is-in-use { border-color: var(--color-accent-default); }
+.cl-parview .cl-table { margin-top: var(--space-2); }
+
+/* ------------------------------------------------------------ Page (settings): over the screen, one column */
+.cl-page { position: absolute; inset: 0; z-index: var(--z-page); background: var(--color-scrim); display: flex; justify-content: center; }
+.cl-page__inner { width: 100%; max-width: 900px; height: 100%; display: grid; grid-template-columns: 200px 1fr; background: var(--color-surface-page); border-left: var(--border-width-default) solid var(--color-border-default); border-right: var(--border-width-default) solid var(--color-border-default); }
+.cl-page__nav { padding: var(--space-6) var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); border-right: var(--border-width-default) solid var(--color-border-default); }
+.cl-page__nav a { color: var(--color-text-secondary); text-decoration: none; font-size: var(--font-size-small); padding: var(--space-1) var(--space-2); border-radius: var(--radius-md); }
+.cl-page__nav a[aria-current="true"] { background: var(--color-surface-selected); color: var(--color-accent-strong); }
+.cl-page__body { overflow: hidden; display: flex; flex-direction: column; }
+.cl-page__head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-bottom: var(--border-width-default) solid var(--color-border-default); }
+.cl-page__title { margin: 0; font-size: var(--font-size-display); line-height: var(--font-line-height-display); font-weight: var(--font-weight-strong); }
+.cl-page__section { padding: var(--space-4) var(--space-6); display: flex; flex-direction: column; gap: var(--space-3); border-bottom: var(--border-width-default) solid var(--color-border-subtle); max-width: 640px; }
+.cl-page__section h3 { margin: 0; font-size: var(--font-size-title); line-height: var(--font-line-height-title); font-weight: var(--font-weight-strong); }
+.cl-field { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-4); align-items: center; }
+.cl-field__label { font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
+.cl-field__help { grid-column: 1 / -1; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
+.cl-select { height: var(--size-control-large); padding: 0 var(--space-2); background: var(--color-surface-page); border: var(--border-width-default) solid var(--color-border-control); border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-small); }
+
+/* ------------------------------------------------------------ SignIn: the first page */
+.cl-signin { height: 100%; display: grid; place-items: center; background: var(--color-surface-page); }
+.cl-signin__card { width: 360px; padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); background: var(--color-surface-panel); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); }
+.cl-signin__mark { display: flex; align-items: center; gap: 10px; font: var(--font-weight-strong) 26px / 1 var(--font-family-mono); color: var(--color-text-primary); }
+.cl-signin__mark svg { width: 40px; height: 40px; }
+.cl-signin__field { display: flex; flex-direction: column; gap: var(--space-1); }
+.cl-signin .cl-btn--primary { height: var(--size-control-large); justify-content: center; }
+
+/* ------------------------------------------------------------ Phone: one pane at a time, tabs at the bottom */
+.cl-phone { width: 390px; height: 844px; display: flex; flex-direction: column; background: var(--color-surface-page); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); overflow: hidden; }
+.cl-phone__bar { height: var(--size-target-touch); flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); background: var(--color-surface-panel); border-bottom: var(--border-width-default) solid var(--color-border-default); }
+.cl-phone__bar svg { width: 20px; height: 20px; }
+.cl-phone__pane { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--color-surface-panel); position: relative; }
+.cl-tabbar { height: 56px; flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--color-surface-panel); border-top: var(--border-width-default) solid var(--color-border-default); }
+.cl-tabbar__tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--color-text-secondary); font-size: var(--font-size-caption); cursor: pointer; }
+.cl-tabbar__tab svg { width: 18px; height: 18px; }
+.cl-tabbar__tab[aria-selected="true"] { color: var(--color-accent-strong); box-shadow: inset 0 var(--border-width-strong) 0 var(--color-accent-default); }
+.cl-check--radio .cl-check__box { border-radius: 50%; }
+.cl-check--radio.is-on .cl-check__box { background: transparent; border-color: var(--color-accent-default); }
+.cl-check--radio.is-on .cl-check__box::after { content: ""; width: 6px; height: 6px; border: 0; border-radius: 50%; background: var(--color-accent-default); transform: none; }
+.cl-menu--map { width: 340px; }
+.cl-tabs--column { align-items: center; }
+.cl-tabs--column .cl-tabs__tab { align-self: stretch; }
+
+/* ------------------------------------------------------------ Touch density: inside a phone frame, and on any screen under 768 px */
+.cl-phone .cl-btn, .cl-phone .cl-toggle, .cl-phone .cl-seg__item, .cl-phone .cl-input, .cl-phone .cl-channel { height: var(--size-control-touch); }
+.cl-phone .cl-btn--icon, .cl-phone .cl-exchange__play { width: var(--size-target-touch); height: var(--size-target-touch); }
+.cl-phone .cl-strip { height: var(--size-row-touch); }
+@media (max-width: 767px) {
+    .cl-toggle, .cl-seg__item, .cl-input, .cl-channel { height: var(--size-control-touch); }
+    .cl-exchange__play { width: var(--size-target-touch); height: var(--size-target-touch); }
+}
+/* MapLabel's optional third line: the last transmission heard, quoted, for ten minutes */
+.cl-maplabel__said { font-family: var(--font-family-text); color: var(--color-text-secondary); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; }
+
+/* ------------------------------------------------------------ SignIn, the sky (chosen 13/10): the page is the sign's scope */
+.cl-signin--sky { position: relative; display: block; height: 100%; overflow: hidden; background: var(--color-surface-map); }
+.cl-signin__scope { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cl-signin__brand { position: absolute; left: var(--space-8); top: var(--space-8); display: flex; align-items: center; gap: var(--space-4); font: var(--font-weight-strong) 56px / 1 var(--font-family-mono); letter-spacing: -0.02em; color: var(--color-text-primary); }
+.cl-signin__brand svg { width: 64px; height: 64px; }
+.cl-signin--sky .cl-signin__card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 400px; padding: var(--space-8); gap: var(--space-6); background: color-mix(in srgb, var(--color-surface-panel) 92%, transparent); box-shadow: var(--shadow-overlay); }
+.cl-signin__title { margin: 0; font-size: var(--font-size-title); line-height: var(--font-line-height-title); font-weight: var(--font-weight-strong); }
+.cl-signin__console { position: absolute; right: var(--space-8); top: var(--space-8); width: 420px; padding: var(--space-4); background: color-mix(in srgb, var(--color-surface-page) 88%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); }
+.cl-signin__foot { position: absolute; left: 0; right: 0; bottom: var(--space-6); text-align: center; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); color: var(--color-text-tertiary); }
+@media (max-width: 767px) {
+    .cl-signin__brand { left: var(--space-4); top: var(--space-4); font-size: 32px; gap: var(--space-2); }
+    .cl-signin__brand svg { width: 36px; height: 36px; }
+    .cl-signin--sky .cl-signin__card { width: calc(100% - 2 * var(--space-4)); padding: var(--space-6) var(--space-4); }
+    .cl-signin__console { position: static; width: auto; margin: 0 var(--space-4); }
+}
+
+/* ------------------------------------------------------------ StationVitals: the station's console, aggregated figures only */
+.cl-vitals { display: flex; flex-direction: column; gap: var(--space-2); }
+.cl-vitals__head { display: flex; justify-content: space-between; align-items: baseline; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: var(--font-tracking-label); }
+.cl-vitals__list { display: grid; grid-template-columns: max-content 1fr; gap: 6px var(--space-4); margin: 0; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); }
+.cl-vitals__list dt { color: var(--color-text-tertiary); }
+.cl-vitals__list dd { margin: 0; color: var(--color-text-primary); display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.cl-vitals__list dd span { color: var(--color-text-tertiary); }
+.cl-vitals__ok { width: 8px; height: 8px; border-radius: 50%; background: var(--color-status-ok); display: inline-block; }

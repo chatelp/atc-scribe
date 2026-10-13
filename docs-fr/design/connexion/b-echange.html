@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · B · an exchange</title>
+<link rel="stylesheet" href="../systeme/project/tokens.css">
+<link rel="stylesheet" href="../systeme/project/components/bundle.css">
+<style>
+html, body { margin: 0; height: 100%; background: var(--color-surface-page); }
+.lg-form { display: flex; flex-direction: column; gap: var(--space-4); width: 320px; }
+.lg-h { margin: 0; font: var(--font-weight-strong) var(--font-size-title) / var(--font-line-height-title) var(--font-family-text); color: var(--color-text-primary); }
+.lg-form .cl-btn--primary { height: var(--size-control-large); justify-content: center; }
+.lg-name { font: var(--font-weight-strong) 26px / 1 var(--font-family-mono); color: var(--color-text-primary); display: flex; align-items: center; gap: 10px; }
+.lg-name svg { width: 40px; height: 40px; }
+.lg-foot { font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); color: var(--color-text-tertiary); }
+
+.vt { display: grid; grid-template-columns: max-content 1fr; gap: 6px var(--space-4); margin: 0; font: var(--font-weight-regular) var(--font-size-small) / var(--font-line-height-small) var(--font-family-mono); }
+.vt dt { color: var(--color-text-tertiary); text-transform: lowercase; }
+.vt dd { margin: 0; color: var(--color-text-primary); display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.vt dd i { width: 8px; height: 8px; border-radius: 50%; background: var(--color-status-ok); display: inline-block; }
+.vt dd span { color: var(--color-text-tertiary); }
+.vt-head { display: flex; justify-content: space-between; align-items: baseline; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: var(--font-tracking-label); }
+
+
+.b { height: 100%; display: grid; grid-template-columns: 1fr 480px; }
+.b-left { display: flex; flex-direction: column; justify-content: center; gap: var(--space-6); padding: 0 96px; }
+.b-name { display: flex; align-items: center; gap: var(--space-6); font: var(--font-weight-strong) 88px / 0.95 var(--font-family-mono); color: var(--color-text-primary); letter-spacing: -0.02em; }
+.b-name svg { width: 96px; height: 96px; }
+.b-left > p { margin: 0; max-width: 560px; font: var(--font-weight-regular) var(--font-size-title) / 26px var(--font-family-text); color: var(--color-text-secondary); }
+.b-example { max-width: 560px; border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); overflow: hidden; }
+.b-example .cl-label { display: block; padding: var(--space-2) var(--space-3) 0; background: var(--color-surface-panel); }
+.b-right { display: flex; flex-direction: column; justify-content: center; gap: var(--space-8); padding: 0 var(--space-8) 0 64px; background: var(--color-surface-panel); border-left: var(--border-width-default) solid var(--color-border-default); }
+.b-right .vt { font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); }
+
+</style>
+</head>
+<body>
+<div class="cl-root" style="height: 100%;">
+<div class="b">
+  <div class="b-left">
+    <div class="b-name"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26.5" fill="none" stroke="#e0e0e0" stroke-width="4"/><circle cx="32" cy="32" r="13" fill="none" stroke="#e0e0e0" stroke-width="2" opacity="0.55"/><path d="M32 32 L32 6 A26 26 0 0 1 50.385 13.615 Z" fill="#4caf50" fill-opacity="0.35"/><path d="M32 32 L50.385 13.615" fill="none" stroke="#4caf50" stroke-width="4" stroke-linecap="round"/><circle cx="39.18" cy="16.59" r="3.8" fill="#4caf50"/></svg>Clairance</div>
+    <p>Hear the airband you receive, read it in English and French, and see which aircraft is speaking.</p>
+    <div class="b-example"><span class="cl-label">An example of what you will read</span>
+      <article class="cl-exchange" lang="fr">
+        <div class="cl-exchange__head" lang="en"><span class="cl-exchange__when">124.350</span><span class="cl-chip cl-chip--atc">ATC</span><span class="cl-exchange__to">→</span><span class="cl-chip cl-chip--callsign"><span class="cl-phase cl-phase--arr cl-phase--small">APP</span>AFR47KX</span></div>
+        <p class="cl-exchange__text">Air France quatre sept Kilo X-ray, autorisé ILS piste deux six gauche, contactez la tour un deux zéro décimal six cinq.</p>
+        <div class="cl-exchange__instr" lang="en"><span class="cl-chip cl-chip--instr cl-chip--clearance">Cleared ILS runway 26L</span><span class="cl-chip cl-chip--instr">Contact 120.650</span></div>
+        <div class="cl-exchange__explain cl-exchange__explain--boxed">Autorisé à l'approche ILS, piste 26L. Contactez 120.650.</div>
+        <div class="cl-exchange__reply" lang="en"><span>↩</span><span>Pilot replied, 4 s later</span></div>
+      </article>
+    </div>
+    <p class="lg-foot">Runs on your own machine: nothing leaves it. Made for the listener; it judges no one.</p>
+  </div>
+  <div class="b-right"><form class="lg-form" onsubmit="return false">
+  <h1 class="lg-h">Sign in</h1>
+  <label class="cl-signin__field"><span class="cl-label">User</span><input class="cl-input" autocomplete="username" value="pierre"></label>
+  <label class="cl-signin__field"><span class="cl-label">Password</span><input class="cl-input" type="password" autocomplete="current-password" value="••••••••••••"></label>
+  <button class="cl-btn cl-btn--primary" type="submit">Sign in</button>
+  <span class="cl-plain">After 8 failed tries, wait 15 minutes.</span>
+</form><div class="vt-wrap" style="display: flex; flex-direction: column; gap: var(--space-2);">
+<div class="vt-head"><span>This station, live</span><span>refreshed every 10 s</span></div>
+<dl class="vt">
+  <dt>ads-b</dt><dd><i></i>107 aircraft <span>·</span> 702 msg/s <span>·</span> farthest 182 NM</dd>
+  <dt>airband</dt><dd><i></i>2 channels on air <span>·</span> 412 transmissions today</dd>
+  <dt>speech</dt><dd><i></i>whisper large-v3 <span>·</span> GPU <span>·</span> 1.4 s a transmission</dd>
+  <dt>matched</dt><dd>31 % of transmissions to an aircraft today</dd>
+  <dt>runways</dt><dd>3 airports followed <span>·</span> 4 runways in use</dd>
+  <dt>up</dt><dd>6 d 14 h <span>·</span> Clairance 2026.10 <span>·</span> a7489d5</dd>
+</dl>
+</div></div>
+</div>
+</div>
+</body>
+</html>

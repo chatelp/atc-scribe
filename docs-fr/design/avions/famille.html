@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avions — notre famille</title>
+<link rel="stylesheet" href="../maquettes/tokens.css">
+<link rel="stylesheet" href="../maquettes/base.css">
+<style>
+    /* Served from the repository root, like inventaire.html. */
+    body { padding: var(--space-8) var(--space-4); }
+    main { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-8); }
+    h1, h2 { margin: 0; }
+    h2 { font-size: var(--font-size-title); line-height: var(--font-line-height-title); margin-bottom: var(--space-2); }
+    p { margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-body); line-height: var(--font-line-height-body); max-width: 80ch; }
+    .ico { display: inline-block; background: var(--c, #e0e0e0); -webkit-mask: var(--src) center / contain no-repeat; mask: var(--src) center / contain no-repeat; flex: none; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--color-border-subtle); vertical-align: middle; text-align: left; }
+    th { font-weight: 400; }
+    td.pics { display: flex; align-items: center; gap: var(--space-6); }
+    .name { font: var(--font-weight-strong) var(--font-size-body)/20px var(--font-family-text); color: var(--color-text-primary); }
+    .meta { font-size: var(--font-size-caption); line-height: 14px; color: var(--color-text-tertiary); }
+    .old { display: flex; align-items: center; gap: var(--space-2); }
+    .sky { position: relative; height: 320px; background: var(--color-surface-map); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); overflow: hidden; }
+    .sky .ico { position: absolute; }
+    .sky .lab { position: absolute; font: 11px/14px var(--font-family-mono); color: var(--color-text-secondary); background: #0a0a0ad9; padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    .pair > div { display: flex; flex-direction: column; gap: var(--space-2); }
+    .light { background: #ffffff; border-radius: var(--radius-md); padding: var(--space-4); display: flex; gap: var(--space-6); align-items: center; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<main>
+    <header>
+        <h1 class="t-display">Notre famille d'avions</h1>
+        <p style="margin-top: var(--space-2)">Neuf classes dessinées par <code>tools/design/avions.mjs</code> depuis des cotes réelles arrondies, vues de dessus, nez en haut. Une épaisseur minimale garde les petites pièces (hélice, nacelles, rotor de queue) visibles à 24 px. À gauche, la classe en grand puis à 32, 24, 20 et 16 px ; à droite, l'ancien dessin de la même classe, à la même taille sur la carte. Lecture : <code>06-avions.md</code>.</p>
+    </header>
+
+    <section>
+        <h2>Un bout de ciel, comme la carte le dessinerait</h2>
+        <div class="pair">
+            <div><span class="label">Notre famille</span><div class="sky" id="skyNew"></div></div>
+            <div><span class="label">Aujourd'hui</span><div class="sky" id="skyOld"></div></div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Les neuf classes</h2>
+        <table>
+            <thead><tr><th class="label">Classe</th><th class="label">96 · 32 · 24 · 20 · 16 px</th><th class="label">Sur la carte</th><th class="label">Aujourd'hui, même taille</th></tr></thead>
+            <tbody id="rows"></tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2>Sur fond clair (fonds IGN, OSM)</h2>
+        <div class="light" id="light"></div>
+    </section>
+</main>
+<script>
+    const F = 'famille/';
+    const OLD = '../../../www/assets/';
+    const fam = [
+        ['leger', 'Monomoteur léger', 'Robin DR400 · Cessna 172 · Tecnam P2002', 20, 'aircraft/cessna'],
+        ['turboprop', 'Turbopropulseur', 'ATR 72 · Dash 8 · King Air', 24, 'aircraft/dh8a'],
+        ['affaires', "Jet d'affaires", 'Falcon 2000 · Gulfstream · Global', 22, 'aircraft/fa7x'],
+        ['bireacteur', 'Biréacteur moyen-courrier', 'A320 · B737 · A220 · E190', 26, 'aircraft/a320'],
+        ['gros', 'Gros-porteur biréacteur', 'A350 · B787 · B777 · A330', 30, 'aircraft/b787'],
+        ['quadri', 'Gros-porteur quadriréacteur', 'A380 · B747 · A340', 32, 'aircraft/b747'],
+        ['helico', 'Hélicoptère', 'H125 · EC135 · H145', 22, 'a7'],
+        ['planeur', 'Planeur', 'ASK 21 · Duo Discus', 22, 'a1'],
+        ['inconnu', 'Inconnu', 'ni type ni catégorie : un chevron qui donne le cap', 18, 'a0'],
+    ];
+    const ico = (src, s, c = '#e0e0e0', extra = '') => `<span class="ico" style="--src:url(${src});--c:${c};width:${s}px;height:${s}px;${extra}"></span>`;
+    document.getElementById('rows').innerHTML = fam.map(([k, name, type, px, old]) => `<tr>
+        <td><div class="name">${name}</div><div class="meta">${type}</div></td>
+        <td class="pics">${ico(F + k + '.svg', 96)}${ico(F + k + '.svg', 32)}${ico(F + k + '.svg', 24)}${ico(F + k + '.svg', 20)}${ico(F + k + '.svg', 16)}</td>
+        <td><div class="old">${ico(F + k + '.svg', px, '#cfcfcf')}${ico(F + k + '.svg', px, '#6b6b6b')}<span class="meta">${px} px</span></div></td>
+        <td><div class="old">${ico(OLD + old + '.svg', px, '#cfcfcf')}${ico(OLD + old + '.svg', px, '#6b6b6b')}<span class="meta">${old.replace('aircraft/', '')}</span></div></td>
+    </tr>`).join('');
+    document.getElementById('light').innerHTML = fam.map(([k, , , px]) => ico(F + k + '.svg', 48, '#1a1a1a') + ico(F + k + '.svg', px, '#4d4d4d')).join('');
+    // the same patch of sky for both: class, x, y, heading, altitude tint, label
+    const sky = [
+        ['bireacteur', 40, 40, 30, '#cfcfcf', 'AFR47KX', 'aircraft/a320'],
+        ['bireacteur', 150, 200, 250, '#a8a8a8', 'EZY82QT', 'aircraft/b737'],
+        ['gros', 250, 60, 80, '#6b6b6b', 'UAE73R', 'aircraft/b787'],
+        ['leger', 330, 230, 45, '#f5f5f5', 'F-GXQA', 'aircraft/cessna'],
+        ['leger', 400, 150, 300, '#f5f5f5', 'F-HBZC', 'a1'],
+        ['affaires', 90, 120, 160, '#858585', 'FHDEX', 'a2'],
+        ['quadri', 440, 40, 120, '#6b6b6b', 'BAW15', 'aircraft/b747'],
+        ['turboprop', 200, 120, 210, '#a8a8a8', 'HOP62', 'aircraft/dh8a'],
+        ['helico', 470, 250, 0, '#f5f5f5', 'F-GZSA', 'a7'],
+        ['inconnu', 30, 260, 60, '#858585', '3c4b21', 'a0'],
+    ];
+    const paint = (id, useNew) => document.getElementById(id).innerHTML = sky.map(([k, x, y, r, c, cs, old]) => {
+        const fp = fam.find((f) => f[0] === k);
+        const px = fp ? fp[3] : 24;
+        const src = useNew ? F + k + '.svg' : OLD + old + '.svg';
+        const size = useNew ? px : (old.startsWith('aircraft/') ? 27 : 24);
+        return ico(src, size, c, `left:${x}px;top:${y}px;transform:rotate(${r}deg)`) + `<span class="lab" style="left:${x + size + 4}px;top:${y - 4}px">${cs}</span>`;
+    }).join('');
+    paint('skyNew', true); paint('skyOld', false);
+</script>
+</body>
+</html>

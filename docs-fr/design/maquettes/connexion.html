@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Sign in — mock-up</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="base.css">
+<style>
+    body { background: #050505; }
+    .frame { width: 1440px; height: 900px; background: var(--color-surface-page); display: grid; place-items: center; position: relative; overflow: hidden; }
+    /* the map, very dim, behind: the same tool, not another site */
+    .ghost { position: absolute; inset: 0; opacity: 1; }
+    .card { position: relative; width: 360px; padding: var(--space-6); background: var(--color-surface-panel); border: 1px solid var(--color-border-default); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: var(--space-4); }
+    .mark-slot { display: flex; align-items: center; gap: var(--space-2); }
+    .mark-slot .sign { width: 24px; height: 24px; border: 1.5px dashed var(--color-border-control); border-radius: var(--radius-md); }
+    .mark-slot .name { font: var(--font-weight-strong) var(--font-size-title)/1 var(--font-family-mono); color: var(--color-text-tertiary); border-bottom: 1.5px dashed var(--color-border-control); padding-bottom: 2px; }
+    .promise { font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); margin: 0; }
+    .field { display: flex; flex-direction: column; gap: var(--space-1); }
+    .field .input { height: 36px; font-size: var(--font-size-body); }
+    .btn-primary { height: 36px; justify-content: center; font-size: var(--font-size-body); }
+    .error { display: none; gap: var(--space-2); align-items: flex-start; font-size: var(--font-size-small); line-height: var(--font-line-height-small); }
+    .s-error .error { display: flex; }
+    .s-error .pw { border-color: var(--color-status-urgent); }
+    .foot { font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); }
+    .notes { width: 1440px; padding: var(--space-6) 0; color: var(--color-text-secondary); font-size: var(--font-size-body); line-height: var(--font-line-height-body); }
+    .notes h2 { font-size: var(--font-size-title); color: var(--color-text-primary); }
+</style>
+</head>
+<body>
+<div class="frame">
+    <svg class="ghost" viewBox="0 0 1440 900" width="1440" height="900" aria-hidden="true">
+        <g fill="none" stroke="var(--color-border-subtle)"><circle cx="720" cy="450" r="160"/><circle cx="720" cy="450" r="320"/><circle cx="720" cy="450" r="520"/></g>
+    </svg>
+    <form class="card" onsubmit="return false">
+        <div class="mark-slot"><svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26.5" fill="none" stroke="#e0e0e0" stroke-width="4"/><circle cx="32" cy="32" r="13" fill="none" stroke="#e0e0e0" stroke-width="2" opacity=".55"/><path d="M32 32 L32 6 A26 26 0 0 1 50.385 13.615 Z" fill="#4caf50" fill-opacity=".35"/><path d="M32 32 L50.385 13.615" fill="none" stroke="#4caf50" stroke-width="4" stroke-linecap="round"/><circle cx="39.18" cy="16.59" r="3.8" fill="#4caf50"/></svg><span class="name" style="color: var(--color-text-primary); border: 0; padding: 0">Clairance</span></div>
+        <div>
+            <div class="t-title">Sign in</div>
+            <p class="promise">Runs here, on this station; nothing leaves it. For the listener; it judges no one.</p>
+        </div>
+        <label class="field"><span class="label">User</span><input class="input" value="listener" autocomplete="username"></label>
+        <label class="field"><span class="label">Password</span><input class="input pw" type="password" value="xxxxxxxxxxxx" autocomplete="current-password"></label>
+        <div class="error c1"><span class="light bad" style="margin-top:3px"></span><span>Sign-in failed: the user or the password is wrong. After 8 tries in 15 minutes, signing in pauses for a while.</span></div>
+        <button class="btn btn-primary">Sign in</button>
+        <span class="foot">Asked because this station is open to the network (Settings › Account).</span>
+    </form>
+</div>
+<div class="notes" lang="fr">
+    <h2>À lire (hors interface)</h2>
+    <ol>
+        <li>La page de connexion prend les surfaces, les tailles et le vert de l'outil : la palette propre de <code>login.js</code> (sept couleurs, dont le second vert <code>#4ADE80</code>) disparaît. Version avec erreur : <a class="c-accent" href="?erreur">?erreur</a>.</li>
+        <li>La marque Clairance en tête (<code>05-identite.md</code>) : le signe à 24 px, le nom en monospace 16 px.</li>
+        <li>La phrase sous le titre porte les trois messages que la session communauté recommande de dire d'emblée : local, pour celui qui écoute, n'évalue personne. Le pied dit pourquoi on demande un mot de passe.</li>
+        <li>Le message d'erreur dit ce que fait le serveur (<code>internal/auth/service.go</code> : 8 essais par fenêtre de 15 minutes, puis 429) et ne dit pas lequel du nom ou du mot de passe est faux, comme aujourd'hui ; il ajoute seulement la limite, pour qu'elle ne surprenne pas.</li>
+    </ol>
+</div>
+<script>
+    if (new URLSearchParams(location.search).has('erreur')) document.body.classList.add('s-error');
+</script>
+</body>
+</html>
