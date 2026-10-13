@@ -84,10 +84,15 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
 
 ## Les décisions attendues du propriétaire
 
-1. **Le nom** — propositions prêtes le 12/10 (`docs-fr/design/00-nom.md`, branche `design`) :
-   `5/5` (recommandé, générique, dépôt `five-by-five`), Entendu, En clair, Verticale, Lisible ;
-   positionnement recommandé : le français porté comme une capacité, pas comme un territoire
-   (même conclusion que l'étude communauté) (Q53).
+1. **Le nom** — propositions du 12/10 (`docs-fr/design/00-nom.md`, branche `design`) ; le
+   propriétaire a écarté `5/5` (pas assez original) et les noms d'histoire (Galène, pris par un
+   serveur de visioconférence libre) ; au 13/10 il retient **« Clairance »**, vérifié par la
+   session design (§ 4 du document) : aucune marque active seule, aucun paquet, `.org` / `.app`
+   / `.dev` libres, `.com` pris par un cabinet d'avocats depuis 2011, quatre dépôts GitHub
+   médicaux homonymes. **Décision à confirmer par lui** ; dès son mot, D74 se complète, le dépôt
+   devient `chatelp/clairance`, et le renommage se fait en une fois (dépôt, lanceur et dossier
+   de configuration sur le Mac, titre de page, documents, README, sessions). Positionnement :
+   le français porté comme une capacité, pas comme un territoire (Q53).
 2. **Le système de design** — tout est livré (`docs-fr/design/`, branche `design` : principes,
    système, jetons, maquettes, plan de migration ≈ 13 j). Six choix à trancher avant la
    migration : (1) monospace pour les phrases ou police du système (principe 8 ; le monospace
