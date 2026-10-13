@@ -8,6 +8,8 @@
 //
 //   node tools/design/inventory.mjs            # markdown report on stdout
 //   node tools/design/inventory.mjs --json f   # also the raw numbers in f
+//   node tools/design/inventory.mjs --root D   # measure the checkout in D
+//                                              # (a migration worktree)
 //
 // Counting rules, so that two runs compare:
 // - index.html: class tokens are read inside class="…", :class="…" and
@@ -23,7 +25,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const rootAt = process.argv.indexOf('--root');
+const root = rootAt > 0 ? path.resolve(process.argv[rootAt + 1]) : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const www = path.join(root, 'www');
 const rel = (f) => path.relative(root, f);
 
@@ -474,16 +477,27 @@ p();
 // with normal sight and with the three dichromacies (Machado et al. 2009,
 // severity 1, applied in linear RGB)?
 const classColor = (cls, role = 'bg') => { const c = classify(cls); return (c[role] || c.text || c.bg || '').split('@')[0]; };
-const parText = read(path.join(www, 'par/par-view.js'));
-const phaseBlock = /PHASE_COLORS\s*=\s*\{([\s\S]*?)\}/.exec(parText)[1];
-const phases = [...phaseBlock.matchAll(/'([^']+)':\s*'(#[0-9A-Fa-f]{6})'/g)].map((m) => [m[1], m[2].toLowerCase()]);
+// Hex pairs of an object literal: { 'very-low': '#fff59a', low: '#e68cba' }.
+const hexPairs = (block) => [...(block || '').matchAll(/'?([\w/-]+)'?:\s*'(#[0-9A-Fa-f]{6})'/g)].map((m) => [m[1], m[2].toLowerCase()]);
+// Phases: the five families since migration step 2 (phase/phase-families.js,
+// HEX), the ten colours of PHASE_COLORS in par/par-view.js before.
+const familiesFile = path.join(www, 'phase/phase-families.js');
+const phases = fs.existsSync(familiesFile)
+    ? hexPairs(/HEX\s*=\s*Object\.freeze\(\{([\s\S]*?)\}/.exec(read(familiesFile))?.[1])
+    : hexPairs(/PHASE_COLORS\s*=\s*\{([\s\S]*?)\}/.exec(read(path.join(www, 'par/par-view.js')))?.[1]);
+const phasesFrom = fs.existsSync(familiesFile) ? 'phase-families.js HEX, cinq familles' : 'par-view.js PHASE_COLORS';
+// Altitude bands: palette F as two literals (dark, light) since 13/10; the
+// switch statements of getAltitudeBandColor before.
 const webglText = read(path.join(www, 'map/renderers/aircraft-webgl.js'));
-const bandSets = [...webglText.matchAll(/case 'high': return '(#\w+)';\s*case 'mid': return '(#\w+)';\s*case 'low': return '(#\w+)';\s*case 'very-low': return '(#\w+)';[\s\S]*?return '(#\w+)';/g)]
-    .map((m) => ['high', 'mid', 'low', 'very-low', 'cruise/default'].map((k, i) => [k, m[i + 1].toLowerCase()]));
+let bandSets = [/\bdark:\s*\{([^}]*)\}/, /\blight:\s*\{([^}]*)\}/].map((re) => hexPairs(re.exec(webglText)?.[1]));
+if (!bandSets[0].length) {
+    bandSets = [...webglText.matchAll(/case 'high': return '(#\w+)';\s*case 'mid': return '(#\w+)';\s*case 'low': return '(#\w+)';\s*case 'very-low': return '(#\w+)';[\s\S]*?return '(#\w+)';/g)]
+        .map((m) => ['high', 'mid', 'low', 'very-low', 'cruise/default'].map((k, i) => [k, m[i + 1].toLowerCase()])).reverse();
+}
 const palettes = [
-    { name: 'Phases de vol (par-view.js PHASE_COLORS = étiquettes de la carte = classes de la liste)', bg: '#000000', colors: phases },
-    { name: 'Bandes d\'altitude, fond sombre (aircraft-webgl.js getAltitudeBandColor)', bg: '#000000', colors: bandSets[1] || [] },
-    { name: 'Bandes d\'altitude, fond clair (idem)', bg: '#ffffff', colors: bandSets[0] || [] },
+    { name: `Phases de vol (${phasesFrom} = étiquettes de la carte = classes de la liste)`, bg: '#000000', colors: phases },
+    { name: 'Bandes d\'altitude, fond sombre (aircraft-webgl.js)', bg: '#000000', colors: bandSets[0] || [] },
+    { name: 'Bandes d\'altitude, fond clair (idem)', bg: '#ffffff', colors: bandSets[1] || [] },
     { name: 'Voyants d\'état (index.html, bandeau : ok / warn / bad / unknown)', bg: '#1a1a1a', colors: [['ok', classColor('bg-green-400')], ['warn', classColor('bg-amber-400')], ['bad', classColor('bg-red-500')], ['unknown', classColor('bg-gray-500')]] },
     { name: 'Force des indices d\'appariement (weak / medium / strong)', bg: '#1a1a1a', colors: [['weak', classColor('bg-amber-400')], ['medium', classColor('bg-sky-300')], ['strong', classColor('bg-green-400')]] },
     { name: 'Locuteur (ATC / PILOT / inconnu)', bg: '#1a1a1a', colors: [['ATC', classColor('text-orange-400', 'text')], ['PILOT', classColor('text-green-400', 'text')], ['unknown', classColor('text-gray-400', 'text')]] },

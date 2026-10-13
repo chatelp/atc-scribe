@@ -45,6 +45,8 @@
 .cl-btn--icon:hover { color: var(--color-text-primary); }
 .cl-btn--icon svg { width: 14px; height: 14px; }
 .cl-btn:disabled { color: var(--color-text-disabled); border-color: var(--color-border-subtle); background: transparent; cursor: default; filter: none; }
+/* a button that opens a card below it (TAF, NOTAM, Earlier): open reads as selected */
+.cl-btn[aria-expanded="true"] { background: var(--color-surface-selected); border-color: var(--color-accent-default); color: var(--color-accent-strong); }
 @media (max-width: 767px) { .cl-btn { height: var(--size-control-touch); } .cl-btn--icon { width: var(--size-target-touch); } }
 
 /* ------------------------------------------------------------ FilterToggle */
@@ -273,8 +275,9 @@
 .cl-summary__source { margin: var(--space-1) 0 0; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
 
 /* ------------------------------------------------------------ EventList (Worth knowing) */
-.cl-events { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.cl-events li { display: flex; gap: var(--space-2); font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-primary); }
+.cl-events { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+/* 4 px above and below each line instead of an 8 px gap: the same 24 px pitch, and every row a 24 px target */
+.cl-events li { display: flex; gap: var(--space-2); padding: var(--space-1) 0; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-primary); }
 .cl-events time { font-family: var(--font-family-mono); color: var(--color-text-tertiary); flex: none; }
 .cl-events .is-warn { color: var(--color-status-warn); }
 
@@ -392,6 +395,7 @@
 /* ------------------------------------------------------------ small helpers */
 .cl-row { display: flex; align-items: center; gap: var(--space-1-5); flex-wrap: wrap; }
 .cl-warn { color: var(--color-status-warn); }
+.cl-urgent { color: var(--color-status-urgent); }
 .cl-card--sky { width: 320px; }
 .cl-tabs--inset { padding: 0 var(--space-3); }
 .cl-card > .cl-btn { align-self: flex-start; }
@@ -421,7 +425,10 @@
 /* ------------------------------------------------------------ EventLog: the bell's list */
 .cl-events .is-urgent { color: var(--color-status-urgent); }
 .cl-events .is-info { color: var(--color-status-info); }
-.cl-events li.is-clickable { cursor: pointer; }
+.cl-events li.is-clickable { cursor: pointer; margin: 0 calc(-1 * var(--space-1)); padding-inline: var(--space-1); border-radius: var(--radius-md); }
+.cl-events li.is-clickable:hover { background: var(--color-surface-hover); }
+.cl-phone .cl-events li.is-clickable { min-height: var(--size-target-touch); align-items: center; }
+@media (max-width: 767px) { .cl-events li.is-clickable { min-height: var(--size-target-touch); align-items: center; } }
 
 /* ------------------------------------------------------------ ParHead: the PAR view's header */
 .cl-parhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); padding: 60px var(--space-4) var(--space-2); font-size: var(--font-size-small); color: var(--color-text-primary); }
