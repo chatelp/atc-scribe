@@ -283,18 +283,6 @@ func NewService(
 	logger.Info("Initializing WebSocket change detection for aircraft streaming")
 	service.changeDetector = NewChangeDetector(logger)
 
-	// Set the config for the prediction function
-	predictionConfig := &Config{
-		Station: struct {
-			Latitude  float64
-			Longitude float64
-		}{
-			Latitude:  stationCfg.Latitude,
-			Longitude: stationCfg.Longitude,
-		},
-	}
-	SetConfig(predictionConfig)
-
 	service.runwayJudge = NewRunwayJudge()
 
 	// Initialize trajectory tracker for phase detection
@@ -938,6 +926,15 @@ func (s *Service) GetAircraftByHex(hex string) (*Aircraft, bool) {
 			if hindcast := s.trajectoryTracker.GetHindcast(hex); len(hindcast) > 0 {
 				aircraft.Hindcast = PredictionPointsToPositions(hindcast)
 			}
+		}
+		// An aircraft the tracker does not forecast (no tracker, or no longer
+		// tracked): the same model from its last stored sample, from when its
+		// position was decoded -- last_seen is the poll less the whole seconds
+		// of seen.
+		if len(aircraft.Future) == 0 && aircraft.ADSB != nil {
+			poll := aircraft.LastSeen.Add(time.Duration(math.Trunc(NumberOrZero(aircraft.ADSB.Seen))) * time.Second)
+			posAt := poll.Add(-time.Duration(NumberOrZero(aircraft.ADSB.SeenPos) * float64(time.Second)))
+			aircraft.Future = PredictionPointsToPositions(ForecastFromTarget(aircraft.ADSB, posAt))
 		}
 	}
 	return aircraft, found
@@ -1892,7 +1889,6 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 
 		// Trajectory-based predictions (hindcast + forecast)
 		if s.trajectoryTracker != nil {
-			// Forecast: trajectory-aware kinematic model (replaces naive PredictFuturePositions)
 			if forecast := s.trajectoryTracker.GetForecast(raw.Hex); len(forecast) > 0 {
 				a.Future = PredictionPointsToPositions(forecast)
 			}
@@ -1901,35 +1897,11 @@ func (s *Service) ProcessRawData(rawData *RawAircraftData) []*Aircraft {
 				a.Hindcast = PredictionPointsToPositions(hindcast)
 			}
 		}
-
-		// Fallback to old prediction if trajectory forecast unavailable
-		if len(a.Future) == 0 && raw.HasPosition() && raw.AltBaro.Float64() != 0 {
-			lat, lon, _ := raw.Position()
-			heading := NumberOrZero(raw.TrueHeading)
-			if heading == 0 {
-				heading = NumberOrZero(raw.Track)
-			}
-			if heading == 0 {
-				heading = NumberOrZero(raw.MagHeading)
-			}
-			speed := NumberOrZero(raw.TAS)
-			if speed == 0 {
-				speed = NumberOrZero(raw.GS)
-			}
-			verticalRate := NumberOrZero(raw.BaroRate)
-			if verticalRate == 0 {
-				verticalRate = NumberOrZero(raw.GeomRate)
-			}
-			if heading != 0 && speed != 0 {
-				magHeading := NumberOrZero(raw.MagHeading)
-				if magHeading == 0 {
-					magHeading = heading
-				}
-				a.Future = PredictFuturePositions(
-					lat, lon, raw.AltBaro.Float64(),
-					heading, magHeading, speed, verticalRate,
-				)
-			}
+		// No forecast from the tracker (a first poll, or no tracker at all):
+		// the same model from this one sample, dated when it was decoded.
+		if len(a.Future) == 0 {
+			posAt := now.Add(-time.Duration(NumberOrZero(raw.SeenPos) * float64(time.Second)))
+			a.Future = PredictionPointsToPositions(ForecastFromTarget(&raw, posAt))
 		}
 
 		aircraft = append(aircraft, a)

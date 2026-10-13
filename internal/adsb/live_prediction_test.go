@@ -77,3 +77,59 @@ func TestSnapshotPositionTimeFromSeenPos(t *testing.T) {
 		t.Errorf("without seen_pos the position time is the poll's: got %v", plain.PositionTime())
 	}
 }
+
+// One model for every predicted position (fiche L, step 2): an aircraft the
+// tracker cannot forecast gets the same kinematic forecast from its one
+// sample, along its track at its ground speed, from when its position was
+// decoded.
+func TestForecastFromOneSample(t *testing.T) {
+	lat, lon, gs, track, tas, heading, vr := 48.5, 2.0, 400.0, 90.0, 430.0, 95.0, -1200.0
+	at := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
+	target := &ADSBTarget{Lat: &lat, Lon: &lon, AltBaro: 30000, GS: &gs, Track: &track, TAS: &tas, TrueHeading: &heading, BaroRate: &vr}
+	points := ForecastFromTarget(target, at)
+	if len(points) != forecastSteps {
+		t.Fatalf("%d points, want %d", len(points), forecastSteps)
+	}
+	p := points[len(points)-1]
+	sec := forecastSteps * forecastStepSec
+	if !p.Timestamp.Equal(at.Add(time.Duration(sec) * time.Second)) {
+		t.Errorf("last point at %v, want %v s after the fix", p.Timestamp, sec)
+	}
+	east := (p.Lon - lon) * 111000 * math.Cos(lat*math.Pi/180)
+	if want := gs * 0.514444 * sec; math.Abs(east-want) > want*0.02 || math.Abs(p.Lat-lat) > 1e-6 {
+		t.Errorf("after %v s: %.0f m east, lat %+.6f; want %.0f m east along the track", sec, east, p.Lat-lat, want)
+	}
+	if want := 30000 + vr*sec/60; math.Abs(p.Altitude-want) > 1 {
+		t.Errorf("altitude %.0f, want %.0f", p.Altitude, want)
+	}
+	if p.Speed != gs || p.Heading != track {
+		t.Errorf("speed %v heading %v, want the ground speed %v and the track %v", p.Speed, p.Heading, gs, track)
+	}
+
+	// Nothing to predict from: no position, on the ground, or not moving.
+	for name, tg := range map[string]*ADSBTarget{
+		"no position": {AltBaro: 30000, GS: &gs, Track: &track},
+		"no altitude": {Lat: &lat, Lon: &lon, GS: &gs, Track: &track},
+		"no speed":    {Lat: &lat, Lon: &lon, AltBaro: 30000, Track: &track},
+	} {
+		if got := ForecastFromTarget(tg, at); got != nil {
+			t.Errorf("%s: %d points, want none", name, len(got))
+		}
+	}
+}
+
+// The forecast the tracker computes and the one from a single sample have
+// the same form once turned into positions for the API.
+func TestForecastPositionsForm(t *testing.T) {
+	lat, lon, gs, track := 48.5, 2.0, 400.0, 90.0
+	positions := PredictionPointsToPositions(ForecastFromTarget(&ADSBTarget{Lat: &lat, Lon: &lon, AltBaro: 30000, GS: &gs, Track: &track}, time.Now()))
+	if len(positions) == 0 {
+		t.Fatal("no positions")
+	}
+	for i, p := range positions {
+		if p.Lat == nil || p.Lon == nil || p.Altitude == nil || p.SpeedGS == nil || p.SpeedTrue == nil ||
+			p.TrueHeading == nil || p.MagHeading == nil || p.Timestamp.IsZero() {
+			t.Errorf("position %d incomplete: %+v", i, p)
+		}
+	}
+}

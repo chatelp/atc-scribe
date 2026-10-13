@@ -161,9 +161,11 @@ func TestTheTrailIsChronologicalAndSkipsReportsWithoutPosition(t *testing.T) {
 	if !a.History[0].Timestamp.Equal(t0) || a.History[0].AltBaro != 3000 {
 		t.Errorf("first point %+v", a.History[0])
 	}
-	// The latest message has a position, a speed and a track: a prediction is drawn.
-	if a.ADSB == nil || len(a.Future) == 0 {
-		t.Errorf("a moving aircraft with a position should have predicted positions, got %d", len(a.Future))
+	// The latest message comes with the aircraft; the predicted positions are
+	// the ADS-B service's (internal/api checks them through /tracks), not the
+	// store's.
+	if a.ADSB == nil || len(a.Future) != 0 {
+		t.Errorf("adsb %v, %d predicted positions from the store, want the message and none", a.ADSB != nil, len(a.Future))
 	}
 }
 

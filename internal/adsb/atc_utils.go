@@ -5,7 +5,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/yegors/co-atc/internal/config"
 )
@@ -17,10 +16,6 @@ const (
 	METERS_PER_NM  = 1852.0  // Meters per nautical mile
 	FEET_PER_NM    = 6076.12 // Feet per nautical mile
 	FEET_PER_METER = 3.28084 // Feet per meter
-
-	// Speed adjustment constants for trajectory prediction
-	SPEED_ADJUST_RANGE_NM = 10.0 // Range in nautical miles where speed adjustments apply
-	SPEED_ADJUST_PERCENT  = 0.25 // Maximum speed adjustment (25%)
 )
 
 // ValidateSensorData detects and corrects ADS-B signal degradation.
@@ -416,169 +411,6 @@ func IcaoToTailNumber(icao string) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported ICAO prefix '%c' in '%s'. Only 'A' (US) and 'C' (Canada) are supported", firstChar, icao)
 	}
-}
-
-// PredictFuturePositions calculates predicted future positions for an aircraft
-// based on its current position, heading, speed, and vertical rate.
-// It returns an array of predicted positions at 1-minute intervals for the next 5 minutes.
-// The function also adjusts speed based on proximity to the airport (station).
-func PredictFuturePositions(lat, lon, altBaro, trueHeading, magHeading, speedKnots, verticalRateFtMin float64) []Position {
-	predictions := make([]Position, 5) // 5 predictions (1-5 minutes ahead)
-	now := time.Now().UTC()
-
-	// Convert heading from degrees to radians for trigonometric calculations
-	headingRad := trueHeading * math.Pi / 180.0
-
-	// Calculate distance traveled per minute in degrees
-	// 1 knot = 1 nautical mile per hour = 1.852 km per hour
-	// 1 minute = 1/60 hour
-	// Distance in km per minute = speedKnots * 1.852 / 60
-	speedKmPerMin := speedKnots * 1.852 / 60
-
-	// Approximate degrees per km (varies by latitude, but this is a reasonable approximation)
-	// 1 degree of latitude = ~111 km
-	// 1 degree of longitude = ~111 km * cos(latitude)
-	latKmPerDegree := 111.0
-	lonKmPerDegree := 111.0 * math.Cos(lat*math.Pi/180.0)
-
-	// Get station coordinates from config
-	// For now, we'll use a placeholder function that will be replaced with actual config values
-	stationLat, stationLon := GetStationCoordinates()
-
-	// Calculate initial distance to station in nautical miles (used for logging/debugging)
-	_ = Haversine(lat, lon, stationLat, stationLon) / METERS_PER_NM
-
-	// Determine if we're approaching or departing from the station based on heading
-	// Calculate bearing to station
-	bearingToStation := Bearing(lat, lon, stationLat, stationLon)
-
-	// Calculate the absolute angular difference between aircraft heading and bearing to station
-	// If the difference is less than 90 degrees, the aircraft is heading toward the station
-	// If the difference is more than 90 degrees, the aircraft is heading away from the station
-	headingDiff := math.Abs(trueHeading - bearingToStation)
-	if headingDiff > 180 {
-		headingDiff = 360 - headingDiff
-	}
-
-	approachingStation := headingDiff < 90
-
-	for i := 0; i < 5; i++ {
-		minutesAhead := float64(i + 1)
-
-		// Start with the original speed
-		adjustedSpeed := speedKnots
-		adjustedSpeedKmPerMin := speedKmPerMin
-
-		// Calculate new position
-		latChange := (adjustedSpeedKmPerMin * minutesAhead * math.Cos(headingRad)) / latKmPerDegree
-		lonChange := (adjustedSpeedKmPerMin * minutesAhead * math.Sin(headingRad)) / lonKmPerDegree
-
-		newLat := lat + latChange
-		newLon := lon + lonChange
-
-		// Calculate distance of the predicted position to the station
-		predictedDistanceToStationNM := Haversine(newLat, newLon, stationLat, stationLon) / METERS_PER_NM
-
-		// Adjust speed based on proximity to airport if within range
-		if predictedDistanceToStationNM < SPEED_ADJUST_RANGE_NM {
-			// Calculate adjustment factor (0-1) based on how close we are to the airport
-			adjustmentFactor := (SPEED_ADJUST_RANGE_NM - predictedDistanceToStationNM) / SPEED_ADJUST_RANGE_NM
-
-			// Apply the adjustment based on whether we're approaching or departing
-			if approachingStation {
-				// Decrease speed when approaching
-				adjustedSpeed = speedKnots * (1.0 - (SPEED_ADJUST_PERCENT * adjustmentFactor))
-			} else {
-				// Increase speed when departing
-				adjustedSpeed = speedKnots * (1.0 + (SPEED_ADJUST_PERCENT * adjustmentFactor))
-			}
-		}
-
-		// Calculate new altitude based on vertical rate
-		// Vertical rate is in feet per minute
-		newAltitude := altBaro + (verticalRateFtMin * minutesAhead)
-
-		// If we're approaching the station and altitude is predicted to be negative,
-		// adjust it to be at ground level (0 feet)
-		if approachingStation && newAltitude < 0 {
-			// Keep the negative value for UI warning purposes, but cap it at -100 feet
-			// This allows the UI to show a warning icon while preventing extreme negative values
-			if newAltitude < -100 {
-				newAltitude = -100
-			}
-		}
-
-		// Create prediction
-		timestamp := now.Add(time.Duration(minutesAhead) * time.Minute)
-
-		predictions[i] = Position{
-			Lat:         NumberPtr(newLat),
-			Lon:         NumberPtr(newLon),
-			Altitude:    NumberPtr(newAltitude),
-			SpeedTrue:   NumberPtr(adjustedSpeed),
-			SpeedGS:     NumberPtr(adjustedSpeed),
-			TrueHeading: NumberPtr(trueHeading), // Assuming constant true heading
-			MagHeading:  NumberPtr(magHeading),  // Assuming constant magnetic heading
-			Timestamp:   timestamp,
-		}
-	}
-
-	return predictions
-}
-
-// GetStationCoordinates returns the latitude and longitude of the station (airport)
-// from the config. If the config is not available, it returns default values.
-func GetStationCoordinates() (float64, float64) {
-	// Get the config from the service
-	cfg := GetConfig()
-	if cfg != nil && cfg.Station.Latitude != 0 && cfg.Station.Longitude != 0 {
-		return cfg.Station.Latitude, cfg.Station.Longitude
-	}
-
-	// Default to Toronto Pearson International Airport coordinates
-	return 43.6777, -79.6248
-}
-
-// GetConfig returns the current configuration
-// This is a placeholder that should be replaced with actual config access
-var configInstance *Config
-
-func GetConfig() *Config {
-	return configInstance
-}
-
-// Config represents the application configuration
-type Config struct {
-	Station struct {
-		Latitude  float64
-		Longitude float64
-	}
-}
-
-// SetConfig sets the configuration for testing purposes
-func SetConfig(cfg *Config) {
-	configInstance = cfg
-}
-
-// Bearing calculates the initial bearing from point 1 to point 2
-func Bearing(lat1, lon1, lat2, lon2 float64) float64 {
-	// Convert to radians
-	lat1 = lat1 * math.Pi / 180.0
-	lon1 = lon1 * math.Pi / 180.0
-	lat2 = lat2 * math.Pi / 180.0
-	lon2 = lon2 * math.Pi / 180.0
-
-	// Calculate bearing
-	y := math.Sin(lon2-lon1) * math.Cos(lat2)
-	x := math.Cos(lat1)*math.Sin(lat2) - math.Sin(lat1)*math.Cos(lat2)*math.Cos(lon2-lon1)
-	bearing := math.Atan2(y, x) * 180.0 / math.Pi
-
-	// Normalize to 0-360
-	if bearing < 0 {
-		bearing += 360.0
-	}
-
-	return bearing
 }
 
 // RunwayThreshold represents a single runway threshold with its coordinates
