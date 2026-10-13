@@ -449,7 +449,7 @@
         // --- The context column (migration step 4, TrafficColumn) -------------
         // Which tab the column shows: "traffic" (the list and its filters) or
         // "now" (Right now, filled at step 5).
-        columnTab: 'traffic',
+        columnTab: 'now',
 
         // A family's filter is on when every one of its phase codes is on; the
         // codes keep their own keys and shortcuts (0 to 9), so a family can be

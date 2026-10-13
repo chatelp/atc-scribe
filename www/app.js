@@ -337,6 +337,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 await this.fetchStationData();
                 await this.fetchWeatherData();
+                this.startRightNow();
                 await this.fetchADSBSourceStatus();
                 // Initialize map using MapManager
                 if (this.mapManager && !this.mapManager.map) {

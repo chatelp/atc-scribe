@@ -57,9 +57,6 @@
         heliportsData: null, // Heliport reference data
         navaidsData: null, // Navaid reference data
         allRunwaysData: null, // All runways within range
-        metarDetailsVisible: false,
-        tafDetailsVisible: false,
-        notamDetailsVisible: false,
         stationRefreshInterval: null,
         weatherRefreshInterval: null,
         adsbSourceRefreshInterval: null,
@@ -79,11 +76,6 @@
             if (!aircraft || this.followedAirports.length < 2) return '';
             const cur = aircraft.phase && aircraft.phase.current && aircraft.phase.current[0];
             return (cur && cur.airport) || '';
-        },
-
-        // The airports followed besides the reference one, each with its runway in use.
-        otherAirports() {
-            return this.followedAirports.filter(a => !a.principal);
         },
 
         // The QNH of the moment, as the PAR view estimates it, within 40 NM of
@@ -221,10 +213,7 @@
                 this.setMainView('map');
             }
             // The map was display:none: OpenLayers must measure it again.
-            setTimeout(() => {
-                const m = this.mapManager && this.mapManager.engine && this.mapManager.engine.map;
-                if (m && typeof m.updateSize === 'function') m.updateSize();
-            }, 50);
+            this.remeasureMap();
         },
 
         async fetchStationData() {
@@ -559,24 +548,6 @@
             }
         },
         
-        // Extract runway end identifier from "05-23/05" format → "05"
-        formatRunwayEnd(runwayId) {
-            if (!runwayId) return '';
-            const parts = runwayId.split('/');
-            return parts.length === 2 ? parts[1] : runwayId;
-        },
-
-        // Check if two runway IDs represent parallel runways (same base number, different L/R/C).
-        // "06L-24R/06L" and "06R-24L/06R" → both base "06" → parallel
-        areParallelRunways(rwy1, rwy2) {
-            const end1 = this.formatRunwayEnd(rwy1);
-            const end2 = this.formatRunwayEnd(rwy2);
-            if (!end1 || !end2 || end1 === end2) return false;
-            const base1 = end1.replace(/[LRC]$/, '');
-            const base2 = end2.replace(/[LRC]$/, '');
-            return base1 === base2;
-        },
-
         getLatestMetar() {
             if (!this.metar || !this.metar.trend || this.metar.trend.length === 0) {
                 return null;
@@ -585,32 +556,5 @@
             // Return the first (latest) METAR in the trend array
             return this.metar.trend[0];
         },
-        
-        // The METAR, TAF and NOTAM popups (kind: 'metar', 'taf', 'notam'): one open
-        // at a time, placed above the button that opens it.
-        toggleWeatherDetails(kind) {
-            const open = !this[`${kind}DetailsVisible`];
-            this.metarDetailsVisible = false;
-            this.tafDetailsVisible = false;
-            this.notamDetailsVisible = false;
-            this[`${kind}DetailsVisible`] = open;
-            if (!open) return;
-
-            setTimeout(() => {
-                const button = document.querySelector(`[data-${kind}-button]`);
-                const popup = document.querySelector(`[data-${kind}-popup]`);
-
-                if (button && popup) {
-                    const rect = button.getBoundingClientRect();
-                    popup.style.left = `${rect.left + (rect.width / 2)}px`;
-                    popup.style.bottom = `${window.innerHeight - rect.top + 8}px`;
-                    popup.style.transform = 'translateX(-50%)';
-                    popup.style.transition = 'none';
-                }
-            }, 0);
-        },
-        toggleMetarDetails() { this.toggleWeatherDetails('metar'); },
-        toggleTAFDetails() { this.toggleWeatherDetails('taf'); },
-        toggleNOTAMDetails() { this.toggleWeatherDetails('notam'); },
-    }));
+            }));
 })();

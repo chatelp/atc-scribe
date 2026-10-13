@@ -49,6 +49,9 @@
     <!-- 4) Map foundation (core primitives and perf metrics) -->
     <!-- The five families of flight phase, one source for the map, the PAR and the list (migration step 2). -->
     <script defer src="phase/phase-families.js"></script>
+    <!-- Right now: the summary sentence, the arrival tables, the METAR in plain English (step 5). -->
+    <script defer src="now/right-now.js"></script>
+    <script defer src="now/metar-plain.js"></script>
     <script defer src="map/core/layer-registry.js"></script>
     <script defer src="map/core/event-bus.js"></script>
     <script defer src="map/core/visibility-rules.js"></script>
@@ -832,6 +835,27 @@
                             </template>
                         </div>
 
+                        <!-- The column folded (layout B, b-replie): Right now as a card over
+                             the sky, under the Map/PAR switch, which keeps the top right
+                             corner until its own step. -->
+                        <div x-show="$store.atc.columnFolded && !$store.atc.selectedAircraft" x-cloak
+                             class="cl-root hidden md:block absolute top-16 right-4 z-[10001]">
+                            <div class="cl-sky__end">
+                                <div class="cl-row">
+                                    <button class="cl-btn" @click="$store.atc.setColumnFolded(false, 'traffic')"
+                                            data-help-title="Traffic" data-help="Bring the column back on the list of aircraft.">Traffic <span class="cl-tabs__count" x-text="$store.atc.activeAircraftCount"></span></button>
+                                    <button class="cl-btn cl-btn--icon cl-mono" aria-label="Unfold the column" @click="$store.atc.setColumnFolded(false)"
+                                            data-help-title="Unfold the column" data-help="Bring the column back: Right now and the list of aircraft.">«</button>
+                                </div>
+                                <div class="cl-card cl-card--sky">
+                                    <span class="cl-label">Right now</span>
+                                    <p class="cl-summary" x-html="$store.atc.rightNow.short"></p>
+                                    <span class="cl-summary__source">From the ADS-B tracks.</span>
+                                    <button class="cl-btn" @click="$store.atc.setColumnFolded(false, 'now')">Open Right now</button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div x-data="{ open: false }" x-show="$store.atc.mainView === 'map'" class="absolute bottom-4 right-4 z-[10001]">
                             <button @click="open = !open"
                                     @keydown.escape.window="open = false"
@@ -1017,22 +1041,137 @@
                  filters; the map follows the filters. cl-root scopes the system's
                  styles to the column; the details panel keeps its old width until
                  step 8. -->
+            <!-- Folded (layout B), the column is hidden on a wide screen unless an
+                 aircraft's details are open: they live in it until step 8. The
+                 phone's list pane is not affected. -->
             <aside class="cl-root cl-app__column w-full min-w-0 overflow-hidden z-50"
-                   :class="[$store.atc.mobilePane === 'list' ? 'flex' : 'hidden md:flex', $store.atc.selectedAircraft ? 'md:w-120 md:min-w-120' : '']"
+                   :class="[($store.atc.columnFolded && !$store.atc.selectedAircraft)
+                              ? ($store.atc.mobilePane === 'list' ? 'flex md:hidden' : 'hidden')
+                              : ($store.atc.mobilePane === 'list' ? 'flex' : 'hidden md:flex'),
+                            $store.atc.selectedAircraft ? 'md:w-120 md:min-w-120' : '']"
                    aria-label="Context">
                 <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col">
                     <div class="cl-tabs cl-tabs--column" role="tablist">
                         <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.columnTab === 'now'" @click="$store.atc.columnTab = 'now'"
-                                data-help-title="Right now" data-help="The runway in use, who lands next, what happened, the weather: coming at the next step of the migration.">Right now</button>
+                                data-help-title="Right now" data-help="What the sky is doing now: the runway each airport uses, who lands next, what happened in the last half hour, the weather.">Right now</button>
                         <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.columnTab === 'traffic'" @click="$store.atc.columnTab = 'traffic'"
                                 data-help-title="Traffic" data-help="Every aircraft the receiver hears, with the filters; the map shows the same selection.">Traffic <span class="cl-tabs__count" x-text="$store.atc.activeAircraftCount"></span></button>
+                        <!-- Fold the column: the map takes its width, Right now becomes a card over it (layout B). -->
+                        <span class="cl-tabs__end hidden md:flex">
+                            <button class="cl-btn cl-btn--icon cl-mono" aria-label="Fold the column" @click="$store.atc.setColumnFolded(true)"
+                                    data-help-title="Fold the column" data-help="Give the map the whole width. Right now stays on the map as a small card; « brings the column back.">»</button>
+                        </span>
                     </div>
 
-                    <!-- Right now: a placeholder until step 5 gives it its content. -->
+                    <!-- Right now (ContextColumn, migration step 5): the summary sentence,
+                         the arrival tables, the last half hour's events, the weather and
+                         the counters, from what the store already holds. -->
                     <template x-if="$store.atc.columnTab === 'now'">
-                        <div class="cl-section" style="flex: 1; justify-content: center; text-align: center;">
-                            <span class="cl-strip__s" style="white-space: normal;">Right now will say the runway in use and since when, who lands next, what happened in the last half hour and the weather. It comes at the next step; the Traffic tab has everything for now.</span>
+                    <div class="cl-app__scroll">
+                    <div class="h-full overflow-y-auto overflow-x-hidden">
+                        <!-- SummarySentence: built from templates (www/now/right-now.js). -->
+                        <div class="cl-section">
+                            <p class="cl-summary" x-html="$store.atc.rightNow.html"></p>
+                            <p class="cl-summary__source cursor-help" x-text="$store.atc.rightNow.source"
+                               data-help-title="Where this comes from" data-help="The runway in use is judged from the takeoffs and landings the receiver has seen in the last minutes, and who lands next from the aircraft lined up on each runway's axis: an estimate, not what the tower announces."></p>
                         </div>
+
+                        <!-- ArrivalSequence: the PAR's own table, outside the PAR. -->
+                        <template x-for="t in $store.atc.arrivalTables" :key="t.key">
+                            <div class="cl-section">
+                                <span class="cl-label" x-text="t.title"
+                                      data-help-title="Arrivals" :data-help="'The aircraft coming in to ' + t.title.replace('Arrivals to ', '') + ', nearest the threshold first: who lands next, how far, how long at its present ground speed, and how far behind the one ahead.'"></span>
+                                <table class="cl-table">
+                                    <thead><tr>
+                                        <th></th><th>Aircraft</th>
+                                        <th class="is-num" data-help-title="To threshold" data-help="Distance along the runway axis to the landing threshold, which may sit some way in from the end of the runway.">To thr.</th>
+                                        <th class="is-num" data-help-title="Time" data-help="Time to the threshold at the aircraft's present ground speed, minutes:seconds.">Time</th>
+                                        <th class="is-num" data-help-title="Behind" data-help="Distance behind the aircraft ahead on the same final. In amber under 3 NM, the usual minimum radar spacing on final.">Behind</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <template x-for="r in t.rows" :key="r.hex">
+                                            <tr class="cursor-pointer" @click="$store.atc.selectAircraftByHex(r.hex)" :title="'Show ' + r.callsign">
+                                                <td class="is-dim" x-text="r.rank"></td>
+                                                <td><b x-text="r.callsign"></b> <span class="is-dim" x-text="r.type"></span></td>
+                                                <td class="is-num" x-text="r.toThreshold"></td>
+                                                <td class="is-num" x-text="r.time"></td>
+                                                <td class="is-num" :class="r.first ? 'is-dim' : (r.tight ? 'is-tight' : '')" x-text="r.behind"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                                <span x-show="t.more" class="cl-summary__source" x-text="'And ' + t.more + ' more: the PAR shows them all.'"></span>
+                            </div>
+                        </template>
+
+                        <!-- EventList: at most five, newest first; the bell keeps the full log. -->
+                        <div class="cl-section">
+                            <span class="cl-label">Worth knowing · last 30 min</span>
+                            <template x-if="$store.atc.nowEvents.length === 0">
+                                <span class="cl-summary__source">Nothing notable in the last half hour: no emergency, go-around or runway change.</span>
+                            </template>
+                            <ul class="cl-events" x-show="$store.atc.nowEvents.length > 0">
+                                <template x-for="ev in $store.atc.nowEvents" :key="ev.id">
+                                    <li :class="ev.hex ? 'is-clickable' : ''" @click="$store.events.select(ev)" :title="ev.hex ? 'Show this aircraft' : ''">
+                                        <time x-text="$store.atc.clockText(ev.at)"></time>
+                                        <span><span x-show="ev.mark.mark" :class="ev.mark.cls" x-text="ev.mark.mark + ' '"></span><span x-text="ev.text"></span></span>
+                                    </li>
+                                </template>
+                            </ul>
+                        </div>
+
+                        <!-- Weather: the reference airport's METAR read in plain English,
+                             the earlier ones, the TAF and the NOTAMs behind buttons. -->
+                        <div class="cl-section" x-show="$store.atc.stationFetchMETAR || $store.atc.stationFetchTAF || $store.atc.stationFetchNOTAMs">
+                            <span class="cl-label" x-text="'Weather at ' + $store.atc.weatherAirport"></span>
+                            <template x-if="$store.atc.metarRaw">
+                                <span class="cl-metar cursor-help" x-text="$store.atc.metarRaw"
+                                      data-help-title="METAR" data-help="The weather report the airport publishes every half hour, in the code pilots read. The line below says the same in words."></span>
+                            </template>
+                            <template x-if="$store.atc.metarPlain">
+                                <span class="cl-metar__plain" x-text="$store.atc.metarPlain"></span>
+                            </template>
+                            <template x-if="!$store.atc.metarRaw">
+                                <span class="cl-summary__source" x-text="'No METAR for ' + $store.atc.weatherAirport + ': the weather service has none for this airfield. Small airfields often publish none.'"></span>
+                            </template>
+                            <span class="cl-row" x-show="$store.atc.metarTrend.length > 1 || ($store.atc.stationFetchTAF && $store.atc.taf) || ($store.atc.stationFetchNOTAMs && $store.atc.notams && $store.atc.notams.length)">
+                                <button class="cl-btn" x-show="$store.atc.metarTrend.length > 1" :aria-pressed="$store.atc.nowWeatherOpen === 'trend'" @click="$store.atc.toggleNowWeather('trend')"
+                                        data-help-title="Earlier METARs" data-help="The last few reports, newest first: how the weather has been changing.">Earlier</button>
+                                <button class="cl-btn" x-show="$store.atc.stationFetchTAF && $store.atc.taf" :aria-pressed="$store.atc.nowWeatherOpen === 'taf'" @click="$store.atc.toggleNowWeather('taf')"
+                                        data-help-title="TAF" data-help="The forecast for the airport over the next day, in the same code as the METAR.">TAF</button>
+                                <button class="cl-btn" x-show="$store.atc.stationFetchNOTAMs && $store.atc.notams && $store.atc.notams.length" :aria-pressed="$store.atc.nowWeatherOpen === 'notam'" @click="$store.atc.toggleNowWeather('notam')"
+                                        data-help-title="NOTAM" data-help="Notices to airmen: closed runways, works, unserviceable aids, temporary procedures.">NOTAM <span class="cl-tabs__count" x-text="($store.atc.notams || []).length"></span></button>
+                            </span>
+                            <template x-if="$store.atc.nowWeatherOpen === 'trend'">
+                                <div class="cl-card">
+                                    <template x-for="(m, i) in $store.atc.metarTrend" :key="i">
+                                        <span class="cl-metar" x-text="m.metar"></span>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="$store.atc.nowWeatherOpen === 'taf' && $store.atc.taf">
+                                <div class="cl-card"><span class="cl-metar" x-text="$store.atc.taf.taf"></span></div>
+                            </template>
+                            <template x-if="$store.atc.nowWeatherOpen === 'notam'">
+                                <div class="cl-card max-h-[40vh] overflow-y-auto">
+                                    <template x-for="(n, i) in ($store.atc.notams || [])" :key="i">
+                                        <span class="cl-metar whitespace-pre-wrap" x-text="n.raw || n.message"></span>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- The counters. -->
+                        <div class="cl-section">
+                            <span class="cl-label">Traffic</span>
+                            <div class="cl-stats">
+                                <span class="cursor-help" data-help-title="Airborne" data-help="Aircraft in the air the receiver hears now."><b x-text="$store.atc.nowStats.airborne"></b> airborne</span>
+                                <span class="cursor-help" data-help-title="Heard" data-help="Aircraft the radio has named: a transmission was matched to their callsign."><b x-text="$store.atc.nowStats.heard"></b> heard</span>
+                                <span class="cursor-help" data-help-title="On the ground" data-help="Aircraft on the ground the receiver hears now: taxiing, or parked with a transponder on."><b x-text="$store.atc.nowStats.ground"></b> on the ground</span>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
                     </template>
 
                     <template x-if="$store.atc.columnTab === 'traffic'">
@@ -2042,160 +2181,8 @@
                     </div>
                 </div>
                 
-                <!-- Middle section - weather, kept to its own width. -->
-                <div class="flex-shrink-0 h-full flex items-center justify-center px-2">
-                    <div class="font-mono text-xs flex items-center justify-center">
-                        <div class="flex space-x-4">
-                        <!-- METAR Display -->
-                        <template x-if="$store.atc.getLatestMetar()">
-                            <div class="relative">
-                                <div @click="$store.atc.toggleMetarDetails()" data-metar-button
-                                     class="flex items-center cursor-pointer hover:bg-hover px-2 py-0.5 rounded transition-colors">
-                                    <i class="fas fa-cloud-sun mr-1 text-highlight"></i>
-                                    <span>METAR</span>
-                                </div>
-                        
-                                <!-- METAR Details Popup -->
-                                <div x-show="$store.atc.metarDetailsVisible"
-                                     @click.outside="$store.atc.metarDetailsVisible = false" data-metar-popup
-                                     class="absolute bottom-full left-1/2 mb-2 w-96 bg-panel border border-border rounded-lg shadow-2xl overflow-hidden z-[2000]" style="position: fixed; transform: translateX(-50%);">
-                                    <div class="flex justify-between items-center p-2 border-b border-border">
-                                        <h5 class="text-xs font-semibold text-highlight">METAR</h5>
-                                        <button @click="$store.atc.metarDetailsVisible = false" class="text-text/70 hover:text-text">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                    <div class="p-3 max-h-96 overflow-y-auto">
-                                        <template x-if="$store.atc.metar && $store.atc.metar.trend">
-                                            <div class="space-y-3">
-                                                <template x-for="(item, index) in $store.atc.metar.trend" :key="index">
-                                                    <p class="text-xs bg-background/30 p-2 rounded break-words" x-text="item.metar"></p>
-                                                </template>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                
-                <!-- TAF Display -->
-                <template x-if="$store.atc.stationFetchTAF && $store.atc.taf">
-                    <div class="relative">
-                        <div @click="$store.atc.toggleTAFDetails()" data-taf-button
-                             class="flex items-center cursor-pointer hover:bg-hover px-2 py-0.5 rounded transition-colors">
-                            <i class="fas fa-cloud mr-1 text-blue-400"></i>
-                            <span>TAF</span>
-                        </div>
-                        
-                        <!-- TAF Details Popup -->
-                        <div x-show="$store.atc.tafDetailsVisible"
-                             @click.outside="$store.atc.tafDetailsVisible = false" data-taf-popup
-                             class="absolute bottom-full left-1/2 mb-2 w-96 bg-panel border border-border rounded-lg shadow-2xl overflow-hidden z-[2000]" style="position: fixed; transform: translateX(-50%);">
-                            <div class="flex justify-between items-center p-2 border-b border-border">
-                                <h5 class="text-xs font-semibold text-highlight">TAF</h5>
-                                <button @click="$store.atc.tafDetailsVisible = false" class="text-text/70 hover:text-text">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                            <div class="p-3 max-h-96 overflow-y-auto">
-                                <template x-if="$store.atc.taf">
-                                    <div>
-                                        <p class="text-xs bg-background/30 p-2 rounded break-words" x-text="$store.atc.taf.taf"></p>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-                
-                <!-- NOTAM Display -->
-                <template x-if="$store.atc.stationFetchNOTAMs && $store.atc.notams && $store.atc.notams.length > 0">
-                    <div class="relative">
-                        <div @click="$store.atc.toggleNOTAMDetails()" data-notam-button
-                             class="flex items-center cursor-pointer hover:bg-hover px-2 py-0.5 rounded transition-colors">
-                            <i class="fas fa-exclamation-triangle mr-1 text-warning"></i>
-                            <span>NOTAM</span>
-                        </div>
-                        
-                        <!-- NOTAM Details Popup -->
-                        <div x-show="$store.atc.notamDetailsVisible"
-                             @click.outside="$store.atc.notamDetailsVisible = false" data-notam-popup
-                             class="absolute bottom-full left-1/2 mb-2 w-96 bg-panel border border-border rounded-lg shadow-2xl overflow-hidden z-[2000]" style="position: fixed; transform: translateX(-50%);">
-                            <div class="flex justify-between items-center p-2 border-b border-border">
-                                <h5 class="text-xs font-semibold text-highlight">NOTAM</h5>
-                                <button @click="$store.atc.notamDetailsVisible = false" class="text-text/70 hover:text-text">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                            <div class="p-3 max-h-96 overflow-y-auto">
-                                <template x-if="$store.atc.notams && $store.atc.notams.length > 0">
-                                    <div class="space-y-3">
-                                        <template x-for="(notam, index) in $store.atc.notams" :key="index">
-                                            <p class="text-xs bg-background/30 p-2 rounded break-words" x-text="notam.raw || notam.message"></p>
-                                        </template>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Runway In Use Indicator -->
-                <div class="flex-shrink-0 h-full flex items-center px-4 mr-2 border-l border-r border-border/30 cursor-help"
-                     data-help-title="Runway in use" data-help="The runway each followed airport is using, judged from the takeoffs and landings of the last minutes. A runway is named by its direction: 27 is about 270 degrees, west; L and R tell parallel runways apart. Unknown until enough aircraft have used it.">
-                    <div class="flex items-center space-x-2.5">
-                        <!-- No data -->
-                        <template x-if="!$store.atc.runwayInUse || $store.atc.runwayInUse.length === 0">
-                            <div class="flex flex-col items-center justify-center min-w-[36px]">
-                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5" x-text="$store.atc.followedAirports.length > 1 ? $store.atc.stationAirportCode : 'RWY'">RWY</span>
-                                <span class="font-mono text-sm text-text/25 leading-none tracking-wider">---</span>
-                            </div>
-                        </template>
-                        <!-- Parallel runways: co-primary display (e.g. "06L / 06R") -->
-                        <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15 && $store.atc.areParallelRunways($store.atc.runwayInUse[0].runway_end, $store.atc.runwayInUse[1].runway_end)">
-                            <div class="flex flex-col items-center justify-center">
-                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5" x-text="$store.atc.followedAirports.length > 1 ? $store.atc.stationAirportCode : 'RWYS'">RWYS</span>
-                                <div class="flex items-baseline gap-1">
-                                    <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
-                                          x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[0].runway_end)"></span>
-                                    <span class="font-mono text-sm text-text/30 leading-none">/</span>
-                                    <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
-                                          x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[1].runway_end)"></span>
-                                </div>
-                            </div>
-                        </template>
-                        <!-- Single runway (or non-parallel secondary) -->
-                        <template x-if="$store.atc.runwayInUse && $store.atc.runwayInUse.length > 0 && !($store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15 && $store.atc.areParallelRunways($store.atc.runwayInUse[0].runway_end, $store.atc.runwayInUse[1].runway_end))">
-                            <div class="flex items-center space-x-2.5">
-                                <div class="flex flex-col items-center justify-center min-w-[36px]">
-                                    <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5" x-text="$store.atc.followedAirports.length > 1 ? $store.atc.stationAirportCode : 'RWY'">RWY</span>
-                                    <span class="font-mono text-xl font-black text-highlight leading-none tracking-wider"
-                                          x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[0].runway_end)"></span>
-                                </div>
-                                <template x-if="$store.atc.runwayInUse.length > 1 && $store.atc.runwayInUse[1].probability > 0.15">
-                                    <div class="flex flex-col items-center justify-center opacity-35 border-l border-border/20 pl-2.5 cursor-help"
-                                         data-help-title="Alternate runway" data-help="ALT is not an altitude here: it is the second most likely runway in use, judged from the same takeoffs and landings, shown while its likelihood stays above 15 %.">
-                                        <span class="text-[7px] text-text/30 uppercase tracking-[0.2em] leading-none mb-0.5">ALT</span>
-                                        <span class="font-mono text-xs text-text/50 leading-none tracking-wider"
-                                              x-text="$store.atc.formatRunwayEnd($store.atc.runwayInUse[1].runway_end)"></span>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                        <!-- The runway in use of each airport followed besides the reference one (Q40) -->
-                        <template x-for="ap in $store.atc.otherAirports()" :key="'rwy-' + ap.code">
-                            <div class="flex flex-col items-center justify-center min-w-[36px] border-l border-border/20 pl-2.5">
-                                <span class="text-[7px] text-text/40 uppercase tracking-[0.2em] leading-none mb-0.5" x-text="ap.code"></span>
-                                <span class="font-mono text-sm font-bold leading-none tracking-wider"
-                                      :class="ap.runway_in_use && ap.runway_in_use.length ? 'text-highlight' : 'text-text/25'"
-                                      x-text="ap.runway_in_use && ap.runway_in_use.length ? $store.atc.formatRunwayEnd(ap.runway_in_use[0].runway_end) : '---'"></span>
-                            </div>
-                        </template>
-                    </div>
-                </div>
+                <!-- The weather (METAR, TAF, NOTAM) and the runway in use moved to
+                     Right now (step 5). -->
 
                 <!-- The lights and the clocks moved to the top bar (step 3). -->
             </div>
@@ -2221,6 +2208,7 @@
     <script defer src="store/aircraft-details.js"></script>
     <script defer src="store/feed.js"></script>
     <script defer src="store/sidebar.js"></script>
+    <script defer src="store/now.js"></script>
     <script defer src="server-settings.js"></script>
     <script defer src="app.js"></script>
     <!-- Alpine starts after every script above has registered its stores and
