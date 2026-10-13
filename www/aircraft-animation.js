@@ -162,6 +162,21 @@ class AircraftAnimationEngine {
         this._secMarkerUpdates = 0;
 
         this.rafLoop = this.rafLoop.bind(this);
+
+        // Shown again, the tab draws its first frame before the first
+        // animation frame runs: the poses of before it was hidden, then a
+        // jump to the current ones a frame later (browser bench, scenario e:
+        // 3.7 km in 21 ms). The visibility event comes first: the poses are
+        // set there.
+        if (typeof document !== 'undefined' && document.addEventListener) {
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState !== 'visible' || !this.isRunning) return;
+                const now = performance.now();
+                this._resume();
+                this._processFrame(now);
+                this.lastFrameAt = now;
+            });
+        }
     }
 
     initialize() {
@@ -278,6 +293,16 @@ class AircraftAnimationEngine {
         if (updated) {
             updated.lastEstimateAt = at;
         }
+    }
+
+    // Where the engine draws an aircraft now, for a symbol just created
+    // (map/openlayers-map-manager.js): null when it has no sample of it.
+    currentPose(hex) {
+        const state = this.aircraftStates.get(hex);
+        if (!this.config.enabled || !state || !state.lastReal) return null;
+        const pose = this._computePose(state, performance.now());
+        if (pose && Number.isFinite(pose.fade)) delete pose.fade;
+        return pose;
     }
 
     // An aircraft as the store holds it, for the callers that have no

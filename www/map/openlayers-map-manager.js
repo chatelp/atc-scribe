@@ -1266,6 +1266,12 @@
             // for as long as nobody touched the map).
             if (hadFeature !== !!this._getAircraftFeature(hex)) {
                 this.updateVisibleAircraftList();
+                // A new symbol stands at the position the station gave; the
+                // engine draws the aircraft where that position, dated, puts it
+                // now: on a page just loaded, 450 m further on its next frame
+                // (browser bench, scenario a). It starts there.
+                const pose = !hadFeature && this.store?.animationEngine?.currentPose?.(hex);
+                if (pose) this.updateAnimatedAircraftPose(hex, pose);
             }
             this.updateProximityCircle();
             this._stats.singleAircraftUpdateDurationMs += (performance.now() - startedAt);

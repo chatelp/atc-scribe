@@ -227,3 +227,13 @@ test('strategy B draws the aircraft in the past, between two observed fixes (fic
     assert.ok(Math.abs(p.lon - 2.0014) < 0.0002, `drawn at ${p.lon.toFixed(5)}, want about 2.0014`);
     assert.equal(new AircraftAnimationEngine({}, {}).config.strategy, 'A', 'A stays the default');
 });
+
+test("a symbol just created starts where the engine draws its aircraft (fiche M, step 4)", () => {
+    const { e } = engine();
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 2000, now));
+    const p = e.currentPose('abc123');
+    const metres = (p.lon - 2.0) * 111320 * Math.cos(48.5 * Math.PI / 180);
+    assert.ok(metres > 350 && metres < 480, `${metres.toFixed(0)} m on from the fix decoded 2 s ago, want about 412`);
+    assert.equal(e.currentPose('nobody'), null);
+});
