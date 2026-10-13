@@ -303,11 +303,13 @@ for (const f of walk(WWW).filter((f) => f.endsWith('.css'))) {
 // www/tokens.css and www/components.css are copies of the design system
 // (docs-fr/design/systeme/project/), written by tools/design/ds-export.mjs
 // --www and never edited by hand (04-migration.md, rule 1): a copy that is
-// missing, retouched or behind its source fails here. Until step 1 of the
-// migration puts the copies in www/, their absence is not a problem.
+// missing, retouched or behind its source fails here. Since step 1 of the
+// migration, index.html links both: a missing copy is a problem too.
 {
     const copies = ['tokens.css', 'components.css'].map((f) => join(WWW, f));
-    if (copies.some((f) => existsSync(f))) {
+    const linked = copies.filter((f) => html.includes(`href="${relative(WWW, f)}"`));
+    for (const f of linked) if (!existsSync(f)) problems.push(`${relative(ROOT, f)} is linked by index.html but missing: run node tools/design/ds-export.mjs --www`);
+    if (linked.length || copies.some((f) => existsSync(f))) {
         const r = spawnSync(process.execPath, [join(ROOT, 'tools', 'design', 'ds-export.mjs'), '--check', 'www'], { cwd: ROOT, encoding: 'utf8' });
         if (r.status !== 0) problems.push(`the design system's copies in www/ differ from their source:\n${(r.stdout + r.stderr).trim()}\nrun node tools/design/ds-export.mjs --www`);
     }

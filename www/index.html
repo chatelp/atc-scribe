@@ -22,6 +22,13 @@
     <!-- The libraries are served by co-atc itself, pinned, from www/vendor/:
          no outside host (audit 4.3). -->
     <!-- Custom CSS -->
+    <!-- The design system (docs-fr/design/systeme/), copied here by
+         tools/design/ds-export.mjs --www and checked by the safety net: the
+         tokens as variables on :root, the components under .cl-root. Loaded
+         first; until an element carries cl-root, nothing on screen changes
+         (migration step 1). -->
+    <link rel="stylesheet" href="tokens.css">
+    <link rel="stylesheet" href="components.css">
     <link rel="stylesheet" href="style.css">
     <!-- Tailwind, compiled by tools/tailwind/build.sh from the classes the page
          uses; rebuild it after changing a class. After style.css on purpose: the
