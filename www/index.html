@@ -96,7 +96,7 @@
                   :data-help="($store.atc.statusLights.find(l => l.key === 'rx') || {}).help || 'The radio that feeds the audio streams. Its selection is made at the station.'"></span>
             <template x-for="l in $store.atc.statusLights.filter(l => l.key !== 'rx')" :key="l.key">
                 <span class="cl-light cursor-help" :class="'cl-light--' + l.level"
-                      x-text="l.label + ' ' + l.text" :data-help-title="l.label" :data-help="l.help"></span>
+                      x-text="l.label + (l.text && l.text !== 'OK' ? ' ' + l.text : '')" :data-help-title="l.label" :data-help="l.help"></span>
             </template>
             <!-- The clock that times the interface comes first, in accent; the other
                  after it. Which one is chosen in Settings > Display (showLocalDates). -->
@@ -118,7 +118,8 @@
                     data-help="Emergencies, go-arounds, runway changes, aircraft of interest, the station switching channels, streams lost or back."
                     :class="$store.events.open ? 'is-on' : ''" @click="$store.events.toggleOpen()" style="position: relative;">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 11V7a4 4 0 0 1 8 0v4l1.5 1.5h-11L4 11ZM6.5 14h3"/></svg>
-                <span x-show="$store.events.unread > 0" x-cloak class="cl-counter cl-counter--urgent"
+                <span x-show="$store.events.unread > 0" x-cloak class="cl-counter"
+                      :class="$store.events.unreadUrgent > 0 ? 'cl-counter--urgent' : ''"
                       style="position: absolute; top: -4px; right: -4px;"
                       x-text="$store.events.unread > 99 ? '99+' : $store.events.unread"></span>
             </button>
