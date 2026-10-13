@@ -71,6 +71,12 @@
         return ((a && a.flight) || '').trim() || (a && a.hex ? a.hex.toUpperCase() : '?');
     }
 
+    // "an A337", "a B744": the article as the type code is read aloud, letter
+    // by letter (A, E, F, H, I, L, M, N, O, R, S, X start with a vowel sound).
+    function article(type) {
+        return /^[AEFHILMNORSX]/i.test(String(type || '')) ? 'an' : 'a';
+    }
+
     function runwayEnd(id) {
         if (!id) return '';
         const parts = String(id).split('/');
@@ -180,7 +186,7 @@
                     if (INTEREST_TYPES.has(type)) {
                         this.add({
                             kind: 'interest', hex: a.hex, key: `type:${a.hex}`,
-                            text: `${callsign(a)}, a ${type}, is in range`,
+                            text: `${callsign(a)}, ${article(type)} ${type}, is in range`,
                         });
                     }
                 }
