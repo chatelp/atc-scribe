@@ -90,7 +90,7 @@ Cinq fiches dans `docs-fr/fiches-cloud/` (prompts à coller dans son README), du
 logique pure, sans la station : **G** la route publique des chiffres avant connexion et les trois
 valeurs qui manquent ; **H** le serveur sans transcription et le Docker amont retiré ; **I** les
 dettes de sécurité (CORS, WebSocket, rôle lecture seule, purges) ; **J** la compilation
-Windows ; **K** « Then » sans verdict. Indépendantes, lancées par le propriétaire quand il veut ;
+Windows ; **K** « Then » sans verdict. Indépendantes, **lancées par le propriétaire le 13/10 au soir** ;
 chaque branche `cloud/…` revient sur le Mac pour relecture et intégration. La migration de
 l'interface, elle, reste sur le Mac.
 
