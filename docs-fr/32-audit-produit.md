@@ -506,7 +506,12 @@ sur la carte.
   la longueur des traînées et la limite de pistes, la bulle de dernière transmission, les trois
   réglages d'animation et le bouton WebSocket de « Performance and debug », l'exclusion des
   avions au sol des autres aérodromes ; et le choix « accès local / compte » de la page de
-  connexion, qui passe au premier lancement et aux réglages (déplacé, pas perdu).
+  connexion, qui passe au premier lancement et aux réglages (déplacé, pas perdu). **Intégré le
+  soir même** par la session design : huit lignes de plus dans la table de `09-ecrans.md`, les
+  curseurs d'opacité et la longueur des traînées dessinés dans `a-calques`, les réglages
+  d'animation, de trace, d'accès et le bouton WebSocket dans `reglages` (System › Performance
+  and debug) ; le composant d'étiquette porte la troisième ligne, aucun composant bulle. La
+  table couvre maintenant chaque fonction d'aujourd'hui : c'est elle que chaque étape coche.
 - 13/10 (après-midi) : **trois petits chantiers pour le panneau « Right now »** des esquisses
   design, validés par le propriétaire après l'état des lieux (ce que la page peut afficher
   aujourd'hui, vérifié ligne par ligne) : (1) le journal d'événements survit au rechargement
