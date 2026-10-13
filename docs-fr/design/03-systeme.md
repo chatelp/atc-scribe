@@ -156,8 +156,7 @@ vert) : ΔE 18,4 sous les quatre visions. S'y ajoute toujours une forme (■, �
 - **Mesure** (principe 8) : le monospace est 1,24 à 1,32 fois plus large à taille égale. Une
   transcription passée en police système à 14 px tient dans moins de place qu'aujourd'hui à
   12 px en monospace.
-- *À trancher par le propriétaire* : si le tout-monospace est gardé, l'échelle reste la même. Les
-  phrases restent alors à 12 px dans les colonnes étroites (fil de 320 px).
+- *Tranché le 13/10* : la police du système pour les phrases (choix 1 en fin de document).
 
 ### Cinq tailles, plancher 11 px
 
@@ -486,21 +485,21 @@ Pas de troisième niveau. Le seuil de 768 px est celui des classes `md:` déjà 
 - **Cibles** : 24 px au bureau, 44 au téléphone (aujourd'hui 35 sur 41 sous 44 px au téléphone).
 - **Mouvement** : `prefers-reduced-motion` respecté (§ 5).
 
-## 8. La marque, en attente du nom
+## 8. La marque : Clairance
 
-Quand le nom sera choisi (`00-nom.md`), la marque s'écrira avec ces jetons :
-- le nom en `font.family.mono`, 600, `text.primary`, avec un seul signe en `accent` ;
-- un pictogramme de 16 px dessiné sur une grille de 16 avec des traits de 2 px, lisible en
-  `accent` sur `surface.page` et en monochrome dans la barre de menus ;
-- deux états pour la barre de menus (production en marche ou arrêtée), qui diffèrent par la forme
-  et pas seulement par la couleur (principe 6) ;
-- une page de connexion faite des mêmes surfaces et du même vert que l'outil : la palette propre
-  de `login.js` (7 couleurs) disparaît.
+Le nom et le signe sont décidés le 13/10 et décrits dans `05-identite.md` : le nom en
+`font.family.mono`, 600, `text.primary` ; le signe, le scope radar, en `text.primary` et
+`accent`, en trois états (arrêté, en marche, à l'écoute) qui diffèrent par la forme (principe 6) ;
+la page de connexion faite des mêmes surfaces et du même vert que l'outil (la palette propre de
+`login.js`, 7 couleurs, disparaît).
 
-## Ce qui reste à trancher par le propriétaire
+## Les choix du propriétaire
 
-1. Le monospace pour les phrases ou la police du système (principe 8).
-2. Les cinq familles de phase à la place des dix couleurs.
-3. La rampe de clarté sans teinte pour l'altitude des avions.
-4. J / K au lieu de Tab pour passer d'un avion à l'autre.
-5. L'interpolation des avions gardée sous `prefers-reduced-motion`.
+Tranchés le 13/10, tous selon la proposition :
+1. la police du système pour les phrases, le monospace pour ce qui se compare (principe 8) ;
+2. les cinq familles de phase à la place des dix couleurs, sur la carte, la liste et la PAR ;
+3. la rampe de clarté sans teinte pour l'altitude des avions ;
+4. J / K (et ↓ / ↑ quand la liste a le focus) au lieu de Tab pour passer d'un avion à l'autre.
+
+Reste ouvert, sans effet sur le dessin : 5. l'interpolation des avions gardée sous
+`prefers-reduced-motion` (proposé : gardée, c'est de l'information).

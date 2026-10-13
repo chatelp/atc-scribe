@@ -110,7 +110,8 @@ et du confort. *Mesure* (navigateur, cinq transmissions types FR et EN) : le mon
 système à **14 px** occupe moins de largeur (477 px) que la même en monospace à 12 px (527 px). À
 largeur égale, le passage gagne deux pixels de corps, ce qui règle le plancher du principe 2 sans
 perdre de place. Aujourd'hui : monospace pour 100 % des caractères.
-*À trancher par le propriétaire* : c'est le seul principe qui change l'allure générale.
+*Tranché par le propriétaire le 13/10* : la police du système pour les phrases, le monospace pour
+ce qui se compare. C'est le seul principe qui change l'allure générale.
 
 ## 9. Deux densités, pas trois
 

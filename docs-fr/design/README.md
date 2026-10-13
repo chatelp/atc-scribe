@@ -10,8 +10,8 @@ atc-scribe (`04-migration.md`).
 | `00-nom.md` | la recherche du nom en trois tours et la place du français (D74, Q53) | **Clairance**, décidé le 13/10 |
 | `01-inventaire.md` | l'interface du 12/10, mesurée : tailles, couleurs, contrastes, états, icônes | fait |
 | `01-inventaire-brut.md` | la sortie complète de `tools/design/inventory.mjs`, régénérable | fait |
-| `02-principes.md` | dix principes, chacun justifié par un usage et une mesure | fait ; principe 8 **à trancher** |
-| `03-systeme.md` | le système : couleurs, typographie, espace, composants, mouvement, densité, accessibilité | fait ; cinq choix **à trancher** (fin du document) |
+| `02-principes.md` | dix principes, chacun justifié par un usage et une mesure | fait ; principe 8 tranché le 13/10 |
+| `03-systeme.md` | le système : couleurs, typographie, espace, composants, mouvement, densité, accessibilité | fait ; quatre choix tranchés le 13/10, le cinquième (mouvement réduit) sans effet sur le dessin |
 | `jetons.json` | les 91 jetons, source unique des valeurs | fait |
 | `03-systeme-verif.md` | chaque contraste et chaque distance pour les daltoniens, produit par `tools/design/tokens.mjs` | régénérable |
 | `maquettes/` | écrans en HTML statique sur les jetons (`index.html` pour commencer) | fait |
