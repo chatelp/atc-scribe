@@ -4,6 +4,11 @@
 un positionnement « espace aérien français » ?). **Rien n'est décidé ici : Pierre choisit.** Aucun
 nom n'est marqué, réservé ni acheté avant son choix.*
 
+> **Mis à jour le 13/10.** Le premier tour (§ 3, recommandation 5/5) a été jugé trop peu original
+> par le propriétaire. Un second tour dans l'histoire de l'aviation, puis un troisième dans le
+> vocabulaire de la fréquence, mènent à **Clairance**, vérifié marques et domaines (§ 4). Les
+> paragraphes 1 et 2 (contraintes, place du français) restent la référence.
+
 Sources : la session « ATC-scribe communauté » (noms pris dans l'écosystème, réception probable,
 vocabulaire réel, dans son dépôt privé `02-existant.md`, `03-communautes.md` § 9,
 `annexes/pistes-de-nom.md`) ; une vérification de disponibilité en lecture seule le 12/10 (GitHub,
@@ -153,7 +158,7 @@ d'applications, réseaux sociaux.
 | Clair | Quay Clair (scanner de conteneurs, 11 000 étoiles) |
 | Roger, Contact, Copy | Génériques, impossibles à trouver |
 
-## 4. Le tableau pour trancher
+### Le tableau du premier tour (12/10, dépassé)
 
 | | Générique, français comme capacité | Français assumé |
 |---|---|---|
@@ -163,23 +168,77 @@ d'applications, réseaux sociaux.
 | **D. Verticale** | — | `verticale` |
 | **E. Lisible** | — | `lisible` |
 
-**Ma recommandation** : **A, dans le positionnement générique** (marque `5/5`, dépôt
-`five-by-five`, README français complet à égalité). C'est le seul candidat qui :
-- se dit naturellement dans les deux langues ;
-- est sans collision dans notre domaine ;
-- a ses domaines libres sous les deux formes ;
-- donne un signe évident à 16 px.
+La recommandation de ce tour était A (5/5). Le propriétaire, le 12/10 au soir : « ça manque
+franchement d'originalité » ; chercher dans l'histoire de l'aviation, française en particulier.
 
-Il garde aussi la porte ouverte au français assumé sans changer de nom : la même marque, le dépôt
-`cinq-sur-cinq`.
+## 4. Second et troisième tours (12 et 13/10) : Clairance
 
-**Si le français assumé est préféré** : A sous sa forme française, ou D (le meilleur signe).
+### Ce que le propriétaire a dit
 
-**À faire avant d'adopter quoi que ce soit, quel que soit le choix** :
-- une recherche de marque (INPI, EUIPO) ;
-- la vérification du .com et des magasins d'applications ;
-- la lecture du brevet US12277862B1 (Q53) par quelqu'un de compétent, avant toute diffusion hors
-  de France.
+Sur une liste prise dans l'histoire (Gonio, la radiogoniométrie de l'Aéropostale ; Demoiselle,
+l'avion de Santos-Dumont aux plans donnés ; Éole ; Alouette ; Chandelle ; Timbre ; Identifié ;
+Reçu ; Galène, le poste à galène des années 1920), **Galène** avait sa préférence, sans le
+convaincre tout à fait. Sur une liste de mots à double sens (Aplomb, Portée, Volubile, Envolée) :
+« un nom qui fasse sérieux, Volubile ne va pas du tout, un rapport direct avec l'aviation, moins
+cryptique qu'atc-scribe ». Deux leçons : un mot de la fréquence elle-même, et aucun jeu de mots.
+
+### Écartés à la vérification (13/10)
+
+| Nom | Pourquoi |
+|---|---|
+| Galène | **pris** : `jech/galene`, serveur de visioconférence libre et français, 1 418 étoiles, avec un module `galene-stt` de transcription de la parole ; .org, .app, .dev, .io, .fr enregistrés |
+| Indicatif | bibliothèque Rust `console-rs/indicatif`, 5 224 étoiles |
+| Survol | extension de navigateur `mdolr/survol`, 164 étoiles ; domaines pris ; « sur- » voisin de surveillance |
+| Vol de nuit | la vraie histoire de l'outil (Rivière écoutant les avions dans la nuit), mais parfum Guerlain depuis 1933 et succession Saint-Exupéry |
+| Pionniers (Mermoz, Saint-Ex, Latécoère, Dassault) | successions et marques actives ; un nom propre ne dit pas ce que fait l'outil |
+| Phonie | le vrai mot de la radio aéronautique française ; se lit *phony* en anglais |
+
+### Le troisième tour : les mots de la fréquence
+
+| Nom | Ce qu'il dit | GitHub (nom contient) | Domaines | Verdict |
+|---|---|---|---|---|
+| **Clairance** | l'autorisation que donne le contrôleur, orthographe du contrôle français ; porte « clair » | 4, tous médicaux | .org .app .dev libres ; .io .fr .com pris | **recommandé** |
+| Phraséo | la phraséologie, langue codée de la radio, nom courant chez pilotes et contrôleurs (le manuel de la DSNA s'appelle `phraseo`) | 171, surtout *phraseology* | .org .io .dev libres | bon second ; « salle de cours » |
+| Approche | la phase où le ciel parle le plus, le nom des fréquences écoutées | 872, au sens de « méthode » | probablement pris | compris de tous, impossible à posséder |
+| Bande aéro | le nom que les écouteurs donnent à la bande VHF aviation | 0 | .org .io .fr libres | descriptif, nom de catégorie |
+| Portance | la force qui porte l'aile | 3 | .dev libre | sérieux, mais ne dit rien de la radio |
+
+### Clairance, vérifié le 13/10
+
+- **Sens.** Le mot central de la radio aéronautique : « clairance de décollage », « clairance ILS »,
+  ce que l'outil met en clair sous chaque transmission (« Cleared ILS runway 26L »). Compris d'un
+  anglophone (*clearance*) et de tout spectateur de film. Autres sens, hors aviation : la clairance
+  rénale (médecine) ; en anglais, le dédouanement, l'habilitation, les soldes. Pour la sensibilité
+  du SNCTA : la clairance est l'acte du contrôleur, pas son évaluation.
+- **Prononciation.** FR /klɛ.ʁɑ̃s/ ; EN *clearance*.
+- **Code.** GitHub : 4 dépôts, tous sur la clairance de la créatinine ; npm, PyPI, crates.io,
+  Docker Hub : aucun paquet ; App Store : aucune application de ce nom (seulement des calculateurs
+  médicaux et des applications de soldes « clearance »). Google Play non vérifié.
+- **Domaines.** `clairance.org`, `.app`, `.dev` libres ; `.io` et `.fr` pris ; `.com` pris depuis
+  2011 (OVH) par un cabinet lyonnais de cession d'entreprise, site actif. La paire naturelle est
+  `.org` + `.app`.
+- **Marques** (TMview, 13/10, qui agrège INPI, EUIPO, OMPI, USPTO et les offices nationaux) :
+  11 marques contenant « clairance », toutes déposées en France, en Suisse ou en Tunisie ; **aucune
+  à l'EUIPO**, aucune aux États-Unis. **Aucune marque « CLAIRANCE » seule n'est active** : les
+  trois qui existaient sont expirées (Suisse 1990, cl. 3 ; INPI 1991, cl. 3 et 42 ; INPI 1997,
+  cl. 11). Actives : « CLAIRANCE Avocats » (INPI 2021, cl. 16, 41, 45 : un cabinet, hors
+  logiciel) et « Eclairance » / « éclairance » (INPI 2020 et 2022, cl. 35, 36, 37, 41, 42, 45) : un
+  autre mot, à une lettre près, qui couvre la classe 42 (services logiciels). `data.inpi.fr` rend
+  0 marque sur le mot, son moteur étant moins complet que TMview. La recherche exacte du mot
+  anglais « clearance » a échoué sur TMview (erreur de validation) : non vérifiée.
+- **Lecture.** Pour un logiciel libre qui ne vend rien, rien ne bloque l'usage du mot. Si un dépôt
+  de marque était voulu un jour (cl. 9 et 42), « éclairance » serait l'antériorité à faire examiner
+  par un conseil.
+- **Forme.** Marque « Clairance », dépôt `chatelp/clairance`, signe : une piste et une coche,
+  « autorisé ». Positionnement générique (§ 2) : page GitHub en anglais, README français complet à
+  égalité, le français comme capacité.
+
+**Ma recommandation : Clairance.** Sérieux, aviation sans détour, compréhensible du premier coup,
+et il dit ce que fait l'outil : rendre la clairance claire.
+
+**Reste à faire après le choix** : la lecture du brevet US12277862B1 (Q53) par quelqu'un de
+compétent, avant toute diffusion hors de France ; et, si le propriétaire veut les domaines,
+`clairance.org` et `clairance.app` à prendre chez un registrar (rien n'a été réservé).
 
 ## 5. Ce qui suit le choix
 
