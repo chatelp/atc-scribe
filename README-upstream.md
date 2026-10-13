@@ -3,6 +3,7 @@ Preserved verbatim from upstream yegors/co-atc at commit 0e4d685.
 Clairance replaced the root README; this copy keeps upstream's installation
 notes, configuration reference and screenshots, which are still accurate for
 everything this fork did not change.
+Upstream shipped a Docker setup; it was removed on 13/10, it did not build.
 -->
 
 # Co-ATC: Aircraft Monitoring System
