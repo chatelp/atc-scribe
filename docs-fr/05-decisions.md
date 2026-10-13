@@ -4867,6 +4867,12 @@ copiés dans `www/brand/` pour la page et le README, `tools/menubar/` pour le la
 (balayage et plot en marche, écran vide à l'arrêt) à la place des symboles système ; README avec
 le signe selon le thème et la première phrase de la marque. La marque en tête de la carte de
 connexion et dans l'en-tête de l'outil viendra avec la migration du design.
+**Troisième état, ajouté le 13/10 à la demande du propriétaire** (« Trois états du même signe »
+dans `05-identite.md`) : arrêté (écran vide), en marche (le scope), **à l'écoute** (l'écran
+allumé). Appliqué le même jour : dans le lanceur, « à l'écoute » = production qui tourne **et**
+antenne à l'antenne (mode `chaine` du `/radio/etat` de la station), image en couleurs, pas
+template, à dessein ; dans la page, le favicon passe à `favicon-actif.svg` tant qu'au moins une
+fréquence est écoutée dans ce navigateur (`www/favicon-state.js`), sans animation.
 
 ### D75 — La position de la station à deux décimales, le réseau domestique hors du dépôt, l'historique réécrit *(12/10)*
 

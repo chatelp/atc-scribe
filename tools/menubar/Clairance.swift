@@ -58,6 +58,11 @@ final class Production: ObservableObject {
     @Published var running = false
     @Published var elapsed = ""
     @Published var onAir = "—"
+    // The station's own mode word ("chaine" = the airband chain on the air).
+    @Published var stationMode = ""
+    // The third state of the sign (05-identite.md): production runs and the
+    // antenna is on the air.
+    var listening: Bool { running && stationMode == "chaine" }
     @Published var sidecar = "—"
     @Published var testInstance = false
     @Published var busy = false
@@ -96,7 +101,9 @@ final class Production: ObservableObject {
             elapsed = ""
             sidecar = "—"
         }
-        onAir = await stationOnAir()
+        let station = await stationOnAir()
+        onAir = station.title
+        stationMode = station.mode
         // A start ends when co-atc runs, a stop when the script is gone.
         if busy && (running ? note == "Starting…" : pids(matching: command).isEmpty) {
             busy = false
@@ -170,15 +177,15 @@ final class Production: ObservableObject {
         return degraded.isEmpty ? status : "\(status): \(degraded.joined(separator: ", "))"
     }
 
-    private func stationOnAir() async -> String {
-        guard let s = cfg.station_status_url, let url = URL(string: s) else { return "—" }
+    private func stationOnAir() async -> (title: String, mode: String) {
+        guard let s = cfg.station_status_url, let url = URL(string: s) else { return ("—", "") }
         var req = URLRequest(url: url)
         req.timeoutInterval = 4
         guard let (data, _) = try? await URLSession.shared.data(for: req),
               let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let sel = j["selection"] as? [String: Any],
-              let title = sel["titre"] as? String else { return "station not answering" }
-        return title
+              let title = sel["titre"] as? String else { return ("station not answering", "") }
+        return (title, (j["mode"] as? String) ?? "")
     }
 
     // The GPU is shared with the lab: production says so while it runs, in the
@@ -239,14 +246,16 @@ enum Entry {
     }
 }
 
-// menuBarIcon loads barre-menus-marche.svg or barre-menus-arret.svg from the
-// bundle's Resources (build.sh copies them there), 18 pt, as a template image.
-// Without the bundle (the command-line form), the system symbols stand in.
-func menuBarIcon(running: Bool) -> NSImage {
-    let name = running ? "barre-menus-marche" : "barre-menus-arret"
+// menuBarIcon loads the sign's three states from the bundle's Resources
+// (build.sh copies them there), 18 pt: stopped and running are template
+// images, tinted by macOS for a light or dark bar; listening keeps its own
+// colours, on purpose (05-identite.md). Without the bundle (the command-line
+// form), the system symbols stand in.
+func menuBarIcon(running: Bool, listening: Bool) -> NSImage {
+    let name = listening ? "barre-menus-ecoute" : running ? "barre-menus-marche" : "barre-menus-arret"
     if let url = Bundle.main.url(forResource: name, withExtension: "svg"),
        let image = NSImage(contentsOf: url) {
-        image.isTemplate = true
+        image.isTemplate = !listening
         image.size = NSSize(width: 18, height: 18)
         return image
     }
@@ -277,7 +286,7 @@ struct ClairanceLauncher: App {
             // The brand's two states (docs-fr/design/05-identite.md): the scope with
             // its sweep and plot while production runs, the empty screen when it is
             // stopped. Template images, so macOS tints them for a light or dark bar.
-            Image(nsImage: menuBarIcon(running: p.running))
+            Image(nsImage: menuBarIcon(running: p.running, listening: p.listening))
         }
         .menuBarExtraStyle(.menu)
     }
