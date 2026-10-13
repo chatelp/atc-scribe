@@ -131,8 +131,8 @@ func TestTheVitalsCarryTheListedKeysOnly(t *testing.T) {
 		t.Errorf("today: %d transmissions, %d matched, %d%%; want 3, 2, 67%%",
 			v.TransmissionsToday, v.MatchedToday, v.MatchedShare)
 	}
-	if v.TranscriptionModel != "Whisper large-v3 ATCO2" {
-		t.Errorf("transcription_model = %q", v.TranscriptionModel)
+	if v.TranscriptionModel != "Whisper large-v3 ATCO2" || v.TranscriptionBackend != "fake" {
+		t.Errorf("transcription_model = %q, transcription_backend = %q", v.TranscriptionModel, v.TranscriptionBackend)
 	}
 	if v.AirportsFollowed != 1 || v.RunwaysInUse != 0 || v.ChannelsOnAir != 0 {
 		t.Errorf("airports %d, runways %d, channels %d: want 1, 0, 0 (no reference data, no stream started)",

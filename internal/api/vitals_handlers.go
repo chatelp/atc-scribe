@@ -154,6 +154,9 @@ func (h *Handler) computeVitals() Vitals {
 		// sidecar runs, and every start and restart reads its health.
 		health := h.sttSidecar.LastHealth()
 		v.TranscriptionModel = ModelFamily(health.ModelEN)
+		if b := strings.TrimSpace(health.Backend); len(b) <= 48 {
+			v.TranscriptionBackend = b
+		}
 	}
 
 	return v

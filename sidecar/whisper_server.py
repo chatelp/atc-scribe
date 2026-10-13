@@ -43,6 +43,7 @@ from fastapi.responses import JSONResponse
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from config import Config, from_args  # noqa: E402
+from device import backend_name  # noqa: E402
 from loops import cut_loops  # noqa: E402
 
 WHISPER_RATE = 16000
@@ -52,6 +53,9 @@ cfg = Config()
 app = FastAPI(title="Clairance STT sidecar")
 
 _models: dict[str, object] = {}
+# What the models run on, as /health declares it: the GPU's name when MLX gives
+# it, else "mlx". Read once at startup, on the model thread (main).
+_backend = "mlx"
 _vad = None
 _counters = {"second_opinion_ok": 0, "second_opinion_failed": 0,
              "second_opinion_by_detector": 0, "detector_failed": 0,
@@ -337,6 +341,7 @@ def health():
         # was already holding the port. A health probe answering says something
         # is there, not that it is yours.
         "pid": os.getpid(),
+        "backend": _backend,
         "degraded": degraded,
         "models": models,
         "second_opinion": cfg.second_opinion,
@@ -599,10 +604,13 @@ def watch_parent(interval: float = 5.0) -> None:
 
 
 def main() -> None:
-    global cfg
+    global cfg, _backend
     cfg = from_args()
     logging.basicConfig(level=cfg.log_level.upper(),
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    # On the model thread: MLX ties what it creates to the thread that created it.
+    _backend = _mlx_thread.submit(backend_name).result()
+    log.info("Backend: %s", _backend)
     log.info("English model: %s", cfg.model_en)
     log.info("French model: %s", cfg.model_fr or "(none — French will be refused)")
     if cfg.fr_detector:

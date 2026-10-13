@@ -69,6 +69,9 @@ type Health struct {
 	// The English model's name as configured -- a Hugging Face id or a local
 	// path. The sign-in page shows its family, never the name itself.
 	ModelEN string `json:"model_en"`
+	// What the models run on, as the sidecar declares it: the GPU's name, or
+	// "mlx". Empty from a sidecar that does not say.
+	Backend string `json:"backend"`
 	Models  map[string]struct {
 		ID        string `json:"id"`
 		Kind      string `json:"kind"`
