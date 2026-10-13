@@ -133,3 +133,25 @@ func TestForecastPositionsForm(t *testing.T) {
 		}
 	}
 }
+
+// The predicted state's track is a track: between the fix and the first
+// forecast point it does not start from the true heading, which carries the
+// wind's drift.
+func TestLivePredictionTrackIsNotTheHeading(t *testing.T) {
+	tt := newTestTracker(t, PhaseReference{Lat: receiverLat, Lon: receiverLon, Runways: testRunways()})
+	const hex = "abc124"
+	base := time.Now().UTC().Add(-20 * time.Second)
+	for i := 0; i < 10; i++ {
+		ts := base.Add(time.Duration(i) * time.Second)
+		tt.Ingest(hex, TrajectorySnapshot{
+			Timestamp: ts, PosTimestamp: ts, Lat: 48.5, Lon: 2.0 + float64(i)*0.0028,
+			AltBaro: 30000, GS: 400, TAS: 400, Track: 90, TrueHeading: 101, MagHeading: 99, Valid: true,
+		})
+	}
+	tt.EnsureDerived(hex)
+	for _, p := range tt.GetLivePredictionsAt(base.Add(10 * time.Second)) {
+		if p.Hex == hex && math.Abs(p.Heading-90) > 0.5 {
+			t.Errorf("predicted track %.1f, want the track 90, not the heading 101", p.Heading)
+		}
+	}
+}

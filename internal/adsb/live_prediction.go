@@ -160,13 +160,13 @@ func interpolateLivePredictionFromForecast(latest *TrajectorySnapshot, forecast 
 		return LivePrediction{}, false
 	}
 
+	// The forecast's heading is the track, and the message sends it as the
+	// track: from the latest fix it starts from the fix's track too. Starting
+	// from its true heading, as upstream did, sent the wind's drift (11 deg
+	// aloft on 13/10/2026) as part of the track for the first seconds.
 	first := forecast[0]
 	latestHeading := first.Heading
-	if latest.TrueHeading != 0 {
-		latestHeading = latest.TrueHeading
-	} else if latest.MagHeading != 0 {
-		latestHeading = latest.MagHeading
-	} else if latest.Track != 0 {
+	if latest.Track != 0 {
 		latestHeading = latest.Track
 	}
 
