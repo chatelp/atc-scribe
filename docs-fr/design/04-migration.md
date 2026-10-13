@@ -196,8 +196,11 @@ Indépendante de la disposition, elle passe en premier.
   (`SettingsPage` : Listening, Callsign matching, Display, Account, System), la connexion et le
   premier lancement (`SignIn`, variante « ciel », palette propre de `login.js` retirée), avec la
   console de la station (`StationVitals`) : une route publique qui ne sert que des chiffres
-  agrégés (≈ 1 h serveur ; liste dans la fiche `StationVitals`) et un réglage dans Account pour
-  la couper.
+  agrégés, figés par un cache serveur de 10 s (aucune requête SQL par visite), et un réglage
+  dans Account pour la couper. Chiffré par la session atc-scribe le 13/10 : ≈ 2 h 30 serveur ;
+  trois valeurs sont à fabriquer (l'appareil de calcul dans le `/health` du sidecar, le temps
+  moyen par transmission côté Go, la version et le commit à la construction) ; un test vérifie
+  qu'aucune position, aucun indicatif, aucune fréquence nommée ne sort.
 - **Ne change pas** : les réglages eux-mêmes, leurs routes d'API, l'enregistrement automatique.
 - **Référence** : `a-calques.html`, `a-journal.html`, `reglages.html`, `connexion.html`,
   `premier-lancement.html`.
@@ -244,9 +247,9 @@ Indépendante de la disposition, elle passe en premier.
 
 Ce que l'estimation ne couvre pas : une reprise demandée après usage. Elle est probable sur le fil
 et la colonne, que le propriétaire regarde le plus ; une demi-journée par étape visible mène à
-≈ 22 j au pire. Le serveur ne bouge que pour ≈ 3 h : le « depuis quand » de la piste en service
-(étape 5), la valeur des consignes (étape 8) et la route publique de la console de connexion
-(étape 9). Tout le reste est dans le store depuis le 13/10.
+≈ 22 j au pire. Le serveur ne bouge que pour ≈ 4 h 30 : le « depuis quand » de la piste en
+service (étape 5, ≈ 1 h), la valeur des consignes (étape 8, ≈ 1 h) et la route publique de la
+console de connexion (étape 9, ≈ 2 h 30). Tout le reste est dans le store depuis le 13/10.
 
 Relu côté code par la session atc-scribe le 13/10 : l'ordre 0 → 13 tient ; ses corrections sont
 intégrées (clé `sidebarAircraftTab`, « depuis quand », « Then », message du récepteur, bulles de
