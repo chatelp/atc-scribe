@@ -46,8 +46,9 @@ func TestTheServerStateSaysWhatIsRunning(t *testing.T) {
 
 	var st ServerState
 	s.get("/api/v1/server", &st)
-	if st.Version != "0.1.0" || st.UptimeSeconds < 0 || st.Writable {
-		t.Errorf("version %q uptime %d writable %v", st.Version, st.UptimeSeconds, st.Writable)
+	// No version given at build time, as in a plain go build.
+	if st.Version != "dev" || st.Commit != "unknown" || st.UptimeSeconds < 0 || st.Writable {
+		t.Errorf("version %q commit %q uptime %d writable %v", st.Version, st.Commit, st.UptimeSeconds, st.Writable)
 	}
 
 	sto := st.Storage

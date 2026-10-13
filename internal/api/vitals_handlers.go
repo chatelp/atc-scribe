@@ -103,6 +103,7 @@ func (h *Handler) GetVitals(w http.ResponseWriter, r *http.Request) {
 // answers, with what it has.
 func (h *Handler) computeVitals() Vitals {
 	v := Vitals{UptimeSeconds: int64(time.Since(h.startedAt).Seconds())}
+	v.Version, v.Commit = h.build()
 
 	if h.adsbService != nil {
 		v.MessagesPerSecond = int(math.Round(h.adsbService.MessageRate()))

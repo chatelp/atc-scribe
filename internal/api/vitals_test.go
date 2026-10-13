@@ -231,3 +231,27 @@ func TestModelNamesAreShortenedToTheirFamily(t *testing.T) {
 		}
 	}
 }
+
+// The binary's version and commit, as the linker set them, in the vitals and
+// in the settings panel; "dev" and "unknown" from a plain go build.
+func TestTheVersionAndCommitAreTheBuilds(t *testing.T) {
+	s := newStack(t, stackOptions{})
+	var v Vitals
+	s.get("/api/v1/vitals", &v)
+	if v.Version != "dev" || v.Commit != "unknown" {
+		t.Errorf("a plain build: version %q commit %q, want dev and unknown", v.Version, v.Commit)
+	}
+
+	s = newStack(t, stackOptions{})
+	s.handler.SetBuild("v0.2.0-14-g5fdf8f2", "5fdf8f2")
+	s.get("/api/v1/vitals", &v)
+	if v.Version != "v0.2.0-14-g5fdf8f2" || v.Commit != "5fdf8f2" {
+		t.Errorf("vitals: version %q commit %q", v.Version, v.Commit)
+	}
+	s.signIn()
+	var st ServerState
+	s.get("/api/v1/server", &st)
+	if st.Version != "v0.2.0-14-g5fdf8f2" || st.Commit != "5fdf8f2" {
+		t.Errorf("server state: version %q commit %q", st.Version, st.Commit)
+	}
+}

@@ -13,6 +13,17 @@ import (
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
+// The build's version and commit, set when building:
+//
+//	go build -ldflags "-X main.version=$(git describe --tags --always) -X main.commit=$(git rev-parse --short HEAD)" -o bin/co-atc ./cmd/server
+//
+// A plain go build leaves "dev" and "unknown". The settings panel and the
+// sign-in page show them.
+var (
+	version = "dev"
+	commit  = "unknown"
+)
+
 // main brings the server up in a fixed order, each step in startup.go and
 // serve.go, waits for a signal and takes it down. The order is the one the
 // comments below and in those steps date and justify; moving a step changes
@@ -38,7 +49,8 @@ func main() {
 	defer log.Sync()
 
 	log.Info("Starting Clairance server",
-		logger.String("version", "0.1.0"),
+		logger.String("version", version),
+		logger.String("commit", commit),
 		logger.String("config_path", resolvedConfigPath),
 	)
 	// What the loader had to say about the file: a key written twice, a key

@@ -44,6 +44,8 @@ type Handler struct {
 	db            *sqlite.DB
 	sttSidecar    *transcription.Sidecar
 	startedAt     time.Time
+	version       string // of the binary, set at build time; see SetBuild
+	commit        string
 	dbSampleAt    time.Time
 	dbSampleBytes int64
 }
