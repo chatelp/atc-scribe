@@ -517,3 +517,5 @@
 .cl-toggle.is-mixed .cl-toggle__count { color: var(--color-text-secondary); }
 /* a segment never wraps: shorten its label instead ("≤ 3000", not "≤ 3000 ft") */
 .cl-seg__item { white-space: nowrap; }
+/* SegmentedControl, dense: six presets in the 380 px column */
+.cl-seg--dense .cl-seg__item { padding: 0 var(--space-1-5); }

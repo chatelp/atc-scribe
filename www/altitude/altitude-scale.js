@@ -129,7 +129,7 @@
             { id: 'circuit', label: '≤ 3000', min: FLOOR, max: 3000, help: 'Circuits, light aircraft, final approaches' },
             { id: 'ta', label: `≤ TA`, min: FLOOR, max: transitionAltitudeFt, help: `Below the transition altitude (${thousands(transitionAltitudeFt)} ft): altitudes on QNH` },
             { id: 'low', label: '≤ FL 100', min: FLOOR, max: 10000, help: 'Arrivals and departures, below the 250 kt limit' },
-            { id: 'mid', label: '≤ FL 195', min: FLOOR, max: 19500, help: 'Up to FL 195, the top of the lower airspace: everything but the en-route flights' },
+            { id: 'mid', label: 'FL 100–195', min: 10000, max: 19500, help: 'Climbing and descending traffic between FL 100 and FL 195, up to the ceiling of visual flight' },
             { id: 'high', label: '≥ FL 195', min: 19500, max: NO_CEILING, help: 'Upper airspace, en route (instrument flights only)' },
         ];
     }

@@ -1086,7 +1086,7 @@
                                     <span :style="'left:' + m.at + '%'" x-text="m.text"></span>
                                 </template>
                             </div>
-                            <div class="cl-seg" role="group" aria-label="Altitude presets">
+                            <div class="cl-seg cl-seg--dense" role="group" aria-label="Altitude presets">
                                 <template x-for="p in presets" :key="p.id">
                                     <button class="cl-seg__item" :aria-pressed="isPreset(p)" data-help-title="Preset" :data-help="p.help" @click="choose(p)" x-text="p.label"></button>
                                 </template>
