@@ -13,7 +13,8 @@ python3 -m venv .venv && .venv/bin/pip install -r sidecar/requirements.txt
     [--save-audio <dir> [--save-audio-min-free-gb 8]]
 ```
 
-`GET /health` reports which languages are served. `POST /transcribe` takes raw
+`GET /health` reports which languages are served, and in `backend` what the
+models run on: the GPU's name when MLX gives it, else `mlx`. `POST /transcribe` takes raw
 `s16le` PCM (or a WAV container) with `X-Sample-Rate`, `X-Channels`, `X-Language`
 and `X-Frequency-Id` (and optionally `X-Created-At` / `X-Segment-At`, see the
 archive below), and returns the transcript plus `duration`,

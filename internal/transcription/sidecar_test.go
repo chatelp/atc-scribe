@@ -363,3 +363,21 @@ func TestStopEndsSupervision(t *testing.T) {
 		t.Errorf("started %d times after Stop, want 1", n)
 	}
 }
+
+// The sidecar says what it computes on; the probe keeps it with the rest of
+// its health, and a sidecar that does not say leaves it empty.
+func TestTheProbeReadsTheBackend(t *testing.T) {
+	srv := healthServerSaying(t, `{"status":"ok","backend":"fake","model_en":"sfabriece/whisper-large-v3-atco2-asr-mlx"}`)
+	s := NewSidecar(SidecarConfig{ServerURL: srv.URL}, testLogger(t))
+	h, err := s.Refresh(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.Backend != "fake" || h.ModelEN != "sfabriece/whisper-large-v3-atco2-asr-mlx" {
+		t.Errorf("backend %q, model_en %q", h.Backend, h.ModelEN)
+	}
+	silent := NewSidecar(SidecarConfig{ServerURL: healthServer(t).URL}, testLogger(t))
+	if h, _ := silent.Refresh(context.Background()); h.Backend != "" {
+		t.Errorf("a sidecar that does not say: backend %q, want empty", h.Backend)
+	}
+}

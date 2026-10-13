@@ -492,6 +492,24 @@ sur la carte.
 
 ## État
 
+- 13/10 (soir) : **fiche G intégrée** (vague 3 cloud, branche
+  `cloud/g-chiffres-avant-connexion`, six commits, 1 229 lignes dont 540 de tests) : la route
+  publique `GET /api/v1/vitals` (agrégats seulement, cache de 10 s sous mutex, coupable par
+  `vitals.enabled` dans les réglages du panneau, 404 coupée ; tests qui énumèrent les clés et
+  refusent toute position, tout indicatif, toute fréquence nommée), le sidecar qui déclare son
+  appareil (`backend` dans `/health`), la moyenne glissante du temps par transmission, la version
+  et le commit du binaire par `-ldflags` (commande dans le README), le « depuis quand » de la
+  piste en service (`since` dans `runway_in_use`, `null` avant le premier changement), la valeur
+  et l'unité de chaque consigne en clair. Relue sur le Mac : tout vert, aucune valeur privée, lue
+  en direct sur l'instance d'essai contre la vraie station (78 avions, 555 messages/s, le plus
+  loin à 173 NM, deux canaux à l'antenne une fois les flux remis). Deux écarts justifiés par la
+  session cloud et acceptés : `COUNT(NULLIF(callsign, ''))` (le `!= ''` comptait faux), le test
+  d'indicatif à frontière de mot (« ATCO2 »). À faire ici : construire les binaires avec les
+  `-ldflags` ; vérifier `backend` sur le vrai sidecar ; `runways_in_use` compte les pistes de
+  l'ensemble actif (De Gaulle face à l'est = 4), à confronter à l'attente de la session design.
+  **Étapes 2 et 3 de la migration versées** (`35058d0`) après le coup d'œil du propriétaire :
+  familles de phase, palette d'altitude F choisie par lui sur une scène de 34 avions (du chaud au
+  froid ; la rampe de gris refusée), barre du haut.
 - 13/10 (soir) : **étape 1 versée dans `local`** (907b719) après relecture conforme de la session
   design : le système dans `www/` à comportement identique (copies vérifiées par le filet,
   jetons comme utilitaires Tailwind à côté des huit noms d'origine gardés, pas de surcharge

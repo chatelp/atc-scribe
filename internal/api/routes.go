@@ -67,6 +67,11 @@ func (r *Router) Routes() http.Handler {
 		router.Get("/setup/status", r.handler.GetSetupStatus)
 		router.Post("/setup", r.handler.PostSetup)
 
+		// The station's vital signs on the sign-in page, before anyone signs in:
+		// aggregated figures only, computed at most every 10 s, and a 404 when
+		// the settings panel turns them off. See vitals_handlers.go.
+		router.Get("/vitals", r.handler.GetVitals)
+
 		// Everything below carries data from the receiver. A Group is a mux of
 		// its own, which is what lets its middleware be declared after the public
 		// routes above -- chi refuses a Use() that follows a route on the same mux.

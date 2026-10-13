@@ -28,6 +28,7 @@ import (
 // it if someone happens to look.
 type ServerState struct {
 	Version       string                 `json:"version"`
+	Commit        string                 `json:"commit"`
 	UptimeSeconds int64                  `json:"uptime_seconds"`
 	Storage       StorageState           `json:"storage"`
 	Logging       LoggingState           `json:"logging"`
@@ -114,8 +115,10 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	version, commit := h.build()
 	st := ServerState{
-		Version:       "0.1.0",
+		Version:       version,
+		Commit:        commit,
 		UptimeSeconds: int64(time.Since(h.startedAt).Seconds()),
 		Logging:       h.loggingState(),
 		Settings:      h.runtime.Settings(),
@@ -233,6 +236,24 @@ func (h *Handler) AttachRuntime(rt *config.Runtime, db *sqlite.DB, stt *transcri
 	}
 }
 
+// SetBuild gives the handler the binary's version and commit, which main
+// receives from the linker (-ldflags "-X main.version=… -X main.commit=…").
+func (h *Handler) SetBuild(version, commit string) {
+	h.version, h.commit = version, commit
+}
+
+// build is the version and commit, "dev" and "unknown" when none was set.
+func (h *Handler) build() (version, commit string) {
+	version, commit = h.version, h.commit
+	if version == "" {
+		version = "dev"
+	}
+	if commit == "" {
+		commit = "unknown"
+	}
+	return version, commit
+}
+
 // loggingState reports where the log goes and whether anything bounds it. The
 // question it answers is the one nobody asks until a disk is full: is this
 // growing for ever?
@@ -316,6 +337,9 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 	if next.Matching == nil {
 		next.Matching = current.Matching
 	}
+	if next.Vitals == nil {
+		next.Vitals = current.Vitals
+	}
 
 	if err := h.runtime.Apply(next); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -340,7 +364,8 @@ func (h *Handler) PutServerSettings(w http.ResponseWriter, r *http.Request) {
 		logger.Bool("match_one_digit_off", next.Matching.OneDigitOff),
 		logger.Bool("match_context_letters", next.Matching.ContextLetters),
 		logger.Bool("match_context_digits", next.Matching.ContextDigits),
-		logger.Bool("match_context_names", next.Matching.ContextNames))
+		logger.Bool("match_context_names", next.Matching.ContextNames),
+		logger.Bool("vitals_enabled", next.Vitals == nil || next.Vitals.Enabled))
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(h.runtime.Settings()); err != nil {

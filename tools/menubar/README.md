@@ -27,6 +27,15 @@ Needs Xcode's command line tools and macOS 13 or later. Optional settings in
 }
 ```
 
+The server the script starts says which build it is (settings panel, sign-in
+page) only if it was built with its version and commit; a script that builds
+co-atc before starting it should pass them:
+
+```sh
+go build -ldflags "-X main.version=$(git describe --tags --always) -X main.commit=$(git rev-parse --short HEAD)" \
+  -o bin/co-atc ./cmd/server
+```
+
 The same actions from a terminal or a Shortcut, through the same code:
 
 ```sh

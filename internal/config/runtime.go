@@ -38,7 +38,21 @@ type RuntimeSettings struct {
 	// Matching is how a transmission is tied to an aircraft. Absent from a file
 	// saved before it existed, which then means the defaults.
 	Matching *MatchingRules `json:"matching,omitempty"`
+
+	// Vitals is the station's console on the sign-in page: aggregated figures
+	// served without a session by /api/v1/vitals. Absent from a file saved
+	// before it existed, which then means on.
+	Vitals *VitalsSettings `json:"vitals,omitempty"`
 }
+
+// VitalsSettings switch the public figures of the sign-in page. Off, the route
+// answers 404 as if it did not exist.
+type VitalsSettings struct {
+	Enabled bool `json:"enabled"`
+}
+
+// DefaultVitals is the console as it starts: on.
+func DefaultVitals() VitalsSettings { return VitalsSettings{Enabled: true} }
 
 // MatchingRules are the association rules that can be changed from the panel.
 // Each was measured against a shuffled sky before being offered
@@ -230,6 +244,8 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 	}
 	defaults := DefaultMatchingRules(cfg.PostProcessing.MinDigits)
 	r.settings.Matching = &defaults
+	vitals := DefaultVitals()
+	r.settings.Vitals = &vitals
 
 	b, err := os.ReadFile(r.path)
 	if err != nil {
@@ -264,6 +280,10 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 			m := *saved.Matching
 			r.settings.Matching = &m
 		}
+	}
+	if saved.Vitals != nil {
+		v := *saved.Vitals
+		r.settings.Vitals = &v
 	}
 	r.log.Info("Applied saved runtime settings",
 		logger.String("path", r.path),
@@ -310,7 +330,19 @@ func (r *Runtime) Settings() RuntimeSettings {
 		m := s.Matching.clone()
 		s.Matching = &m
 	}
+	if s.Vitals != nil {
+		v := *s.Vitals
+		s.Vitals = &v
+	}
 	return s
+}
+
+// VitalsEnabled says whether the sign-in page's public figures are served. Read
+// on every request, so turning them off from the panel applies to the next one.
+func (r *Runtime) VitalsEnabled() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.settings.Vitals == nil || r.settings.Vitals.Enabled
 }
 
 // clone copies the rules, sizes included: a caller that edits its copy must
@@ -392,6 +424,11 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 
 	m := next.Matching.clone()
 	next.Matching = &m
+	vitals := DefaultVitals()
+	if next.Vitals != nil {
+		vitals = *next.Vitals
+	}
+	next.Vitals = &vitals
 	r.mu.Lock()
 	r.settings = next
 	r.mu.Unlock()
@@ -423,6 +460,7 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		logger.Bool("match_context_digits", m.ContextDigits),
 		logger.Bool("match_context_names", m.ContextNames),
 		logger.Bool("match_prefix_digits", m.PrefixDigits),
-		logger.Bool("match_sectors", m.Sectors))
+		logger.Bool("match_sectors", m.Sectors),
+		logger.Bool("vitals_enabled", vitals.Enabled))
 	return nil
 }

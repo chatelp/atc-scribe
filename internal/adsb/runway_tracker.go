@@ -61,6 +61,12 @@ type RunwayScore struct {
 	Score       float64 `json:"score"`
 	Probability float64 `json:"probability"` // normalized 0-1
 	EventCount  int     `json:"event_count"`
+
+	// When the airport's runway in use last changed, the same for every score
+	// of the airport; nil until a change has been seen since the server
+	// started -- the first runway detected is not a change, the server only
+	// does not know since when it has been in use.
+	Since *time.Time `json:"since"`
 }
 
 // RunwayInUseTracker maintains a rolling window of runway usage evidence
@@ -77,6 +83,7 @@ type RunwayInUseTracker struct {
 	scores        []RunwayScore // sorted descending by score
 	activeSet     map[string]bool
 	lastActiveEnd string    // for change detection
+	lastChangeAt  time.Time // when lastActiveEnd replaced another; zero until then
 	lastLogTime   time.Time // throttle periodic Info log
 
 	// Persisted state — retained when all events expire from the window so
@@ -207,7 +214,27 @@ func (rt *RunwayInUseTracker) GetTopScores(n int) []RunwayScore {
 	}
 	result := make([]RunwayScore, n)
 	copy(result, rt.scores[:n])
+	if !rt.lastChangeAt.IsZero() {
+		for i := range result {
+			since := rt.lastChangeAt
+			result[i].Since = &since
+		}
+	}
 	return result
+}
+
+// RunwaysInUse counts the runways in the active set, a runway used in both
+// directions once: "06L-24R/06L" and "06L-24R/24R" are one runway. Zero until
+// the first evidence; the last known set is kept through quiet hours, as
+// IsActiveRunway keeps it.
+func (rt *RunwayInUseTracker) RunwaysInUse() int {
+	rt.mu.RLock()
+	defer rt.mu.RUnlock()
+	pairs := make(map[string]bool, len(rt.activeSet))
+	for id := range rt.activeSet {
+		pairs[strings.SplitN(id, "/", 2)[0]] = true
+	}
+	return len(pairs)
 }
 
 // recompute prunes old events, recalculates time-decayed scores, and updates
@@ -299,6 +326,7 @@ func (rt *RunwayInUseTracker) recompute(now time.Time) {
 	// Log on active runway change
 	if newActiveEnd != rt.lastActiveEnd && newActiveEnd != "" {
 		if rt.lastActiveEnd != "" {
+			rt.lastChangeAt = now
 			rt.logger.Info("Active runway changed",
 				logger.String("previous", formatRunwayEnd(rt.lastActiveEnd)),
 				logger.String("current", formatRunwayEnd(newActiveEnd)),
@@ -342,6 +370,7 @@ func (rt *RunwayInUseTracker) Reset() {
 	rt.scores = nil
 	rt.activeSet = nil
 	rt.lastActiveEnd = ""
+	rt.lastChangeAt = time.Time{}
 	rt.everHadData = false
 }
 
