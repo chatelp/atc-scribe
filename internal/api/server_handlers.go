@@ -68,7 +68,7 @@ const referenceCandidateRangeNM = 50
 type TranscriptionState struct {
 	Reachable           bool     `json:"reachable"`
 	Stale               bool     `json:"stale,omitempty"` // the reading is the last one, not a fresh probe
-	Status              string   `json:"status"`          // "ok", "degraded", "unknown"
+	Status              string   `json:"status"`          // "ok", "degraded", "unknown", "off" (nothing transcribes)
 	Degraded            []string `json:"degraded,omitempty"`
 	Detail              string   `json:"detail,omitempty"`
 	SecondOpinion       bool     `json:"second_opinion"`
@@ -123,7 +123,9 @@ func (h *Handler) GetServerState(w http.ResponseWriter, r *http.Request) {
 		Access:        h.auth.Access(),
 	}
 
-	if h.sttSidecar != nil {
+	if h.sttSidecar != nil && h.sttSidecar.Off() {
+		st.Transcription = &TranscriptionState{Status: "off", Detail: "no source transcribes"}
+	} else if h.sttSidecar != nil {
 		// A short timeout on purpose: the sidecar is busy decoding for seconds at
 		// a time, and an operational endpoint must not block behind it. Failing
 		// to reach it in two seconds does not mean it is down, so we fall back to
