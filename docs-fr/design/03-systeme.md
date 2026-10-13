@@ -115,6 +115,11 @@ vert) : ΔE 18,4 sous les quatre visions. S'y ajoute toujours une forme (■, �
 
 ### Altitude des avions sur la carte : une rampe de clarté, sans teinte
 
+> **Refusée à l'usage le 13/10** (soirée d'écoute de l'étape 2) : « le dégradé de gris ne marche
+> pas, trop difficile de distinguer les uns des autres ». La palette par teinte d'avant est revenue
+> sur la branche de migration ; une alternative mesurée est proposée (`09-ecrans.md`, écarts). Ce qui
+> suit est la proposition d'origine, gardée pour mémoire.
+
 | Bande | Fond sombre | Fond clair (IGN, OSM) |
 |---|---|---|
 | très basse | `#f5f5f5` (19,3:1) | `#141414` |
@@ -498,7 +503,8 @@ la page de connexion faite des mêmes surfaces et du même vert que l'outil (la 
 Tranchés le 13/10, tous selon la proposition :
 1. la police du système pour les phrases, le monospace pour ce qui se compare (principe 8) ;
 2. les cinq familles de phase à la place des dix couleurs, sur la carte, la liste et la PAR ;
-3. la rampe de clarté sans teinte pour l'altitude des avions ;
+3. la rampe de clarté sans teinte pour l'altitude des avions (**refusée à l'usage le 13/10** : les
+   gris se distinguent mal ; voir `09-ecrans.md`, écarts) ;
 4. J / K (et ↓ / ↑ quand la liste a le focus) au lieu de Tab pour passer d'un avion à l'autre.
 
 Reste ouvert, sans effet sur le dessin : 5. l'interpolation des avions gardée sous
