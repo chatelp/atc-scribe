@@ -501,7 +501,11 @@ sur la carte.
   le voyant ADS-B du bandeau ; (3) **la raison d'un non-appariement** gardée avec la
   transmission (D72 complétée : `unmatched: …`, sans score ; le matcher rend le meilleur
   candidat refusé). Deux autres attendent la validation des esquisses : séquence d'arrivée
-  hors PAR, gabarits français des consignes. Binaires reconstruits.
+  hors PAR, gabarits français des consignes. Binaires reconstruits. Dans la foulée, un défaut
+  de la PAR relevé par le propriétaire et diagnostiqué par la session design : les cadres
+  prenaient leur largeur au premier rendu, conteneur encore caché (plancher 480 px dans une
+  colonne de 949), et un onglet en arrière-plan ne se rattrapait pas ; un rendu à l'image
+  suivante et un `ResizeObserver` sur le conteneur règlent les deux cas.
 - 13/10 : **le produit s'appelle Clairance** (D74, choix du propriétaire sur les propositions
   de la session design). Renommage en une fois : dépôt `chatelp/clairance`, page, lanceur,
   dossier de configuration, documents ; dossier local, module Go, binaire et sessions gardent

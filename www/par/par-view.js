@@ -768,16 +768,28 @@
                 `</g>`;
         }
 
+        // The frames take their width from the container at each render. At the
+        // first show() the container is still hidden (width 0, so the 480 px
+        // floor), and a background tab's timer is throttled: the frames stayed
+        // at 480 px in a 949 px column (seen by the owner on 12/10). A render on
+        // the next frame, once shown, and one at every resize of the container.
+        const resizer = typeof ResizeObserver === 'function'
+            ? new ResizeObserver(() => { if (container.dataset.parActive === '1') render(); })
+            : null;
+
         return {
             show(code) {
                 airport = code || airport;
                 container.dataset.parActive = '1';
                 render();
+                requestAnimationFrame(() => { if (container.dataset.parActive === '1') render(); });
+                if (resizer) resizer.observe(container);
                 if (!timer) timer = setInterval(render, 1000);
             },
             hide() {
                 hideTip();
                 container.dataset.parActive = '0';
+                if (resizer) resizer.unobserve(container);
                 if (timer) clearInterval(timer);
                 timer = null;
             },
