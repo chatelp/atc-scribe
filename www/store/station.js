@@ -144,8 +144,13 @@
             if (st.adsb) {
                 const age = st.adsb.last_fetch ? (Date.now() - Date.parse(st.adsb.last_fetch)) / 1000 : Infinity;
                 const fresh = st.adsb.ok && age < 60;
-                lights.push({ key: 'adsb', label: 'ADS-B', level: fresh ? 'ok' : 'bad', text: fresh ? String(st.adsb.aircraft) : 'Stale',
-                    help: fresh ? `The ADS-B receiver answers: ${st.adsb.aircraft} aircraft in sight now.`
+                // messages_per_second: the receiver's own counter (0 when the source has
+                // none), a health figure the aircraft count does not give.
+                const rate = Number(st.adsb.messages_per_second) || 0;
+                const rateText = rate > 0 ? ` It decodes about ${rate} messages a second.` : '';
+                lights.push({ key: 'adsb', label: 'ADS-B', level: fresh ? 'ok' : 'bad',
+                    text: fresh ? (rate > 0 ? `${st.adsb.aircraft} · ${rate}/s` : String(st.adsb.aircraft)) : 'Stale',
+                    help: fresh ? `The ADS-B receiver answers: ${st.adsb.aircraft} aircraft in sight now.${rateText}`
                         : `No fresh ADS-B data${st.adsb.last_fetch ? ' since ' + when(st.adsb.last_fetch) : ''}: positions on the map are not moving.` });
             }
             return lights;

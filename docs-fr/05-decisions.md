@@ -4950,7 +4950,17 @@ compagnie sur la fréquence peuvent être confondus) ; `-context-swap`, qui le m
 qu'en mode captation. Le seuil de score devient un réglage du panneau (`matching.min_score`),
 appliqué s'il dépasse `post_processing.min_score` du fichier.
 
-### D72 — La preuve de l'appariement est gardée avec la transmission *(11/10)*
+### D72 — La preuve de l'appariement est gardée avec la transmission *(11/10 ; complétée le 13/10)*
+
+> **Complément du 13/10** (validé par le propriétaire avec le plan « Right now ») : une
+> transmission **non appariée garde la raison** dans la même colonne `match_reason`, sans score,
+> préfixée `unmatched: ` pour ne jamais se lire comme une preuve : `no aircraft in range`,
+> `nobody in range was named`, `ambiguous between X and Y`, `best X at 0,55, below the floor`
+> (le plancher du matcher, 0,6, ou celui du panneau, D73). Le matcher rend désormais le
+> meilleur candidat refusé sous le plancher (toujours avec `ok = false`), ce qui distingue
+> « personne nommé » de « nommé mais insuffisant ». La page ne montre pas de force d'indices
+> sans indicatif. À mesurer sur la prochaine journée de production : la part de chaque raison,
+> qui dit où l'appariement perd le plus.
 
 **Validée par le propriétaire le 11/10** (audit 3.7, proposition A3). Jusqu'ici, de chaque
 appariement on ne gardait que l'indicatif, la lecture qui l'avait donné et les mots qui

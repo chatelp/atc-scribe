@@ -393,12 +393,21 @@ func (p *GrammarProcessor) match(record *sqlite.TranscriptionRecord, result phra
 			matcher = &c
 		}
 	}
+	// Why no aircraft was named, kept with the transmission like a proof is
+	// (13/10): the page can then say "nobody in range was named" instead of
+	// showing nothing, and the refusals become measurable. Written in the
+	// same words as a proof, prefixed so they are never read as one.
+	whyNot := "unmatched: no aircraft in range"
 	if len(sky) > 0 {
 		ctx := p.recentlyHeard(record.FrequencyID, record.CreatedAt)
+		whyNot = "unmatched: nobody in range was named"
 
 		try := func(res phraseology.Result, text string) (phraseology.Match, bool) {
 			m, ok := matcher.MatchWithContext(res, sky, ctx)
 			if !ok {
+				if m.Callsign != "" {
+					whyNot = fmt.Sprintf("unmatched: best %s at %.2f, below the floor", m.Callsign, m.Score)
+				}
 				return m, false
 			}
 			if m.Ambiguous {
@@ -407,9 +416,14 @@ func (p *GrammarProcessor) match(record *sqlite.TranscriptionRecord, result phra
 					logger.String("text", text),
 					logger.String("best", m.Callsign),
 					logger.Float64("score", m.Score))
+				whyNot = fmt.Sprintf("unmatched: ambiguous between %s and %s", m.Callsign, strings.Join(m.Runners, ", "))
 				return m, false
 			}
-			return m, m.Score >= minScore
+			if m.Score < minScore {
+				whyNot = fmt.Sprintf("unmatched: best %s at %.2f, below the floor", m.Callsign, m.Score)
+				return m, false
+			}
+			return m, true
 		}
 
 		primary, okPrimary := try(result, record.Content)
@@ -453,13 +467,20 @@ func (p *GrammarProcessor) match(record *sqlite.TranscriptionRecord, result phra
 		// the proof, though the matcher never saw the others.
 		match.Reason += " + in sector"
 	}
+	if callsign == "" {
+		match = phraseology.Match{Reason: whyNot}
+	}
 	return match, callsign, source, evidence
 }
 
-// proofOf is what is kept of a match (D72), nothing when there is none.
+// proofOf is what is kept of a match (D72): the score and the reasons; for a
+// transmission no aircraft was named for, the reason it was not, alone.
 func proofOf(m phraseology.Match, callsign string) *sqlite.MatchProof {
 	if callsign == "" {
-		return nil
+		if m.Reason == "" {
+			return nil
+		}
+		return &sqlite.MatchProof{Reason: m.Reason}
 	}
 	return &sqlite.MatchProof{Score: m.Score, Reason: m.Reason}
 }

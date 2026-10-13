@@ -492,6 +492,16 @@ sur la carte.
 
 ## État
 
+- 13/10 (après-midi) : **trois petits chantiers pour le panneau « Right now »** des esquisses
+  design, validés par le propriétaire après l'état des lieux (ce que la page peut afficher
+  aujourd'hui, vérifié ligne par ligne) : (1) le journal d'événements survit au rechargement
+  (localStorage, borné, clés gardées, `recent(minutes)` pour un résumé) ; (2) **messages ADS-B
+  par seconde** dans `/api/v1/status` (`messages_per_second`, compteur du récepteur sur les dix
+  derniers relevés, 0 sans compteur ; remise à zéro du récepteur gérée ; test unitaire) et dans
+  le voyant ADS-B du bandeau ; (3) **la raison d'un non-appariement** gardée avec la
+  transmission (D72 complétée : `unmatched: …`, sans score ; le matcher rend le meilleur
+  candidat refusé). Deux autres attendent la validation des esquisses : séquence d'arrivée
+  hors PAR, gabarits français des consignes. Binaires reconstruits.
 - 13/10 : **le produit s'appelle Clairance** (D74, choix du propriétaire sur les propositions
   de la session design). Renommage en une fois : dépôt `chatelp/clairance`, page, lanceur,
   dossier de configuration, documents ; dossier local, module Go, binaire et sessions gardent

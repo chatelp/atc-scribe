@@ -205,6 +205,7 @@ type Service struct {
 	logger             *logger.Logger
 	lastFetchTime      time.Time
 	lastFetchStatus    bool
+	messages           messageRate // the receiver's counter, for messages per second
 	mu                 sync.RWMutex
 	stopCh             chan struct{}
 	wg                 sync.WaitGroup
@@ -479,6 +480,7 @@ func (s *Service) fetchAndProcess(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.messages.note(rawData.Messages, time.Now())
 
 	// Process raw data
 	newAircraft := s.ProcessRawData(rawData)
@@ -1137,6 +1139,12 @@ func (s *Service) calculateCounts(aircraft []*Aircraft) (int, int, int, int) {
 }
 
 // GetStatus returns the service status
+// MessageRate is the receiver's messages per second over the last few fetches,
+// 0 while unknown (a source without a counter, or fewer than two samples).
+func (s *Service) MessageRate() float64 {
+	return s.messages.perSecond()
+}
+
 func (s *Service) GetStatus() (time.Time, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

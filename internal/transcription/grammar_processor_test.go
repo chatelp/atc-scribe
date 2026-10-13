@@ -478,8 +478,10 @@ func TestTheProofOfAMatchIsKept(t *testing.T) {
 			t.Errorf("reason %q lacks %q", got.MatchReason, want)
 		}
 	}
-	if r := reread(t, txStore, unmatched); r.MatchScore != nil || r.MatchReason != "" {
-		t.Errorf("an unmatched transmission keeps a proof: %v %q", r.MatchScore, r.MatchReason)
+	// An unmatched transmission keeps no score, and the reason it was not
+	// matched instead of a proof (13/10), prefixed so it never reads as one.
+	if r := reread(t, txStore, unmatched); r.MatchScore != nil || !strings.HasPrefix(r.MatchReason, "unmatched: ") {
+		t.Errorf("an unmatched transmission: score %v, reason %q, want no score and an \"unmatched: \" reason", r.MatchScore, r.MatchReason)
 	}
 }
 

@@ -403,7 +403,9 @@ func (s *TranscriptionStorage) UpdateMatchedTranscription(id int64, contentProce
 	var score sql.NullFloat64
 	var reason sql.NullString
 	if proof != nil {
-		score = sql.NullFloat64{Float64: proof.Score, Valid: true}
+		// No score without an aircraft: an unmatched transmission keeps only
+		// the reason it was not matched (13/10).
+		score = sql.NullFloat64{Float64: proof.Score, Valid: callsign != ""}
 		reason = sql.NullString{String: proof.Reason, Valid: proof.Reason != ""}
 	}
 

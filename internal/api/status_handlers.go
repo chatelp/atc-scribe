@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -124,7 +125,10 @@ func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
 				active++
 			}
 		}
-		out["adsb"] = map[string]any{"ok": ok, "last_fetch": last.UTC(), "aircraft": active}
+		// messages_per_second: the receiver's own counter, a health figure
+		// the aircraft count does not give; 0 when the source has none.
+		out["adsb"] = map[string]any{"ok": ok, "last_fetch": last.UTC(), "aircraft": active,
+			"messages_per_second": math.Round(h.adsbService.MessageRate())}
 	}
 	out["audio_archive"] = map[string]bool{"available": h.audioArchive.Available()}
 

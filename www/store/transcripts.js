@@ -390,7 +390,9 @@
         },
 
         matchStrength(t) {
-            if (!t || !t.match_reason) return null;
+            // An unmatched transmission may carry a reason too (why not, 13/10):
+            // no strength to show then.
+            if (!t || !t.callsign || !t.match_reason) return null;
             const r = new Set(t.match_reason.split(' + ').map((x) => x.trim()));
             const exact = r.has('digits exact') || r.has('flight part exact');
             const named = exact || ['digits suffix', 'digits off by one', 'first digits', 'flight part, last letter missing',

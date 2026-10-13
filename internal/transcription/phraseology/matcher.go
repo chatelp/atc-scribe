@@ -448,7 +448,9 @@ func (m *Matcher) MatchWithContext(r Result, fleet []Aircraft, recent []string) 
 
 	top := best[0]
 	if top.score < 0.6 {
-		return Match{}, false
+		// Refused, but named: the caller may say who came closest and why
+		// it was not enough (13/10). ok is false, as before.
+		return Match{Callsign: top.ac.Callsign, Hex: top.ac.Hex, Score: top.score, Reason: top.reason}, false
 	}
 	out := Match{Callsign: top.ac.Callsign, Hex: top.ac.Hex, Score: top.score, Reason: top.reason, Words: sortedRanges(top.words)}
 	for _, b := range best[1:] {
