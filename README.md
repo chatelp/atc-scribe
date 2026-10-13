@@ -308,7 +308,7 @@ give the binary its version and commit when building; without them it says
 `dev` and `unknown`:
 
 ```bash
-go build -ldflags "-X main.version=$(git describe --tags --always) -X main.commit=$(git rev-parse --short HEAD)" \
+go build -ldflags "-X main.version=$(git describe --tags --match '[0-9]*' --always) -X main.commit=$(git rev-parse --short HEAD)" \
   -o bin/co-atc ./cmd/server
 ```
 
