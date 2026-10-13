@@ -24,7 +24,11 @@ Ce qui reste, et qui est ton sujet :
    le fil principal partagé avec Alpine et la liste, le rythme réel des images, rien de tout
    cela n'est mesuré. La mesure en direct du Mac est une sonde à la main, sur le trafic du moment.
 2. **La première minute après un redémarrage du serveur** : 76 % de variation de la vitesse
-   dessinée (le moteur estime le décalage d'horloge sur 30 s, le serveur n'a pas d'historique).
+   dessinée, sur **une seule passe** de 20 s faite aussitôt après le redémarrage (la passe
+   suivante, une minute plus tard : 8 %). La cause **n'est pas mesurée** : deux hypothèses du
+   Mac, le moteur qui estime le décalage d'horloge serveur/page sur 30 s (`clockWindowSec`), et
+   le suivi de trajectoire du serveur qui n'a pas encore d'historique (prévision depuis un seul
+   relevé, `ForecastFromTarget`). Il peut y en avoir d'autres.
 3. **Un avion qui retrouve sa position après un long trou** (cas réel : 18 s sans position,
    à 45 NM) **recule** pour la rejoindre.
 4. Non mesurés : l'onglet caché puis montré, un zoom ou un déplacement de carte pendant le
@@ -40,9 +44,17 @@ Ce qui reste, et qui est ton sujet :
 ## Étapes, dans cet ordre, un commit chacune
 
 1. **Le banc navigateur, avant toute modification.** Dans `tools/motion-bench/` : le **vrai
-   serveur** compilé, avec `configs/config.toml.example`, sans transcription (fiche H), lisant
-   un `aircraft.json` que le **générateur de la fiche L** réécrit chaque seconde **en temps
-   réel** (même régime : 0,6 position par seconde et par avion, `seen_pos` qui grimpe, des
+   serveur** compilé, avec une copie de `configs/config.toml.example` (sans connexion :
+   `[auth] enabled = false` et serveur sur 127.0.0.1 ; la station placée au **récepteur fictif
+   de la fiche L, 45,0 / 4,67**, jamais ailleurs), sans transcription (fiche H), en source
+   `tar1090` sur une adresse locale où le générateur sert `data/aircraft.json`,
+   `receiver.json` et `stats.json` ; un `aircraft.json` que le **générateur de la fiche L**
+   réécrit chaque seconde **en temps réel**. Ce générateur vit aujourd'hui **dans un fichier de
+   test** (`internal/adsb/replay_test.go`, paquet `adsb`, horloge simulée par la couture
+   `s.now()`) : un exécutable ne peut pas l'importer. Sors-le d'abord dans un paquet ordinaire
+   (par exemple `internal/adsb/simtraffic`) que le test de rejeu et le banc partagent, **sans
+   changer la référence de la fiche L** (le rejeu doit redonner ses chiffres à l'arrondi
+   près), puis donne-lui un nombre d'avions réglable (12 aujourd'hui ; 60 et 150 ici) (même régime : 0,6 position par seconde et par avion, `seen_pos` qui grimpe, des
    pertes de 30 s, et un trou de 18 s suivi d'une reprise) ; la **vraie page** servie par ce
    serveur ; **Chrome sans interface** piloté par le protocole DevTools, fenêtre de
    1 440 × 900, onglet au premier plan. La mesure se prend **dans la page, à chaque image**
@@ -58,6 +70,10 @@ Ce qui reste, et qui est ton sujet :
      longues par 10 s ;
    - glyphe : sauts d'orientation de plus de 3° d'une image à l'autre.
 
+   Chrome sans interface : s'il n'est pas sur ta machine, installe-le (Chrome for Testing,
+   ou le paquet Chromium) ; si c'est impossible, dis-le dans le rapport et arrête-toi à ce
+   qui se mesure sans navigateur, sans passer aux étapes suivantes.
+
    Scénarios, chacun 60 s après une minute de chauffe, sauf le premier : **(a)** redémarrage
    du serveur, mesuré dès la première seconde ; **(b)** 60 avions, onglet Right now ;
    **(c)** 150 avions, onglet Traffic ouvert ; **(d)** un zoom de 10 à 50 NM et un
@@ -67,8 +83,9 @@ Ce qui reste, et qui est ton sujet :
    interface de ta machine ne représente pas (WebGL logiciel, pas de GPU, pas l'écran à 120 Hz
    du Mac).
 2. **Les trois défauts connus**, un commit chacun, mesurés avant et après sur les deux bancs :
-   la première minute (amorcer le décalage d'horloge sur l'heure du serveur, le `now`
-   d'`aircraft.json`, plutôt que d'attendre 30 s) ; la reprise après un long trou (au-delà
+   la première minute (**d'abord en trouver la cause** sur le scénario (a), seconde par
+   seconde ; puis la corriger : par exemple amorcer le décalage d'horloge dès le premier
+   message plutôt qu'au bout de 30 s, si c'est lui) ; la reprise après un long trou (au-delà
    d'un écart que tu chiffres, l'avion **ne glisse pas à reculons** : il se fond de l'ancienne
    pose vers la nouvelle, ou saute s'il est hors de l'écran ; la règle est dite et testée) ;
    l'onglet montré à nouveau (aucun balayage de rattrapage : la pose repart de l'état courant).
@@ -90,11 +107,15 @@ Ce qui reste, et qui est ton sujet :
 ## Ce que tu ne touches pas
 
 La migration de l'interface tourne en même temps sur le Mac : **ni `index.html`, ni les CSS
-(`style.css`, `tokens.css`, `components.css`, `vendor/`), ni `store/sidebar.js`,
-`store/station.js`, `store/now.js`**. Les fichiers du mouvement sont à toi
+(`style.css`, `tokens.css`, `components.css`), ni `vendor/` à la main, ni `store/sidebar.js`,
+`store/station.js`, `store/now.js`**. Exception mécanique : toute modification d'un script de
+`www/` change la ligne d'empreinte de `vendor/tailwind.css`, et le filet échoue tant qu'elle
+n'est pas régénérée par `tools/tailwind/build.sh` ; régénère-la, ne l'écris jamais à la main
+(elle sera régénérée de nouveau à la fusion, comme pour la fiche L). Les fichiers du mouvement sont à toi
 (`aircraft-animation.js` et ses tests, `store/feed.js` pour ce qui le concerne,
 l'application des poses dans `map/openlayers-map-manager.js`, `map/renderers/aircraft-webgl.js`
-si la mesure le désigne, `internal/adsb/live_prediction.go` et le suivi de trajectoire). Les
+seulement si la mesure le désigne, et alors au plus juste : la session design y prépare des
+étiquettes allégées à faible zoom, dis chaque ligne touchée dans le rapport, `internal/adsb/live_prediction.go` et le suivi de trajectoire). Les
 formes des messages WebSocket et des routes restent celles que la fiche L a figées, tests
 compris. **Le choix de la stratégie par défaut revient au propriétaire** : c'est une décision
 structurante ; tu la recommandes, chiffres à l'appui, tu ne la fais pas. Rien de la station :
