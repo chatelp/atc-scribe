@@ -27,8 +27,9 @@ type Router struct {
 	config     *config.Config
 	logger     *logger.Logger
 
-	// The pages that may call this server; see internal/auth/origin.go. Built
-	// by the first Routes(), which every listener calls, once.
+	// The pages that may call this server and open its WebSocket; see
+	// internal/auth/origin.go. Built by the first Routes(), which every
+	// listener calls, once.
 	originsOnce sync.Once
 	origins     *auth.Origins
 }
@@ -64,7 +65,14 @@ func newOrigins(cfg *config.Config, log *logger.Logger) *auth.Origins {
 // Routes returns the API routes
 func (r *Router) Routes() http.Handler {
 	router := chi.NewRouter()
-	r.originsOnce.Do(func() { r.origins = newOrigins(r.config, r.logger) })
+	r.originsOnce.Do(func() {
+		r.origins = newOrigins(r.config, r.logger)
+		// The same pages for the WebSocket, plus the clients that send no
+		// Origin, which are not browsers and carry no borrowed cookie.
+		if r.handler != nil && r.handler.wsServer != nil {
+			r.handler.wsServer.SetOriginCheck(r.origins.AllowedOrAbsent)
+		}
+	})
 
 	// Middleware
 	router.Use(r.middleware.RequestID)
