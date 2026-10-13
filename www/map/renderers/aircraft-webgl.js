@@ -299,20 +299,38 @@
         return BRIGHT_MAP_STYLES.includes((store?.settings?.mapStyle || 'none').toLowerCase());
     }
 
-    // The altitude of an aircraft on the map, by hue, as before the migration.
-    // The design system's ramp of lightness without hue (tokens
-    // color.altitude.*) was tried at step 2 on 13/10 and refused by the owner
-    // at a glance: the five greys could not be told apart. Kept here until the
-    // design session proposes a measured alternative (09-ecrans.md records
-    // the deliberate departure).
+    // The altitude of an aircraft on the map: the design system's palette F,
+    // warm to cold from the lowest to cruise, chosen by the owner on 13/10 on
+    // a scene of 34 aircraft against the palette of before, a grey ramp and
+    // another variant (every pair of bands at least 13.6 apart under the worst
+    // colour blindness, far from the urgency red and from the phase families).
+    // Tokens color.altitude.dark-* on a dark map, light-* on a bright one, read
+    // once from the page, the same hex as fallbacks for a canvas.
     const ALTITUDE_PALETTE = {
-        dark: { 'very-low': '#D35A48', low: '#EA8A4A', mid: '#F4B55A', high: '#F8D857', cruise: '#E8ECEF' },
-        light: { 'very-low': '#B91C1C', low: '#C2410C', mid: '#B45309', high: '#0E7490', cruise: '#1D4ED8' },
+        dark: { 'very-low': '#fff59a', low: '#e68cba', mid: '#c2a3ff', high: '#61c9e3', cruise: '#6e7b8f' },
+        light: { 'very-low': '#33311f', low: '#452a38', mid: '#746299', high: '#27505b', cruise: '#6e7b8f' },
     };
+    let altitudePaletteCache = null;
+
+    function altitudePalette() {
+        if (altitudePaletteCache) return altitudePaletteCache;
+        const palette = { dark: { ...ALTITUDE_PALETTE.dark }, light: { ...ALTITUDE_PALETTE.light } };
+        if (typeof document !== 'undefined' && document.documentElement) {
+            const cs = getComputedStyle(document.documentElement);
+            for (const theme of ['dark', 'light']) {
+                for (const band of Object.keys(palette[theme])) {
+                    const v = cs.getPropertyValue(`--color-altitude-${theme}-${band}`).trim();
+                    if (v) palette[theme][band] = v;
+                }
+            }
+        }
+        altitudePaletteCache = palette;
+        return palette;
+    }
 
     function getAltitudeBandColor(aircraft, store) {
         const band = getAltitudeColorBand(aircraft, store);
-        const palette = ALTITUDE_PALETTE[isBrightMapStyle(store) ? 'light' : 'dark'];
+        const palette = altitudePalette()[isBrightMapStyle(store) ? 'light' : 'dark'];
         return palette[band] || palette.cruise;
     }
 

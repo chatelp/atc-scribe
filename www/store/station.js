@@ -123,6 +123,33 @@
         },
 
         // The three lights of the status banner, each with its help.
+        // The antenna's line in the top bar (migration step 3, TopBar): what the
+        // station has on air and since when, said, not switchable here; or why
+        // there is nothing to listen to. Level: the StatusLight variant.
+        get antennaLine() {
+            const st = this.serverStatus;
+            const rx = st && st.receiver;
+            if (!rx) return { level: 'unknown', text: 'Antenna: no report' };
+            if (rx.stale) return { level: 'unknown', text: `Antenna: no report since ${this.timelineTime(rx.reported_at)}` };
+            const ago = (v) => {
+                const ms = v ? Date.now() - Date.parse(v) : NaN;
+                if (!Number.isFinite(ms) || ms < 0) return '';
+                const m = Math.round(ms / 60000);
+                if (m < 1) return 'just now';
+                if (m < 60) return `${m} min ago`;
+                const h = Math.floor(m / 60);
+                return `${h} h ${String(m % 60).padStart(2, '0')} ago`;
+            };
+            const since = rx.since ? ago(rx.since) : '';
+            if (rx.state === 'on_air') {
+                return { level: 'ok', text: `On air: ${rx.title || rx.label || 'the station\'s selection'}${since ? `, chosen at the station ${since}` : ''}` };
+            }
+            if (rx.state === 'switching') return { level: 'switching', text: `Switching channels at the station${since ? `, ${since}` : ''}` };
+            if (rx.state === 'lent') return { level: 'warn', text: `Receiver lent${rx.detail ? ` (${rx.detail})` : ''}${since ? `, ${since}` : ''}: no audio` };
+            if (rx.state === 'off') return { level: 'off', text: `Receiver off${since ? `, ${since}` : ''}` };
+            return { level: 'unknown', text: `Antenna: ${rx.label || rx.state || '?'}` };
+        },
+
         get statusLights() {
             const st = this.serverStatus;
             if (!st) return [];

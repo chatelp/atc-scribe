@@ -83,6 +83,7 @@
             kinds: KINDS,
             list: restored,    // newest first; what this browser logged before, too
             unread: 0,
+            unreadUrgent: 0,   // of which emergencies: the counter turns urgent for those only
             open: false,
             soundsOpen: false,
             sounds: loadSounds(),
@@ -103,7 +104,10 @@
                 this.list.unshift({ id: Date.now() + Math.random(), at: new Date(), kind, text, hex, key });
                 if (this.list.length > MAX_EVENTS) this.list.length = MAX_EVENTS;
                 saveLog(this.list);
-                if (!this.open) this.unread++;
+                if (!this.open) {
+                    this.unread++;
+                    if (kind === 'emergency') this.unreadUrgent++;
+                }
                 if (this.sounds[kind]) this.ring();
             },
 
@@ -124,12 +128,13 @@
 
             toggleOpen() {
                 this.open = !this.open;
-                if (this.open) this.unread = 0;
+                if (this.open) { this.unread = 0; this.unreadUrgent = 0; }
             },
 
             clear() {
                 this.list = [];
                 this.unread = 0;
+                this.unreadUrgent = 0;
                 saveLog(this.list);
             },
 
