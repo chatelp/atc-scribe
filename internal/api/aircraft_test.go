@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -296,4 +297,42 @@ func TestAircraftRoutes(t *testing.T) {
 			t.Errorf("ground aircraft: %d positions, %d predicted, want 1 and 0", len(tr.History), len(tr.Future))
 		}
 	})
+	// The form of the predicted positions, key by key, as the details panel
+	// and the map read them (fiche L, step 2): whichever predictor computes
+	// them, /tracks and the aircraft keep these keys.
+	t.Run("the predicted positions keep their form", func(t *testing.T) {
+		s := shared.with(t)
+		var tr map[string]any
+		s.get("/api/v1/aircraft/"+hexCruise+"/tracks", &tr)
+		if got, want := sortedKeys(tr), "distance flight future hex history phase_history"; got != want {
+			t.Errorf("tracks keys: %s, want %s", got, want)
+		}
+		future, _ := tr["future"].([]any)
+		if len(future) == 0 {
+			t.Fatal("no predicted position for an aircraft in cruise")
+		}
+		for i, p := range future {
+			point, _ := p.(map[string]any)
+			if got, want := sortedKeys(point), "altitude distance lat lon mag_heading speed_gs speed_true timestamp track true_heading vertical_speed"; got != want {
+				t.Errorf("future[%d] keys: %s, want %s", i, got, want)
+			}
+			for _, k := range []string{"lat", "lon", "altitude", "speed_gs", "true_heading", "distance"} {
+				if _, ok := point[k].(float64); !ok {
+					t.Errorf("future[%d].%s = %v, want a number", i, k, point[k])
+				}
+			}
+			if _, err := time.Parse(time.RFC3339Nano, fmt.Sprint(point["timestamp"])); err != nil {
+				t.Errorf("future[%d].timestamp: %v", i, err)
+			}
+		}
+	})
+}
+
+func sortedKeys(m map[string]any) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, " ")
 }
