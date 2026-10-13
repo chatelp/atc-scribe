@@ -12,7 +12,8 @@
  * - updateAircraft(aircraft): an aircraft from the store, dated on arrival
  *   (the bulk load).
  * Output: once a frame, mapManager.updateAnimatedAircraftPose(hex, {lat, lon,
- * heading}) for each aircraft whose pose moved.
+ * heading, fade?}) for each aircraft whose pose moved; fade (0 to 1) only
+ * while a gap too wide to fade relocates the symbol.
  *
  * Between samples, the last one is carried forward at the velocity the
  * station reported (ground speed and track, smoothed), over at most
@@ -90,7 +91,20 @@ class AircraftAnimationEngine {
             // drawn before the pause swept the aircraft across the map for up
             // to 2.5 s once the tab was shown again (browser bench, scenario e:
             // a 6 km step in one frame after 30 s hidden).
-            resumeAfterMs: 1000
+            resumeAfterMs: 1000,
+            // A gap the capped correction cannot glide over is not faded: the
+            // symbol fades out where it was drawn and in where the sample puts
+            // it, relocateFadeMs each. The correction peaks at 1.5 times the
+            // gap over its duration (at most maxCorrectionDurationMs): drawn
+            // ahead by more than 1.67 s of the aircraft's own flight, gliding
+            // back made it fly backwards; behind or aside by more than twice
+            // that, it flew at three times its speed (back from a gap of 18 s:
+            // 1.3 km in 5 s, browser bench, scenario f). Never below
+            // relocateMinM metres. 99 % of the gaps are under 50 m (browser
+            // bench, scenario b); those over 200 m come from positions lost
+            // for seconds.
+            relocateMinM: 200,
+            relocateFadeMs: 150
         };
 
         this.aircraftStates = new Map();
@@ -407,9 +421,10 @@ class AircraftAnimationEngine {
         }
 
         // The correction: the gap between where the aircraft is drawn now and
-        // where the new sample, carried to now, puts it.
+        // where the new sample, carried to now, puts it. A relocation in
+        // progress goes on: its fade-in already shows the new samples.
         state.correction = null;
-        if (previousReal && previousRendered) {
+        if (previousReal && previousRendered && !state.relocation) {
             const fresh = this._predictedPose(state, snapshot, now, null);
             // Every gap fades, however small: below a threshold (30 m for
             // a real sample, 7 m for a predicted one, before) the aircraft
@@ -427,6 +442,14 @@ class AircraftAnimationEngine {
                     ? Math.hypot(state.velocity.eastMps, state.velocity.northMps)
                     : 0;
                 const gapM = distanceNm * 1852;
+                if (gapM > this.config.relocateMinM && this._outrunsGlide(state.velocity, previousRendered, fresh, gapM)) {
+                    state.relocation = {
+                        lat: previousRendered.lat, lon: previousRendered.lon, alt: previousRendered.alt,
+                        startAt: now, gapM
+                    };
+                    if (!state.lastRendered) state.lastRendered = { ...snapshot, timestamp: now };
+                    return state;
+                }
                 const gentleMs = speedMps > 1 ? (3 * gapM / speedMps) * 1000 : this.config.mergeDurationMs;
                 const correctionDurationMs = Math.min(
                     this.config.maxCorrectionDurationMs,
@@ -454,6 +477,21 @@ class AircraftAnimationEngine {
             state.lastRendered = { ...snapshot, timestamp: now };
         }
         return state;
+    }
+
+    // Whether gliding from the drawn pose to the fresh one would outrun the
+    // aircraft: backwards when drawn ahead of it by more than the gap the
+    // capped correction closes at its own speed (1.67 s of flight), or at
+    // three times its speed when the gap is twice that.
+    _outrunsGlide(velocity, drawn, fresh, gapM) {
+        const speedMps = velocity ? Math.hypot(velocity.eastMps, velocity.northMps) : 0;
+        if (speedMps < 1) return true;
+        const backLimitM = speedMps * this.config.maxCorrectionDurationMs / 1500;
+        if (gapM > 2 * backLimitM) return true;
+        const north = (fresh.lat - drawn.lat) * 111320;
+        const east = (fresh.lon - drawn.lon) * 111320 * Math.cos((drawn.lat * Math.PI) / 180);
+        const along = (north * velocity.northMps + east * velocity.eastMps) / speedMps;
+        return along < -backLimitM;
     }
 
     // A drawn point moved on to time `now` at a velocity.
@@ -516,6 +554,11 @@ class AircraftAnimationEngine {
         for (const state of this.aircraftStates.values()) {
             state.correction = null;
             state.lastRendered = null;
+            if (state.relocation) {
+                state.relocation = null;
+                state.lastFade = null;
+                this._applyPose(state.hex, { ...this._predictedPose(state, state.lastReal, performance.now(), state.displayHeading), fade: 1 }, state);
+            }
         }
     }
 
@@ -596,6 +639,19 @@ class AircraftAnimationEngine {
         const pose = this._predictedPose(state, real, now, heading);
         if (state.velocity) this._secPredictedCount++;
 
+        // A relocation: out where it was drawn, then in where it is.
+        if (state.relocation) {
+            const r = state.relocation;
+            const fadeMs = Math.max(1, this.config.relocateFadeMs);
+            const t = now - r.startAt;
+            if (t < fadeMs) {
+                return { lat: r.lat, lon: r.lon, alt: r.alt, heading, fade: Math.max(0, 1 - t / fadeMs) };
+            }
+            pose.fade = Math.min(1, (t - fadeMs) / fadeMs);
+            if (pose.fade >= 1) state.relocation = null;
+            return pose;
+        }
+
         // A correction in progress: the aircraft flies its prediction, and the
         // gap between where it was drawn and where the sample put it fades out.
         if (state.correction) {
@@ -655,8 +711,9 @@ class AircraftAnimationEngine {
             Math.abs(previous.lat - pose.lat) >= 1e-8 ||
             Math.abs(previous.lon - pose.lon) >= 1e-8;
         const headingChanged = Number.isFinite(pose.heading) && (!previous || Math.abs(this._angleDiffDeg(previous.track, pose.heading)) > 0.25);
+        const fadeChanged = Number.isFinite(pose.fade) && pose.fade !== state.lastFade;
 
-        if (!positionChanged && !headingChanged) {
+        if (!positionChanged && !headingChanged && !fadeChanged) {
             return false;
         }
 
@@ -664,14 +721,13 @@ class AircraftAnimationEngine {
             return false;
         }
 
-        const applied = this.mapManager.updateAnimatedAircraftPose(hex, {
-            lat: pose.lat,
-            lon: pose.lon,
-            heading: pose.heading,
-        });
+        const out = { lat: pose.lat, lon: pose.lon, heading: pose.heading };
+        if (Number.isFinite(pose.fade)) out.fade = pose.fade;
+        const applied = this.mapManager.updateAnimatedAircraftPose(hex, out);
         if (!applied) {
             return false;
         }
+        if (Number.isFinite(pose.fade)) state.lastFade = pose.fade;
 
         state.lastRendered = {
             lat: pose.lat,
@@ -839,6 +895,10 @@ class AircraftAnimationEngine {
             velocity: null,
             // The fading offset: { dLat, dLon, dAlt, startAt, endAt }.
             correction: null,
+            // A gap too wide to fade: { lat, lon, alt, startAt, gapM }, the
+            // pose it fades out from; lastFade, the opacity last drawn.
+            relocation: null,
+            lastFade: null,
             // The last observation, its server send time (ms), and the time
             // of the last estimate applied (ms).
             lastObserved: null,

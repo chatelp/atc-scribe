@@ -221,6 +221,14 @@ func Generated(o Options, n int) []Flight {
 			f.GapFrom, f.GapTo = o.LongGapFrom, o.LongGapFrom+o.LongGapLen
 			if o.LongGapFrom <= 0 {
 				f.GapFrom, f.GapTo = 0, 0
+			} else {
+				// An arrival: it slows down and turns while the receiver
+				// hears no position, so the server's forecast, straight on at
+				// the speed it had, runs ahead of it (the AIC143 case: back
+				// in coverage, the aircraft slid backwards to its fix).
+				f.Accel = Between(f.GapFrom, f.GapTo+20, -1.5)
+				f.Turn = Between(f.GapFrom, f.GapTo+20, 1.5)
+				f.VRate = Between(f.GapFrom, f.GapTo+60, -1500)
 			}
 		}
 		out = append(out, f)

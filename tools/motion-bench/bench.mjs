@@ -255,11 +255,11 @@ class Recorder {
     }
     // The parts, joined; hex indexes are stable across drains of one page.
     joined() {
-        const out = { hexes: [], poses: [], renders: [], frames: [], longTasks: [], corrections: [], events: [], backend: null };
+        const out = { hexes: [], poses: [], renders: [], frames: [], longTasks: [], corrections: [], relocations: [], events: [], backend: null, poseStride: 6 };
         for (const p of this.parts) {
             if (p.hexes.length > out.hexes.length) out.hexes = p.hexes;
-            for (const k of ['poses', 'renders', 'frames', 'longTasks', 'corrections', 'events']) {
-                for (let i = 0; i < p[k].length; i++) out[k].push(p[k][i]);
+            for (const k of ['poses', 'renders', 'frames', 'longTasks', 'corrections', 'relocations', 'events']) {
+                for (let i = 0; i < (p[k] || []).length; i++) out[k].push(p[k][i]);
             }
             out.backend = p.backend || out.backend;
         }

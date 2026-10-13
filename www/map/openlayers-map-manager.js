@@ -1296,6 +1296,12 @@
                 feature.set('heading', headingDeg);
                 feature.set('rotationRad', (headingDeg * Math.PI) / 180);
             }
+            // The symbol's opacity while the engine relocates it (a gap too
+            // wide to glide over), in tenths: the renderer caches a style per
+            // value.
+            if (Number.isFinite(pose.fade)) {
+                feature.set('fade', Math.round(pose.fade * 10) / 10);
+            }
 
             feature.changed();
             return true;

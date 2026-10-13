@@ -13,11 +13,12 @@
     const probe = {
         hexes: [], // index -> hex
         hexIndex: new Map(),
-        poses: [], // flat: t, hexIndex, lat, lon, rotationRad, per aircraft per drawn frame
+        poses: [], // flat: t, hexIndex, lat, lon, rotationRad, fade, per aircraft per drawn frame
         renders: [], // flat: t of each drawn frame, and the time the engine computed its poses for
         frames: [], // t of each animation frame
         longTasks: [], // [start, duration]
         corrections: [], // [t, hexIndex, metres]
+        relocations: [], // [t, hexIndex, metres]: gaps the engine relocates instead of gliding
         events: [], // [t, name]
         attached: false,
         recording: false,
@@ -54,6 +55,11 @@
     function noteCorrections(engine, t) {
         if (!engine || !engine.aircraftStates) return;
         for (const [hex, state] of engine.aircraftStates) {
+            const r = state.relocation;
+            if (r && !seenCorrections.has(r)) {
+                seenCorrections.add(r);
+                if (probe.recording) probe.relocations.push([t, hexId(hex), Math.round(r.gapM * 10) / 10]);
+            }
             const c = state.correction;
             if (c && !seenCorrections.has(c)) {
                 seenCorrections.add(c);
@@ -88,7 +94,8 @@
                 if (!g) continue;
                 const [lon, lat] = window.ol.proj.toLonLat(g.getCoordinates());
                 const rot = Number(f.get('rotationRad'));
-                probe.poses.push(t, hexId(hex), lat, lon, Number.isFinite(rot) ? rot : NaN);
+                const fade = Number(f.get('fade'));
+                probe.poses.push(t, hexId(hex), lat, lon, Number.isFinite(rot) ? rot : NaN, Number.isFinite(fade) ? fade : 1);
             }
         });
     }
@@ -102,11 +109,11 @@
     probe.drain = () => {
         const out = {
             hexes: probe.hexes.slice(), poses: probe.poses, renders: probe.renders, frames: probe.frames,
-            longTasks: probe.longTasks, corrections: probe.corrections, events: probe.events,
-            attached: probe.attached, backend: probe.backend,
+            longTasks: probe.longTasks, corrections: probe.corrections, relocations: probe.relocations, events: probe.events,
+            attached: probe.attached, backend: probe.backend, poseStride: 6,
         };
         probe.poses = []; probe.renders = []; probe.frames = []; probe.longTasks = [];
-        probe.corrections = []; probe.events = [];
+        probe.corrections = []; probe.relocations = []; probe.events = [];
         return JSON.stringify(out);
     };
 })();

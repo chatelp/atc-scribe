@@ -79,7 +79,7 @@ function loadPage(clock, station) {
         },
         updateAnimatedAircraftPose(hex, pose) {
             if (!drawn.has(hex)) return false;
-            drawn.set(hex, { lat: pose.lat, lon: pose.lon, heading: pose.heading });
+            drawn.set(hex, { lat: pose.lat, lon: pose.lon, heading: pose.heading, fade: Number.isFinite(pose.fade) ? pose.fade : 1 });
             return true;
         },
         removeAircraft(hex) { drawn.delete(hex); },
@@ -148,6 +148,8 @@ function replay() {
     const per = new Map(); // hex -> { steps: [{speed, along, trueSpeed}], errors: [] }
     for (const t of rec.truth) per.set(t.hex, { kind: t.kind, steps: [], errors: [], prev: null });
     let maxCorrectionM = 0;
+    let relocations = 0;
+    let maxRelocationM = 0;
     const seenCorrections = new WeakSet();
 
     const noteCorrections = () => {
@@ -188,7 +190,13 @@ function replay() {
             if (!acc || !tr) continue;
             const truthNow = truthAt(tr, frameMs);
             acc.errors.push(metresBetween(truthNow.lat, truthNow.lon, p.lat, p.lon).d);
-            if (acc.prev) {
+            // A step taken while the symbol fades out or in is a relocation
+            // (a gap too wide to glide over, aircraft-animation.js), not a
+            // motion: counted apart, with its distance.
+            if (acc.prev && (acc.prev.fade < 1 || p.fade < 1)) {
+                const m = metresBetween(acc.prev.lat, acc.prev.lon, p.lat, p.lon).d;
+                if (m > 1) { relocations++; maxRelocationM = Math.max(maxRelocationM, m); }
+            } else if (acc.prev) {
                 const step = metresBetween(acc.prev.lat, acc.prev.lon, p.lat, p.lon);
                 const trackRad = truthNow.track * Math.PI / 180;
                 acc.steps.push({
@@ -236,6 +244,9 @@ function replay() {
         jumpsPct: pct(jumps),
         speedStdPct: Number((100 * std(ratios)).toFixed(2)),
         maxCorrectionM: Number(maxCorrectionM.toFixed(1)),
+        // Gaps relocated rather than glided over (fiche M), and the widest.
+        relocations,
+        maxRelocationM: Number(maxRelocationM.toFixed(1)),
         meanErrorM: Number(mean(errors).toFixed(1)),
         p95ErrorM: Number(sortedErrors[Math.floor(sortedErrors.length * 0.95)].toFixed(1)),
         // By kind of flight: mean error (m); backwards, slow and jump steps,

@@ -16,6 +16,8 @@
 //   speedStdEnginePct  the same, the steps timed by when the engine computed
 //                 them: the motion itself, without the drawing's timing
 //   maxCorrectionM  largest gap the engine started to fade (its corrections)
+//   relocations, maxRelocationM  gaps relocated rather than glided over (the
+//                 symbol fades out and in): their steps are not motion steps
 //   meanErrorM, p95ErrorM  drawn pose against the true position, each frame
 //   moveMedMs, moveP95Ms  time between two poses of an aircraft (its cadence)
 //   frameMedMs, frameP95Ms, framesOver50Pct  animation frames (rAF) intervals
@@ -93,15 +95,16 @@ export function analyse(data, truth, { from, to, scenario }) {
     for (let i = 0; i < data.renders.length; i += 2) renderTimes.push(data.renders[i]);
     const per = new Map();
     const P = data.poses;
-    for (let i = 0; i < P.length; i += 5) {
+    const W = data.poseStride || 5; // 5 before the fade was read
+    for (let i = 0; i < P.length; i += W) {
         const t = P[i];
         if (t < from || t > to) continue;
         const hex = data.hexes[P[i + 1]];
         const tr = truthByHex.get(hex);
         if (!tr) continue;
         let acc = per.get(hex);
-        if (!acc) { acc = { hex, kind: tr.kind, gap: tr.gap_ms, samples: [], steps: [], errors: [], pauses: 0 }; per.set(hex, acc); }
-        acc.samples.push({ t, et: engineAt.get(t), lat: P[i + 2], lon: P[i + 3], rot: P[i + 4] });
+        if (!acc) { acc = { hex, kind: tr.kind, gap: tr.gap_ms, samples: [], steps: [], errors: [], pauses: 0, relocationSteps: 0 }; per.set(hex, acc); }
+        acc.samples.push({ t, et: engineAt.get(t), lat: P[i + 2], lon: P[i + 3], rot: P[i + 4], fade: W > 5 ? P[i + 5] : 1 });
     }
     for (const acc of per.values()) {
         const tr = truthByHex.get(acc.hex);
@@ -119,7 +122,9 @@ export function analyse(data, truth, { from, to, scenario }) {
                 (Number.isFinite(s.rot) && Number.isFinite(anchor.rot) && Math.abs(s.rot - anchor.rot) > 1e-6);
             const held = s.t - anchor.t > STEP_MAX_MS;
             if (!moved && !held) continue;
-            if (!paused) {
+            if (anchor.fade < 1 || s.fade < 1) {
+                acc.relocationSteps++;
+            } else if (!paused) {
                 const dt = s.t - anchor.t;
                 const step = metres(anchor.lat, anchor.lon, s.lat, s.lon);
                 const trackRad = truthNow.track * Math.PI / 180;
@@ -152,6 +157,8 @@ export function analyse(data, truth, { from, to, scenario }) {
         ...motion(per),
         moveMedMs: r1(median(moves)), moveP95Ms: r1(quantile(moves, 0.95)),
         maxCorrectionM: r1(corrections.reduce((m, c) => Math.max(m, c[2]), 0)),
+        relocations: (data.relocations || []).filter(([t]) => inWindow(t)).length,
+        maxRelocationM: r1((data.relocations || []).filter(([t]) => inWindow(t)).reduce((m, c) => Math.max(m, c[2]), 0)),
         frameMedMs: r1(median(frameIntervals)), frameP95Ms: r1(quantile(frameIntervals, 0.95)),
         framesOver50Pct: r2(100 * frameIntervals.filter((d) => d > 50).length / Math.max(1, frameIntervals.length)),
         drawMedMs: r1(median(drawIntervals)), drawP95Ms: r1(quantile(drawIntervals, 0.95)),

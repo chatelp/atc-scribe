@@ -530,7 +530,8 @@
             const iconSize = Number.isFinite(properties.iconSize) ? properties.iconSize : 24;
             const labelColor = properties.labelColor || '#9CA3AF';
             const deemphasized = properties.deemphasized ? 1 : 0;
-            return `${selected}_${hovered}_${deemphasized}_${color}_${labelColor}_${iconSrc}_${iconSize}_${rotationRad.toFixed(3)}`;
+            const fade = Number.isFinite(properties.fade) ? properties.fade : 1; // relocation (aircraft-animation.js)
+            return `${selected}_${hovered}_${deemphasized}_${color}_${labelColor}_${iconSrc}_${iconSize}_${rotationRad.toFixed(3)}_${fade}`;
         }
 
         function getVectorStyle(feature) {
@@ -576,7 +577,8 @@
             const baseTextOpacity = deemphasized
                 ? (brightMap ? 0.72 : 0.5)
                 : (brightMap ? 1 : 0.9);
-            const textOpacity = baseTextOpacity * labelAgeFade;
+            const fade = Number.isFinite(properties.fade) ? properties.fade : 1; // relocation (aircraft-animation.js)
+            const textOpacity = baseTextOpacity * labelAgeFade * fade;
             const labelLineOne = `${labelParts.phaseText || ''}${labelParts.callsignText || ''}${labelParts.typeText || ''}`;
             const labelLineTwo = `${labelParts.detailsText || ''}`;
             const labelLineThree = `${labelParts.voiceText || ''}`;
@@ -591,7 +593,7 @@
 
             const iconSize = Number.isFinite(properties.iconSize) ? properties.iconSize : 24;
             const rotationRad = Number.isFinite(properties.rotationRad) ? properties.rotationRad : 0;
-            const markerAlpha = deemphasized ? 0.5 : 1;
+            const markerAlpha = (deemphasized ? 0.5 : 1) * fade;
             const iconColor = properties.color || '#E8ECEF';
             const iconSrc = getColorizedAircraftIconSrc(properties.iconSrc || 'assets/a0.svg', iconColor);
             const showHalo = isSelected || isHovered;

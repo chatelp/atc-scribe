@@ -175,3 +175,39 @@ test('after a pause of the frames, the aircraft goes on from where its samples p
     const fresh = e._predictedPose(state, state.lastReal, t, null);
     assert.ok(Math.abs(drawn.lon - fresh.lon) < 1e-6, 'drawn where the samples put it now');
 });
+
+test('a gap the glide cannot close without outrunning the aircraft relocates it (fiche M, scenario f)', () => {
+    // At 400 kt (206 m/s) the capped glide (2.5 s) outruns the aircraft
+    // backwards past 1.67 s of flight (343 m), at three times its speed past
+    // 3.33 s (686 m).
+    const at = (drawnLon) => {
+        const { e, poses } = engine();
+        const now = Date.now();
+        e.observe('abc123', fix(2.0, now, now));
+        const state = e.aircraftStates.get('abc123');
+        state.lastRendered = { lat: 48.5, lon: drawnLon, alt: 30000, track: 90, timestamp: performance.now() };
+        e.observe('abc123', fix(2.0028, now, now));
+        return { e, state, poses };
+    };
+    const metresPerDeg = 111320 * Math.cos(48.5 * Math.PI / 180);
+    // Drawn 300 m ahead: glided (no relocation), never backwards.
+    let { e, state } = at(2.0028 + 300 / metresPerDeg);
+    assert.ok(state.correction && !state.relocation, 'glided');
+    // Drawn 400 m ahead: relocated, and never drawn moving west.
+    ({ e, state } = at(2.0028 + 400 / metresPerDeg));
+    assert.ok(state.relocation && !state.correction, 'relocated');
+    const t0 = performance.now();
+    let prev = null;
+    for (let ms = 0; ms <= 400; ms += 33) {
+        const p = e._computePose(state, t0 + ms);
+        if (prev && p.fade >= 1 && prev.fade >= 1) assert.ok(p.lon >= prev.lon, 'no step west once shown');
+        if (ms < 150) assert.ok(p.fade < 1, 'fading out');
+        prev = p;
+    }
+    assert.equal(state.relocation, null, 'done after two fades');
+    // Drawn 600 m behind: glided; 800 m behind: relocated.
+    ({ state } = at(2.0028 - 600 / metresPerDeg));
+    assert.ok(state.correction && !state.relocation, '600 m behind: glided');
+    ({ state } = at(2.0028 - 800 / metresPerDeg));
+    assert.ok(state.relocation, '800 m behind: relocated');
+});
