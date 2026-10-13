@@ -41,6 +41,12 @@ class AircraftAnimationEngine {
             enabled: true,
             // Frames per second the poses are computed at.
             interpolationFps: 30,
+            // A frame is due once 1000 / interpolationFps ms have elapsed, less
+            // this, in ms: the display's frames come 16.7 ms apart (60 Hz)
+            // with a little jitter, two of them often fell a hair short of
+            // 33.3 ms, and the engine waited for a third: 20 frames a second
+            // instead of 30 (browser bench, a pose every 49.7 ms median).
+            frameToleranceMs: 4,
             // How long a sample is carried forward before the aircraft stops,
             // in seconds from the sample's source time (about a second before
             // it reaches the page): 7 s from the source is 6 s from arrival.
@@ -558,7 +564,7 @@ class AircraftAnimationEngine {
             this._resume();
         }
 
-        if (elapsed >= targetFrameMs) {
+        if (elapsed >= targetFrameMs - this.config.frameToleranceMs) {
             this._processFrame(now);
             this.lastFrameAt = now;
         }
