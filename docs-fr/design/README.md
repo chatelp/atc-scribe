@@ -18,6 +18,8 @@ atc-scribe (`04-migration.md`).
 | `captures/` | l'interface « avant », 12/10 | référence |
 | `04-migration.md` | le plan par étapes, vérifiables, avec l'effort (≈ 13 j) | fait |
 | `05-identite.md`, `identite/` | la marque Clairance : signe, nom, favicon, barre de menus, connexion, README (`identite/index.html` pour la planche) | fait, nom décidé le 13/10 |
+| `06-avions.md`, `avions/` | l'inventaire des avions dessinés dans l'outil, et notre famille de neuf silhouettes (`tools/design/avions.mjs`) | fait |
+| `07-esquisses.md` | le fil au centre : A et sa colonne à deux onglets, B replié, suivre un vol ; d'où vient chaque donnée | esquisses ; « suivre un vol » **à valider** |
 
 Outils, dans `tools/design/` :
 
