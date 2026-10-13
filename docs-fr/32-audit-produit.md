@@ -517,7 +517,19 @@ sur la carte.
   (règle du système à porter à 24) ; pas de classe de texte « urgent » hors de la liste. L'outil
   d'inventaire de la session design ne tourne plus depuis l'étape 2 (il cherche `PHASE_COLORS`
   dans `par-view.js`) : signalé. L'instance d'essai suit désormais Orly comme référence, comme la
-  production (Saint-Cyr ne publie pas de METAR).
+  production (Saint-Cyr ne publie pas de METAR). **Relecture design** (même soir, capture à
+  1 440 × 900 par `tools/design/capture.mjs`) : disposition et repli bons, écarts tranchés, quatre
+  corrections faites (7016379) : (1) **le sens d'une piste** — De Gaulle atterrit sur son doublet
+  ouest (26L à 0,57, 27R à 0,43) et la tête passait de l'une à l'autre toutes les quelques minutes :
+  le « depuis » se remettait à zéro et trois lignes sur cinq de « Worth knowing » étaient fausses.
+  Deux pistes dont les numéros diffèrent d'au plus 1 sont de même sens : nommées ensemble, et un
+  changement de piste est un changement de sens, côté serveur (b9e9675, commit autonome,
+  contribuable, testé), dans le journal (« LFPG switched to landing west ») et dans la phrase ;
+  (2) la carte repliée parle d'un seul aérodrome, celui du prochain atterrissage, et tous les
+  comptes lisent les séquences des tableaux ; (3) le present perfect avec « since » ;
+  (4) un journal vide dit depuis quand la page regarde. Système recopié depuis design-suite
+  db61427 (lignes d'événements à 24 px, `cl-urgent`, boutons dépliés dessinés sélectionnés,
+  outil d'inventaire réparé).
 - 13/10 (soir, tard) : **fiches H et I intégrées** (vague 3 cloud). H (`claude/quirky-ritchie-mfjscr`,
   six commits) : le serveur démarre **sans transcription** quand aucune source ne transcrit et
   qu'aucun sidecar n'est configuré (`Sidecar.Idle/Off/Ensure`, une source qui passe à
