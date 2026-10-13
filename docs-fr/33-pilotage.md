@@ -84,6 +84,16 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 Plus tard, à discuter (doc 32) : strips de vol, clairance contre trajectoire, vue d'approche en
 plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
 
+## Les sessions cloud, vague 3 (13/10, validée par le propriétaire)
+
+Cinq fiches dans `docs-fr/fiches-cloud/` (prompts à coller dans son README), du serveur et de la
+logique pure, sans la station : **G** la route publique des chiffres avant connexion et les trois
+valeurs qui manquent ; **H** le serveur sans transcription et le Docker amont retiré ; **I** les
+dettes de sécurité (CORS, WebSocket, rôle lecture seule, purges) ; **J** la compilation
+Windows ; **K** « Then » sans verdict. Indépendantes, lancées par le propriétaire quand il veut ;
+chaque branche `cloud/…` revient sur le Mac pour relecture et intégration. La migration de
+l'interface, elle, reste sur le Mac.
+
 ## Les décisions attendues du propriétaire
 
 1. ~~Le nom~~ — **décidé le 13/10 : Clairance** (D74 complétée, Q53 close), renommage fait le
