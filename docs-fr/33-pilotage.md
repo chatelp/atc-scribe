@@ -74,10 +74,11 @@ la mémoire des décisions dans `05-decisions.md` ; ici, la vue d'ensemble, cour
 | Version en/fr de l'interface | après le design (les textes bougent) | principe : oui (10/10) |
 | **Portage du sidecar : Linux x86-64 + NVIDIA** (faster-whisper / CTranslate2, repli processeur ; Pi qui reçoit, transcription déportée) ; **Windows au moins pour l'affinage** (les simmers) ; sous-point pour un mode différé (Pi 5, dix minutes de retard) : apparier contre le ciel de l'instant de la transmission relu dans `adsb_targets`, comme le fait déjà l'outil de mesure, au lieu de la flotte vivante (modification bornée au point d'appariement) | question 4 ; format permettant l'affinage ; non-régression mesurée au labo | **cible : oui (12/10) ; pas dans l'immédiat** (Q54) |
 | **Refonte de la structure de l'écran** (mission design élargie par le propriétaire le 12/10, contrainte « disposition gardée » levée) : fil unifié des échanges au centre, toutes fréquences ; le ciel (carte / PAR) à côté ; panneau de contexte « en ce moment » ; puis le système de composants. Esquisses en cours, hors dépôt. Si le fil est retenu, deux chantiers serveur bornés : (1) rapprocher chaque instruction ATC de la réponse du pilote qui la suit, **pour la lecture seulement, jamais un jugement d'erreur** (rien de type SLASH) ; (2) enregistrer la raison d'un non-appariement (aucun indicatif entendu / aucun avion en portée / candidats refusés), aujourd'hui seulement journalisée | esquisses validées par le propriétaire | non |
-| **Consultation d'avocat en droit du numérique**, réponse écrite, sur quatre questions : « correspondance » et transcriptions pseudonymisées ; accord de participation pour un corpus simulé ; échange de poids affinés chez soi ; autorisation ANSSI des récepteurs — **c'est le premier pas recommandé par l'étude (fiche 05) : « pas encore » pour faire connaître l'outil** | décision du propriétaire | non |
-| Corpus simulé (pilote avec IVAO France, sessions dédiées, accord écrit) et annotation communautaire | réponse favorable de l'avocat sur l'accord de participation | non |
-| Affinage communautaire ou fédéré (modèle adapté au français) ; prérequis caché : **un jeu de validation partageable**, qui ne peut pas venir des enregistrements de la station (corpus simulé, ou évaluation chez le contributeur en ne rapatriant que les chiffres) | corpus ; portage | non |
-| Premier pas public (quoi, où, quand) | avocat ; renommage ; installable ailleurs | non |
+| **Premier pas (recommandation révisée le 13/10)** : rendre Clairance installable comme **outil strictement local** — c'est le jalon « installable ailleurs » ci-dessus, même mesure de sortie ; ses garde-fous (rien ne sort de la machine, rediffusion de l'audio coupée par défaut, avertissement) passent du rang de bonne pratique à celui de **condition** : c'est ce qui rend l'outil défendable sans avocat, comme les guides français qui recommandent déjà une clé SDR pour la bande aviation. **Aucune démarche** auprès de la DGAC, de la DSNA ou de l'ANSSI, ni consultation d'avocat (objection du propriétaire : coût, et attirer l'attention « pour rien ») | — | **oui (13/10)** |
+| Corpus simulé avec consentement (**voie A, la seule retenue**) : une parole simulée n'est pas une communication réelle (ni 226-15 ni le terrain de la DGAC ; reste le RGPD) ; consentement écrit d'après des modèles universitaires gratuits, relecture gratuite possible (CNIL, clinique juridique) ; pilote avec IVAO France ou un cercle proche, **après** l'étape « installable ». C'est aussi la source naturelle du **jeu de validation partageable** | installable ailleurs ; décision du propriétaire sur le pilote | principe : oui ; pilote : non |
+| Affinage communautaire ou fédéré (modèle adapté au français) sur le corpus simulé | corpus ; portage | non |
+| ~~Voies B (poids entraînés sur du réel) et C (transcriptions réelles publiées)~~ : **fermées** ; un avocat ne redevient utile que si on veut les rouvrir | — | fermées (13/10) |
+| Premier pas public (quoi, où, quand) | installable ailleurs ; identité | non |
 
 Plus tard, à discuter (doc 32) : strips de vol, clairance contre trajectoire, vue d'approche en
 plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
@@ -97,10 +98,10 @@ plan, procédures du SIA, fréquences comme un pupitre, programmation d'écoute.
    de Tab pour passer d'un avion à l'autre ; (5) l'interpolation des avions gardée sous
    `prefers-reduced-motion` ; (6) la validation d'ensemble, maquettes à l'appui, qui ouvre la
    migration.
-3. **Le premier pas communautaire** — recommandation livrée le 12/10 (`SYNTHESE.md` du dossier
-   privé) : **pas encore** pour faire connaître l'outil ; d'abord une consultation d'avocat en
-   droit du numérique, réponse écrite, sur les quatre questions listées dans les jalons. À
-   décider : la faire, et quand.
+3. ~~Le premier pas communautaire~~ — **tranché le 13/10** avec la session communauté : pas
+   d'avocat ni de démarche auprès d'une autorité ; le premier pas est l'outil strictement local
+   installable ailleurs (P0), puis un corpus simulé avec consentement (voie A seule) ; les
+   voies sur du réel sont fermées. Reste à décider plus tard : le pilote de corpus simulé.
 4. **Demander à GitHub la purge des anciens objets** (après D75, faite le 12/10 : position
    arrondie, adresses génériques, historique réécrit et poussé de force sur les quatre
    branches, sauvegarde `~/Dev/Aero/atc-scribe-sauvegarde-2026-10-12.git`) : les commits
