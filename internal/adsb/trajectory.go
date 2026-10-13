@@ -36,8 +36,6 @@ import (
 	"github.com/yegors/co-atc/pkg/logger"
 )
 
-const maxLivePredictionAge = 60 * time.Second
-
 // ─── Trajectory Snapshot ──────────────────────────────────────────────────────
 
 // TrajectorySnapshot is a single ADS-B observation stored in the ring buffer.
@@ -76,15 +74,20 @@ type TrajectorySnapshot struct {
 
 // TrajectorySnapshotFromADSB converts an ADSBTarget and ground state into a
 // TrajectorySnapshot suitable for the ring buffer. The snapshot is marked invalid
-// when both lat and lon are zero (no position data available).
-func TrajectorySnapshotFromADSB(adsb *ADSBTarget, onGround bool, ts time.Time) TrajectorySnapshot {
+// when both lat and lon are zero (no position data available). ts is when the
+// server ingested it; dataAt is the time the source's seen_pos counts from
+// (ReceiverTime), ts when the source does not say.
+func TrajectorySnapshotFromADSB(adsb *ADSBTarget, onGround bool, ts, dataAt time.Time) TrajectorySnapshot {
 	if adsb == nil {
 		return TrajectorySnapshot{Timestamp: ts, Valid: false}
 	}
 	lat, lon, hasPosition := adsb.Position()
-	posTs := ts
+	if dataAt.IsZero() {
+		dataAt = ts
+	}
+	posTs := dataAt
 	if hasPosition && adsb.SeenPos != nil && *adsb.SeenPos > 0 {
-		posTs = ts.Add(-time.Duration(*adsb.SeenPos * float64(time.Second)))
+		posTs = dataAt.Add(-time.Duration(*adsb.SeenPos * float64(time.Second)))
 	}
 	return TrajectorySnapshot{
 		Timestamp:    ts,
@@ -109,6 +112,28 @@ func TrajectorySnapshotFromADSB(adsb *ADSBTarget, onGround bool, ts time.Time) T
 		Seen:         NumberOrZero(adsb.Seen),
 		Valid:        hasPosition,
 	}
+}
+
+// ReceiverTime is the time a target's seen and seen_pos count from: the
+// "now" of the aircraft.json a receiver writes itself (tar1090, readsb),
+// which it writes once a second and the server reads up to a second later;
+// else, and never later than, the server's own now. Counted from the server's
+// now, every position was dated up to a second too recent, and drawn that
+// much behind (replay bench, 0.5 s: 115 m in cruise).
+func ReceiverTime(raw *RawAircraftData, sourceType string, serverNow time.Time) time.Time {
+	switch sourceType {
+	case SourceTypeTar1090, SourceTypeReadsbAPI, SourceTypeReadsbFile:
+	default:
+		return serverNow // the external sources set "now" to the server's own second
+	}
+	if raw == nil || raw.Now <= 0 {
+		return serverNow
+	}
+	at := time.Unix(0, int64(raw.Now*float64(time.Second))).UTC()
+	if at.After(serverNow) {
+		return serverNow
+	}
+	return at
 }
 
 // PositionTime is when the snapshot's position was decoded: PosTimestamp when
@@ -509,163 +534,6 @@ func (tt *TrajectoryTracker) GetForecast(hex string) []PredictionPoint {
 		return nil
 	}
 	return at.Prediction.Forecast
-}
-
-// LivePrediction is an interpolated server-side predicted state for a specific aircraft.
-// It is intended for high-frequency websocket updates between real ADS-B polls.
-type LivePrediction struct {
-	Hex          string    `json:"hex"`
-	Lat          float64   `json:"lat"`
-	Lon          float64   `json:"lon"`
-	Altitude     float64   `json:"altitude"`
-	Heading      float64   `json:"heading"`
-	Speed        float64   `json:"speed"`
-	Confidence   float64   `json:"confidence"`
-	Timestamp    time.Time `json:"timestamp"`
-	BaseObserved time.Time `json:"base_observed"`
-}
-
-// GetLivePredictionsAt returns interpolated live prediction states for all tracked aircraft at time t.
-// Real ADS-B updates should always supersede these client-side.
-func (tt *TrajectoryTracker) GetLivePredictionsAt(t time.Time) []LivePrediction {
-	tt.mu.RLock()
-	defer tt.mu.RUnlock()
-
-	result := make([]LivePrediction, 0, len(tt.aircraft))
-	for hex, at := range tt.aircraft {
-		if at == nil || at.Count == 0 {
-			continue
-		}
-
-		latest := at.Latest()
-		if latest == nil || !latest.Valid {
-			continue
-		}
-		if t.Sub(latest.PositionTime()) > maxLivePredictionAge {
-			continue
-		}
-
-		forecast := at.Prediction.Forecast
-		if len(forecast) == 0 {
-			continue
-		}
-
-		p, ok := interpolateLivePredictionFromForecast(latest, forecast, t)
-		if !ok {
-			continue
-		}
-
-		p.Hex = hex
-		p.BaseObserved = latest.Timestamp
-		result = append(result, p)
-	}
-
-	return result
-}
-
-func interpolateLivePredictionFromForecast(latest *TrajectorySnapshot, forecast []PredictionPoint, atTime time.Time) (LivePrediction, bool) {
-	if latest == nil || len(forecast) == 0 {
-		return LivePrediction{}, false
-	}
-
-	first := forecast[0]
-	latestHeading := first.Heading
-	if latest.TrueHeading != 0 {
-		latestHeading = latest.TrueHeading
-	} else if latest.MagHeading != 0 {
-		latestHeading = latest.MagHeading
-	} else if latest.Track != 0 {
-		latestHeading = latest.Track
-	}
-
-	if atTime.Before(first.Timestamp) {
-		start := latest.PositionTime()
-		end := first.Timestamp
-		if !end.After(start) {
-			return LivePrediction{
-				Lat:        first.Lat,
-				Lon:        first.Lon,
-				Altitude:   first.Altitude,
-				Heading:    first.Heading,
-				Speed:      first.Speed,
-				Confidence: first.Confidence,
-				Timestamp:  atTime,
-			}, true
-		}
-
-		alpha := atTime.Sub(start).Seconds() / end.Sub(start).Seconds()
-		if alpha < 0 {
-			alpha = 0
-		}
-		if alpha > 1 {
-			alpha = 1
-		}
-
-		return LivePrediction{
-			Lat:        lerpFloat(latest.Lat, first.Lat, alpha),
-			Lon:        lerpFloat(latest.Lon, first.Lon, alpha),
-			Altitude:   lerpFloat(latest.AltBaro, first.Altitude, alpha),
-			Heading:    lerpAngleDeg(latestHeading, first.Heading, alpha),
-			Speed:      lerpFloat(latest.GS, first.Speed, alpha),
-			Confidence: lerpFloat(0.95, first.Confidence, alpha),
-			Timestamp:  atTime,
-		}, true
-	}
-
-	for i := 0; i < len(forecast)-1; i++ {
-		a := forecast[i]
-		b := forecast[i+1]
-		if atTime.Before(a.Timestamp) || atTime.After(b.Timestamp) {
-			continue
-		}
-
-		den := b.Timestamp.Sub(a.Timestamp).Seconds()
-		if den <= 0 {
-			return LivePrediction{}, false
-		}
-		alpha := atTime.Sub(a.Timestamp).Seconds() / den
-		if alpha < 0 {
-			alpha = 0
-		}
-		if alpha > 1 {
-			alpha = 1
-		}
-
-		return LivePrediction{
-			Lat:        lerpFloat(a.Lat, b.Lat, alpha),
-			Lon:        lerpFloat(a.Lon, b.Lon, alpha),
-			Altitude:   lerpFloat(a.Altitude, b.Altitude, alpha),
-			Heading:    lerpAngleDeg(a.Heading, b.Heading, alpha),
-			Speed:      lerpFloat(a.Speed, b.Speed, alpha),
-			Confidence: lerpFloat(a.Confidence, b.Confidence, alpha),
-			Timestamp:  atTime,
-		}, true
-	}
-
-	last := forecast[len(forecast)-1]
-	if atTime.After(last.Timestamp) {
-		return LivePrediction{}, false
-	}
-
-	return LivePrediction{
-		Lat:        last.Lat,
-		Lon:        last.Lon,
-		Altitude:   last.Altitude,
-		Heading:    last.Heading,
-		Speed:      last.Speed,
-		Confidence: last.Confidence,
-		Timestamp:  atTime,
-	}, true
-}
-
-func lerpFloat(a, b, t float64) float64 {
-	return a + (b-a)*t
-}
-
-func lerpAngleDeg(a, b, t float64) float64 {
-	d := math.Mod((b-a)+540.0, 360.0) - 180.0
-	out := a + d*t
-	return math.Mod(out+360.0, 360.0)
 }
 
 // ─── Cleanup ──────────────────────────────────────────────────────────────────
