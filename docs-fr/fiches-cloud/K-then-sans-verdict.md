@@ -31,18 +31,26 @@ then(instruction, track, options) -> { text, at, kind }   ou null
 Ce qu'il rend, en anglais, une phrase courte et factuelle, et `kind` ∈ `level`, `heading`,
 `speed`, `frequency`, `runway`, `clearance` :
 
-- niveau : « level at 4,000 ft 2 min later », « descending through 5,200 ft » (encore en
-  route à la fin de la fenêtre), « still at FL110 » (aucun mouvement) ;
+- niveau : « level at 4 000 ft, 2 min later », « descending through 5 200 ft » (encore en
+  route à la fin de la fenêtre), « at FL 110, 6 min later » (aucun mouvement : le même fait,
+  sans attente) ;
 - cap : « turned to 270° », « heading 254°, still turning » ;
-- vitesse : « 220 kt 1 min later », « slowing, 245 kt » ;
+- vitesse : « 220 kt, 1 min later », « slowing, 245 kt » ;
 - fréquence : « no later transmission heard here » ou « next heard on 119.255 3 min later »
   (si le store fournit la liste des transmissions suivantes de l'avion, paramètre optionnel) ;
 - piste et clairance : « landed on 27R » / « took off from 26L » si la trajectoire le montre
   (altitude au sol, position : une règle simple et dite), sinon null.
 
-**Interdit** : les mots *deviation*, *complied*, *error*, *violation*, *wrong*, et toute
-couleur ou classement. Un test l'affirme sur chaque sortie possible : c'est le principe
-« constater, ne pas juger » (D78), que le propriétaire a confirmé.
+**Interdit** : les mots *deviation*, *complied*, *error*, *violation*, *wrong*, et *still*
+(il sous-entend que l'avion aurait dû bouger : un verdict discret), **sauf** dans « still
+turning », qui décrit un mouvement en cours ; et toute couleur ou classement. Un test l'affirme
+sur chaque sortie possible : c'est le principe « constater, ne pas juger » (D78), que le
+propriétaire a confirmé.
+
+**Format des nombres**, celui du système de design (`docs-fr/design/systeme/project/README.md`,
+Content › Numbers) : milliers séparés par une **espace fine insécable U+202F** (« 4 000 ft »,
+jamais « 4,000 ft »), niveau de vol avec une espace (« FL 110 », jamais « FL110 »), et une
+virgule avant le délai (« , 2 min later »). Un test vérifie le format de chaque phrase.
 
 ## Tests
 
