@@ -809,6 +809,10 @@
                     <!-- Map Container -->
                     <div class="flex-1 relative z-10">
                         <div id="map" class="h-full w-full bg-black"></div>
+                        <!-- What the map shows while a filter narrows it (step 4). -->
+                        <div x-show="$store.atc.filterSummary" x-cloak class="cl-root absolute left-2 top-2 z-20 pointer-events-none">
+                            <div class="cl-sky__note" x-text="$store.atc.filterSummary"></div>
+                        </div>
 
                         <!-- The main screen shows the radar map or the PAR view of one
                              followed airport; the side panels stay as they are. -->
@@ -1008,261 +1012,142 @@
             <!-- End of left content area -->
             
             <!-- Right Sidebar -->
-            <aside class="w-full min-w-0 md:w-120 md:min-w-120 bg-panel md:border-l border-border flex-col overflow-hidden z-50"
-                   :class="$store.atc.mobilePane === 'list' ? 'flex' : 'hidden md:flex'">
-                <!-- Aircraft List - Only shown when no aircraft is selected -->
-                <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col p-3 bg-panel">
-                    <div class="mb-3">
-                        <div class="flex justify-between items-center mb-1.5 relative pb-1">
-                            <h3 class="text-highlight text-base m-0">Tracked Targets</h3>
-                            <!-- Subtle green underline -->
-                            <div class="absolute bottom-0 left-0 right-0 h-px bg-highlight/30"></div>
-                        </div>
+            <!-- The context column (design system, TrafficColumn; migration step 4):
+                 two tabs, Right now (filled at step 5) and Traffic, the list and its
+                 filters; the map follows the filters. cl-root scopes the system's
+                 styles to the column; the details panel keeps its old width until
+                 step 8. -->
+            <aside class="cl-root cl-app__column w-full min-w-0 overflow-hidden z-50"
+                   :class="[$store.atc.mobilePane === 'list' ? 'flex' : 'hidden md:flex', $store.atc.selectedAircraft ? 'md:w-120 md:min-w-120' : '']"
+                   aria-label="Context">
+                <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col">
+                    <div class="cl-tabs cl-tabs--column" role="tablist">
+                        <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.columnTab === 'now'" @click="$store.atc.columnTab = 'now'"
+                                data-help-title="Right now" data-help="The runway in use, who lands next, what happened, the weather: coming at the next step of the migration.">Right now</button>
+                        <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.columnTab === 'traffic'" @click="$store.atc.columnTab = 'traffic'"
+                                data-help-title="Traffic" data-help="Every aircraft the receiver hears, with the filters; the map shows the same selection.">Traffic <span class="cl-tabs__count" x-text="$store.atc.activeAircraftCount"></span></button>
                     </div>
 
-                    <!-- Search -->
-                    <div class="flex mb-2 gap-2">
-                        <div class="relative flex-1">
-                            <input type="text"
-                                   class="filter-input w-full p-1.5 pr-8 border border-border text-text rounded-md text-sm transition-all duration-200 focus:outline-none"
-                                   placeholder="Search callsign, category"
+                    <!-- Right now: a placeholder until step 5 gives it its content. -->
+                    <template x-if="$store.atc.columnTab === 'now'">
+                        <div class="cl-section" style="flex: 1; justify-content: center; text-align: center;">
+                            <span class="cl-strip__s" style="white-space: normal;">Right now will say the runway in use and since when, who lands next, what happened in the last half hour and the weather. It comes at the next step; the Traffic tab has everything for now.</span>
+                        </div>
+                    </template>
+
+                    <template x-if="$store.atc.columnTab === 'traffic'">
+                    <div class="flex-1 min-h-0 flex flex-col">
+                    <div class="cl-section">
+                        <!-- Search -->
+                        <div class="relative">
+                            <input type="search" class="cl-input" style="width: 100%;" placeholder="Callsign, registration, type" aria-label="Find an aircraft"
                                    x-model="$store.atc.searchTerm"
                                    @input.debounce.300ms="$store.atc.applyFilters()"
                                    @keydown.tab.prevent="$store.atc.cycleToNextAircraft()"
                                    @keydown.shift.tab.prevent="$store.atc.cycleToPreviousAircraft()">
-                            <button x-show="$store.atc.searchTerm.length > 0"
-                                    @click="$store.atc.searchTerm = ''; $store.atc.applyFilters()"
-                                    class="absolute right-2 top-1/2 transform -translate-y-1/2 text-text/50 hover:text-highlight transition-colors duration-200 cursor-pointer">
-                                <i class="fas fa-times text-xs"></i>
+                        </div>
+
+                        <!-- Altitude band (www/altitude/): floor and ceiling on one slider,
+                             feet below the transition altitude, flight levels above. -->
+                        <div class="cl-altrange select-none" x-data="altitudeFilter()">
+                            <div class="cl-altrange__head">
+                                <span class="cl-strip__s cursor-help" data-help-title="Altitude band" :data-help="bandHelp">Altitude
+                                    <span class="cl-age cursor-help" :data-help="qnhHelp" data-help-title="QNH"
+                                          x-text="$store.atc.altimetry.estimated ? 'QNH ' + Math.round($store.atc.altimetry.qnh) : 'QNH std'"></span>
+                                </span>
+                                <span class="cl-altrange__value" :class="active ? '' : ''">
+                                    <span x-text="band"></span>
+                                    <small x-text="active ? ' · ' + inBand + ' of ' + airborne : ' · ' + airborne + ' airborne'"
+                                           class="cursor-help" data-help-title="Aircraft in the band"
+                                           data-help="Airborne aircraft inside the band, of those seen now. Aircraft on the ground are shown or hidden by the Ground toggle, whatever the band."></small>
+                                </span>
+                            </div>
+                            <!-- The traffic of the moment, along the slider. -->
+                            <div class="cl-altrange__histo" aria-hidden="true" data-help-title="Traffic by altitude"
+                                 data-help="Each bar is the number of airborne aircraft at that height now, on the same scale as the slider under it; green bars are inside the band.">
+                                <template x-for="(n, i) in counts" :key="i">
+                                    <i :class="binInBand(i) ? 'is-in' : ''" :style="'height:' + (n ? Math.max(12, n / peak * 100) : 0) + '%'"></i>
+                                </template>
+                            </div>
+                            <div class="alt-track-wrap">
+                                <div class="alt-track"></div>
+                                <div class="alt-track-band" :style="'left:calc(7px + (100% - 14px) * ' + loPct / 100 + ');right:calc(7px + (100% - 14px) * ' + (100 - hiPct) / 100 + ')'"></div>
+                                <div class="alt-ta" :style="'left:calc(7px + (100% - 14px) * ' + taPct / 100 + ')'"></div>
+                                <input type="range" class="alt-range" x-ref="lo" min="0" :max="last" step="1" :value="lo"
+                                       aria-label="Altitude floor" :aria-valuetext="label(min)"
+                                       @input="moveLo($event.target.value)" @change="save()">
+                                <input type="range" class="alt-range" x-ref="hi" min="0" :max="last" step="1" :value="hi"
+                                       aria-label="Altitude ceiling" :aria-valuetext="label(max)"
+                                       @input="moveHi($event.target.value)" @change="save()">
+                            </div>
+                            <div class="cl-altrange__marks alt-marks" aria-hidden="true" data-help-title="Scale"
+                                 :data-help="'SFC is the surface. TA is the transition altitude (' + label(ta) + '): below it, altitudes are in feet on the local QNH; above it, in flight levels, hundreds of feet on the standard pressure.'">
+                                <template x-for="m in marks" :key="m.text">
+                                    <span :style="'left:' + m.at + '%'" x-text="m.text"></span>
+                                </template>
+                            </div>
+                            <div class="cl-seg cl-seg--dense" role="group" aria-label="Altitude presets">
+                                <template x-for="p in presets" :key="p.id">
+                                    <button class="cl-seg__item" :aria-pressed="isPreset(p)" data-help-title="Preset" :data-help="p.help" @click="choose(p)" x-text="p.label"></button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Air / Ground / Heard -->
+                        <div class="cl-row">
+                            <button class="cl-toggle" :class="$store.atc.settings.showAirAircraft ? 'is-on' : ''" :aria-pressed="$store.atc.settings.showAirAircraft"
+                                    @click="$store.atc.toggleAirAircraft()" data-help-title="In the air (key A)"
+                                    data-help="Show or hide the aircraft in flight. The count is those heard in the last moments, over the day's total.">
+                                Air <span class="cl-toggle__count"><span x-text="$store.atc.counts.air_active"></span>/<span x-text="$store.atc.counts.air_total"></span></span>
+                            </button>
+                            <button class="cl-toggle" :class="$store.atc.settings.showGroundAircraft ? 'is-on' : ''" :aria-pressed="$store.atc.settings.showGroundAircraft"
+                                    @click="$store.atc.toggleGroundAircraft()" data-help-title="On the ground (key G)"
+                                    data-help="Show or hide the aircraft on the ground: taxiing, parked, or just landed. The altitude band does not apply to them.">
+                                Ground <span class="cl-toggle__count"><span x-text="$store.atc.counts.ground_active"></span>/<span x-text="$store.atc.counts.ground_total"></span></span>
+                            </button>
+                            <button class="cl-toggle" :class="$store.atc.settings.voiceOnly ? 'is-on' : ''" :aria-pressed="!!$store.atc.settings.voiceOnly"
+                                    @click="$store.atc.toggleVoiceOnly()" data-help-title="Heard on the radio"
+                                    data-help="Show only the aircraft a transmission has been matched to: the ones talking or talked to on the frequencies listened to.">
+                                Heard <span class="cl-toggle__count" x-text="$store.atc.voiceAircraftCount"></span>
                             </button>
                         </div>
-                    </div>
 
-                    <!-- Altitude band (www/altitude/): floor and ceiling on one
-                         slider, feet below the transition altitude, flight levels above. -->
-                    <div class="mb-2 select-none" x-data="altitudeFilter()">
-                        <div class="flex items-baseline gap-2 text-xs mb-0.5">
-                            <i class="fas fa-arrows-up-down text-text/50"></i>
-                            <span class="font-medium cursor-help" :class="active ? 'text-highlight' : 'text-text/80'" x-text="band"
-                                  data-help-title="Altitude band" :data-help="bandHelp"></span>
-                            <span class="flex-1"></span>
-                            <span class="text-text/50 tabular-nums cursor-help" :data-help="qnhHelp" data-help-title="QNH"
-                                  x-text="$store.atc.altimetry.estimated ? 'QNH ' + Math.round($store.atc.altimetry.qnh) : 'QNH std'"></span>
-                            <span class="text-text/50 tabular-nums cursor-help" data-help-title="Aircraft in the band"
-                                  data-help="Airborne aircraft inside the band, of those seen now. Aircraft on the ground are shown or hidden by the Ground button, whatever the band."
-                                  x-text="active ? inBand + ' of ' + airborne + ' airborne' : airborne + ' airborne'"></span>
-                            <button x-show="active" class="text-text/50 hover:text-highlight" title="All altitudes"
-                                    @click="choose(presets[0])"><i class="fas fa-times"></i></button>
-                        </div>
-                        <!-- The traffic of the moment, along the slider. -->
-                        <div class="alt-histogram" aria-hidden="true" data-help-title="Traffic by altitude"
-                             data-help="Each bar is the number of airborne aircraft at that height now, on the same scale as the slider under it; green bars are inside the band.">
-                            <template x-for="(n, i) in counts" :key="i">
-                                <div class="alt-bin" :class="binInBand(i) ? 'alt-bin-in' : ''"
-                                     :style="'height:' + (n ? Math.max(12, n / peak * 100) : 0) + '%'"></div>
+                        <!-- The five families of flight phase (step 2); keys 1 to 0 still toggle one phase. -->
+                        <div class="cl-row">
+                            <template x-for="fam in (window.PhaseFamilies ? PhaseFamilies.FAMILIES : [])" :key="fam">
+                                <button class="cl-toggle" :class="{ 'is-on': $store.atc.familyIsOn(fam), 'is-mixed': $store.atc.familyIsMixed(fam) }"
+                                        :aria-pressed="$store.atc.familyIsMixed(fam) ? 'mixed' : String($store.atc.familyIsOn(fam))"
+                                        :title="PhaseFamilies.LABEL[fam]"
+                                        @click="$store.atc.toggleFamily(fam)" :data-help-title="PhaseFamilies.LABEL[fam]" :data-help="$store.atc.familyHelp(fam)">
+                                    <i class="cl-dot" :class="'cl-dot--' + PhaseFamilies.MODIFIER[fam]"></i><span x-text="PhaseFamilies.SHORT[fam]"></span>
+                                    <span class="cl-toggle__count" x-text="$store.atc.familyCount(fam)"></span>
+                                </button>
                             </template>
                         </div>
-                        <div class="alt-track-wrap">
-                            <div class="alt-track"></div>
-                            <div class="alt-track-band" :style="'left:calc(7px + (100% - 14px) * ' + loPct / 100 + ');right:calc(7px + (100% - 14px) * ' + (100 - hiPct) / 100 + ')'"></div>
-                            <div class="alt-ta" :style="'left:calc(7px + (100% - 14px) * ' + taPct / 100 + ')'"></div>
-                            <input type="range" class="alt-range" x-ref="lo" min="0" :max="last" step="1" :value="lo"
-                                   aria-label="Altitude floor" :aria-valuetext="label(min)"
-                                   @input="moveLo($event.target.value)" @change="save()">
-                            <input type="range" class="alt-range" x-ref="hi" min="0" :max="last" step="1" :value="hi"
-                                   aria-label="Altitude ceiling" :aria-valuetext="label(max)"
-                                   @input="moveHi($event.target.value)" @change="save()">
-                        </div>
-                        <div class="alt-marks" aria-hidden="true" data-help-title="Scale"
-                             :data-help="'SFC is the surface. TA is the transition altitude (' + label(ta) + '): below it, altitudes are in feet on the local QNH; above it, in flight levels, hundreds of feet on the standard 1013 hPa (FL100 is 10 000 ft). The scale gives more room to low altitudes, where the traffic around airfields is. ∞ is no ceiling.'">
-                            <template x-for="m in marks" :key="m.text">
-                                <span :style="'left:' + m.at + '%'" x-text="m.text"></span>
-                            </template>
-                        </div>
-                        <div class="flex flex-wrap gap-1 mt-1">
-                            <template x-for="p in presets" :key="p.id">
-                                <button class="px-1.5 py-0.5 rounded border text-[11px] leading-4"
-                                        :class="isPreset(p) ? 'border-highlight/60 bg-highlight/15 text-highlight' : 'border-border text-text/70 hover:text-text'"
-                                        data-help-title="Preset" :data-help="p.help" @click="choose(p)" x-text="p.label"></button>
-                            </template>
-                        </div>
                     </div>
 
-                    <!-- Status Filter Buttons -->
-                    <div class="flex mb-2 gap-1.5">
-                        <!-- Air and Ground buttons side by side with equal width -->
-                        <div class="flex gap-1.5 flex-1">
-                            <button @click="$store.atc.toggleAirAircraft()" data-help-title="In the air"
-                                    data-help="Show or hide the aircraft in flight. Active ones are those heard in the last moments; the total counts the day's."
-                                    :class="{
-                                        'filter-btn-active bg-highlight/15 border-highlight/40 text-highlight': $store.atc.settings.showAirAircraft,
-                                        'filter-btn-inactive text-text/50': !$store.atc.settings.showAirAircraft
-                                    }"
-                                    class="flex-1 px-2 py-1.5 border rounded-md text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
-                                <span class="w-1.5 h-1.5 rounded-full bg-highlight flex-shrink-0"></span>
-                                <span class="whitespace-nowrap"><strong>A</strong>ir (<span x-text="$store.atc.counts.air_active"></span>/<span x-text="$store.atc.counts.air_total"></span>)</span>
-                            </button>
-                            <button @click="$store.atc.toggleGroundAircraft()" data-help-title="On the ground"
-                                    data-help="Show or hide the aircraft on the ground: taxiing, parked, or just landed. The altitude band does not apply to them."
-                                    :class="{
-                                        'filter-btn-active bg-gray-400/15 border-gray-400/40 text-gray-400': $store.atc.settings.showGroundAircraft,
-                                        'filter-btn-inactive text-text/50': !$store.atc.settings.showGroundAircraft
-                                    }"
-                                    class="flex-1 px-2 py-1.5 border rounded-md text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
-                                <span class="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0"></span>
-                                <span class="whitespace-nowrap"><strong>G</strong>round (<span x-text="$store.atc.counts.ground_active"></span>/<span x-text="$store.atc.counts.ground_total"></span>)</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Heard on the radio: aircraft a transcription has been matched to -->
-                    <div class="flex mb-2">
-                        <button @click="$store.atc.toggleVoiceOnly()"
-                                :class="{
-                                    'filter-btn-active bg-amber-400/15 border-amber-400/40 text-amber-400': $store.atc.settings.voiceOnly,
-                                    'filter-btn-inactive text-text/50': !$store.atc.settings.voiceOnly
-                                }"
-                                data-help-title="Heard on the radio" data-help="Show only the aircraft a transmission has been matched to: the ones talking or talked to on the frequencies listened to."
-                                class="flex-1 px-2 py-1.5 border rounded-md text-xs transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer">
-                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0"></span>
-                            <span class="whitespace-nowrap">Heard on the radio (<span x-text="$store.atc.voiceAircraftCount"></span>)</span>
-                        </button>
-                    </div>
-
-                    <!-- Flight Phase Filter Buttons -->
-                    <div class="mb-2">
-                        <div class="grid grid-cols-10 gap-1">
-                            <button @click="$store.atc.togglePhaseFilter('NEW')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('NEW')"
-                                    :class="{
-                                        'filter-btn-active bg-gray-500/15 border-gray-500/40 text-gray-400': $store.atc.settings.phaseFilters?.NEW !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.NEW === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">1</span>
-                                <span class="whitespace-nowrap">NEW</span>
-                            </button>
-                            <button @click="$store.atc.togglePhaseFilter('TAX')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('TAX')"
-                                    :class="{
-                                        'filter-btn-active bg-purple-500/15 border-purple-500/40 text-purple-400': $store.atc.settings.phaseFilters?.TAX !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.TAX === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">2</span>
-                                <span class="whitespace-nowrap">TAX</span>
-                            </button>
-                            <button @click="$store.atc.togglePhaseFilter('T/O')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('T/O')"
-                                    :class="{
-                                        'filter-btn-active bg-orange-500/15 border-orange-500/40 text-orange-400': $store.atc.settings.phaseFilters?.['T/O'] !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.['T/O'] === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">3</span>
-                                <span class="whitespace-nowrap">T/O</span>
-                            </button>
-                            <button @click="$store.atc.togglePhaseFilter('CLB')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('CLB')"
-                                    :class="{
-                                        'filter-btn-active bg-lime-500/15 border-lime-500/40 text-lime-400': $store.atc.settings.phaseFilters?.CLB !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.CLB === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">4</span>
-                                <span class="whitespace-nowrap">CLB</span>
-                            </button>
-                            <button @click="$store.atc.togglePhaseFilter('DEP')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('DEP')"
-                                    :class="{
-                                        'filter-btn-active bg-green-500/15 border-green-500/40 text-green-400': $store.atc.settings.phaseFilters?.DEP !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.DEP === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">5</span>
-                                <span class="whitespace-nowrap">DEP</span>
-                            </button>
-                            <button @click="$store.atc.togglePhaseFilter('CRZ')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('CRZ')"
-                                    :class="{
-                                        'filter-btn-active bg-blue-500/15 border-blue-500/40 text-blue-400': $store.atc.settings.phaseFilters?.CRZ !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.CRZ === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">6</span>
-                                <span class="whitespace-nowrap">CRZ</span>
-                            </button>
-                            <button @click="$store.atc.togglePhaseFilter('ARR')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('ARR')"
-                                    :class="{
-                                        'filter-btn-active bg-pink-400/10 border-pink-400/35 text-pink-300': $store.atc.settings.phaseFilters?.ARR !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.ARR === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">7</span>
-                                <span class="whitespace-nowrap">ARR</span>
-                            </button>
-                            <button @click="$store.atc.togglePhaseFilter('APP')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('APP')"
-                                    :class="{
-                                        'filter-btn-active bg-yellow-500/15 border-yellow-500/40 text-yellow-400': $store.atc.settings.phaseFilters?.APP !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.APP === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">8</span>
-                                <span class="whitespace-nowrap">APP</span>
-                            </button>
-                            <button @click="$store.atc.togglePhaseFilter('T/D')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('T/D')"
-                                    :class="{
-                                        'filter-btn-active bg-teal-500/15 border-teal-500/40 text-teal-400': $store.atc.settings.phaseFilters?.['T/D'] !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.['T/D'] === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">9</span>
-                                <span class="whitespace-nowrap">T/D</span>
-                            </button>
-                            <button @click="$store.atc.togglePhaseFilter('UNK')" data-help-title="Flight phase" :data-help="$store.atc.phaseHelp('UNK')"
-                                    :class="{
-                                        'filter-btn-active bg-slate-500/10 border-slate-500/35 text-slate-400': $store.atc.settings.phaseFilters?.UNK !== false,
-                                        'filter-btn-inactive text-text/40': $store.atc.settings.phaseFilters?.UNK === false
-                                    }"
-                                    class="px-0.5 py-1 border rounded-[4px] text-[10px] transition-all duration-150 flex items-center justify-center cursor-pointer relative">
-                                <span class="absolute top-0 left-0.5 text-[7px] opacity-50 font-mono">0</span>
-                                <span class="whitespace-nowrap">UNK</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Sidebar Tabs and List Controls -->
-                    <div class="mb-2 flex items-center justify-between gap-2">
-                        <div class="inline-flex rounded-md border border-border/70 overflow-hidden">
-                            <button @click="$store.atc.setSidebarTab('active')" data-help-title="Active"
-                                    data-help="Aircraft the ADS-B receiver hears now."
-                                    :class="$store.atc.sidebarTab === 'active' ? 'bg-highlight/15 text-highlight' : 'text-text/70 hover:text-text hover:bg-hover/40'"
-                                    class="px-2.5 py-1 text-[10px] font-medium transition-colors cursor-pointer">
-                                Active (<span x-text="$store.atc.activeAircraftCount"></span>)
-                            </button>
-                            <button @click="$store.atc.setSidebarTab('lost')" data-help-title="Signal lost"
-                                    data-help="Aircraft no longer heard: out of range of the antenna, landed out of its sight, or switched off. They stay listed for a while, then go."
-                                    :class="$store.atc.sidebarTab === 'lost' ? 'bg-gray-500/15 text-gray-300' : 'text-text/70 hover:text-text hover:bg-hover/40'"
-                                    class="px-2.5 py-1 text-[10px] font-medium border-l border-border/70 transition-colors cursor-pointer">
-                                Signal Lost (<span x-text="$store.atc.lostAircraftCount"></span>)
-                            </button>
-                        </div>
-
-                        <div class="flex items-center gap-1 text-[9px] text-gray-500 shrink-0" @click.stop @mousedown.stop>
+                    <!-- Active / Signal lost, the retention, the sort -->
+                    <div class="cl-tabs cl-tabs--inset" role="tablist" style="padding: 0 var(--space-4);">
+                        <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.sidebarTab === 'active'" @click="$store.atc.setSidebarTab('active')"
+                                data-help-title="Active" data-help="Aircraft the ADS-B receiver hears now.">Active <span class="cl-tabs__count" x-text="$store.atc.activeAircraftCount"></span></button>
+                        <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.sidebarTab === 'lost'" @click="$store.atc.setSidebarTab('lost')"
+                                data-help-title="Signal lost" data-help="Aircraft no longer heard: out of range of the antenna, landed out of its sight, or switched off. They stay listed for a while, then go.">Signal lost <span class="cl-tabs__count" x-text="$store.atc.lostAircraftCount"></span></button>
+                        <div class="cl-tabs__end" style="display: flex; align-items: center; gap: var(--space-1);" @click.stop @mousedown.stop>
                             <template x-if="$store.atc.sidebarTab === 'lost'">
-                                <div class="flex items-center gap-1">
-                                    <span class="whitespace-nowrap">Retention</span>
-                                    <select x-model="$store.atc.settings.lastSeenMinutes"
-                                            @change="$store.atc.saveSettings(); $store.atc.requestNewAircraftData()"
-                                            title="Signal lost retention window"
-                                            class="w-12 px-1 py-0.5 bg-background border border-border/70 rounded text-[9px] text-text/80">
-                                        <option value="1">1m</option>
-                                        <option value="2">2m</option>
-                                        <option value="5">5m</option>
-                                        <option value="10">10m</option>
-                                        <option value="20">20m</option>
-                                    </select>
-                                </div>
+                                <select x-model="$store.atc.settings.lastSeenMinutes"
+                                        @change="$store.atc.saveSettings(); $store.atc.requestNewAircraftData()"
+                                        aria-label="Signal lost retention" data-help-title="Retention" data-help="How long an aircraft stays in this list after its last message."
+                                        class="w-12 px-1 py-0.5 bg-background border border-border/70 rounded text-[9px] text-text/80">
+                                    <option value="1">1m</option>
+                                    <option value="2">2m</option>
+                                    <option value="5">5m</option>
+                                    <option value="10">10m</option>
+                                    <option value="20">20m</option>
+                                </select>
                             </template>
-
-                            <span class="whitespace-nowrap">Sort</span>
                             <select x-model="$store.atc.settings.listSort"
                                     @change="$store.atc.saveSettings(); $store.atc.applyFilters()"
-                                    title="Sort sidebar aircraft"
+                                    aria-label="Sort" data-help-title="Sort" data-help="The order of the list."
                                     class="w-20 px-1 py-0.5 bg-background border border-border/70 rounded text-[9px] text-text/80">
                                 <option value="callsign_az">CS A-Z</option>
                                 <option value="distance">Distance</option>
@@ -1272,138 +1157,48 @@
                             </select>
                         </div>
                     </div>
-                    
-                    <!-- Aircraft Table - Wrapped in scrollable container -->
-                    <div class="overflow-y-auto overflow-x-auto flex-1 min-h-0 pr-0">
-                        <table class="w-full table-fixed mt-0 text-xs">
-                        <tbody>
-                            <template x-for="aircraft in $store.atc.visibleSidebarAircraft" :key="aircraft.hex">
-                                <tr @click="$store.atc.selectedAircraft = aircraft; if ($store.atc.mapManager) { $store.atc.mapManager.updateVisualState(aircraft.hex, true); $store.atc.mapManager.centerOnAircraft(aircraft); }"
-                                    @mouseover="$store.atc.hoveredAircraft = aircraft; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
-                                    @mouseout="$store.atc.hoveredAircraft = null; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
-                                    class="group cursor-pointer aircraft-row"
-                                    :class="{ 'signal-lost': $store.atc.isSignalLostForSidebar(aircraft) }"
-                                    :data-aircraft-hex="aircraft.hex">
-                                    <!-- Flight strip container -->
-                                    <td colspan="7">
-                                        <!-- PERFORMANCE: Use CSS hover instead of Alpine hoveredAircraft state to prevent full table re-renders -->
-                                        <div class="flight-strip relative flex items-stretch rounded-md overflow-hidden border transition-all duration-0 mt-0.5"
-                                             :class="{
-                                                'flight-strip-active': $store.atc.selectedAircraft?.hex === aircraft.hex,
-                                                'flight-strip-on-map': $store.atc.visibleAircraftOnMap && $store.atc.visibleAircraftOnMap.has(aircraft.hex) && !($store.atc.selectedAircraft?.hex === aircraft.hex)
-                                             }">
-                                            <template x-if="$store.atc.shouldShowLastSeenBadge(aircraft)">
-                                                <div class="pointer-events-none absolute bottom-1 left-1 z-20">
-                                                    <div class="px-2 py-0.5 rounded-md bg-black/45 border border-slate-300/15 text-[10px] tracking-wide uppercase text-slate-100/90 shadow-sm backdrop-blur-[1px]">
-                                                        <span x-text="'-' + $store.atc.getSecondsSinceLastSeen(aircraft) + 's'" class="font-bold"></span>
-                                                    </div>
-                                                </div>
-                                            </template>
 
-                                            <!-- Phase cell -->
-                                            <div class="p-1.5 text-center w-[70px] flex flex-col items-center justify-center">
-                                                <span x-show="aircraft.phase && aircraft.phase.current && aircraft.phase.current.length > 0"
-                                                      x-text="$store.atc.getCurrentPhase(aircraft)"
-                                                      class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center"
-                                                      :class="$store.atc.phaseBadgeClasses(aircraft)"></span>
-                                                <span x-show="$store.atc.getPhaseAirport(aircraft)" x-text="$store.atc.getPhaseAirport(aircraft)"
-                                                      class="text-[8px] font-mono opacity-60 mt-0.5"></span>
-                                                <span x-show="!aircraft.phase || !aircraft.phase.current || aircraft.phase.current.length === 0"
-                                                      x-text="'NEW'"
-                                                      class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-surface-raised text-phase-unknown border border-phase-unknown"></span>
-                                            </div>
-                                            
-                                            <!-- Callsign cell -->
-                                            <div class="p-1.5 text-left flex-1 min-w-0 transition-colors">
-                                                <div class="flex flex-col">
-                                                    <span x-html="$store.atc.highlightSearchMatch(aircraft.flight || aircraft.hex)"
-                                                          :title="aircraft.last_seen ? 'Last seen: ' + $store.atc.getSecondsSinceLastSeen(aircraft) + 's ago' : 'Unknown'"
-                                                          :class="{
-                                                              'text-highlight': !aircraft.on_ground && !$store.atc.isSignalLostForSidebar(aircraft),
-                                                              'text-white': aircraft.on_ground && !$store.atc.isSignalLostForSidebar(aircraft),
-                                                              'text-gray-400': $store.atc.isSignalLostForSidebar(aircraft)
-                                                          }"
-                                                          class="text-sm"></span>
-                                                    <div class="flex items-center gap-1 -mt-1">
-                                                        <span x-show="aircraft.stale_position"
-                                                              title="Last known position — GPS data lost"
-                                                              class="text-[8px] text-orange-500/80 font-medium">LP</span>
-                                                        <span x-show="!aircraft.stale_position && (!aircraft.adsb || (aircraft.adsb.lat === 0 && aircraft.adsb.lon === 0))"
-                                                              title="Mode S — no GPS position"
-                                                              class="text-[8px] text-yellow-600/80 font-medium">S</span>
-                                                        <span class="text-[9px] text-gray-500" x-text="aircraft.adsb?.category || ''"></span>
-                                                        <span class="text-[8px] text-gray-400"
-                                                              :title="aircraft.bsdb?.icao_type_code || aircraft.bsdb?.manufacturer || aircraft.bsdb?.type || aircraft.adsb?.aircraft_type || 'Unknown'"
-                                                              x-text="(aircraft.bsdb?.icao_type_code || aircraft.bsdb?.manufacturer || aircraft.bsdb?.type || aircraft.adsb?.aircraft_type || '-').substring(0, 10)">
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Altitude cell -->
-                                            <div class="p-1.5 text-right w-[65px]"
-                                                 data-help-title="Altitude" :data-help="$store.atc.altitudeHelp(aircraft)">
-                                                <div class="flex flex-col items-end">
-                                                    <div class="flex items-center justify-end">
-                                                        <span class="text-sm" x-text="$store.atc.altitudeValueText(aircraft)"></span>
-                                                        <i :class="[$store.atc.getAltitudeTrendIcon(aircraft), $store.atc.getAltitudeTrendClasses(aircraft), 'ml-1']"
-                                                           :title="aircraft.adsb && aircraft.adsb.baro_rate !== undefined ? Math.round(aircraft.adsb.baro_rate) + ' ft/min' : '-'"></i>
-                                                    </div>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5 whitespace-nowrap" x-show="typeof aircraft.adsb?.alt_baro === 'number'" x-text="$store.atc.getAltitudeUnitLabel(aircraft)"></span>
-                                                </div>
-                                            </div>
-
-                                            <div class="w-px flight-strip-divider my-1.5"></div>
-
-                                            <!-- Heading cell (not on a phone: too narrow) -->
-                                            <div class="p-1.5 text-right w-[55px] hidden md:block">
-                                                <div class="flex flex-col items-end">
-                                                    <span class="text-sm" x-text="$store.atc.getHeadingDisplayText(aircraft)"></span>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType(aircraft).type)"
-                                                          data-help-title="Heading" :data-help="$store.atc.headingHelp($store.atc.getHeadingWithType(aircraft).type)"></span>
-                                                </div>
-                                            </div>
-
-                                            <div class="w-px flight-strip-divider my-1.5"></div>
-
-                                            <!-- TAS cell (not on a phone: too narrow) -->
-                                            <div class="p-1.5 text-right w-[55px] hidden md:block">
-                                                <div class="flex flex-col items-end">
-                                                    <span class="text-sm" x-text="$store.atc.formatTrackSpeed(aircraft.adsb?.tas)"></span>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="True airspeed" data-help="TAS, true airspeed in knots: its speed through the air. It differs from the ground speed by the wind.">tas</span>
-                                                </div>
-                                            </div>
-
-                                            <div class="w-px flight-strip-divider my-1.5"></div>
-
-                                            <!-- GS cell -->
-                                            <div class="p-1.5 text-right w-[55px]">
-                                                <div class="flex flex-col items-end">
-                                                    <span class="text-sm" x-text="$store.atc.formatTrackSpeed(aircraft.adsb?.gs)"></span>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="Ground speed" data-help="GS, ground speed in knots: its speed over the ground, what the map shows it moving at. Tailwind adds to it, headwind takes from it.">gs</span>
-                                                </div>
-                                            </div>
-
-                                            <div class="w-px flight-strip-divider my-1.5"></div>
-
-                                            <!-- Distance cell -->
-                                            <div class="p-1.5 text-right w-[55px] pr-3">
-                                                <div class="flex flex-col items-end">
-                                                    <span class="text-sm" x-text="aircraft.distance !== undefined && aircraft.distance !== null ? aircraft.distance : '-'"></span>
-                                                    <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-show="aircraft.distance !== undefined && aircraft.distance !== null"
-                                                          data-help-title="Distance" data-help="From the receiving station, in nautical miles (1 NM = 1.852 km).">nm</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+                    <!-- The list: one strip per aircraft (AircraftStrip). -->
+                    <div class="cl-app__scroll">
+                    <div class="h-full overflow-y-auto overflow-x-hidden">
+                        <template x-for="aircraft in $store.atc.visibleSidebarAircraft" :key="aircraft.hex">
+                            <div class="cl-strip aircraft-row" :class="$store.atc.stripClasses(aircraft)" :data-aircraft-hex="aircraft.hex"
+                                 @click="$store.atc.selectedAircraft = aircraft; if ($store.atc.mapManager) { $store.atc.mapManager.updateVisualState(aircraft.hex, true); $store.atc.mapManager.centerOnAircraft(aircraft); }"
+                                 @mouseover="$store.atc.hoveredAircraft = aircraft; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
+                                 @mouseout="$store.atc.hoveredAircraft = null; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);">
+                                <span class="cl-phase" :class="$store.atc.phaseClasses(aircraft)" x-text="$store.atc.getCurrentPhase(aircraft) || 'NEW'"
+                                      data-help-title="Flight phase" :data-help="$store.atc.phaseHelp($store.atc.getCurrentPhase(aircraft) || 'NEW')"></span>
+                                <div class="cl-strip__col" style="flex: 1;">
+                                    <span class="cl-strip__v cl-strip__v--callsign" x-html="$store.atc.highlightSearchMatch(aircraft.flight || aircraft.hex)"></span>
+                                    <span class="cl-strip__s">
+                                        <span x-text="(aircraft.bsdb?.icao_type_code || aircraft.bsdb?.manufacturer || aircraft.bsdb?.type || aircraft.adsb?.aircraft_type || '-').substring(0, 8)"></span>
+                                        <span x-show="$store.atc.getPhaseAirport(aircraft)" x-text="' · ' + $store.atc.getPhaseAirport(aircraft)"></span>
+                                        <span x-show="$store.atc.heardAgoText(aircraft)" class="cl-strip__heard" x-text="' · ' + $store.atc.heardAgoText(aircraft)"></span>
+                                        <span x-show="$store.atc.shouldShowLastSeenBadge(aircraft)" x-text="' · -' + $store.atc.getSecondsSinceLastSeen(aircraft) + ' s'"></span>
+                                        <span x-show="aircraft.stale_position" class="cl-badge" title="Last known position" data-help-title="LP" data-help="Last known position: the aircraft stopped sending its position; it is drawn where it was last seen."> LP</span>
+                                        <span x-show="!aircraft.stale_position && (!aircraft.adsb || (aircraft.adsb.lat === 0 && aircraft.adsb.lon === 0))" class="cl-badge" title="Mode S, no position" data-help-title="S" data-help="Mode S only: the aircraft sends no position, so it has no place on the map."> S</span>
+                                    </span>
+                                </div>
+                                <div class="cl-strip__col cl-strip__col--end" data-help-title="Altitude" :data-help="$store.atc.altitudeHelp(aircraft)">
+                                    <span class="cl-strip__v"><span x-text="$store.atc.altitudeValueText(aircraft)"></span> <i :class="[$store.atc.getAltitudeTrendIcon(aircraft), $store.atc.getAltitudeTrendClasses(aircraft)]" style="font-size: 10px;"></i></span>
+                                    <span class="cl-strip__s" x-text="$store.atc.getAltitudeUnitLabel(aircraft)"></span>
+                                </div>
+                                <div class="cl-strip__col cl-strip__col--end" data-help-title="Ground speed" data-help="GS, ground speed in knots: its speed over the ground.">
+                                    <span class="cl-strip__v" x-text="$store.atc.formatTrackSpeed(aircraft.adsb?.gs)"></span>
+                                    <span class="cl-strip__s">kt</span>
+                                </div>
+                                <div class="cl-strip__col cl-strip__col--end" data-help-title="Distance" data-help="From the receiving station, in nautical miles (1 NM = 1.852 km).">
+                                    <span class="cl-strip__v" x-text="aircraft.distance !== undefined && aircraft.distance !== null ? aircraft.distance : '-'"></span>
+                                    <span class="cl-strip__s">NM</span>
+                                </div>
+                            </div>
+                        </template>
                     </div>
+                    </div>
+                    </div>
+                    </template>
                 </div>
-                
+
                 <!-- Aircraft Details - Takes full height when shown -->
                 <template x-if="$store.atc.selectedAircraft">
                     <div class="flex-1 min-h-0 p-3 overflow-y-auto bg-panel">

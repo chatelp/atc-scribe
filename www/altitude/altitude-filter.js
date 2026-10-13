@@ -61,9 +61,9 @@ function altitudeFilter() {
             return [
                 { at: 0, text: 'SFC' },
                 { at: this.taPct, text: 'TA' },
-                { at: S.position(this.list, 10000) * 100, text: 'FL100' },
-                { at: S.position(this.list, 20000) * 100, text: 'FL200' },
-                { at: S.position(this.list, 30000) * 100, text: 'FL300' },
+                { at: S.position(this.list, 10000) * 100, text: 'FL 100' },
+                { at: S.position(this.list, 20000) * 100, text: 'FL 200' },
+                { at: S.position(this.list, 30000) * 100, text: 'FL 300' },
                 { at: 100, text: '∞' },
             ];
         },

@@ -511,3 +511,11 @@
 .cl-vitals__list dd { margin: 0; color: var(--color-text-primary); display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
 .cl-vitals__list dd span { color: var(--color-text-tertiary); }
 .cl-vitals__ok { width: 8px; height: 8px; border-radius: 50%; background: var(--color-status-ok); display: inline-block; }
+
+/* FilterToggle, mixed: some of the codes of a family are on, some off (the digit keys act per code) */
+.cl-toggle.is-mixed { border-style: dashed; border-color: var(--color-accent-default); color: var(--color-text-primary); background: transparent; }
+.cl-toggle.is-mixed .cl-toggle__count { color: var(--color-text-secondary); }
+/* a segment never wraps: shorten its label instead ("≤ 3000", not "≤ 3000 ft") */
+.cl-seg__item { white-space: nowrap; }
+/* SegmentedControl, dense: six presets in the 380 px column */
+.cl-seg--dense .cl-seg__item { padding: 0 var(--space-1-5); }
