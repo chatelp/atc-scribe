@@ -40,6 +40,8 @@ PAR (`www/par/par-view.js`) réduit à la piste où il atterrit : échelle d'alt
 carrée, couche de transition, cônes de 7° et 15°, plan de 3° et ses marges de 0,7°, bande
 d'azimut, triangle plein quand le juge de piste l'a rattaché à cette piste, trace de l'avion
 suivi en blanc. L'esquisse est générée avec les mêmes formules (remarque du propriétaire, 13/10).
+Le cadre prenait sa largeur une fois par seconde et restait à 480 px s'il était rendu masqué :
+corrigé le 13/10 par la session atc-scribe (`4b9a254`, `ResizeObserver`).
 De même, la séquence de « Right now » est le tableau « Arrivals to 26L » de la PAR, sorti de la
 PAR : distance au seuil, heure, écart avec le précédent, ambre sous 3 NM. Le design system
 reprendra ces deux composants tels qu'ils sont ; seule leur palette de phases passera aux cinq
@@ -54,7 +56,7 @@ la page, **S** travail serveur, **X** pas aujourd'hui.
 |---|---|---|
 | D | piste en service par aérodrome suivi, depuis quand | juge de piste du serveur (`/api/v1/station`, `runway_in_use`) |
 | P | séquence d'arrivée hors de la PAR | les calculs de la PAR (`buildFrames`, `placeInFrame`) passent de `par-view.js` au store : ≈ ½ j page, rien au serveur |
-| P | « Worth knowing » | journal de la page (100 événements), **perdu au rechargement** ; le garder : `localStorage` borné (petit) ou une route serveur « événements depuis T » (≈ 1 j) |
+| D | « Worth knowing » | journal de la page gardé dans le navigateur depuis le 13/10 à 12 h 43 (`986354f`, `localStorage`, 100 événements) ; `events.recent(30)` donne les 30 dernières minutes ; une route serveur seulement pour partager l'historique entre navigateurs |
 | D | compteurs en vol, au sol, entendus | filtres du store, `voiceAircraftCount` |
 | P | phrase de synthèse | gabarits, rien de génératif ; **elle dit qu'elle vient de l'ADS-B** |
 | D | antenne : à l'antenne, choisi où, depuis quand | `/api/v1/status` → `antenna` |
@@ -65,7 +67,7 @@ la page, **S** travail serveur, **X** pas aujourd'hui.
 | D | onglet Traffic | existe dans l'outil, réorganisé |
 
 En somme, toute la colonne tient avec l'existant ; le seul vrai déplacement de code est celui de
-la séquence d'arrivée, et le seul choix à faire est la survie de « Worth knowing » au rechargement.
+la séquence d'arrivée.
 
 ## Corrections faites aux esquisses le 13/10
 
@@ -79,9 +81,5 @@ la séquence d'arrivée, et le seul choix à faire est la survie de « Worth kno
 ## Ce qui reste
 
 - valider le principe de « Suivre un vol » (C) ;
-- choisir la survie de « Worth knowing » : `localStorage` (proposé, rien au serveur) ou une route ;
-- signaler à la session atc-scribe que le cadre PAR prend sa largeur une fois par seconde : rendu
-  au moment où le conteneur est encore masqué, ou onglet en arrière-plan (minuteries ralenties),
-  il reste à 480 px ; un `ResizeObserver` le corrigerait (petit, non urgent) ;
 - puis construire le design system (composants du canevas : échange, bande d'avion, voyant,
   bascule, onglets, carte) et refaire les maquettes à partir de lui.
