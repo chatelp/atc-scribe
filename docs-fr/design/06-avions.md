@@ -108,3 +108,22 @@ Règles du dessin :
 
 Pour la PAR, le triangle reste : à 10 px, de profil, une silhouette n'apporterait rien. Le logo
 sera tiré de la famille, choisi parmi les classes une fois dessinées.
+
+## Notre famille, première version (13/10)
+
+`node tools/design/avions.mjs` écrit les neuf classes dans `avions/famille/` (une par fichier SVG,
+aplat noir comme la carte les teinte, boîte de 64 centrée sur le point de rotation) et
+`famille.json` (nom, types couverts, taille sur la carte). La planche `avions/famille.html` les
+montre en grand, aux tailles de la carte, à côté de l'ancien dessin de la même classe, et dans le
+même bout de ciel. Cotes de référence (arrondies) : DR400 / C172, ATR 72, Falcon 2000, A320,
+A350-900, B747-400, H125, ASK 21. L'épaisseur minimale est de 3 unités sur 64, soit 1,1 px à
+24 px : elle épaissit l'hélice, les nacelles, la poutre et le rotor de queue, le fuselage du
+planeur.
+
+Tailles sur la carte proposées : inconnu 18, léger 20, affaires, hélicoptère et planeur 22,
+turbopropulseur 24, moyen-courrier 26, gros-porteur 30, quadriréacteur 32 px.
+
+Ce qui reste ouvert : le choix de l'avion du logo dans la famille (le propriétaire choisit) ;
+l'adaptation des règles de `getAircraftIconClass` aux neuf classes (un code de type → une classe,
+par la base `aircraft.csv` et la catégorie ADS-B) ; le remplacement des 28 fichiers de
+`www/assets/`, au moment de la migration.
