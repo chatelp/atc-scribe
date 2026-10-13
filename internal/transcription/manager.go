@@ -25,6 +25,7 @@ type TranscriptionManager struct {
 	postProcessingConfig PostProcessingConfig
 	fleet                FleetProvider // live ADS-B for the grammar; nil disables matching
 	fileLogger           *FileLogger   // Optional file logger for transcriptions
+	timing               *TranscriptionTiming
 }
 
 // NewTranscriptionManager creates a new transcription manager
@@ -61,7 +62,14 @@ func NewTranscriptionManager(
 		postProcessingConfig: postProcessingConfig,
 		fleet:                fleet,
 		fileLogger:           fileLogger,
+		timing:               &TranscriptionTiming{},
 	}
+}
+
+// MeanTranscriptionSeconds is the rolling mean of the time a transmission
+// takes to transcribe, over every frequency; false until one has been.
+func (m *TranscriptionManager) MeanTranscriptionSeconds() (float64, bool) {
+	return m.timing.Mean()
 }
 
 // StartTranscriptionWithExternalAudio starts transcription for a frequency using an external audio processor
@@ -121,6 +129,7 @@ func (m *TranscriptionManager) StartTranscriptionWithExternalAudio(
 		m.transcriptionStorage,
 		m.logger,
 		m.fileLogger,
+		m.timing,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create external processor: %w", err)

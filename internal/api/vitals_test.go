@@ -134,6 +134,10 @@ func TestTheVitalsCarryTheListedKeysOnly(t *testing.T) {
 	if v.TranscriptionModel != "Whisper large-v3 ATCO2" || v.TranscriptionBackend != "fake" {
 		t.Errorf("transcription_model = %q, transcription_backend = %q", v.TranscriptionModel, v.TranscriptionBackend)
 	}
+	// Stored by hand, not transcribed by this server: no time to show yet.
+	if v.SecondsPerTransmission != nil {
+		t.Errorf("seconds_per_transmission = %v before any transcription, want absent", *v.SecondsPerTransmission)
+	}
 	if v.AirportsFollowed != 1 || v.RunwaysInUse != 0 || v.ChannelsOnAir != 0 {
 		t.Errorf("airports %d, runways %d, channels %d: want 1, 0, 0 (no reference data, no stream started)",
 			v.AirportsFollowed, v.RunwaysInUse, v.ChannelsOnAir)

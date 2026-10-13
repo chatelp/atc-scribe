@@ -134,6 +134,10 @@ func (h *Handler) computeVitals() Vitals {
 				v.ChannelsOnAir++
 			}
 		}
+		if mean, ok := h.frequenciesService.MeanTranscriptionSeconds(); ok {
+			rounded := math.Round(mean*10) / 10
+			v.SecondsPerTransmission = &rounded
+		}
 	}
 
 	if h.transcriptionStorage != nil {

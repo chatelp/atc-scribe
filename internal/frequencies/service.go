@@ -683,6 +683,15 @@ func (s *Service) startSource(freqConfig *cfg.FrequencyConfig) bool {
 	return true
 }
 
+// MeanTranscriptionSeconds is the rolling mean of the time a transmission
+// takes to transcribe, over every frequency; false until one has been.
+func (s *Service) MeanTranscriptionSeconds() (float64, bool) {
+	if s.transcriptionManager == nil {
+		return 0, false
+	}
+	return s.transcriptionManager.MeanTranscriptionSeconds()
+}
+
 // Stop stops all stream processors and cleans up resources.
 func (s *Service) Stop() {
 	s.logger.Info("Frequencies service stopping")

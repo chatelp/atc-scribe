@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/yegors/co-atc/internal/storage/sqlite"
@@ -33,6 +34,7 @@ type LocalProcessor struct {
 	config      Config
 	sink        *transcriptionSink
 	client      *http.Client
+	timing      *TranscriptionTiming // shared by every frequency; nil records nothing
 	ctx         context.Context
 	cancel      context.CancelFunc
 	logger      *logger.Logger
@@ -48,6 +50,7 @@ func NewLocalProcessor(
 	storage *sqlite.TranscriptionStorage,
 	log *logger.Logger,
 	fileLogger *FileLogger,
+	timing *TranscriptionTiming,
 ) (ProcessorInterface, error) {
 	if config.Local.ServerURL == "" {
 		return nil, fmt.Errorf("transcription.local.server_url is required when backend = \"local\"")
@@ -84,6 +87,7 @@ func NewLocalProcessor(
 			logger:      log,
 		},
 		client: &http.Client{Timeout: time.Duration(timeout) * time.Second},
+		timing: timing,
 		ctx:    procCtx,
 		cancel: procCancel,
 		logger: log.Named("local-xscribe").With(String("frequency_id", frequencyID)),
@@ -214,6 +218,9 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 	req.Header.Set("X-Created-At", at.UTC().Format(time.RFC3339))
 	req.Header.Set("X-Segment-At", at.UTC().Format("2006-01-02T15:04:05.000Z"))
 
+	// From the request to the decoded answer: what one transmission costs,
+	// waiting behind others in the sidecar's queue included.
+	started := time.Now()
 	resp, err := p.client.Do(req)
 	if err != nil {
 		if p.ctx.Err() == nil {
@@ -259,6 +266,7 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 	if out.Text == "" {
 		return
 	}
+	p.timing.Record(time.Since(started))
 
 	p.logger.Info("Transcribed",
 		String("language", out.Language),
@@ -276,6 +284,52 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 	if err := p.sink.emit(out.Text, at, out.Language, out.SecondText); err != nil {
 		p.logger.Error("Failed to store transcription", Error(err))
 	}
+}
+
+// MeanTranscriptionSeconds is the rolling mean of the time a transmission
+// takes to transcribe, over every frequency; false until one has been.
+func (p *LocalProcessor) MeanTranscriptionSeconds() (float64, bool) {
+	return p.timing.Mean()
+}
+
+// TranscriptionTiming is an exponential rolling mean of the time the sidecar
+// takes per transmission, request to decoded answer, counted for the
+// transmissions it transcribed: a rejection (no speech, no model for the
+// language) costs a fraction of a decode and would pull the figure down. The
+// sign-in page shows it; the first transmission sets it, each next one moves
+// it by timingAlpha of the difference.
+type TranscriptionTiming struct {
+	mu   sync.Mutex
+	mean float64 // seconds
+	seen bool
+}
+
+// timingAlpha weighs the newest transmission: 0.1 is about the last ten.
+const timingAlpha = 0.1
+
+// Record adds one transmission's time.
+func (t *TranscriptionTiming) Record(d time.Duration) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.seen {
+		t.mean, t.seen = d.Seconds(), true
+		return
+	}
+	t.mean += timingAlpha * (d.Seconds() - t.mean)
+}
+
+// Mean returns the rolling mean in seconds, and false while nothing has been
+// transcribed.
+func (t *TranscriptionTiming) Mean() (float64, bool) {
+	if t == nil {
+		return 0, false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.mean, t.seen
 }
 
 // --------------------------------------------------------------------- segmenter
