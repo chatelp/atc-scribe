@@ -297,11 +297,13 @@
         // when the match was made (callsign_evidence, UTF-16 offsets into this
         // very text), and the search term underlined. Everything is escaped here:
         // the text comes from a speech model and must never reach x-html raw.
-        transcriptHtml(text, spans) {
+        // The term underlined is the windows' search, or the one given (the
+        // thread's, step 6).
+        transcriptHtml(text, spans, searchTerm) {
             if (!text) return '';
             const esc = str => str.replace(/[&<>"']/g, c =>
                 ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-            const term = (this.transcriptionSearchTerm || '').trim();
+            const term = ((searchTerm !== undefined ? searchTerm : this.transcriptionSearchTerm) || '').trim();
             const re = term ? new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi') : null;
             const plain = str => re
                 ? str.split(re).map((piece, i) => i % 2

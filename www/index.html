@@ -136,6 +136,187 @@
         
         <!-- Main Content with Sidebar Layout -->
         <div class="flex flex-1 overflow-hidden">
+            <!-- The thread (design system ThreadHead and Exchange, migration step 6):
+                 every exchange of every frequency in one list that grows at the
+                 bottom, the frequencies to listen to at its head. It replaces the
+                 per-frequency transcript windows of the radio bar, which stays
+                 until step 7 to be compared. Wide screens only; the phone keeps
+                 its panes until step 12. Folded (layout B), it takes the width the
+                 column gave up. -->
+            <section class="cl-root cl-app__thread hidden md:flex" aria-label="Radio"
+                     :style="$store.atc.columnFolded && !$store.atc.selectedAircraft ? 'flex-basis: 640px' : ''">
+                <div class="cl-threadhead">
+                    <div class="cl-threadhead__row">
+                        <h2 class="cl-threadhead__title">Radio</h2>
+                        <span class="cl-exchange__when" x-text="$store.atc.threadPace"></span>
+                        <span class="cl-threadhead__end">
+                            <button class="cl-btn cl-btn--icon" aria-label="Search the thread" aria-controls="thread-search"
+                                    :aria-expanded="String($store.atc.threadSearchOpen)"
+                                    @click="$store.atc.threadSearchOpen = !$store.atc.threadSearchOpen; if (!$store.atc.threadSearchOpen) $store.atc.threadSearch = ''; else $nextTick(() => document.querySelector('#thread-search input').focus())"
+                                    data-help-title="Search" data-help="Find exchanges by their words, a callsign, a speaker or an instruction.">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>
+                            </button>
+                            <button class="cl-btn" x-show="$store.atc.audioFrequencies.length" @click="$store.atc.toggleAllListening()"
+                                    x-text="$store.atc.anyUnmuted ? 'Mute all' : 'Listen to all'"
+                                    data-help-title="Listening" data-help="Play or mute every frequency in this browser. The station chooses what is on air; this only chooses what you hear."></button>
+                        </span>
+                    </div>
+                    <div class="cl-threadhead__row" id="thread-search" x-show="$store.atc.threadSearchOpen" x-cloak>
+                        <input type="search" class="cl-input w-full" placeholder="Words, callsign, instruction"
+                               aria-label="Search the thread" x-model.debounce.250ms="$store.atc.threadSearch"
+                               @keydown.escape="$store.atc.threadSearch = ''; $store.atc.threadSearchOpen = false">
+                    </div>
+                    <!-- ChannelButton (split) per frequency, and its ChannelMenu. -->
+                    <div class="cl-threadhead__row relative" x-show="$store.atc.audioFrequencies.length">
+                        <template x-for="freq in $store.atc.audioFrequencies" :key="freq.id">
+                            <span class="cl-channel cl-channel--split"
+                                  :class="{ 'is-on': $store.atc.isUnmuted(freq.id), 'is-menu-open': $store.atc.threadMenuFor === freq.id,
+                                            'is-failed': $store.atc.isFrequencyFailed(freq.id), 'is-connecting': $store.atc.isFrequencyConnecting(freq.id) }">
+                                <button class="cl-channel__main" :aria-pressed="String($store.atc.isUnmuted(freq.id))"
+                                        :disabled="$store.atc.isFrequencyFailed(freq.id) || $store.atc.isFrequencyConnecting(freq.id)"
+                                        @click="$store.atc.toggleMute(freq)"
+                                        data-help-title="Listen" :data-help="$store.atc.tileHelp(freq)">
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 6h2.5l3.5-3v10l-3.5-3H2.5V6Z"/><path x-show="$store.atc.isUnmuted(freq.id)" d="M11 5.5a3.5 3.5 0 0 1 0 5"/><path x-show="!$store.atc.isUnmuted(freq.id)" d="m11 6 3 4m0-4-3 4"/></svg>
+                                    <span class="cl-channel__freq" x-text="$store.atc.freqLabel(freq.id)"></span>
+                                    <span x-text="$store.atc.freqShortName(freq)"></span>
+                                </button>
+                                <button class="cl-channel__caret" :aria-label="$store.atc.freqLabel(freq.id) + ': volume and options'"
+                                        :aria-expanded="String($store.atc.threadMenuFor === freq.id)"
+                                        @click.stop="$store.atc.toggleThreadMenu(freq.id)">
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></svg>
+                                </button>
+                            </span>
+                        </template>
+                        <template x-for="freq in $store.atc.audioFrequencies.filter((f) => f.id === $store.atc.threadMenuFor)" :key="'menu-' + freq.id">
+                            <div class="cl-menu absolute left-0 top-full z-[1100] mt-1" role="dialog" :aria-label="$store.atc.freqLabel(freq.id) + ' ' + freq.name"
+                                 x-data="{ v: Number($store.atc.volumeOf(freq.id)) }"
+                                 @click.outside="$store.atc.threadMenuFor = null" @keydown.escape.window="$store.atc.threadMenuFor = null">
+                                <div class="cl-menu__head"><span class="cl-channel__freq cl-menu__title" x-text="$store.atc.freqLabel(freq.id)"></span><span class="cl-menu__title" x-text="$store.atc.freqShortName(freq)"></span></div>
+                                <div class="cl-menu__row"><span class="cl-light" :class="'cl-light--' + $store.atc.channelState(freq).level" x-text="$store.atc.channelState(freq).text"></span></div>
+                                <div class="cl-menu__row">
+                                    <span class="cl-label">Volume</span>
+                                    <div class="cl-slider">
+                                        <span class="cl-slider__rail"></span>
+                                        <span class="cl-slider__fill" :style="'left:0;width:' + Math.round(v * 100) + '%'"></span>
+                                        <span class="cl-slider__thumb" :style="'left:' + Math.round(v * 100) + '%'"></span>
+                                        <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="0" max="1" step="0.05"
+                                               :value="v" aria-label="Volume" @input="v = Number($event.target.value); $store.atc.setVolume(freq.id, v)">
+                                    </div>
+                                    <span class="cl-channel__age" x-text="Math.round(v * 100) + ' %'"></span>
+                                </div>
+                                <div class="cl-menu__sep"></div>
+                                <label class="cl-check" :class="$store.atc.threadShow === freq.id ? 'is-on' : ''"
+                                       @click.prevent="$store.atc.setThreadShow($store.atc.threadShow === freq.id ? 'all' : freq.id)">
+                                    <span class="cl-check__box"></span>Only this frequency in the thread
+                                </label>
+                                <span class="cl-plain" x-text="$store.atc.channelNote(freq)"></span>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="cl-threadhead__row" x-show="$store.atc.audioFrequencies.length > 1">
+                        <span class="cl-label">Show</span>
+                        <div class="cl-seg">
+                            <button class="cl-seg__item" :aria-pressed="String($store.atc.threadShow === 'all')" @click="$store.atc.setThreadShow('all')">All</button>
+                            <template x-for="freq in $store.atc.audioFrequencies" :key="'show-' + freq.id">
+                                <button class="cl-seg__item" :aria-pressed="String($store.atc.threadShow === freq.id)" @click="$store.atc.setThreadShow(freq.id)"
+                                        :title="freq.name" x-text="$store.atc.freqLabel(freq.id)"></button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cl-app__bottom relative" x-data="threadView()">
+                    <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" x-ref="scroller" @scroll.passive="onScroll()">
+                        <template x-if="$store.atc.threadExchanges.length === 0">
+                            <p class="cl-plain px-4 py-3" x-text="$store.atc.threadSearch ? 'No exchange matches this search.' : ($store.atc.audioFrequencies.length ? 'No exchange yet: they appear here as the frequencies are transcribed.' : 'No frequency: the station has nothing on air.')"></p>
+                        </template>
+                        <!-- Exchange: who spoke to whom, what was said, what it means. -->
+                        <template x-for="t in $store.atc.threadExchanges" :key="t.id || (t.frequency_id + '-' + t.timestamp)">
+                            <article class="cl-exchange"
+                                     :class="{ 'is-unmatched': t.is_processed && !t.callsign, 'is-selected': t.callsign && $store.atc.exchangeChip(t).classes.includes('is-selected') }">
+                                <div class="cl-exchange__head">
+                                    <span class="cl-exchange__when" x-text="$store.atc.exchangeTime(t) + ' · ' + $store.atc.freqLabel(t.frequency_id)"></span>
+                                    <!-- The controller speaks to the aircraft. -->
+                                    <template x-if="t.callsign && t.speaker_type === 'ATC'">
+                                        <span class="contents">
+                                            <span class="cl-chip cl-chip--atc cursor-help" data-help-title="Who is speaking" :data-help="$store.atc.speakerHelp('ATC')">ATC</span>
+                                            <span class="cl-exchange__to">→</span>
+                                        </span>
+                                    </template>
+                                    <template x-if="t.callsign">
+                                        <button class="cl-chip cl-chip--callsign" :class="$store.atc.exchangeChip(t).classes"
+                                                @click="$store.atc.aircraftByCallsign(t.callsign) && $store.atc.selectAircraftByCallsign(t.callsign)"
+                                                data-help-title="Aircraft" :data-help="$store.atc.threadChipHelp(t)">
+                                            <span x-show="$store.atc.exchangeChip(t).phase" class="cl-phase cl-phase--small" :class="$store.atc.exchangeChip(t).phaseClass" x-text="$store.atc.exchangeChip(t).phase"></span><span x-text="$store.atc.exchangeChip(t).text"></span>
+                                        </button>
+                                    </template>
+                                    <!-- The pilot speaks to the controller. -->
+                                    <template x-if="t.callsign && t.speaker_type === 'PILOT'">
+                                        <span class="contents">
+                                            <span class="cl-exchange__to">→</span>
+                                            <span class="cl-chip cl-chip--atc cursor-help" data-help-title="Who is speaking" :data-help="$store.atc.speakerHelp('PILOT')">ATC</span>
+                                        </span>
+                                    </template>
+                                    <template x-if="!t.callsign && t.is_processed">
+                                        <span class="contents">
+                                            <span class="cl-chip cl-chip--callsign is-away">?</span>
+                                            <span class="cl-plain" x-text="$store.atc.unmatchedReason(t)"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="!t.is_processed">
+                                        <span class="cl-plain">being matched…</span>
+                                    </template>
+                                    <span x-show="$store.atc.strengthBars(t)" class="cl-strength cursor-help" :class="'cl-strength--' + $store.atc.strengthBars(t)"
+                                          :title="$store.atc.matchProofText(t)" data-help-title="Match" :data-help="$store.atc.matchProofText(t)"><i></i><i></i><i></i></span>
+                                    <button class="cl-exchange__play" x-show="$store.atc.audioArchive.available && t.id"
+                                            :aria-label="$store.atc.clipHelp(t.id)" @click.stop="$store.atc.playClip(t.id)"
+                                            data-help-title="Listen again" :data-help="$store.atc.clipHelp(t.id)">
+                                        <svg x-show="!($store.atc.clip.id === t.id && $store.atc.clip.state !== 'idle')" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M5 3.5v9l7-4.5-7-4.5Z"/></svg>
+                                        <svg x-show="$store.atc.clip.id === t.id && $store.atc.clip.state !== 'idle'" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1"/></svg>
+                                    </button>
+                                </div>
+                                <p class="cl-exchange__text" :lang="$store.atc.exchangeIsFrench(t) ? 'fr' : 'en'"
+                                   x-html="(t.is_processed && t.content_processed)
+                                       ? $store.atc.transcriptHtml(t.content_processed, t.callsign_source !== 'fr' ? t.callsign_evidence : null, $store.atc.threadSearch)
+                                       : $store.atc.transcriptHtml(t.text, null, $store.atc.threadSearch)"></p>
+                                <!-- When the French reading named the aircraft, its words are in it. -->
+                                <template x-if="t.callsign_source === 'fr' && t.content_second">
+                                    <div class="cl-exchange__explain" lang="fr">
+                                        <span class="cursor-help" data-help-title="French reading" data-help="Every transmission is transcribed twice, by an English and a French model. This is the French reading, where the aircraft was recognised.">French reading:</span>
+                                        <span x-html="$store.atc.transcriptHtml(t.content_second, t.callsign_evidence, $store.atc.threadSearch)"></span>
+                                    </div>
+                                </template>
+                                <!-- The instructions in plain words (phraseology grammar). -->
+                                <template x-if="t.plain && t.plain.length">
+                                    <div class="cl-exchange__instr" data-help-title="In plain words" :data-help="$store.atc.plainHelp(t)">
+                                        <template x-for="p in t.plain" :key="p.text">
+                                            <span class="cl-chip cl-chip--instr" :class="p.role === 'clearance' ? 'cl-chip--clearance' : ''" x-text="p.text"></span>
+                                        </template>
+                                    </div>
+                                </template>
+                                <!-- A French transmission: the same instructions in plain French. -->
+                                <template x-if="$store.atc.exchangeIsFrench(t) && $store.atc.plainFrench(t)">
+                                    <div class="cl-exchange__explain cl-exchange__explain--boxed" lang="fr" x-text="$store.atc.plainFrench(t) + '.'"></div>
+                                </template>
+                            </article>
+                        </template>
+                        <!-- Someone is speaking now: the level of the frequency, drawn by
+                             audio-client.js into [data-level-for]. -->
+                        <template x-for="f in $store.atc.threadLive" :key="'live-' + f.id">
+                            <article class="cl-exchange is-live">
+                                <div class="cl-exchange__head">
+                                    <span class="cl-exchange__when" x-text="'now · ' + $store.atc.freqLabel(f.id)"></span>
+                                    <span class="cl-level" :data-level-for="f.id"><i></i><i></i><i></i><i></i><i></i></span>
+                                    <span class="cl-plain">someone is speaking</span>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                    <button class="cl-newbelow" x-show="newCount > 0" x-cloak @click="toBottom(true)"
+                            x-text="'↓ ' + newCount + ' new exchange' + (newCount > 1 ? 's' : '')"></button>
+                </div>
+            </section>
+
             <!-- Left Content Area (Settings, Map). On a phone (under 768 px) the
                  map and the list take turns, chosen by the tabs above the radio bar
                  (audit 4.2). -->
@@ -2209,6 +2390,7 @@
     <script defer src="store/feed.js"></script>
     <script defer src="store/sidebar.js"></script>
     <script defer src="store/now.js"></script>
+    <script defer src="store/thread.js"></script>
     <script defer src="server-settings.js"></script>
     <script defer src="app.js"></script>
     <!-- Alpine starts after every script above has registered its stores and
