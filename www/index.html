@@ -259,8 +259,9 @@
                                     </template>
                                     <template x-if="!t.callsign && t.is_processed">
                                         <span class="contents">
-                                            <span class="cl-chip cl-chip--callsign is-away">?</span>
-                                            <span class="cl-plain" x-text="$store.atc.unmatchedReason(t)"></span>
+                                            <span class="cl-chip cl-chip--callsign is-away" x-text="$store.atc.unmatchedView(t).guess ? $store.atc.unmatchedView(t).guess + '?' : '?'"></span>
+                                            <span class="cl-plain cursor-help" x-text="$store.atc.unmatchedView(t).text"
+                                                  data-help-title="Not matched" :data-help="$store.atc.unmatchedView(t).help"></span>
                                         </span>
                                     </template>
                                     <template x-if="!t.is_processed">

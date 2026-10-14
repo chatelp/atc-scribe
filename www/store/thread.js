@@ -161,10 +161,29 @@
             return { strong: 3, medium: 2, weak: 1 }[this.matchStrength(t)] || 0;
         },
 
-        // Why no aircraft was named, from the matcher's own words.
-        unmatchedReason(t) {
-            const r = (t.match_reason || '').replace(/^unmatched:\s*/, '').replace(/^nobody in range/, 'no aircraft in range');
-            return r || 'no aircraft in range was named';
+        // Why no aircraft was named, in a newcomer's words (Exchange sheet, 14/10):
+        // the server keeps the matcher's terms ("best X at 0.30, below the
+        // floor", "ambiguous between X and Y"), the page translates them.
+        // { guess: the callsign shown dashed with "?", or null; text; help }.
+        unmatchedView(t) {
+            const r = (t.match_reason || '').replace(/^unmatched:\s*/, '').trim();
+            let m = /^best (\S+) at ([\d.]+), below the floor$/.exec(r);
+            if (m) {
+                return { guess: m[1], text: 'too uncertain to name',
+                    help: `The closest callsign heard was ${m[1]}, with a score of ${m[2]}: under 0.60, the least the tool accepts, so it names no aircraft. A guess, not a match.` };
+            }
+            m = /^ambiguous between (.+)$/.exec(r);
+            if (m) {
+                const names = m[1].split(/\s*(?:,|\band\b)\s*/).filter(Boolean);
+                const list = names.length > 1 ? names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] : names[0];
+                return { guess: null, text: `could be ${list}`,
+                    help: 'Two or more aircraft in range fit what was heard equally well: the tool names none rather than guess.' };
+            }
+            if (r === 'no aircraft in range') {
+                return { guess: null, text: 'no aircraft was in range', help: 'No aircraft was in sight of the receiver when this was heard.' };
+            }
+            return { guess: null, text: 'no aircraft in range was named',
+                help: 'No callsign of an aircraft in sight of the receiver was heard in this transmission.' };
         },
 
         exchangeIsFrench(t) {
