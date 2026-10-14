@@ -27,10 +27,13 @@
 
     const ELEV_H_FULL = 230;     // elevation band height, px
     const AZ_H_FULL = 64;        // azimuth band height, px
-    // The frame under the map while a flight is followed (step 8, c-suivre): one
-    // runway, lower bands.
+    // The frame under the map while a flight is followed (step 8, c-suivre):
+    // one runway, lower bands.
     const ELEV_H_SINGLE = 140;
     const AZ_H_SINGLE = 36;
+    // The PAR view's frames fit the view's height, down to this elevation band
+    // (owner, 14/10); below it they scroll.
+    const ELEV_H_MIN = 80;
     const LEFT = 70;        // room for the level labels
     const RIGHT = 14;
     const TRAIL_SECONDS = 60;
@@ -171,6 +174,11 @@
         const trails = new Map();             // hex -> [{t, lat, lon, altBaro}]
         let timer = null;
         let airport = '';
+        // The elevation band's height that lets every open frame, with its
+        // arrival tables, fit the view's height (owner, 14/10: adapt to what the
+        // screen can show); measured after each render, used by the next.
+        let fitElevH = null;
+        let refitting = false;
 
         // A frame's fold, as chosen (key -> true folded, false open); without a
         // choice, a runway not in use is folded to its head (ParView, step 9e).
@@ -350,6 +358,38 @@
             return `<div class="par-message">${text}</div>`;
         }
 
+        // The bands for an elevation height: the azimuth band in proportion, the
+        // empty margin under it only at full height.
+        function bandsFor(elevH) {
+            if (!Number.isFinite(elevH) || elevH >= ELEV_H_FULL) return {};
+            return { elevH, azH: Math.max(24, Math.round(elevH * AZ_H_FULL / ELEV_H_FULL)), bottomPad: 6 };
+        }
+
+        // After a render: the elevation height at which the open frames fill
+        // the view's height without scrolling, between ELEV_H_MIN and full.
+        // Drawn again at once when it moved, then kept for the next renders.
+        function fit(openCount) {
+            const svgs = [...container.querySelectorAll('.cl-parframe svg.par-svg')];
+            if (!openCount || !svgs.length || refitting) return;
+            const vb = svgs[0].viewBox && svgs[0].viewBox.baseVal;
+            const shown = svgs[0].getBoundingClientRect();
+            if (!vb || !vb.height || !shown.height) return;
+            const scale = shown.height / vb.height;
+            const svgTotal = svgs.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0);
+            const other = container.scrollHeight - svgTotal;
+            const perFrame = (container.clientHeight - other) / svgs.length / scale;
+            const cur = bandsFor(fitElevH);
+            const fixed = vb.height - (cur.elevH || ELEV_H_FULL) - (cur.azH || AZ_H_FULL) - (cur.bottomPad != null ? 6 : 20);
+            const ratio = 1 + AZ_H_FULL / ELEV_H_FULL;
+            let next = Math.floor((perFrame - fixed - 6) / ratio);
+            next = Math.max(ELEV_H_MIN, Math.min(ELEV_H_FULL, next));
+            if (fitElevH !== null && Math.abs(next - fitElevH) < 4) return;
+            if (fitElevH === null && next >= ELEV_H_FULL) { fitElevH = ELEV_H_FULL; return; }
+            fitElevH = next;
+            refitting = true;
+            try { render(); } finally { refitting = false; }
+        }
+
         function draw(apt, runways) {
             // The placement is shared with the store's arrival sequence
             // (par-arrivals.js, 13/10): one logic, drawn here, listed there.
@@ -401,6 +441,11 @@
                 </div>`;
 
             const selected = store.selectedAircraft && store.selectedAircraft.hex;
+            // Two runways open or more: each frame is drawn low, as under the
+            // map, so that they are seen together on one screen; one alone keeps
+            // the full height (owner, 14/10).
+            const openCount = ordered.filter((f) => !isFolded(`${apt.code} ${f.id}`, usage(f) > 0)).length;
+            const compact = bandsFor(fitElevH);
             const body = ordered.map((f) => {
                 const key = `${apt.code} ${f.id}`;
                 const isInUse = usage(f) > 0;
@@ -418,10 +463,11 @@
                     </div>`;
                 const cls = `cl-parframe${isInUse ? ' is-in-use' : ''}`;
                 if (folded) return `<section class="${cls}">${head}</section>`;
-                return `<section class="${cls}">${head}${frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse })}${sequenceHtml(f, A, items, selected, true)}${sequenceHtml(f, A === 'le' ? 'he' : 'le', items, selected, false)}</section>`;
+                return `<section class="${cls}">${head}${frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse, ...compact })}${sequenceHtml(f, A, items, selected, true)}${sequenceHtml(f, A === 'le' ? 'he' : 'le', items, selected, false)}</section>`;
             }).join('');
 
             container.innerHTML = header + body;
+            fit(openCount);
         }
 
         // The frame holding the followed aircraft, alone; nothing when it is in
@@ -492,7 +538,7 @@
                     `<td class="is-num">${x.distNM.toFixed(1)} NM</td><td class="is-num">${eta}</td>` +
                     `<td class="is-num${x.gapNM == null ? ' is-dim' : tight ? ' is-tight' : ''}"${tight ? HELP.tight() : ''}>${gap}</td></tr>`;
             }).join('');
-            return `<div class="cl-section" style="border: 0; padding: 0;">${title}<table class="cl-table"><thead><tr>` +
+            return `<div class="cl-section" style="border: 0; padding: 0; gap: var(--space-1);">${title}<table class="cl-table" style="margin-top: 0;"><thead><tr>` +
                 `<th></th><th>Aircraft</th><th class="is-num"${HELP.seqDist()}>To thr.</th><th class="is-num"${HELP.seqEta()}>Time</th><th class="is-num"${HELP.seqGap()}>Behind</th>` +
                 `</tr></thead><tbody>${rows}</tbody></table></div>`;
         }
@@ -511,7 +557,7 @@
             const ceil = opts.ceilingFt;
             const elevTop = 18;
             const azTop = elevTop + ELEV_H + 22;
-            const height = azTop + AZ_H + 20;
+            const height = azTop + AZ_H + (Number.isFinite(ctx.bottomPad) ? ctx.bottomPad : 20);
 
             // Display coordinate u: arrivals to A come from u < 0; the runway is [0, L].
             const u = (s) => (A === 'le' ? s : L - s);
