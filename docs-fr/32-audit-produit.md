@@ -512,8 +512,11 @@ sur la carte.
   l'attribution elle-même, côté serveur, reste à revoir (le détecteur nomme un aérodrome suivi
   quel que soit l'éloignement). Petits points : secondes retirées de l'historique des phases,
   « Radio · none matched », types en casse normale (« Airbus A-321 », un mot à chiffres reste
-  tel quel), âges en heures et minutes. Reste visible : « Map controls » chevauche le bas du
-  cadre PAR, à régler avec `MapControls` à l'étape 9.
+  tel quel), âges en heures et minutes. « Map controls » se pose 8 px au-dessus du cadre PAR
+  tant qu'il s'affiche (hauteur mesurée ; bas du bouton 619 px, haut du cadre 627 px, à
+  1 440 × 900), à la demande du recompte design ; le reste de `MapControls` attend l'étape 9.
+  Recompte design : conforme. Noté pour le détecteur de phases, avec l'aérodrome des phases : un
+  avion aligné sur 27R à 2 300 ft retombe de APP à UNK en courte finale.
 - 14/10 : **étape 8 livrée sur `migration`** (suivre un vol, `AircraftStory`). Choisir un avion
   remplace le contenu de la colonne : « ‹ Back to Traffic » (ou « Back to Right now », l'onglet
   d'où l'on vient), l'en-tête (phase, indicatif, aérodrome, exploitant · type · immatriculation ;

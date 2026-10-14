@@ -69,6 +69,10 @@
 
     window.AtcStore = window.AtcStore || [];
     window.AtcStore.push(() => ({
+        // The height of the PAR frame under the map, measured: the map
+        // controls sit above it while it shows.
+        parFrameHeight: 0,
+
         // Which sections of the Details tab are open (c-details): the tables
         // and the basic facts open, the long lists closed.
         storyOpen: {

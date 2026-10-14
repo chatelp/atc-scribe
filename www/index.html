@@ -1050,7 +1050,8 @@
                             </div>
                         </div>
 
-                        <div x-data="{ open: false }" x-show="$store.atc.mainView === 'map'" class="absolute bottom-4 right-4 z-[10001]">
+                        <div x-data="{ open: false }" x-show="$store.atc.mainView === 'map'" class="absolute bottom-4 right-4 z-[10001]"
+                             :style="$store.atc.storyFrameAirport && $store.atc.parFrameHeight ? 'bottom: ' + ($store.atc.parFrameHeight + 8) + 'px' : ''">
                             <button @click="open = !open"
                                     @keydown.escape.window="open = false"
                                     type="button"

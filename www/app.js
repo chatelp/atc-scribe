@@ -859,7 +859,11 @@ document.addEventListener('alpine:init', () => {
     // (step 8): shown while it is in an arrival sequence and the map is on.
     {
         const store = Alpine.store('atc');
-        const frame = window.ParView.create(document.getElementById('par-frame'), store, { single: true });
+        const frameEl = document.getElementById('par-frame');
+        const frame = window.ParView.create(frameEl, store, { single: true });
+        if (typeof ResizeObserver === 'function') {
+            new ResizeObserver(() => { store.parFrameHeight = Math.round(frameEl.offsetHeight); }).observe(frameEl);
+        }
         let shownFor = '';
         Alpine.effect(() => {
             const code = store.storyFrameAirport;
