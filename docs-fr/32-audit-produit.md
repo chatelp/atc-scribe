@@ -492,6 +492,15 @@ sur la carte.
 
 ## État
 
+- 14/10 (soir) : **étape 9 versée dans `local`** après le coup d'œil du propriétaire (« ok
+  validé sauf la roue crantée qui ressemble à un soleil » : remplacée par une roue dentée). Ses
+  décisions du soir : la vue PAR **s'adapte à la hauteur de l'écran** (bande d'élévation de 80 à
+  230 px selon la place que laissent têtes et tableaux ; une piste sur un grand écran garde la
+  pleine hauteur, deux sur 900 px tiennent sans défiler) ; la latence de transcription transmise au
+  labo, qui l'a décomposée : de la requête au texte 7,8 s en médiane, 31,7 s au 90ᵉ centile ; calcul
+  seul 3,1 s (0,40 s par seconde d'audio) ; **le retard vient de la file à un seul fil** (attente
+  médiane 0,5 s, 26,5 s au 90ᵉ centile, quand les deux fréquences parlent ensemble ; la seconde
+  lecture française passe devant la première lecture de l'autre fréquence).
 - 14/10 (nuit) : **étapes 9b, 9d et 9e livrées sur `migration`, relues conformes pour 9b et 9d**
   (9e en relecture ; 9c, les réglages, en cours). 9b : les phrases d'événements alignées sur la fiche
   EventList, écrites en un seul endroit (`events.js`) pour la colonne et la cloche (« 7700 EZY306H,
