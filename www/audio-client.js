@@ -361,7 +361,23 @@ class AudioClient {
                 
                 barElement.style.opacity = '1';
             }
-            
+
+            // The thread's level meter (LevelMeter, migration step 6): five bars,
+            // 2 to 14 px, from the same level; drawn here, at the meter's own pace,
+            // so the store is not touched thirty times a second. The bar of the
+            // radio strip above goes at step 7; this one stays.
+            const meter = document.querySelector(`[data-level-for="${frequencyId}"]`);
+            if (meter) {
+                const level = Math.min(1, audioLevel * this.visualizerMultiplier / 100);
+                const shape = [0.55, 0.9, 0.7, 1, 0.6];
+                for (let i = 0; i < meter.children.length && i < shape.length; i++) {
+                    const bar = meter.children[i];
+                    const was = parseFloat(bar.style.height) || 2;
+                    const target = 2 + 12 * level * shape[i];
+                    bar.style.height = (was * 0.4 + target * 0.6).toFixed(1) + 'px';
+                }
+            }
+
             this.visualizationFrameIds[frequencyId] = requestAnimationFrame(renderFrame);
         };
         

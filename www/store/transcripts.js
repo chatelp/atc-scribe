@@ -293,19 +293,23 @@
             return ts.toLocaleDateString();
         },
 
-        // A transcript as HTML: the words that named its aircraft in bold, kept
+        // A transcript as HTML: the words that named its aircraft in <b> (the
+        // system draws them strong, primary text: amber means doubt, kept for a
+        // weak match), the search term in <mark> (step 6 review). Kept
         // when the match was made (callsign_evidence, UTF-16 offsets into this
         // very text), and the search term underlined. Everything is escaped here:
         // the text comes from a speech model and must never reach x-html raw.
-        transcriptHtml(text, spans) {
+        // The term underlined is the windows' search, or the one given (the
+        // thread's, step 6).
+        transcriptHtml(text, spans, searchTerm) {
             if (!text) return '';
             const esc = str => str.replace(/[&<>"']/g, c =>
                 ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-            const term = (this.transcriptionSearchTerm || '').trim();
+            const term = ((searchTerm !== undefined ? searchTerm : this.transcriptionSearchTerm) || '').trim();
             const re = term ? new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi') : null;
             const plain = str => re
                 ? str.split(re).map((piece, i) => i % 2
-                    ? '<span class="border-b border-red-400">' + esc(piece) + '</span>'
+                    ? '<mark>' + esc(piece) + '</mark>'
                     : esc(piece)).join('')
                 : esc(str);
             // Offsets that do not fit this text name words in another one: shown
@@ -317,7 +321,7 @@
             for (const [a, b] of [...spans].sort((x, y) => x[0] - y[0])) {
                 if (a < at) continue;
                 out += plain(text.slice(at, a)) +
-                    '<b class="font-bold text-amber-300">' + plain(text.slice(a, b)) + '</b>';
+                    '<b>' + plain(text.slice(a, b)) + '</b>';
                 at = b;
             }
             return out + plain(text.slice(at));
