@@ -25,8 +25,12 @@
         highlight: '#4CAF50', transition: '#FFC107', runway: '#bdbdbd', cone: '#4a4a4a',
     };
 
-    const ELEV_H = 230;     // elevation band height, px
-    const AZ_H = 64;        // azimuth band height, px
+    const ELEV_H_FULL = 230;     // elevation band height, px
+    const AZ_H_FULL = 64;        // azimuth band height, px
+    // The frame under the map while a flight is followed (step 8, c-suivre): one
+    // runway, lower bands.
+    const ELEV_H_SINGLE = 140;
+    const AZ_H_SINGLE = 36;
     const LEFT = 70;        // room for the level labels
     const RIGHT = 14;
     const TRAIL_SECONDS = 60;
@@ -156,7 +160,10 @@
         return (a.phase && a.phase.current && a.phase.current.length) ? a.phase.current[0].phase : 'UNK';
     }
 
-    function create(container, store) {
+    // options.single: draw only the frame holding the followed aircraft, with a
+    // cl-parframe head and "Open the PAR view" (the frame under the map, step 8).
+    function create(container, store, options) {
+        const single = !!(options && options.single);
         const runwaysByAirport = new Map();   // code -> Promise<RunwayInfo[]>
         const previousFrame = new Map();      // hex -> frame id, for the hysteresis
         const trails = new Map();             // hex -> [{t, lat, lon, altBaro}]
@@ -223,6 +230,10 @@
         container.addEventListener('click', (ev) => {
             hideTip();
             if (ev.target.closest('a[href]')) return;   // the VAC link opens its tab, nothing else
+            if (ev.target.closest('[data-par-open]')) {
+                store.setMainView('par', airport);
+                return;
+            }
             const toggle = ev.target.closest('[data-par-toggle]');
             if (toggle) {
                 const key = toggle.getAttribute('data-par-toggle');
@@ -236,8 +247,9 @@
                 store.selectAircraftByHex(hit.getAttribute('data-hex'));
                 return;
             }
-            // A click beside the aircraft lets go of the selected one, as on the map.
-            if (store.selectedAircraft) {
+            // A click beside the aircraft lets go of the selected one, as on the
+            // map; not in the frame under the map, which is about that aircraft.
+            if (store.selectedAircraft && !single) {
                 store.selectedAircraft = null;
                 const m = store.mapManager;
                 if (m) {
@@ -339,6 +351,10 @@
             }
             const { opts, frames, inUse, list, est, qnh, tl, placed } = placement;
             recordTrails(list);
+            if (single) {
+                drawSingle(apt, placement);
+                return;
+            }
 
             // Frames carrying a runway in use come first, in the order of the
             // runway names, not of their scores: at De Gaulle 08R and 09L land
@@ -397,6 +413,30 @@
             container.innerHTML = header + body;
         }
 
+        // The frame holding the followed aircraft, alone; nothing when it is in
+        // none of them.
+        function drawSingle(apt, placement) {
+            const { opts, frames, inUse, qnh, tl, placed } = placement;
+            const selected = store.selectedAircraft && store.selectedAircraft.hex;
+            const f = selected && frames.find((fr) => (placed.get(fr.id) || []).some((it) => it.a.hex === selected));
+            if (!f) {
+                container.innerHTML = '';
+                return;
+            }
+            const items = placed.get(f.id);
+            const isInUse = inUse.some((r) => r.end === f.le.ident || r.end === f.he.ident);
+            const A = arrivalEnd(f, inUse);
+            const a = f[A].ident;
+            const b = f[A === 'le' ? 'he' : 'le'].ident;
+            const width = Math.max(480, container.clientWidth);
+            container.innerHTML =
+                `<div class="cl-parframe__head"><b${HELP.runway(a, b)}>${esc(a + ' → ' + b)}</b>` +
+                (isInUse ? `<span class="cl-parframe__inuse"${HELP.inUse(inUse.length > 1)}>IN USE</span>` : '') +
+                `<span class="cl-age"${HELP.count()}>${items.length} aircraft</span>` +
+                `<button class="cl-btn" style="margin-left: auto;" data-par-open>Open the PAR view</button></div>` +
+                frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse, elevH: ELEV_H_SINGLE, azH: AZ_H_SINGLE });
+        }
+
         // --- The arrival sequence under a frame (audit 3.4) ---------------------
 
         // Who lands next on this frame's arrival end: distance to the threshold,
@@ -433,6 +473,8 @@
 
         function frameSvg(f, A, items, ctx) {
             const { width, qnh, tl, opts, selected, isInUse } = ctx;
+            const ELEV_H = ctx.elevH || ELEV_H_FULL;
+            const AZ_H = ctx.azH || AZ_H_FULL;
             const R = opts.rangeNM;
             const L = f.lengthNM;
             const B = A === 'le' ? 'he' : 'le';

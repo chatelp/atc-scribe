@@ -492,6 +492,28 @@ sur la carte.
 
 ## État
 
+- 14/10 : **étape 8, corrections de la relecture design** (sept points). La colonne garde ses
+  380 px pendant un suivi (elle passait à 480 et décalait la carte). **Le cadre PAR sous la carte**
+  : `par-view.js` gagne un mode « un seul cadre » (`create(…, { single: true })`), qui dessine le
+  cadre de piste de l'avion suivi avec les mêmes fonctions, en plus bas (bandes 140 et 36 px au
+  lieu de 230 et 64), sous une tête « 25 → 07 · IN USE · 2 aircraft · Open the PAR view » ;
+  affiché quand l'avion est dans une séquence d'arrivée et que la carte est à l'écran. Dans la
+  barre du haut, « Following » et la puce de l'indicatif avec ✕ après la marque. La note de carte
+  dit ce qu'elle montre (« VLG9EJ · its track since 14:29Z », sur une ligne). **Le vol en cours
+  seulement** : il commence à la dernière réapparition (phase NEW, ou trace muette plus de 10 min),
+  les vols précédents de la journée se replient (« Earlier today: 2 flights ») dans Story et dans
+  l'historique des phases ; un T/O ou un T/D jugé dans la minute d'une réapparition n'est pas
+  raconté (daté de la réapparition, pas observé). **Une ligne par événement radio** (« Controller
+  on 124.350: FL 100 », « Handed to Approche De Gaulle ») ; un clic amène l'échange au milieu du
+  fil, filtres levés. « Seen by the receiver, FL 110, 15 NM south », du premier point de chaque vol.
+  **L'aérodrome d'une phase n'est nommé que s'il est plausible** (point de la phase sous 10 000 ft
+  et à moins de 20 NM, ou avion dans sa séquence d'arrivée) ; même règle pour le badge de
+  l'en-tête. Constaté : un A321 à FL 110, 15 NM au sud, en « Arrival at LFPZ » pour le détecteur ;
+  l'attribution elle-même, côté serveur, reste à revoir (le détecteur nomme un aérodrome suivi
+  quel que soit l'éloignement). Petits points : secondes retirées de l'historique des phases,
+  « Radio · none matched », types en casse normale (« Airbus A-321 », un mot à chiffres reste
+  tel quel), âges en heures et minutes. Reste visible : « Map controls » chevauche le bas du
+  cadre PAR, à régler avec `MapControls` à l'étape 9.
 - 14/10 : **étape 8 livrée sur `migration`** (suivre un vol, `AircraftStory`). Choisir un avion
   remplace le contenu de la colonne : « ‹ Back to Traffic » (ou « Back to Right now », l'onglet
   d'où l'on vient), l'en-tête (phase, indicatif, aérodrome, exploitant · type · immatriculation ;

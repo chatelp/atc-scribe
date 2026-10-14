@@ -17,6 +17,51 @@
     const group = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, THIN);
     // Faster than this, the altitude's arrow says it climbs or descends.
     const TREND_FPM = 300;
+    // A track silent this long ends a flight: the next point starts another
+    // (the same as the Track tab's "gap" divider).
+    const FLIGHT_GAP_MS = 10 * 60 * 1000;
+    // An airport is named for a phase only where it is plausible: under this
+    // altitude and this close to it, or in its arrival sequence (design
+    // review of step 8: a Citation at FL 215, 47 NM out, "Arrival at LFPZ").
+    const AIRPORT_MAX_FT = 10000;
+    const AIRPORT_MAX_NM = 20;
+    // A takeoff or a touchdown judged this soon after the aircraft reappeared
+    // was not seen: it is dated by the reappearance.
+    const REAPPEAR_MS = 60 * 1000;
+    const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+
+    function nmBetween(lat1, lon1, lat2, lon2) {
+        const r = Math.PI / 180;
+        const dLat = (lat2 - lat1) * r;
+        const dLon = (lon2 - lon1) * r;
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
+        return 2 * 3440.065 * Math.asin(Math.sqrt(h));
+    }
+
+    function compass(lat1, lon1, lat2, lon2) {
+        const r = Math.PI / 180;
+        const y = Math.sin((lon2 - lon1) * r) * Math.cos(lat2 * r);
+        const x = Math.cos(lat1 * r) * Math.sin(lat2 * r) - Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos((lon2 - lon1) * r);
+        const deg = (Math.atan2(y, x) / r + 360) % 360;
+        return COMPASS[Math.round(deg / 45) % 8];
+    }
+
+    // "25818s" -> "7 h 10 min ago", "95s" -> "1 min ago", "40s" -> "40 s ago".
+    function agoText(seconds) {
+        const n = parseInt(seconds, 10);
+        if (!Number.isFinite(n)) return '';
+        if (n < 60) return `${n} s ago`;
+        if (n < 3600) return `${Math.floor(n / 60)} min ago`;
+        return `${Math.floor(n / 3600)} h ${Math.floor((n % 3600) / 60)} min ago`;
+    }
+
+    // "BOEING 737-800" -> "Boeing 737-800": the aircraft base writes some
+    // types in capitals; a word with a digit is a model and stays.
+    function typeCase(text) {
+        const t = String(text || '').trim();
+        if (/[a-z]/.test(t)) return t;
+        return t.split(' ').map((w) => (/\d/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase())).join(' ');
+    }
     // Out of the store, so that reading them in a getter does not make Alpine
     // render again: the last instructions table and the runway frames.
     const memo = { key: null, rows: [] };
@@ -27,7 +72,7 @@
         // Which sections of the Details tab are open (c-details): the tables
         // and the basic facts open, the long lists closed.
         storyOpen: {
-            phases: true, instructions: true, radio: false, basic: true,
+            earlier: false, earlierPhases: false, phases: true, instructions: true, radio: false, basic: true,
             position: false, speed: false, nav: false, adsb: false,
         },
 
@@ -97,6 +142,14 @@
             return null;
         },
 
+        // The airport whose runway frame shows under the map: the followed
+        // aircraft's arrival, while the map (not the PAR view) is on.
+        get storyFrameAirport() {
+            if (!this.selectedAircraft || this.mainView !== 'map') return '';
+            const arr = this.storyArrival(this.selectedAircraft);
+            return arr ? arr.airport : '';
+        },
+
         // The head of the story: who, and four numbers.
         get storyHead() {
             const a = this.selectedAircraft;
@@ -104,7 +157,7 @@
             const adsb = a.adsb || {};
             const bsdb = a.bsdb || {};
             const phase = this.getCurrentPhase(a);
-            const who = [a.airline || bsdb.registered_owners, bsdb.type || adsb.t, bsdb.registration || adsb.r]
+            const who = [a.airline || bsdb.registered_owners, typeCase(bsdb.type || adsb.t), bsdb.registration || adsb.r]
                 .map((x) => String(x || '').trim()).filter((x) => x && x !== '-');
 
             const r = this.altitudeReading(a);
@@ -139,7 +192,7 @@
             return {
                 callsign: (a.flight || '').trim() || a.hex,
                 phase: phase || 'NEW',
-                airport: this.getPhaseAirport(a),
+                airport: this.plausibleAirport(this.getPhaseAirport(a), adsb.alt_baro, adsb.lat, adsb.lon, a) ? this.getPhaseAirport(a) : '',
                 who: who.join(' · '),
                 cells: [
                     { label: 'Altitude', value: alt.value, unit: alt.unit, extra: arrow, help: this.altitudeHelp(a) },
@@ -156,18 +209,55 @@
             };
         },
 
-        // The map's note while a flight is followed.
+        // The map's note while a flight is followed: what the map shows (it
+        // was centred once, it does not follow).
         get storySkyNote() {
             const a = this.selectedAircraft;
-            if (!a) return '';
-            const pts = this.aircraftDetailsHistoryData || [];
-            let first = null;
-            for (const p of pts) {
+            if (!a) return null;
+            const first = this.storyTrack().find((p) => p.t >= this.storyFlight.start);
+            return {
+                callsign: (a.flight || '').trim() || a.hex,
+                since: first ? ` · its track since ${this.storyClock(new Date(first.t))}` : '',
+            };
+        },
+
+        // The track as points in time order: { t, alt, lat, lon, distance, id }.
+        storyTrack() {
+            return (this.aircraftDetailsHistoryData || [])
+                .map((p) => ({ t: Date.parse(p.timestamp), alt: p.altitude, lat: p.lat, lon: p.lon, distance: p.distance, id: p.id }))
+                .filter((p) => Number.isFinite(p.t))
+                .sort((x, y) => x.t - y.t);
+        },
+
+        // Is naming this airport for a phase plausible: low and near, or the
+        // aircraft is in its arrival sequence?
+        plausibleAirport(code, alt, lat, lon, aircraft) {
+            if (!code) return false;
+            const arr = aircraft && this.storyArrival(aircraft);
+            if (arr && arr.airport === code) return true;
+            const apt = (this.followedAirports || []).find((x) => x.code === code);
+            if (!apt || typeof alt !== 'number' || lat == null || lon == null || apt.latitude == null) return false;
+            return alt < AIRPORT_MAX_FT && nmBetween(lat, lon, apt.latitude, apt.longitude) < AIRPORT_MAX_NM;
+        },
+
+        // The flight in progress: it starts where the aircraft last reappeared
+        // (a NEW phase, or a silence of the track); the ones before it today
+        // are counted, and folded in the story.
+        get storyFlight() {
+            const a = this.selectedAircraft;
+            const created = a ? Date.parse(a.created_at) : NaN;
+            const starts = [];
+            const phases = this.phaseHistoryAircraftHex === (a && a.hex) ? (this.phaseHistoryData || []) : [];
+            for (const p of phases) {
                 const t = Date.parse(p.timestamp);
-                if (Number.isFinite(t) && (first === null || t < first)) first = t;
+                if (p.phase === 'NEW' && Number.isFinite(t) && !(Number.isFinite(created) && t - created < REAPPEAR_MS)) starts.push(t);
             }
-            const cs = (a.flight || '').trim() || a.hex;
-            return first === null ? `Following ${cs}` : `Following ${cs} · its track since ${this.storyClock(new Date(first))}`;
+            const pts = this.storyTrack();
+            for (let i = 1; i < pts.length; i++) if (pts[i].t - pts[i - 1].t > FLIGHT_GAP_MS) starts.push(pts[i].t);
+            const uniq = [...new Set(starts)].sort((x, y) => x - y)
+                .filter((t, i, all) => i === 0 || t - all[i - 1] > REAPPEAR_MS);
+            const start = uniq.length ? uniq[uniq.length - 1] - 1000 : -Infinity;
+            return { start, earlier: uniq.length, marks: uniq };
         },
 
         // "13:12Z" or "13:12": a timeline's time without its seconds.
@@ -175,29 +265,111 @@
             return this.timelineTime(at).replace(/(\d{1,2}:\d{2}):\d{2}/, '$1');
         },
 
-        // The Story tab: the flight's timeline (www/timeline/) as a list of
-        // facts, the last one marked as now, then the expected touchdown when
-        // the aircraft is in an arrival sequence.
+        // The Story tab: the flight's timeline (www/timeline/), one line per
+        // fact. A transmission is one line ("Controller on 124.350: Descend
+        // to 3 000 ft"), a hand-off another ("Handed to Approche De Gaulle"):
+        // the words stay in the thread, where a click on the line leads. The
+        // flight in progress is shown, the earlier ones of the day folded;
+        // the expected touchdown ends it when the aircraft is in a sequence.
         get storyEvents() {
-            const list = this.flightTimeline.map((ev, i, all) => ({
-                key: i + ev.kind + ev.at.getTime(),
-                time: this.storyClock(ev.at),
-                dot: i === all.length - 1 ? 'is-now' : (ev.kind === 'transmission' || ev.kind === 'transfer') ? 'is-radio' : '',
-                next: false,
-                ev,
-            }));
-            const arr = this.storyArrival(this.selectedAircraft);
-            if (arr && Number.isFinite(arr.etaSec) && !(this.selectedAircraft && this.selectedAircraft.on_ground)) {
-                const at = new Date(Date.now() + arr.etaSec * 1000);
-                list.push({
-                    key: 'next',
-                    time: '≈' + this.storyClock(at),
-                    dot: '',
-                    next: true,
-                    ev: { text: `Expected touchdown on ${arr.runway}, from its distance and speed.` },
-                });
+            const a = this.selectedAircraft;
+            const flight = this.storyFlight;
+            const pts = this.storyTrack();
+            const byId = new Map(pts.filter((p) => p.id != null).map((p) => [p.id, p]));
+            const handed = new Set();
+            for (const ev of this.flightTimeline) if (ev.kind === 'transfer' && ev.transmission) handed.add(ev.transmission.id);
+            const afterReappearing = (t) => flight.marks.some((m) => t >= m - 1000 && t - m < REAPPEAR_MS);
+            const P = (window.FlightTimeline && window.FlightTimeline.PHASES) || {};
+
+            const items = [];
+            for (const ev of this.flightTimeline) {
+                const t = ev.at.getTime();
+                let text = ev.text;
+                let exchange = null;
+                let radio = false;
+                if (ev.kind === 'seen') continue;   // told from the track below
+                if (ev.kind === 'phase') {
+                    if ((ev.phase === 'T/O' || ev.phase === 'T/D') && afterReappearing(t)) continue;
+                    const p = byId.get(ev.adsbId);
+                    const name = (P[ev.phase] || [ev.phase])[0];
+                    const named = ev.airport && p && this.plausibleAirport(ev.airport, p.alt, p.lat, p.lon, t >= flight.start ? a : null);
+                    text = named ? `${name} at ${ev.airport}` : name;
+                } else if (ev.kind === 'transfer') {
+                    radio = true;
+                    exchange = ev.transmission ? ev.transmission.id : null;
+                    text = ev.toName ? `Handed to ${this.freqShortName({ name: ev.toName })}` : `Told to contact ${ev.frequency}`;
+                } else if (ev.kind === 'transmission') {
+                    const tr = ev.transmission;
+                    if (handed.has(tr.id)) continue;
+                    radio = true;
+                    exchange = tr.id;
+                    const who = tr.speaker_type === 'ATC' ? 'Controller' : tr.speaker_type === 'PILOT' ? 'Pilot' : 'Heard';
+                    const said = (tr.plain || []).map((x) => x.text).join(', ');
+                    text = `${who} on ${this.freqLabel(tr.frequency_id)}${said ? ': ' + said : ''}`;
+                }
+                items.push({ t, text, help: ev.help || '', radio, exchange, quote: ev.quote || '', key: items.length + ev.kind + t });
             }
-            return list;
+
+            // Seen by the receiver: the first point of each flight, told from
+            // the track; the day's first sight when the track does not reach it.
+            const firsts = [Number.isFinite(Date.parse(a && a.created_at)) ? Date.parse(a.created_at) : null, ...flight.marks].filter((x) => x != null);
+            firsts.forEach((from, i) => {
+                const p = pts.find((q) => q.t >= from - 1000);
+                const close = p && p.t - from < 2 * 60 * 1000;
+                // Dated by the first message (it opens the flight), told from the first position.
+                items.push(close ? { t: Math.min(p.t, from), text: this.seenText(p), help: 'The first position the station decoded for this flight.', key: 'seen' + i + p.t }
+                    : { t: from, text: 'First seen by the receiver', help: 'When the station first decoded this aircraft\'s ADS-B messages in this database day.', key: 'seen' + i + from });
+            });
+            items.sort((x, y) => (x.t - y.t) || ((y.key.startsWith('seen') ? 1 : 0) - (x.key.startsWith('seen') ? 1 : 0)));
+
+            const shape = (it, now) => ({
+                key: it.key, time: this.storyClock(new Date(it.t)), next: false, text: it.text, help: it.help, quote: it.quote,
+                exchange: it.exchange, dot: now ? 'is-now' : it.radio ? 'is-radio' : '',
+            });
+            const earlier = items.filter((it) => it.t < flight.start).map((it) => shape(it, false));
+            const current = items.filter((it) => it.t >= flight.start);
+            const list = current.map((it, i) => shape(it, i === current.length - 1));
+            const arr = this.storyArrival(a);
+            if (arr && Number.isFinite(arr.etaSec) && !(a && a.on_ground)) {
+                const at = new Date(Date.now() + arr.etaSec * 1000);
+                list.push({ key: 'next', time: '≈' + this.storyClock(at), dot: '', next: true, exchange: null, quote: '', help: '',
+                    text: `Expected touchdown on ${arr.runway}, from its distance and speed.` });
+            }
+            return { current: list, earlier, flights: flight.earlier };
+        },
+
+        // "Seen by the receiver, FL 210, 61 NM north-east".
+        seenText(p) {
+            const parts = ['Seen by the receiver'];
+            const r = typeof p.alt === 'number' && window.AltitudeScale ? window.AltitudeScale.reading(p.alt, this.altimetry) : null;
+            if (r) parts.push(r.kind === 'gnd' ? 'on the ground' : r.kind === 'ft' ? `${group(Math.round(r.ft / 100) * 100)} ft` : window.AltitudeScale.readingText(r));
+            if (p.lat != null && this.stationLatitude != null) {
+                const nm = typeof p.distance === 'number' ? p.distance : nmBetween(this.stationLatitude, this.stationLongitude, p.lat, p.lon);
+                parts.push(`${Math.round(nm)} NM ${compass(this.stationLatitude, this.stationLongitude, p.lat, p.lon)}`);
+            }
+            return parts.join(', ');
+        },
+
+        // The phase history, the flight in progress apart from the earlier ones.
+        get storyPhases() {
+            const start = this.storyFlight.start;
+            const all = this.safePhaseHistoryData;
+            return {
+                current: all.filter((p) => Date.parse(p.timestamp) >= start),
+                earlier: all.filter((p) => Date.parse(p.timestamp) < start),
+            };
+        },
+
+        // "Show in the thread": the line's exchange, if the thread still holds it.
+        showInThread(id) {
+            if (id != null) window.dispatchEvent(new CustomEvent('thread-show', { detail: { id } }));
+        },
+
+        // "Radio · 6 matched", "Radio · none matched".
+        get storyRadioCount() {
+            const R = this.aircraftRadio;
+            if (R.loading && !R.transcriptions.length) return '· loading…';
+            return R.transcriptions.length ? `· ${R.transcriptions.length} matched` : '· none matched';
         },
 
         // The instructions heard: every value the grammar read in what the
@@ -208,11 +380,12 @@
             const a = this.selectedAircraft;
             const R = this.aircraftRadio;
             if (!a || !R || R.callsign !== (a.flight || '').trim()) return [];
-            const said = (R.transcriptions || []).filter((t) => t.speaker_type === 'ATC' && Array.isArray(t.plain) && t.plain.length);
+            const start = this.storyFlight.start;
+            const said = (R.transcriptions || []).filter((t) => t.speaker_type === 'ATC' && Array.isArray(t.plain) && t.plain.length && Date.parse(t.created_at) >= start);
             const track = this.aircraftDetailsHistoryData || [];
             const last = track.length ? track[track.length - 1].timestamp : '';
             const frames = this.storyFrames();
-            const key = `${a.hex}|${said.length}|${said.length ? said[0].id : ''}|${track.length}|${last}|${Math.round(this.altimetry.qnh || 0)}|${frames ? frames.length : 0}`;
+            const key = `${a.hex}|${start}|${said.length}|${said.length ? said[0].id : ''}|${track.length}|${last}|${Math.round(this.altimetry.qnh || 0)}|${frames ? frames.length : 0}`;
             if (memo.key === key) return memo.rows;
 
             const T = window.StoryThen;
@@ -275,7 +448,8 @@
             const rows = (items) => items.map(([k, v, extra]) => {
                 const text = String(v === undefined || v === null ? '-' : v).trim();
                 const none = text === '-' || /^-\s*(ft|kts|hPa|°|°C|s|dBm|ft\/min)?$/.test(text);
-                return { k, v: none ? '—' : (extra ? `${text} · ${extra} ago` : text), none };
+                const shown = k === 'Type' ? typeCase(text) : text;
+                return { k, v: none ? '—' : (extra ? `${shown} · ${agoText(extra)}` : shown), none };
             });
             return [
                 { key: 'basic', name: 'Basic info', rows: rows(merge('Basic Info', 'Status')) },

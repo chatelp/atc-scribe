@@ -92,6 +92,12 @@
                 <svg x-show="$store.atc.anyUnmuted" x-cloak viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7.4" fill="#163020"/><circle cx="8" cy="8" r="6.6" fill="none" stroke="#4caf50" stroke-width="1.6"/><path d="M8 8 L8 1.6 A6.4 6.4 0 0 1 12.525 3.475 Z" fill="#4caf50" fill-opacity="0.45"/><path d="M8 8 L12.525 3.475" fill="none" stroke="#66c56a" stroke-width="1.6" stroke-linecap="round"/><circle cx="9.78" cy="4.19" r="1.15" fill="#e0e0e0"/></svg>
                 <span class="cl-topbar__name">Clairance</span>
             </span>
+            <!-- Following a flight (step 8, TopBar): its chip after the brand, ✕ stops. -->
+            <span x-show="$store.atc.selectedAircraft" x-cloak class="cl-plain hidden md:inline">Following</span>
+            <span x-show="$store.atc.selectedAircraft" x-cloak class="cl-chip cl-chip--callsign is-selected hidden md:inline-flex"
+                  ><span x-text="$store.atc.storyHead ? $store.atc.storyHead.callsign : ''"></span
+                  ><button class="cl-btn cl-btn--icon" aria-label="Stop following" @click.stop="$store.atc.stopFollowing()"
+                           data-help-title="Stop following" data-help="Back to the whole sky: the column returns to the tab it was on (Escape does the same)."><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button></span>
             <!-- What is on air is chosen at the station: said here, never switched here. -->
             <span class="cl-light cursor-help" :class="'cl-light--' + $store.atc.antennaLine.level"
                   x-text="$store.atc.antennaLine.text"
@@ -117,9 +123,6 @@
             <template x-if="!$store.atc.showLocalDates">
                 <span class="cl-topbar__local" x-text="$store.atc.currentTime"></span>
             </template>
-            <!-- ✕ Stop following (step 8): the column's ‹ does the same, Escape too. -->
-            <button x-show="$store.atc.selectedAircraft" x-cloak class="cl-btn hidden md:inline-flex" @click="$store.atc.stopFollowing()"
-                    data-help-title="Stop following" data-help="Back to the whole sky: the column returns to the tab it was on (Escape does the same).">✕ <span x-text="'Stop following ' + (($store.atc.selectedAircraft && ($store.atc.selectedAircraft.flight || '').trim()) || '')"></span></button>
             <button class="cl-btn cl-btn--icon" aria-label="Event log" data-help-title="Event log"
                     data-help="Emergencies, go-arounds, runway changes, aircraft of interest, the station switching channels, streams lost or back."
                     :class="$store.events.open ? 'is-on' : ''" @click="$store.events.toggleOpen()" style="position: relative;">
@@ -235,7 +238,7 @@
                         </template>
                         <!-- Exchange: who spoke to whom, what was said, what it means. -->
                         <template x-for="t in $store.atc.threadExchanges" :key="t.id || (t.frequency_id + '-' + t.timestamp)">
-                            <article class="cl-exchange"
+                            <article class="cl-exchange" :data-exchange="t.id"
                                      :class="{ 'is-unmatched': t.is_processed && !t.callsign, 'is-selected': t.callsign && $store.atc.exchangeChip(t).classes.includes('is-selected') }">
                                 <div class="cl-exchange__head">
                                     <span class="cl-exchange__when" x-text="$store.atc.exchangeTime(t) + ' · ' + $store.atc.freqLabel(t.frequency_id)"></span>
@@ -999,14 +1002,18 @@
                         <div id="map" class="h-full w-full bg-black"></div>
                         <!-- What the map shows while a filter narrows it (step 4). -->
                         <!-- Clear of the Map/PAR switch in the top right corner until step 9 joins them. -->
-                        <div x-show="$store.atc.filterSummary || $store.atc.selectedAircraft" x-cloak class="cl-root absolute left-2 top-2 z-20 pointer-events-none flex flex-col items-start gap-1" style="max-width: calc(100% - 17rem)">
-                            <div x-show="$store.atc.selectedAircraft" class="cl-sky__note" x-text="$store.atc.storySkyNote"></div>
+                        <div x-show="$store.atc.filterSummary || $store.atc.selectedAircraft" x-cloak class="cl-root absolute left-2 top-2 z-20 pointer-events-none flex flex-col items-start gap-1" style="max-width: calc(100% - 16rem)">
+                            <template x-if="$store.atc.storySkyNote">
+                                <div class="cl-sky__note whitespace-nowrap"><b x-text="$store.atc.storySkyNote.callsign"></b><span x-text="$store.atc.storySkyNote.since"></span></div>
+                            </template>
                             <div x-show="$store.atc.filterSummary" class="cl-sky__note" x-text="$store.atc.filterSummary"></div>
                         </div>
 
                         <!-- The main screen shows the radar map or the PAR view of one
                              followed airport; the side panels stay as they are. -->
                         <div id="par-view" x-show="$store.atc.mainView === 'par'" style="display: none"></div>
+                        <!-- ParFrame (step 8, c-suivre): the followed aircraft's approach, drawn by par-view.js. -->
+                        <div id="par-frame" x-show="$store.atc.storyFrameAirport" x-cloak class="cl-root cl-parframe absolute left-0 right-0 bottom-0 z-20"></div>
                         <div class="absolute top-4 right-4 z-[10001] flex items-center gap-0.5 px-1 py-1 rounded border border-border bg-panel/85 backdrop-blur-sm text-xs shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
                             <button type="button" @click="$store.atc.setMainView('map')"
                                     :class="$store.atc.mainView === 'map' ? 'bg-highlight/20 text-highlight' : 'text-text/70 hover:text-text'"
@@ -1234,8 +1241,7 @@
             <aside class="cl-root cl-app__column w-full min-w-0 overflow-hidden z-50"
                    :class="[($store.atc.columnFolded && !$store.atc.selectedAircraft)
                               ? ($store.atc.mobilePane === 'list' ? 'flex md:hidden' : 'hidden')
-                              : ($store.atc.mobilePane === 'list' ? 'flex' : 'hidden md:flex'),
-                            $store.atc.selectedAircraft ? 'md:w-120 md:min-w-120' : '']"
+                              : ($store.atc.mobilePane === 'list' ? 'flex' : 'hidden md:flex')]"
                    aria-label="Context">
                 <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col">
                     <div class="cl-tabs cl-tabs--column" role="tablist">
@@ -1571,44 +1577,50 @@
                             <template x-if="$store.atc.aircraftRadio.loading && !$store.atc.aircraftRadio.transcriptions.length">
                                 <div class="cl-section"><span class="cl-plain">Loading the transmissions…</span></div>
                             </template>
-                            <template x-if="!$store.atc.storyEvents.length">
+                            <template x-if="!$store.atc.storyEvents.current.length">
                                 <div class="cl-section"><span class="cl-plain">Nothing recorded on this aircraft yet.</span></div>
                             </template>
-                            <ol class="cl-story__events">
-                                <template x-for="item in $store.atc.storyEvents" :key="item.key">
+                            <template x-if="$store.atc.storyEvents.flights">
+                                <div class="cl-section">
+                                    <button class="cl-disclosure" :aria-expanded="$store.atc.storyOpen.earlier" @click="$store.atc.toggleStorySection('earlier')"
+                                            x-text="'Earlier today: ' + $store.atc.storyEvents.flights + ($store.atc.storyEvents.flights > 1 ? ' flights' : ' flight')"
+                                            data-help-title="Earlier today" data-help="This aircraft was seen before today, left the receiver's range and came back: its earlier flights, folded."></button>
+                                    <ol x-show="$store.atc.storyOpen.earlier" class="cl-story__events" style="padding: 0">
+                                <template x-for="item in $store.atc.storyEvents.earlier" :key="item.key">
                                     <li :class="item.next ? 'is-next' : ''">
                                         <time x-text="item.time"></time><i :class="item.dot"></i>
-                                        <div class="min-w-0">
-                                            <span :class="item.ev.help ? 'cursor-help' : ''" x-text="item.ev.text"
-                                                  data-help-title="Story" :data-help="item.ev.help || ''"></span>
-                                            <span x-show="item.ev.transmission && $store.atc.strengthBars(item.ev.transmission)" class="cl-strength cursor-help ml-1"
-                                                  :class="item.ev.transmission ? 'cl-strength--' + $store.atc.strengthBars(item.ev.transmission) : ''"
-                                                  data-help-title="Why this aircraft" :data-help="item.ev.transmission ? $store.atc.matchProofText(item.ev.transmission) : ''"><i></i><i></i><i></i></span>
-                                            <button class="cl-exchange__play align-middle" x-show="item.ev.transmission && $store.atc.audioArchive.available"
-                                                    :aria-label="item.ev.transmission ? $store.atc.clipHelp(item.ev.transmission.id) : ''" @click.stop="$store.atc.playClip(item.ev.transmission.id)"
-                                                    data-help-title="Listen again" :data-help="item.ev.transmission ? $store.atc.clipHelp(item.ev.transmission.id) : ''">
-                                                <svg x-show="!(item.ev.transmission && $store.atc.clip.id === item.ev.transmission.id && $store.atc.clip.state !== 'idle')" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M5 3.5v9l7-4.5-7-4.5Z"/></svg>
-                                                <svg x-show="item.ev.transmission && $store.atc.clip.id === item.ev.transmission.id && $store.atc.clip.state !== 'idle'" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1"/></svg>
-                                            </button>
-                                            <template x-if="item.ev.transmission">
-                                                <p class="cl-exchange__text mt-0.5"
-                                                   x-html="$store.atc.transcriptHtml(item.ev.transmission.content_processed || item.ev.transmission.content, (item.ev.transmission.callsign_source !== 'fr' && item.ev.transmission.content_processed) ? item.ev.transmission.callsign_evidence : null)"></p>
+                                        <span class="min-w-0">
+                                            <template x-if="item.exchange != null">
+                                                <button class="text-left hover:underline" @click="$store.atc.showInThread(item.exchange)" x-text="item.text"
+                                                        data-help-title="In the thread" data-help="Shows this exchange in the radio thread, with its words and its audio, while the thread still holds it."></button>
                                             </template>
-                                            <!-- In plain words, from the phraseology grammar (audit 3.5). -->
-                                            <template x-if="item.ev.transmission && item.ev.transmission.plain && item.ev.transmission.plain.length">
-                                                <div class="cl-exchange__explain cursor-help" data-help-title="In plain words" :data-help="$store.atc.plainHelp(item.ev.transmission)">
-                                                    <span x-text="$store.atc.plainLead(item.ev.transmission)"></span>
-                                                    <template x-for="p in item.ev.transmission.plain" :key="p.text"><b class="ml-1" x-text="p.text"></b></template>
-                                                </div>
+                                            <template x-if="item.exchange == null">
+                                                <span :class="item.help ? 'cursor-help' : ''" x-text="item.text" data-help-title="Story" :data-help="item.help"></span>
                                             </template>
-                                            <template x-if="item.ev.quote">
-                                                <div class="cl-plain italic" x-text="'“' + item.ev.quote + '”'"></div>
+                                            <template x-if="item.quote"><span class="cl-plain italic" x-text="' “' + item.quote + '”'"></span></template>
+                                        </span>
+                                    </li>
+                                </template>
+                                    </ol>
+                                </div>
+                            </template>
+                            <ol class="cl-story__events">
+                                <template x-for="item in $store.atc.storyEvents.current" :key="item.key">
+                                    <li :class="item.next ? 'is-next' : ''">
+                                        <time x-text="item.time"></time><i :class="item.dot"></i>
+                                        <span class="min-w-0">
+                                            <template x-if="item.exchange != null">
+                                                <button class="text-left hover:underline" @click="$store.atc.showInThread(item.exchange)" x-text="item.text"
+                                                        data-help-title="In the thread" data-help="Shows this exchange in the radio thread, with its words and its audio, while the thread still holds it."></button>
                                             </template>
-                                        </div>
+                                            <template x-if="item.exchange == null">
+                                                <span :class="item.help ? 'cursor-help' : ''" x-text="item.text" data-help-title="Story" :data-help="item.help"></span>
+                                            </template>
+                                            <template x-if="item.quote"><span class="cl-plain italic" x-text="' “' + item.quote + '”'"></span></template>
+                                        </span>
                                     </li>
                                 </template>
                             </ol>
-                            <p class="cl-section cl-plain">Transmissions: the last 50 matched to this callsign, on every frequency of the day.</p>
                         </div>
 
                         <div id="story-track" x-show="$store.atc.storyTab === 'track'" class="p-3">
@@ -1792,13 +1804,12 @@
                                         <template x-if="$store.atc.phaseHistoryLoading">
                                             <tr><td colspan="3" class="is-dim">Loading…</td></tr>
                                         </template>
-                                        <template x-if="!$store.atc.phaseHistoryLoading && $store.atc.safePhaseHistoryData.length === 0">
+                                        <template x-if="!$store.atc.phaseHistoryLoading && $store.atc.storyPhases.current.length === 0">
                                             <tr><td colspan="3" class="is-dim">No phase history yet</td></tr>
                                         </template>
-                                        <template x-for="phase in $store.atc.safePhaseHistoryData" :key="phase.timestamp + (phase.is_current ? '-current' : '-history')">
+                                        <template x-for="phase in $store.atc.storyPhases.current" :key="phase.timestamp + (phase.is_current ? '-current' : '-history')">
                                             <tr>
-                                                <td><span x-text="$store.atc.formatDate(phase.timestamp, true)"></span>
-                                                    <span class="is-dim" x-text="Math.floor(($store.atc.currentTimeForPhases - new Date(phase.timestamp)) / 1000) + 's'"></span></td>
+                                                <td x-text="$store.atc.formatDate(phase.timestamp, true)"></td>
                                                 <td><span class="cl-phase cl-phase--small" :class="window.PhaseFamilies ? 'cl-phase--' + PhaseFamilies.modifierOf(phase.phase) : ''" x-text="phase.phase"></span></td>
                                                 <td class="is-num">
                                                     <button x-show="phase.adsb_id" class="underline" @click="$store.atc.navigateToTracksWithHighlight(phase.adsb_id)"
@@ -1809,6 +1820,27 @@
                                         </template>
                                     </tbody>
                                 </table>
+                                <template x-if="$store.atc.storyOpen.phases && $store.atc.storyPhases.earlier.length">
+                                    <div>
+                                        <button class="cl-disclosure" :aria-expanded="$store.atc.storyOpen.earlierPhases" @click="$store.atc.toggleStorySection('earlierPhases')"
+                                                x-text="'Earlier today: ' + $store.atc.storyFlight.earlier + ($store.atc.storyFlight.earlier > 1 ? ' flights' : ' flight')"></button>
+                                        <table x-show="$store.atc.storyOpen.earlierPhases" class="cl-table">
+                                            <tbody>
+                                        <template x-for="phase in $store.atc.storyPhases.earlier" :key="phase.timestamp + (phase.is_current ? '-current' : '-history')">
+                                            <tr>
+                                                <td x-text="$store.atc.formatDate(phase.timestamp, true)"></td>
+                                                <td><span class="cl-phase cl-phase--small" :class="window.PhaseFamilies ? 'cl-phase--' + PhaseFamilies.modifierOf(phase.phase) : ''" x-text="phase.phase"></span></td>
+                                                <td class="is-num">
+                                                    <button x-show="phase.adsb_id" class="underline" @click="$store.atc.navigateToTracksWithHighlight(phase.adsb_id)"
+                                                            data-help-title="Point" data-help="The track point where the phase changed: opens it in the Track tab." x-text="'#' + phase.adsb_id"></button>
+                                                    <span x-show="!phase.adsb_id" class="is-dim">—</span>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </template>
                             </div>
 
                             <!-- Instructions heard, and Then: what the aircraft did next, from its
@@ -1837,7 +1869,7 @@
                                  facts the phraseology grammar recovered from them. -->
                             <div class="cl-section">
                                 <button class="cl-disclosure" :aria-expanded="$store.atc.storyOpen.radio" @click="$store.atc.toggleStorySection('radio')">
-                                    <span>Radio</span><span class="cl-plain ml-auto" x-text="($store.atc.aircraftRadio.loading && !$store.atc.aircraftRadio.transcriptions.length) ? 'loading…' : ($store.atc.aircraftRadio.transcriptions.length + ' transmission(s)')"></span>
+                                    <span>Radio</span><span class="cl-plain" x-text="$store.atc.storyRadioCount"></span>
                                 </button>
                                 <div x-show="$store.atc.storyOpen.radio">
 

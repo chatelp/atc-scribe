@@ -855,6 +855,19 @@ document.addEventListener('alpine:init', () => {
     // The PAR view takes the map's place when chosen (docs-fr/31-vue-par.md)
     Alpine.store('atc').parView = window.ParView.create(document.getElementById('par-view'), Alpine.store('atc'));
     Alpine.store('atc').setMainView(Alpine.store('atc').mainView);
+    // The followed aircraft's approach, in its runway's frame under the map
+    // (step 8): shown while it is in an arrival sequence and the map is on.
+    {
+        const store = Alpine.store('atc');
+        const frame = window.ParView.create(document.getElementById('par-frame'), store, { single: true });
+        let shownFor = '';
+        Alpine.effect(() => {
+            const code = store.storyFrameAirport;
+            if (code === shownFor) return;
+            shownFor = code;
+            if (code) frame.show(code); else frame.hide();
+        });
+    }
 
     // The open transcripts follow their tiles when the window changes or the
     // strip of tiles scrolls.
