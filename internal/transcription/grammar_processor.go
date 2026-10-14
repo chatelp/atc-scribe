@@ -394,13 +394,13 @@ func (p *GrammarProcessor) match(record *sqlite.TranscriptionRecord, result phra
 		}
 	}
 	// Why no aircraft was named, kept with the transmission like a proof is
-	// (13/10): the page can then say "nobody in range was named" instead of
+	// (13/10): the page can then say "no aircraft in range was named" instead of
 	// showing nothing, and the refusals become measurable. Written in the
 	// same words as a proof, prefixed so they are never read as one.
 	whyNot := "unmatched: no aircraft in range"
 	if len(sky) > 0 {
 		ctx := p.recentlyHeard(record.FrequencyID, record.CreatedAt)
-		whyNot = "unmatched: nobody in range was named"
+		whyNot = "unmatched: no aircraft in range was named"
 
 		try := func(res phraseology.Result, text string) (phraseology.Match, bool) {
 			m, ok := matcher.MatchWithContext(res, sky, ctx)

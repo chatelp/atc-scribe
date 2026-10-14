@@ -37,7 +37,7 @@ func TestTransmissionsAreServedInPlainWords(t *testing.T) {
 				continue
 			}
 			found = true
-			if got := fmt.Sprint(tr.Plain); got != "[{flight_level Descend to FL100 100 FL} {frequency Contact 119.255 119.255 MHz}]" {
+			if got := fmt.Sprint(tr.Plain); got != "[{flight_level Descend to FL 100 100 FL} {frequency Contact 119.255 119.255 MHz}]" {
 				t.Errorf("%s: %s", path, got)
 			}
 		}
