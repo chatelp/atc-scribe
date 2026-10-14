@@ -1014,10 +1014,10 @@
                                 </template>
                             </div>
                             <template x-if="$store.atc.mainView === 'map' && $store.atc.storySkyNote">
-                                <div class="cl-sky__note whitespace-nowrap min-w-0 overflow-hidden text-ellipsis"><b x-text="$store.atc.storySkyNote.callsign"></b><span x-text="$store.atc.storySkyNote.since"></span></div>
+                                <div class="cl-sky__note"><b x-text="$store.atc.storySkyNote.callsign"></b><span x-text="$store.atc.storySkyNote.since"></span></div>
                             </template>
-                            <div x-show="$store.atc.mainView === 'map' && $store.atc.filterSummary" x-cloak class="cl-sky__note whitespace-nowrap min-w-0 overflow-hidden text-ellipsis" x-text="$store.atc.filterSummary"></div>
-<div x-show="$store.atc.columnFolded && !$store.atc.selectedAircraft" x-cloak class="cl-sky__end pointer-events-auto hidden md:flex shrink-0">
+                            <div x-show="$store.atc.mainView === 'map' && $store.atc.filterSummary" x-cloak class="cl-sky__note" x-text="$store.atc.filterSummary"></div>
+<div x-show="$store.atc.columnFolded && !$store.atc.selectedAircraft" x-cloak class="cl-sky__end pointer-events-auto hidden md:flex">
                                 <div class="cl-row">
                                     <button class="cl-btn" @click="$store.atc.setColumnFolded(false, 'traffic')"
                                             data-help-title="Traffic" data-help="Bring the column back on the list of aircraft.">Traffic <span class="cl-tabs__count" x-text="$store.atc.activeAircraftCount"></span></button>
