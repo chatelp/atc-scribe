@@ -131,8 +131,14 @@ func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		// messages_per_second: the receiver's own counter, a health figure
 		// the aircraft count does not give; 0 when the source has none.
-		out["adsb"] = map[string]any{"ok": ok, "last_fetch": last.UTC(), "aircraft": active,
+		adsb := map[string]any{"ok": ok, "last_fetch": last.UTC(), "aircraft": active,
 			"messages_per_second": math.Round(h.adsbService.MessageRate())}
+		// While every fetch fails: since when and why (14/10).
+		if since, why := h.adsbService.FetchFailure(); !since.IsZero() {
+			adsb["failing_since"] = since.UTC()
+			adsb["failing_why"] = why
+		}
+		out["adsb"] = adsb
 	}
 	out["audio_archive"] = map[string]bool{"available": h.audioArchive.Available()}
 

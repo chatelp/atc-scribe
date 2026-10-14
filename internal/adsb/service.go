@@ -194,12 +194,18 @@ type Storage interface {
 type Service struct {
 	voiceState // what the radio has said about each aircraft; see voice.go
 
-	client             *Client
-	storage            Storage
-	fetchInterval      time.Duration
-	logger             *logger.Logger
-	lastFetchTime      time.Time
-	lastFetchStatus    bool
+	client          *Client
+	storage         Storage
+	fetchInterval   time.Duration
+	logger          *logger.Logger
+	lastFetchTime   time.Time
+	lastFetchStatus bool
+	// Since when every fetch has failed, and why, in a few words; zero and
+	// empty while the source answers. The ADS-B light says it (14/10: after a
+	// network cut a test instance failed for 12 h, "no route to host", while
+	// a new process reached the station; a restart was the remedy).
+	failingSince       time.Time
+	failingWhy         string
 	messages           messageRate // the receiver's counter, for messages per second
 	mu                 sync.RWMutex
 	stopCh             chan struct{}
@@ -412,8 +418,10 @@ func (s *Service) fetchLoop(ctx context.Context) {
 			if err := s.fetchAndProcess(ctx); err != nil {
 				s.logger.Error("Failed to fetch ADS-B data", logger.Error(err))
 				s.setFetchStatus(false)
+				s.noteFetchFailure(err)
 			} else {
 				s.setFetchStatus(true)
+				s.noteFetchFailure(nil)
 			}
 		case <-s.stopCh:
 			return
@@ -1143,6 +1151,49 @@ func (s *Service) setLastFetchTime(t time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lastFetchTime = t
+}
+
+// noteFetchFailure keeps when the current run of failed fetches began and
+// why the last one failed; a success clears both.
+func (s *Service) noteFetchFailure(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err == nil {
+		s.failingSince, s.failingWhy = time.Time{}, ""
+		return
+	}
+	if s.failingSince.IsZero() {
+		s.failingSince = s.now()
+	}
+	s.failingWhy = fetchFailureReason(err)
+}
+
+// FetchFailure says since when every fetch has failed and why, or a zero
+// time while the source answers.
+func (s *Service) FetchFailure() (time.Time, string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.failingSince, s.failingWhy
+}
+
+// fetchFailureReason turns a fetch error into a few words a reader can act
+// on, without the URL.
+func fetchFailureReason(err error) string {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "no route to host"):
+		return "no route to the station"
+	case strings.Contains(msg, "connection refused"):
+		return "the station refuses the connection"
+	case strings.Contains(msg, "i/o timeout"), strings.Contains(msg, "Client.Timeout"), strings.Contains(msg, "deadline exceeded"):
+		return "the station does not answer in time"
+	case strings.Contains(msg, "no such host"):
+		return "the station's name is not found"
+	case strings.Contains(msg, "status"):
+		return "the station answers with an error"
+	default:
+		return "the station cannot be read"
+	}
 }
 
 // setFetchStatus sets the fetch status

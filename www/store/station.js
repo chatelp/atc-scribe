@@ -180,9 +180,16 @@
                 // none), a health figure the aircraft count does not give.
                 const rate = Number(st.adsb.messages_per_second) || 0;
                 const rateText = rate > 0 ? ` It decodes about ${rate} messages a second.` : '';
+                // Every fetch failing (failing_since, 14/10): since when, why, and
+                // what to do if it lasts. After a network cut a server once kept
+                // failing for 12 h while the station answered; a restart cured it.
+                const failingMin = st.adsb.failing_since ? Math.floor((Date.now() - Date.parse(st.adsb.failing_since)) / 60000) : null;
+                const unreachable = !fresh && failingMin !== null;
                 lights.push({ key: 'adsb', label: 'ADS-B', level: fresh ? 'ok' : 'bad',
-                    text: fresh ? (rate > 0 ? `${st.adsb.aircraft} · ${rate}/s` : String(st.adsb.aircraft)) : 'Stale',
+                    text: fresh ? (rate > 0 ? `${st.adsb.aircraft} · ${rate}/s` : String(st.adsb.aircraft))
+                        : unreachable ? `Unreachable · ${failingMin < 1 ? '<1' : failingMin} min` : 'Stale',
                     help: fresh ? `The ADS-B receiver answers: ${st.adsb.aircraft} aircraft in sight now.${rateText}`
+                        : unreachable ? `Clairance cannot read the station's ADS-B since ${when(st.adsb.failing_since)}: ${st.adsb.failing_why || 'the station cannot be read'}. Positions on the map are not moving. If the station answers elsewhere (its own map, another device) and this lasts more than a few minutes, restart Clairance: after a network cut it may not find the station again by itself.`
                         : `No fresh ADS-B data${st.adsb.last_fetch ? ' since ' + when(st.adsb.last_fetch) : ''}: positions on the map are not moving.` });
             }
             return lights;

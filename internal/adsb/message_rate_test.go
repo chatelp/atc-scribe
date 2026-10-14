@@ -1,6 +1,7 @@
 package adsb
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -47,5 +48,21 @@ func TestTheMessageRateFollowsTheReceiversCounter(t *testing.T) {
 	r.note(0, t0.Add(33*time.Second))
 	if got := r.perSecond(); got != before {
 		t.Fatalf("a zero counter changed the rate: %v -> %v", before, got)
+	}
+}
+
+// A failed fetch is said in a few words a reader can act on (14/10).
+func TestFetchFailureReason(t *testing.T) {
+	cases := map[string]string{
+		`Get "http://station:8080/data/aircraft.json": dial tcp 10.0.0.1:8080: connect: no route to host`: "no route to the station",
+		`dial tcp 10.0.0.1:8080: i/o timeout`:                 "the station does not answer in time",
+		`dial tcp 10.0.0.1:8080: connect: connection refused`: "the station refuses the connection",
+		`unexpected status 502`:                               "the station answers with an error",
+		`something else`:                                      "the station cannot be read",
+	}
+	for msg, want := range cases {
+		if got := fetchFailureReason(errors.New(msg)); got != want {
+			t.Errorf("%q: %q, want %q", msg, got, want)
+		}
 	}
 }
