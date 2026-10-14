@@ -90,7 +90,7 @@
                   data-help="The scope lights up while a frequency plays in this browser; otherwise it shows the tool is running.">
                 <svg x-show="!$store.atc.anyUnmuted" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="#e0e0e0" stroke-width="1.6"/><path d="M8 8 L8 1.6 A6.4 6.4 0 0 1 12.525 3.475 Z" fill="#4caf50" fill-opacity="0.35"/><path d="M8 8 L12.525 3.475" fill="none" stroke="#4caf50" stroke-width="1.6" stroke-linecap="round"/><circle cx="9.78" cy="4.19" r="1.15" fill="#4caf50"/></svg>
                 <svg x-show="$store.atc.anyUnmuted" x-cloak viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7.4" fill="#163020"/><circle cx="8" cy="8" r="6.6" fill="none" stroke="#4caf50" stroke-width="1.6"/><path d="M8 8 L8 1.6 A6.4 6.4 0 0 1 12.525 3.475 Z" fill="#4caf50" fill-opacity="0.45"/><path d="M8 8 L12.525 3.475" fill="none" stroke="#66c56a" stroke-width="1.6" stroke-linecap="round"/><circle cx="9.78" cy="4.19" r="1.15" fill="#e0e0e0"/></svg>
-                Clairance
+                <span class="cl-topbar__name">Clairance</span>
             </span>
             <!-- What is on air is chosen at the station: said here, never switched here. -->
             <span class="cl-light cursor-help" :class="'cl-light--' + $store.atc.antennaLine.level"

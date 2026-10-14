@@ -346,6 +346,16 @@
 .cl-topbar__brand svg { width: 20px; height: 20px; }
 .cl-topbar__utc { margin-left: auto; font: var(--font-weight-strong) var(--font-size-body) / 1 var(--font-family-mono); color: var(--color-accent-default); }
 .cl-topbar__local { font: var(--font-weight-regular) var(--font-size-small) / 1 var(--font-family-mono); color: var(--color-text-tertiary); }
+/* the phone: the sign, one light, UTC, the bell and the settings; never wider than the screen */
+@media (max-width: 767px) {
+    .cl-topbar { gap: var(--space-2); padding: 0 var(--space-1) 0 var(--space-3); }
+    .cl-topbar__name, .cl-topbar__local { display: none; }
+    .cl-topbar .cl-light { display: block; min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+    .cl-topbar .cl-light::before { display: inline-block; vertical-align: -1px; margin-right: var(--space-1); }
+    .cl-topbar .cl-light ~ .cl-light:not(.cl-light--bad):not(.cl-light--warn) { display: none; }
+    .cl-topbar__utc, .cl-topbar .cl-btn--icon { flex: none; }
+    .cl-topbar .cl-btn--icon { border-color: transparent; }
+}
 
 /* ------------------------------------------------------------ AppShell: the screen's layout (A, B, C) */
 .cl-app { height: 100%; display: flex; flex-direction: column; background: var(--color-surface-page); }
@@ -480,7 +490,11 @@
 /* ------------------------------------------------------------ Phone: one pane at a time, tabs at the bottom */
 .cl-phone { width: 390px; height: 844px; display: flex; flex-direction: column; background: var(--color-surface-page); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); overflow: hidden; }
 .cl-phone__bar { height: var(--size-target-touch); flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); background: var(--color-surface-panel); border-bottom: var(--border-width-default) solid var(--color-border-default); }
-.cl-phone__bar svg { width: 20px; height: 20px; }
+.cl-phone__bar > svg { width: 20px; height: 20px; flex: none; }
+.cl-phone__bar .cl-light { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cl-phone__bar .cl-light::before { display: inline-block; vertical-align: -1px; margin-right: var(--space-1); }
+.cl-phone__bar .cl-topbar__utc { flex: none; }
+.cl-phone__bar .cl-btn--icon { flex: none; width: var(--size-target-touch); height: var(--size-target-touch); border-color: transparent; }
 .cl-phone__pane { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--color-surface-panel); position: relative; }
 .cl-tabbar { height: 56px; flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--color-surface-panel); border-top: var(--border-width-default) solid var(--color-border-default); }
 .cl-tabbar__tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--color-text-secondary); font-size: var(--font-size-caption); cursor: pointer; }
