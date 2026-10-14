@@ -492,6 +492,22 @@ sur la carte.
 
 ## État
 
+- 14/10 (soir) : **trois retours du propriétaire pendant 9a.** (1) **Perte de signal** : un
+  avion trop bas avant l'atterrissage restait figé à côté de sa trace. Cause mesurée : pendant la
+  minute qui précède « signal lost », le serveur envoie des positions prédites en ligne droite et
+  le moteur extrapole ; l'avion déclaré perdu n'est plus animé là où la prédiction l'avait mené.
+  Désormais un avion silencieux revient en glissant (1,2 s) à sa dernière position observée et y
+  attend, sans estimation : sous 5 000 ft après 12 s sans position, plus haut une fois déclaré
+  perdu. Le banc de rejeu a tranché le seuil : un arrêt à 12 s partout dégradait le trou de 30 s
+  en croisière (erreur moyenne 97 → 414 m, images lentes 1,36 → 2,30 %) ; avec la règle « bas
+  seulement », les métriques du banc sont inchangées. Une fois perdu, le symbole est gris (texte
+  tertiaire) au lieu de la rampe d'altitude, l'étiquette dit « lost 3 min · last 1620ft » ; il
+  reste sur la carte le temps du réglage « last seen » (10 min), comme avant. (2) **L'indicatif
+  reconnu dans le fil** passe en vert d'accent (règle du système, `.cl-exchange__text b`,
+  contraste 8,1:1) ; les valeurs reconnues ne se marquent pas dans le texte, les puces les disent.
+  (3) Relecture de 9a : conforme ; la carte repliée se suspend sous la rangée (système). Ajouté à
+  l'étape 9 par la relecture : la vue PAR elle-même (tête, tableaux, piste hors service repliée),
+  prévue en 9e.
 - 14/10 (soir) : **étape 9a livrée sur `migration`** : la rangée du haut du ciel (`cl-sky__top` :
   la bascule Map / PAR · LFPG… en `SegmentedControl`, les notes de carte, la colonne repliée à son
   bout), le bouton des calques dans le coin (`cl-sky__corner`) et son menu `cl-menu--map` (fond de
