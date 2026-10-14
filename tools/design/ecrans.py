@@ -64,7 +64,7 @@ def topbar(following=None):
         follow = (f'<span class="cl-plain">Following</span><span class="cl-chip cl-chip--callsign is-selected">{following}'
                   f'<button class="cl-btn cl-btn--icon" aria-label="Stop following">{CLOSE}</button></span>')
     return f'''<header class="cl-topbar">
-  <span class="cl-topbar__brand">{SIGN_ON}Clairance</span>{follow}
+  <span class="cl-topbar__brand">{SIGN_ON}<span class="cl-topbar__name">Clairance</span></span>{follow}
   <span class="cl-light cl-light--ok">On air: Approche De Gaulle + De Gaulle App. (L), chosen at the station 1 h 38 ago</span>
   <span class="cl-light cl-light--ok">Transcription</span>
   <span class="cl-light cl-light--ok">ADS-B 107 · 700/s</span>
@@ -519,7 +519,7 @@ TAB_ICONS = {
 def phone(current, pane):
     tabs_html = ''.join(f'<button class="cl-tabbar__tab" aria-selected="{str(n == current).lower()}">{TAB_ICONS[n]}{n}</button>' for n in TAB_ICONS)
     return f'''<div class="cl-phone">
-<div class="cl-phone__bar">{SIGN_ON}<span class="cl-light cl-light--ok">On air: Approche De Gaulle</span><span class="cl-topbar__utc">13:13Z</span></div>
+<div class="cl-phone__bar">{SIGN_ON}<span class="cl-light cl-light--ok">On air: Approche De Gaulle</span><span class="cl-topbar__utc">13:13Z</span><button class="cl-btn cl-btn--icon" aria-label="Event log">{BELL}</button><button class="cl-btn cl-btn--icon" aria-label="Settings">{GEAR}</button></div>
 <div class="cl-phone__pane">{pane}</div>
 <nav class="cl-tabbar" aria-label="Panes">{tabs_html}</nav>
 </div>'''
