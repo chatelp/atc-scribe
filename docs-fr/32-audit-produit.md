@@ -492,6 +492,16 @@ sur la carte.
 
 ## État
 
+- 14/10 (soir) : **étape 10 versée dans `local`** après relecture design et coup d'œil du
+  propriétaire. L'écran plein « Connection Lost » devient un `cl-banner` en haut du ciel, vérifié
+  en coupant le serveur sous une page ouverte (« Connection to the server lost since 18:31Z:
+  reconnecting (attempt 4), next in 9 s. The map shows the last positions. ») ; le fil vide dit
+  pourquoi (récepteur prêté ou éteint depuis quand, aucune fréquence, rien de transcrit encore) et
+  son en-tête n'offre plus de canal quand rien n'est à l'antenne ; l'avis de reprise prend la forme
+  du système. Le même soir, hors migration : **D81** (la première lecture d'abord, la seconde
+  ensuite) et le correctif du sidecar qui garde les deux modèles en mémoire (mesure du labo :
+  4,58 → 0,90 s pour la lecture anglaise, 4,66 → 0,99 s pour la française) ; la mesure en direct
+  suit.
 - 14/10 (soir) : **étape 9 versée dans `local`** après le coup d'œil du propriétaire (« ok
   validé sauf la roue crantée qui ressemble à un soleil » : remplacée par une roue dentée). Ses
   décisions du soir : la vue PAR **s'adapte à la hauteur de l'écran** (bande d'élévation de 80 à
