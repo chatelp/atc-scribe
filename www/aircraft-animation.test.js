@@ -238,25 +238,27 @@ test("a symbol just created starts where the engine draws its aircraft (fiche M,
     assert.equal(e.currentPose('nobody'), null);
 });
 
-test('a silent aircraft glides back to its last observed position and waits there (14/10)', () => {
+test('a silent aircraft fades out where it was drawn and in at its last observed position (14/10)', () => {
     const { e } = engine();
     e.updateAircraft(sample(48.5, 2.0, { alt_baro: 1600 }));
     e.updateAircraft(sample(48.5, 2.0028, { alt_baro: 1600 }));
     const state = e.aircraftStates.get('abc123');
     const at = state.lastFixAt;
-    // Flown ahead while the positions come.
     const ahead = e._computePose(state, at + 3000);
     assert.ok(ahead.lon > 2.0028 + 1e-5, 'predicted ahead of the fix');
     state.lastRendered = { lat: ahead.lat, lon: ahead.lon, alt: ahead.alt, timestamp: at + 3000 };
-    // Silent past the hold: back to the fix, then held.
+    const fadeMs = e.config.relocateFadeMs;
     const silent = at + e.config.holdAfterSilenceMs + 1;
-    const start = e._computePose(state, silent);
-    assert.ok(start.held && Math.abs(start.lon - ahead.lon) < 1e-9, 'starts from where it was drawn');
-    const end = e._computePose(state, silent + e.config.holdGlideMs + 10);
-    assert.equal(end.lat, 48.5);
-    assert.equal(end.lon, 2.0028);
+    e._computePose(state, silent);   // the hold starts at its first frame
+    const out = e._computePose(state, silent + fadeMs / 2);
+    assert.ok(out.held && out.lon === ahead.lon && out.fade > 0 && out.fade < 1, 'fading out where it was drawn');
+    const back = e._computePose(state, silent + fadeMs * 1.5);
+    assert.equal(back.lon, 2.0028, 'fading in at the last fix, never between');
+    assert.ok(back.fade > 0 && back.fade < 1);
     const later = e._computePose(state, silent + 60000);
     assert.equal(later.lon, 2.0028, 'it waits at the last fix');
+    assert.equal(later.fade, 1);
+    assert.ok(state.holdSettled);
 });
 
 test('a silent aircraft takes no estimate, and a new fix lets it go (14/10)', () => {

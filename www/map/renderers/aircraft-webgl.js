@@ -85,6 +85,56 @@
         image.src = iconSrc;
     }
 
+    // A lost aircraft's glyph as an outline (MapLabel, signal lost): the
+    // silhouette widened by about 1.5 px at the drawn size, its inside cut out.
+    function createOutlinedAircraftIcon(iconSrc, colorHex, cacheKey) {
+        pendingAircraftIconColorizations.add(cacheKey);
+        const image = new Image();
+        image.decoding = 'async';
+        image.onload = () => {
+            try {
+                const width = image.naturalWidth || image.width || 64;
+                const height = image.naturalHeight || image.height || 64;
+                const solid = document.createElement('canvas');
+                solid.width = width;
+                solid.height = height;
+                const s = solid.getContext('2d');
+                if (!s) return;
+                s.drawImage(image, 0, 0, width, height);
+                s.globalCompositeOperation = 'source-in';
+                s.fillStyle = colorHex;
+                s.fillRect(0, 0, width, height);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const c = canvas.getContext('2d');
+                if (!c) return;
+                // The glyphs are drawn at about 24 px.
+                const r = Math.max(1, 1.5 * width / 24);
+                for (let a = 0; a < 16; a++) {
+                    c.drawImage(solid, r * Math.cos(a * Math.PI / 8), r * Math.sin(a * Math.PI / 8));
+                }
+                c.globalCompositeOperation = 'destination-out';
+                c.drawImage(image, 0, 0, width, height);
+                colorizedAircraftIconCache.set(cacheKey, canvas.toDataURL('image/png'));
+                notifyAircraftIconColorized();
+            } finally {
+                pendingAircraftIconColorizations.delete(cacheKey);
+            }
+        };
+        image.onerror = () => pendingAircraftIconColorizations.delete(cacheKey);
+        image.src = iconSrc;
+    }
+
+    function getOutlinedAircraftIconSrc(iconSrc, colorHex) {
+        const cacheKey = `${iconSrc}|${colorHex}|outline`;
+        const cached = colorizedAircraftIconCache.get(cacheKey);
+        if (cached) return cached;
+        if (!pendingAircraftIconColorizations.has(cacheKey)) createOutlinedAircraftIcon(iconSrc, colorHex, cacheKey);
+        return getColorizedAircraftIconSrc(iconSrc, colorHex);
+    }
+
     function getColorizedAircraftIconSrc(iconSrc, colorHex) {
         if (!iconSrc || !colorHex) return iconSrc || 'assets/a0.svg';
 
@@ -475,13 +525,23 @@
             typeText: shortType ? ` ${shortType}` : '',
             // Lost: since when, and the last altitude it reported.
             detailsText: aircraft.status === 'signal_lost'
-                ? `lost ${lostAgeText(ageSeconds)}· last ${altitude}`
+                ? `signal lost ${lostAgeText(ageSeconds)}· last ${lostAltitudeText(aircraft, reading)}`
                 : `${altitude} ${trendArrow} ${speed}`.trim(),
             ageText: (aircraft.status === 'signal_lost' || ageSeconds === null || !Number.isFinite(ageSeconds) || ageSeconds < 5)
                 ? ''
                 : `-${Math.max(0, ageSeconds)}s`,
             voiceText: getVoiceLabelLine(aircraft, store),
         };
+    }
+
+    // "1 620 ft", "FL 110", "ground": the brand's numbers (thin space).
+    function lostAltitudeText(aircraft, reading) {
+        const alt = aircraft?.adsb?.alt_baro;
+        if (alt === 0 || alt === 'ground') return 'ground';
+        if (!Number.isFinite(alt)) return '—';
+        if (reading && reading.kind === 'fl') return 'FL ' + String(reading.fl).padStart(3, '0');
+        const ft = Math.round((reading && Number.isFinite(reading.ft) ? reading.ft : alt) / 10) * 10;
+        return String(ft).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f') + ' ft';
     }
 
     // "40 s ", "3 min ": how long ago a lost aircraft was last heard.
@@ -608,7 +668,9 @@
             const rotationRad = Number.isFinite(properties.rotationRad) ? properties.rotationRad : 0;
             const markerAlpha = (deemphasized ? 0.5 : 1) * fade;
             const iconColor = properties.color || '#E8ECEF';
-            const iconSrc = getColorizedAircraftIconSrc(properties.iconSrc || 'assets/a0.svg', iconColor);
+            const iconSrc = properties.status === 'signal_lost'
+                ? getOutlinedAircraftIconSrc(properties.iconSrc || 'assets/a0.svg', iconColor)
+                : getColorizedAircraftIconSrc(properties.iconSrc || 'assets/a0.svg', iconColor);
             const showHalo = isSelected || isHovered;
             const haloColor = isSelected ? '#FFFFFF' : '#9CA3AF';
             const haloFillAlpha = deemphasized ? 0.12 : 0.2;
@@ -996,6 +1058,7 @@
 
                 const aircraft = store?.aircraft?.[hex] || null;
                 feature.set('color', getAircraftSymbolColor(aircraft, { selected, hovered, proximity }, store));
+                if (aircraft) feature.set('status', aircraft.status || 'active');
                 feature.changed();
             });
 
@@ -1019,6 +1082,7 @@
 
             const aircraft = store?.aircraft?.[hex] || null;
             feature.set('color', getAircraftSymbolColor(aircraft, { selected, hovered, proximity }, store));
+            if (aircraft) feature.set('status', aircraft.status || 'active');
             feature.changed();
 
             if (layer) {

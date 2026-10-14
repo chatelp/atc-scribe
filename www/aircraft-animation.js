@@ -60,7 +60,7 @@ class AircraftAnimationEngine {
             // sawtooth of speed once a second (D79).
             predictionGain: 1.0,
             // No new position for this long: the receiver has lost the aircraft
-            // for now. It is no longer flown ahead; it glides back to the last
+            // for now. It is no longer flown ahead; it fades back to the last
             // position observed and waits there (owner, 14/10: a lost aircraft
             // stood frozen beside its track, where a straight prediction had
             // taken it as it turned onto final). Low, a silence is the aircraft
@@ -72,7 +72,6 @@ class AircraftAnimationEngine {
             holdAfterSilenceMs: 12000,
             holdAfterSilenceHighMs: 60000,
             holdBelowFt: 5000,
-            holdGlideMs: 1200,
             // Duration of the fading correction of an aircraft at rest (below
             // 1 m/s), in ms; a moving one takes three times the gap over its
             // speed, so it catches up at no more than half its own speed (D79).
@@ -704,27 +703,31 @@ class AircraftAnimationEngine {
         return now - state.lastFixAt > after || state.status === 'signal_lost';
     }
 
-    // A silent aircraft: from where it was drawn back to its last observed
-    // position over holdGlideMs, then held there, facing its last heading.
+    // A silent aircraft: out where it was drawn, in at its last observed
+    // position (the relocation fade, relocateFadeMs each way), then held
+    // there facing its last heading. Never slid back: the motion never runs
+    // backwards (D80; MapLabel, signal lost).
     _heldPose(state, now, heading) {
         const fix = state.fixes.length ? state.fixes[state.fixes.length - 1] : state.lastReal;
         if (!state.hold) {
             const r = state.lastRendered;
-            state.hold = { startAt: now, from: r && Number.isFinite(r.lat) ? { lat: r.lat, lon: r.lon, alt: r.alt } : { lat: fix.lat, lon: fix.lon, alt: fix.alt } };
+            state.hold = { startAt: now, from: r && Number.isFinite(r.lat) ? { lat: r.lat, lon: r.lon, alt: r.alt } : null };
             state.correction = null;
             state.relocation = null;
         }
-        const t = Math.min(1, Math.max(0, (now - state.hold.startAt) / Math.max(1, this.config.holdGlideMs)));
-        state.holdSettled = t >= 1;
-        const k = t * t * (3 - 2 * t);
+        const fadeMs = Math.max(1, this.config.relocateFadeMs);
+        const t = now - state.hold.startAt;
         const f = state.hold.from;
-        return {
-            lat: f.lat + (fix.lat - f.lat) * k,
-            lon: f.lon + (fix.lon - f.lon) * k,
-            alt: f.alt + (fix.alt - f.alt) * k,
-            heading: Number.isFinite(fix.heading) ? fix.heading : heading,
-            held: true,
-        };
+        const at = { lat: fix.lat, lon: fix.lon, alt: fix.alt, heading: Number.isFinite(fix.heading) ? fix.heading : heading, held: true };
+        // Already where it was last seen: nothing to fade.
+        const moved = f && (Math.abs(f.lat - fix.lat) > 1e-7 || Math.abs(f.lon - fix.lon) > 1e-7);
+        if (!moved) {
+            state.holdSettled = true;
+            return at;
+        }
+        if (t < fadeMs) return { lat: f.lat, lon: f.lon, alt: f.alt, heading: at.heading, held: true, fade: Math.max(0, 1 - t / fadeMs) };
+        state.holdSettled = t >= 2 * fadeMs;
+        return { ...at, fade: Math.min(1, (t - fadeMs) / fadeMs) };
     }
 
     _computePose(state, now) {
