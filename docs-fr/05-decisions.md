@@ -4891,6 +4891,22 @@ système de design : la séquence d'arrivée calculée dans le store pour tous l
 (la PAR la relit), les gabarits français des consignes, puis la migration elle-même
 (`04-migration.md`).
 
+### D80 — Le mouvement des avions : prolonger la trajectoire (stratégie A) *(14/10)*
+
+**Décidé par le propriétaire le 14/10** (« on garde A »), sur la recommandation de la fiche M.
+Trois façons de dessiner un avion entre deux positions reçues ont été mesurées sur deux bancs
+(rejeu synthétique et navigateur réel, `tools/motion-bench`, rejoué sur le Mac) :
+**A**, l'actuelle, prolonge la trajectoire depuis la dernière position, datée de sa réception,
+et efface l'écart en douceur à chaque position neuve ; **B** dessine l'avion quelques secondes
+dans le passé, entre deux positions réellement reçues ; **C** mêle un court retard et une
+extrapolation. B ne gagne que 2 à 6 points de régularité de la vitesse dessinée pour **600 m
+à 1,1 km de retard** à 230 m/s ; C est moins bon des deux côtés. A coûte environ 12 %
+d'écart-type de vitesse dans le moteur et 25 m d'erreur moyenne (sur le Mac : 11,6 % et 26 m,
+60 avions). Aucun outil public de code ouvert ne dessine dans le passé en direct (tar1090,
+SkyAware et Virtual Radar Server sautent d'une position à l'autre ; FlightAirMap extrapole).
+B et C restent des options du moteur (`strategy`), non activées : le banc s'en sert pour
+comparer, c'est leur rôle.
+
 ### D79 — Un relevé sans position neuve n'est pas une observation *(13/10)*
 
 **Le symptôme.** Le propriétaire voit les avions « pulser », reculer puis avancer, faire de
