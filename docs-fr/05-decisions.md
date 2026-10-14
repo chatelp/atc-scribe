@@ -4918,8 +4918,11 @@ transmission passait devant la première lecture de l'autre fréquence.
 - **Sans l'en-tête, rien ne change** : la réponse attend les deux lectures, comme les outils du
   labo le demandent.
 
-**Reste à mesurer**, avec le vrai sidecar, quand le labo aura rendu le GPU : la queue de
-distribution de la première lecture, avant et après ce changement.
+**Mesuré le soir même**, avec le correctif qui garde les deux modèles en mémoire (le labo :
+`mlx_whisper` ne gardait qu'un modèle, chaque bascule le reconstruisait, 4,58 → 0,90 s pour la
+lecture anglaise) : sur l'instance d'essai, 83 transmissions en dix minutes, la première lecture
+arrive en **1,0 s en médiane (3,3 s au 90ᵉ centile)**, contre 9,2 s (28,6 s) avant ; la seconde
+voie se vide d'elle-même.
 
 
 
