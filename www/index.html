@@ -175,7 +175,7 @@
                                 <button class="cl-channel__main" :aria-pressed="String($store.atc.isUnmuted(freq.id))"
                                         :disabled="$store.atc.isFrequencyFailed(freq.id) || $store.atc.isFrequencyConnecting(freq.id)"
                                         @click="$store.atc.toggleMute(freq)" :title="freq.name"
-                                        data-help-title="Listen" :data-help="$store.atc.tileHelp(freq)">
+                                        data-help-title="Listen" :data-help="$store.atc.channelHelp(freq)">
                                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 6h2.5l3.5-3v10l-3.5-3H2.5V6Z"/><path x-show="$store.atc.isUnmuted(freq.id)" d="M11 5.5a3.5 3.5 0 0 1 0 5"/><path x-show="!$store.atc.isUnmuted(freq.id)" d="m11 6 3 4m0-4-3 4"/></svg>
                                     <span class="cl-channel__freq" x-text="$store.atc.freqLabel(freq.id)"></span>
                                     <span class="cl-channel__name" x-text="$store.atc.freqShortName(freq)"></span>
@@ -265,7 +265,7 @@
                                         </span>
                                     </template>
                                     <template x-if="!t.is_processed">
-                                        <span class="cl-plain">being matched…</span>
+                                        <span class="cl-plain" x-text="$store.atc.pendingText(t)"></span>
                                     </template>
                                     <span x-show="$store.atc.strengthBars(t)" class="cl-strength cursor-help" :class="'cl-strength--' + $store.atc.strengthBars(t)"
                                           :title="$store.atc.matchProofText(t)" data-help-title="Match" :data-help="$store.atc.matchProofText(t)"><i></i><i></i><i></i></span>
@@ -333,7 +333,7 @@
                     <div x-show="$store.atc.settingsOpen" x-cloak
                          @keydown.escape.window="$store.atc.settingsOpen = false"
                          x-data="serverSettings()" x-init="load()"
-                         class="fixed inset-x-0 top-0 bottom-20 z-[70] bg-panel flex">
+                         class="fixed inset-x-0 top-0 bottom-20 md:bottom-0 z-[70] bg-panel flex">
                         <nav class="hidden md:flex flex-col gap-1 w-48 shrink-0 border-r border-border p-4 text-sm">
                             <div class="text-highlight font-semibold mb-2">Settings</div>
                             <a href="#set-listening" @click.prevent="document.getElementById('set-listening').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">Listening</a>
@@ -2147,9 +2147,12 @@
                     @click="$store.atc.showPane('list')"><i class="fas fa-list"></i>
                 <span x-text="$store.atc.selectedAircraft ? 'Aircraft' : 'List'"></span></button>
         </div>
-        <!-- Radio Bar - Now positioned as footer spanning full width -->
+        <!-- The radio bar, on the phone only since migration step 7: on a wide
+             screen the thread (step 6) does all it did. The phone keeps it until
+             step 12, where the thread is still hidden; its per-frequency windows
+             and their layout code go then. -->
         <template x-if="$store.atc">
-            <div id="radio-bar" class="h-20 bg-panel border-t border-border flex items-center z-[1001] relative overflow-x-auto md:overflow-visible shadow-[0_-5px_10px_rgba(0,0,0,0.3)]">
+            <div id="radio-bar" class="md:hidden h-20 bg-panel border-t border-border flex items-center z-[1001] relative overflow-x-auto md:overflow-visible shadow-[0_-5px_10px_rgba(0,0,0,0.3)]">
                 <!-- Left side - the frequencies (audit 4.1): narrow tiles in a strip
                      that scrolls when there are more than fit, so that the runway in
                      use, the status and the clocks stay on screen at 1 440 px. -->

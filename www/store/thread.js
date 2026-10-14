@@ -186,6 +186,15 @@
                 help: 'No callsign of an aircraft in sight of the receiver was heard in this transmission.' };
         },
 
+        // "being matched…" for the few seconds the matcher takes; an exchange
+        // left unmatched past two minutes (the server stopped before matching
+        // it) says so instead of waiting forever. Follows nowTick (30 s).
+        pendingText(t) {
+            this.nowTick;
+            const at = Date.parse(t.timestamp || t.created_at || '') || 0;
+            return Date.now() - at > 2 * 60 * 1000 ? 'not matched' : 'being matched…';
+        },
+
         exchangeIsFrench(t) {
             return (t.language || '').toLowerCase().startsWith('fr');
         },
@@ -206,6 +215,15 @@
         setThreadVolume(freqId, value) {
             this.threadMenuVolume = Number(value);
             this.setVolume(freqId, this.threadMenuVolume);
+        },
+
+        // The channel button's help in the thread (the tile's spoke of the bar).
+        channelHelp(freq) {
+            const state = this.isFrequencyFailed(freq.id) ? `Connection failed: ${this.getFrequencyError(freq.id) || 'unknown error'}; the page tries again by itself.`
+                : this.isFrequencyConnecting(freq.id) ? 'Connecting…'
+                : this.isUnmuted(freq.id) ? 'Listening in this browser. Click to mute.' : 'Muted in this browser. Click to listen.';
+            const mhz = freq.frequency_mhz > 0 ? `${Number(freq.frequency_mhz).toFixed(3)} MHz` : 'a mixed stream of several channels';
+            return `${freq.name} (${mhz}). ${state} The arrow beside it opens its volume and "only this frequency in the thread".`;
         },
 
         // In the frequency's menu: its state in this browser, in a word.
