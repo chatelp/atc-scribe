@@ -84,12 +84,16 @@
         if (!Array.isArray(entries) || !entries.length) return null;
         const first = runwayEnd(entries[0].runway_end);
         if (!first) return null;
-        const out = { ends: [first], maybe: null, since: null };
+        const out = { ends: [first], since: null };
+        // A second end of the same direction is named with the first. One of
+        // the other direction is not written: it is the other end of a change
+        // in progress (08R, then 26L of the same runway, read "perhaps 26L too"),
+        // and the event "switched to landing east (08R, was 26L)" says it
+        // (design review of step 9e).
         const second = entries[1];
         if (second && second.probability > SECOND_RUNWAY_PROBABILITY) {
             const end = runwayEnd(second.runway_end);
             if (sameDirection(first, end)) out.ends.push(end);
-            else if (end && end !== first) out.maybe = end;
         }
         const since = entries[0].since ? new Date(entries[0].since) : null;
         out.since = since && !isNaN(since.getTime()) ? since : null;
@@ -168,7 +172,6 @@
             if (r.since) s = `${name} has been using ${rw} since ${esc(clock(r.since))}`;
             else if (i === 0 && o.serverStarted) s = `${name} has been using ${rw} since at least ${esc(clock(o.serverStarted))}`;
             else s = `${name} uses ${rw}`;
-            if (r.maybe) s += `, perhaps <b>${esc(r.maybe)}</b> too`;
             sentences.push(s + '.');
         });
 
