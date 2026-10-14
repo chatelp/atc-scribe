@@ -492,6 +492,9 @@ sur la carte.
 
 ## État
 
+- 14/10 : **étape 8 versée dans `local`** (b0c4e23) après le coup d'œil du propriétaire (« ok pour
+  l'étape 8 »). Dernier détail de la relecture : le voyant d'antenne dit les jours au-delà de 48 h
+  (« 5 days ago » au lieu de « 126 h 27 ago »).
 - 14/10 (fin d'après-midi) : **trois retours du propriétaire sur l'étape 8.** (1) « Le cadre de
   piste n'apparaît pas » pour un avion [ARR] : il ne venait que pour un avion déjà dans le cône
   d'une piste, 3 à 5 des 21 avions ARR/APP mesurés. Il vient maintenant pour tout avion ARR ou APP
