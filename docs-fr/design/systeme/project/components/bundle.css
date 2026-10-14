@@ -223,8 +223,9 @@
 .cl-exchange__play { margin-left: auto; width: var(--size-target-desk); height: var(--size-target-desk); border: 0; background: none; color: var(--color-text-secondary); display: inline-grid; place-items: center; border-radius: var(--radius-md); cursor: pointer; }
 .cl-exchange__play:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
 .cl-exchange__text { margin: 0; font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
-/* the words that named the aircraft: weight, not colour (amber means doubt) */
-.cl-exchange__text b { font-weight: var(--font-weight-strong); color: var(--color-text-primary); }
+/* the words that named the aircraft: the tool's reading, so its voice (accent-strong, 6.6:1 on the
+   selected surface, 8.1:1 on panel; dE 38 from the transcript under deuteranopia) and weight */
+.cl-exchange__text b { font-weight: var(--font-weight-strong); color: var(--color-accent-strong); }
 /* a search hit: the highlighter of find-in-page */
 .cl-exchange mark { background: var(--color-status-warn); color: var(--color-text-on-warn); border-radius: var(--radius-sm); padding: 0 1px; }
 .cl-exchange__instr { display: flex; gap: var(--space-1); flex-wrap: wrap; }
