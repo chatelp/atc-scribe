@@ -313,7 +313,9 @@ function serverSettings() {
             if (ref.airport && !list.some(c => c.code === ref.airport)) {
                 list.unshift({ code: ref.airport, name: ref.name || '', distance_nm: ref.distance_nm || 0 });
             }
-            return list;
+            // The short name, as everywhere else ("Paris-Orly", not "Paris-Orly Airport").
+            const R = window.RightNow;
+            return list.map((c) => (R ? Object.assign({}, c, { name: R.shortName({ name: c.name, code: c.code }) }) : c));
         },
 
         // Airports followed besides the reference one (Q40): each aircraft is

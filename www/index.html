@@ -359,7 +359,7 @@
 
                         <section id="set-listening" class="cl-page__section max-md:px-4">
                             <h3>Listening</h3>
-                            <div class="cl-field max-md:grid-cols-1">
+                            <div class="cl-field cl-field--text">
                                 <span class="cl-field__label">On air</span>
                                 <span class="cl-plain" x-text="onAir()"></span>
                                 <span class="cl-field__help">Chosen at the station; this page plays what it receives.</span>
@@ -520,7 +520,7 @@
                             <h3>Display <span class="cl-age">this browser</span></h3>
                             <div class="cl-field">
                                 <span class="cl-field__label cursor-help" data-help-title="Last transmission on the label"
-                                      data-help="Under the callsign of each aircraft the radio has named in the last ten minutes, its last transmission, cut short. Click the aircraft to read it in full in its details.">Last transmission on aircraft labels</span>
+                                      data-help="Under the callsign of each aircraft the radio has named in the last ten minutes, its last transmission, cut short. Click the aircraft to read it in full in its story.">Last transmission on aircraft labels</span>
                                 <button class="cl-switch" role="switch" aria-label="Last transmission on aircraft labels"
                                         :class="$store.atc.settings.voiceBubbles ? 'is-on' : ''" :aria-checked="String(!!$store.atc.settings.voiceBubbles)"
                                         @click="$store.atc.flipSetting('voiceBubbles', 'toggleVoiceBubbles')"></button>
@@ -528,7 +528,7 @@
                             </div>
                             <div class="cl-field">
                                 <span class="cl-field__label cursor-help" data-help-title="Smooth movement"
-                                      data-help="The receiver reports each aircraft about once a second; between two reports the map moves it along its course instead of letting it jump.">Smooth movement between updates</span>
+                                      data-help="The receiver reports each aircraft about every two seconds; between two reports the map moves it along its course instead of letting it jump.">Smooth movement between updates</span>
                                 <button class="cl-switch" role="switch" aria-label="Smooth movement between updates"
                                         :class="$store.atc.settings.aircraftAnimation.enabled ? 'is-on' : ''" :aria-checked="String(!!$store.atc.settings.aircraftAnimation.enabled)"
                                         @click="$store.atc.settings.aircraftAnimation.enabled = !$store.atc.settings.aircraftAnimation.enabled; $store.atc.toggleAnimation()"></button>
@@ -686,31 +686,27 @@
                                 <template x-if="state">
                                     <dl class="cl-kv">
                                         <dt>Database</dt>
-                                        <dd :class="state.storage.rotates ? '' : '!text-status-urgent'"
-                                            x-text="fmtBytes(state.storage.active_db_bytes) + (state.storage.rotates ? ' · rotates daily' : ' · NEVER ROTATES')"></dd>
+                                        <dd><span x-text="fmtBytes(state.storage.active_db_bytes) + (state.storage.rotates ? ' · rotates daily' : ' · ')"></span><span x-show="!state.storage.rotates" class="cl-warn">▲ never rotates</span></dd>
                                         <div class="contents" x-show="state.storage.growth_bytes_per_hour > 0">
                                             <dt>Growing</dt><dd x-text="fmtBytes(state.storage.growth_bytes_per_hour) + '/h'"></dd>
                                         </div>
                                         <div class="contents" x-show="state.storage.days_until_full > 0">
                                             <dt>Disk full in</dt>
-                                            <dd :class="state.storage.days_until_full < 7 ? '!text-status-urgent' : ''"
-                                                x-text="state.storage.days_until_full.toFixed(1) + ' days'"></dd>
+                                            <dd><span :class="state.storage.days_until_full < 7 ? 'cl-urgent' : ''"
+                                                      x-text="(state.storage.days_until_full < 7 ? '■ ' : '') + state.storage.days_until_full.toFixed(1) + ' days'"></span></dd>
                                         </div>
                                         <dt>Disk free</dt><dd x-text="fmtBytes(state.storage.disk_free_bytes)"></dd>
                                         <dt>Log</dt>
-                                        <dd :class="state.logging.bounded ? '' : '!text-status-warn'"
-                                            x-text="state.logging.bounded
-                                                    ? (state.logging.max_size_mb + ' MB × ' + state.logging.max_files + ' files')
-                                                    : 'stdout only · UNBOUNDED'"></dd>
+                                        <dd><span x-show="state.logging.bounded" x-text="state.logging.max_size_mb + ' MB × ' + state.logging.max_files + ' files'"></span><span x-show="!state.logging.bounded">stdout only · </span><span x-show="!state.logging.bounded" class="cl-warn">▲ no size limit</span></dd>
                                         <template x-if="state.transcription">
                                             <div class="contents">
                                                 <dt>Transcription</dt>
-                                                <dd :class="state.transcription.status === 'ok' ? '' : '!text-status-urgent'"
-                                                    x-text="state.transcription.status + (state.transcription.second_opinion ? ' · second opinion' : '')"></dd>
+                                                <dd><span :class="state.transcription.status === 'ok' ? '' : 'cl-urgent'"
+                                                          x-text="(state.transcription.status === 'ok' ? '' : '■ ') + state.transcription.status"></span><span x-show="state.transcription.second_opinion"> · second opinion</span></dd>
                                             </div>
                                         </template>
                                         <template x-if="state.transcription && state.transcription.detail">
-                                            <dd class="col-span-2 !text-status-urgent whitespace-normal" x-text="state.transcription.detail"></dd>
+                                            <dd class="col-span-2 whitespace-normal"><span class="cl-urgent" x-text="'■ ' + state.transcription.detail"></span></dd>
                                         </template>
                                         <dt>Uptime</dt><dd x-text="fmtUptime(state.uptime_seconds)"></dd>
                                     </dl>
@@ -719,8 +715,8 @@
                                 <dl class="cl-kv">
                                     <dt>Mode</dt><dd x-text="$store.atc.adsbSourceInfo?.source_type || '—'"></dd>
                                     <dt>Status</dt>
-                                    <dd :class="$store.atc.adsbSourceInfo?.status === 'ok' ? '!text-accent-strong' : '!text-status-urgent'"
-                                        x-text="$store.atc.adsbSourceInfo?.status || 'unknown'"></dd>
+                                    <dd><span :class="$store.atc.adsbSourceInfo?.status === 'ok' ? '' : 'cl-urgent'"
+                                              x-text="($store.atc.adsbSourceInfo?.status === 'ok' ? '' : '■ ') + ($store.atc.adsbSourceInfo?.status || 'unknown')"></span></dd>
                                     <dt>Aircraft feed</dt>
                                     <dd :class="$store.atc.adsbSourceInfo?.aircraft?.available ? '' : 'is-none'"
                                         x-text="$store.atc.adsbSourceInfo?.aircraft?.available ? 'available' : 'unavailable'"></dd>
@@ -733,7 +729,7 @@
                                     <dt>Updated</dt>
                                     <dd x-text="$store.atc.adsbSourceInfo?.updated_at ? new Date($store.atc.adsbSourceInfo.updated_at).toLocaleTimeString() : '—'"></dd>
                                     <template x-if="$store.atc.adsbSourceInfo?.aircraft?.last_error">
-                                        <dd class="col-span-2 !text-status-urgent break-all" x-text="$store.atc.adsbSourceInfo.aircraft.last_error"></dd>
+                                        <dd class="col-span-2 break-all"><span class="cl-urgent" x-text="'■ ' + $store.atc.adsbSourceInfo.aircraft.last_error"></span></dd>
                                     </template>
                                 </dl>
                                 <div x-show="$store.atc.adsbSourceInfo?.receiver?.available" class="flex flex-col gap-3">

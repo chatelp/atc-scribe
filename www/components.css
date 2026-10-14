@@ -481,6 +481,8 @@
 .cl-field { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-4); align-items: center; }
 .cl-field__label { font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
 .cl-field__help { grid-column: 1 / -1; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
+/* a field whose value is a sentence (On air) goes under its label on the phone, never the label cut in two */
+@media (max-width: 767px) { .cl-field--text { grid-template-columns: 1fr; } }
 .cl-select { height: var(--size-control-large); padding: 0 var(--space-2); background: var(--color-surface-page); border: var(--border-width-default) solid var(--color-border-control); border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-small); }
 
 /* ------------------------------------------------------------ SignIn: the first page */
