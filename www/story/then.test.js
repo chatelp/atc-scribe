@@ -198,22 +198,22 @@ const S220 = { role: 'speed', text: 'Reduce speed to 220 kt', value: '220', unit
 test('a speed reached', () => {
     const r = run(S220, track({ gs: (s) => Math.max(220, 280 - s / 2) }));
     assert.equal(r.kind, 'speed');
-    assert.equal(r.text, '225 kt, 2 min later');
+    assert.equal(r.text, 'ground speed 225 kt, 2 min later');
 });
 
 test('a speed on its way at the end of the window', () => {
     const r = run(S220, track({ gs: (s) => 300 - s / 6 }));
-    assert.equal(r.text, 'slowing, 241 kt');
+    assert.equal(r.text, 'slowing, 241 kt ground speed');
 });
 
 test('a speed unchanged', () => {
     const r = run(S220, track({ gs: 250 }));
-    assert.equal(r.text, '250 kt, 6 min later');
+    assert.equal(r.text, 'ground speed 250 kt, 6 min later');
 });
 
 test('a speed passed through', () => {
     const r = run({ role: 'speed', text: 'Increase speed to 250 kt', value: '250', unit: 'kt' }, track({ gs: (s) => 180 + s }));
-    assert.equal(r.text, 'accelerating through 250 kt, 1 min later');
+    assert.equal(r.text, 'accelerating through 250 kt ground speed, 1 min later');
     assert.equal(r.at, T0 + 70000);
 });
 
@@ -337,9 +337,9 @@ const FORMS = [
     `turning through \\d{3}°${D}`,
     'heading \\d{3}°, still turning',
     `heading \\d{3}°${D}`,
-    `\\d{2,3} kt${D}`,
-    `(?:accelerating|slowing) through \\d{2,3} kt${D}`,
-    `(?:accelerating|slowing), \\d{2,3} kt(?:${D})?`,
+    `ground speed \\d{2,3} kt${D}`,
+    `(?:accelerating|slowing) through \\d{2,3} kt ground speed${D}`,
+    `(?:accelerating|slowing), \\d{2,3} kt ground speed(?:${D})?`,
     'no later transmission heard here',
     `next heard on 1\\d\\d\\.\\d{3}${D}`,
     `next heard${D}`,

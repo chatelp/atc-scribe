@@ -117,6 +117,9 @@
             <template x-if="!$store.atc.showLocalDates">
                 <span class="cl-topbar__local" x-text="$store.atc.currentTime"></span>
             </template>
+            <!-- ✕ Stop following (step 8): the column's ‹ does the same, Escape too. -->
+            <button x-show="$store.atc.selectedAircraft" x-cloak class="cl-btn hidden md:inline-flex" @click="$store.atc.stopFollowing()"
+                    data-help-title="Stop following" data-help="Back to the whole sky: the column returns to the tab it was on (Escape does the same).">✕ <span x-text="'Stop following ' + (($store.atc.selectedAircraft && ($store.atc.selectedAircraft.flight || '').trim()) || '')"></span></button>
             <button class="cl-btn cl-btn--icon" aria-label="Event log" data-help-title="Event log"
                     data-help="Emergencies, go-arounds, runway changes, aircraft of interest, the station switching channels, streams lost or back."
                     :class="$store.events.open ? 'is-on' : ''" @click="$store.events.toggleOpen()" style="position: relative;">
@@ -995,8 +998,10 @@
                     <div class="flex-1 relative z-10">
                         <div id="map" class="h-full w-full bg-black"></div>
                         <!-- What the map shows while a filter narrows it (step 4). -->
-                        <div x-show="$store.atc.filterSummary" x-cloak class="cl-root absolute left-2 top-2 z-20 pointer-events-none">
-                            <div class="cl-sky__note" x-text="$store.atc.filterSummary"></div>
+                        <!-- Clear of the Map/PAR switch in the top right corner until step 9 joins them. -->
+                        <div x-show="$store.atc.filterSummary || $store.atc.selectedAircraft" x-cloak class="cl-root absolute left-2 top-2 z-20 pointer-events-none flex flex-col items-start gap-1" style="max-width: calc(100% - 17rem)">
+                            <div x-show="$store.atc.selectedAircraft" class="cl-sky__note" x-text="$store.atc.storySkyNote"></div>
+                            <div x-show="$store.atc.filterSummary" class="cl-sky__note" x-text="$store.atc.filterSummary"></div>
                         </div>
 
                         <!-- The main screen shows the radar map or the PAR view of one
@@ -1520,210 +1525,93 @@
                     </template>
                 </div>
 
-                <!-- Aircraft Details - Takes full height when shown -->
+                <!-- AircraftStory (migration step 8, c-suivre and c-details): following a
+                     flight replaces the column's content. Story, Details, Track and Nearby
+                     are the former Timeline, Details, Tracks and Proximity (store/story.js). -->
                 <template x-if="$store.atc.selectedAircraft">
-                    <div class="flex-1 min-h-0 p-3 overflow-y-auto bg-panel">
-                        <!-- Back to the list, on a phone (a click beside the aircraft does it on the map). -->
-                        <button class="md:hidden mb-2 px-3 py-1.5 rounded-md border border-border text-xs text-text/80 flex items-center gap-2"
-                                @click="$store.atc.closeAircraftPanel()">
-                            <i class="fas fa-arrow-left"></i> Back to the list
-                        </button>
-                        <!-- Flight Strip at the top -->
-                        <div class="mb-3">
-                            <!-- Flight Strip at the top -->
-                            <div class="flight-strip flight-strip-detail flex items-stretch rounded-md overflow-hidden border transition-all duration-200 mb-2">
-                                <!-- Phase cell -->
-                                <div class="px-2.5 py-2 text-center w-[70px] flex flex-col items-center justify-center">
-                                    <span x-show="$store.atc.selectedAircraft.phase && $store.atc.selectedAircraft.phase.current && $store.atc.selectedAircraft.phase.current.length > 0"
-                                          x-text="$store.atc.getCurrentPhase($store.atc.selectedAircraft)"
-                                          class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center"
-                                          :class="$store.atc.phaseBadgeClasses($store.atc.selectedAircraft)"></span>
-                                    <span x-show="$store.atc.getPhaseAirport($store.atc.selectedAircraft)" x-text="$store.atc.getPhaseAirport($store.atc.selectedAircraft)"
-                                          class="text-[8px] font-mono opacity-60 mt-0.5"></span>
-                                    <span x-show="!$store.atc.selectedAircraft.phase || !$store.atc.selectedAircraft.phase.current || $store.atc.selectedAircraft.phase.current.length === 0"
-                                          x-text="'NEW'"
-                                          class="text-[9px] font-bold uppercase px-2 py-0.5 rounded min-w-[40px] text-center bg-surface-raised text-phase-unknown border border-phase-unknown"></span>
-                                </div>
-                                
-                                <!-- Callsign cell -->
-                                <div class="px-2.5 py-2 text-left flex-1 min-w-0 transition-colors">
-                                    <div class="flex flex-col">
-                                        <span x-html="$store.atc.highlightSearchMatch($store.atc.selectedAircraft.flight || $store.atc.selectedAircraft.hex)"
-                                              :class="{
-                                                  'text-highlight': !$store.atc.selectedAircraft.on_ground && $store.atc.selectedAircraft.status !== 'signal_lost',
-                                                  'text-white': $store.atc.selectedAircraft.on_ground && $store.atc.selectedAircraft.status !== 'signal_lost',
-                                                  'text-gray-400': $store.atc.selectedAircraft.status === 'signal_lost'
-                                              }"
-                                              class="font-bold text-sm"></span>
-                                        <span class="text-[9px] text-gray-500 -mt-1" x-text="$store.atc.selectedAircraft.bsdb?.icao_type_code || $store.atc.selectedAircraft.adsb?.t || ''"></span>
-                                    </div>
-                                </div>
-                                
-                                <!-- Altitude cell -->
-                                <div class="px-2.5 py-2 text-right w-[65px]"
-                                     data-help-title="Altitude" :data-help="$store.atc.altitudeHelp($store.atc.selectedAircraft)">
-                                    <div class="flex flex-col items-end">
-                                        <div class="flex items-center justify-end">
-                                            <span class="text-sm" x-text="$store.atc.altitudeValueText($store.atc.selectedAircraft)"></span>
-                                            <i :class="[$store.atc.getAltitudeTrendIcon($store.atc.selectedAircraft), $store.atc.getAltitudeTrendClasses($store.atc.selectedAircraft), 'ml-1']"
-                                                              :title="$store.atc.selectedAircraft.adsb && $store.atc.selectedAircraft.adsb.baro_rate !== undefined ? Math.round($store.atc.selectedAircraft.adsb.baro_rate) + ' ft/min' : '-'"></i>
-                                        </div>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5 whitespace-nowrap" x-show="typeof $store.atc.selectedAircraft.adsb?.alt_baro === 'number'" x-text="$store.atc.getAltitudeUnitLabel($store.atc.selectedAircraft)"></span>
-                                    </div>
-                                </div>
-                                
-                                <div class="w-px flight-strip-divider my-2"></div>
-
-                                <!-- Heading cell (not on a phone) -->
-                                <div class="px-2.5 py-2 text-right w-[55px] hidden md:block">
-                                    <div class="flex flex-col items-end">
-                                        <span class="text-sm" x-text="$store.atc.getHeadingDisplayText($store.atc.selectedAircraft)"></span>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-text="$store.atc.getHeadingSuffix($store.atc.getHeadingWithType($store.atc.selectedAircraft).type)"
-                                              data-help-title="Heading" :data-help="$store.atc.headingHelp($store.atc.getHeadingWithType($store.atc.selectedAircraft).type)"></span>
-                                    </div>
-                                </div>
-
-                                <div class="w-px flight-strip-divider my-2"></div>
-
-                                <!-- TAS cell (not on a phone) -->
-                                <div class="px-2.5 py-2 text-right w-[55px] hidden md:block">
-                                    <div class="flex flex-col items-end">
-                                        <span class="text-sm" x-text="$store.atc.formatTrackSpeed($store.atc.selectedAircraft.adsb?.tas)"></span>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="True airspeed" data-help="TAS, true airspeed in knots: its speed through the air. It differs from the ground speed by the wind.">tas</span>
-                                    </div>
-                                </div>
-
-                                <div class="w-px flight-strip-divider my-2"></div>
-
-                                <!-- GS cell -->
-                                <div class="px-2.5 py-2 text-right w-[55px]">
-                                    <div class="flex flex-col items-end">
-                                        <span class="text-sm" x-text="$store.atc.formatTrackSpeed($store.atc.selectedAircraft.adsb?.gs)"></span>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" data-help-title="Ground speed" data-help="GS, ground speed in knots: its speed over the ground, what the map shows it moving at. Tailwind adds to it, headwind takes from it.">gs</span>
-                                    </div>
-                                </div>
-
-                                <div class="w-px flight-strip-divider my-2"></div>
-
-                                <!-- Distance cell -->
-                                <div class="px-2.5 py-2 text-right w-[55px] pr-4">
-                                    <div class="flex flex-col items-end">
-                                        <span class="text-sm" x-text="$store.atc.selectedAircraft.distance !== undefined && $store.atc.selectedAircraft.distance !== null ? $store.atc.selectedAircraft.distance : '-'"></span>
-                                        <span class="text-[9px] text-gray-400 -mt-0.5 cursor-help" x-show="$store.atc.selectedAircraft.distance !== undefined && $store.atc.selectedAircraft.distance !== null"
-                                                          data-help-title="Distance" data-help="From the receiving station, in nautical miles (1 NM = 1.852 km).">nm</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Navigation Buttons - 3-way toggle -->
-                            <div class="flex gap-1 mb-3">
-                                <!-- Details Button -->
-                                <!-- Timeline: the flight's story (www/timeline/) -->
-                                <button @click="$store.atc.showTimelineView = true; $store.atc.aircraftDetailsShowHistoryView = false; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView()"
-                                        :class="{ 'bg-black/50 border-highlight text-highlight': $store.atc.showTimelineView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': !$store.atc.showTimelineView }"
-                                        class="flex-1 py-1.5 px-2 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5"
-                                        data-help-title="Timeline" data-help="The flight's story as the station saw and heard it: first seen, phases, runways, every transmission on every frequency with its audio, transfers to other controllers, clearances.">
-                                    <i class="fas fa-timeline text-xs"></i>
-                                    <span>TIMELINE</span>
-                                </button>
-
-                                <button @click="$store.atc.showTimelineView = false; $store.atc.aircraftDetailsShowHistoryView = false; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView(); $store.atc.stopPhaseHistoryRefresh()"
-                                        :class="{ 'bg-black/50 border-highlight text-highlight': !$store.atc.showTimelineView && !$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showProximityView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': $store.atc.showTimelineView || $store.atc.aircraftDetailsShowHistoryView || $store.atc.showProximityView }"
-                                        class="flex-1 py-1.5 px-3 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5">
-                                    <i class="fas fa-info-circle text-xs"></i>
-                                    <span>DETAILS</span>
-                                </button>
-                                
-                                <!-- Tracks Button (History + Future) -->
-                                <button @click="$store.atc.showTimelineView = false; $store.atc.aircraftDetailsShowHistoryView = true; $store.atc.showProximityView = false; $store.atc.stopProximityRefresh(); $store.atc.clearProximityView()"
-                                        :class="{ 'bg-black/50 border-highlight text-highlight': $store.atc.aircraftDetailsShowHistoryView && !$store.atc.showTimelineView, 'bg-black/30 border-border/50 hover:border-highlight/30 text-text/80 hover:text-highlight/80': !$store.atc.aircraftDetailsShowHistoryView || $store.atc.showTimelineView }"
-                                        class="flex-1 py-1.5 px-3 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5">
-                                    <i class="fas fa-route text-xs"></i>
-                                    <span>TRACKS</span>
-                                    <span x-show="$store.atc.aircraftDetailsHistoryCount > 0"
-                                          class="ml-1 bg-highlight/20 text-highlight text-[9px] px-1 py-0.5 rounded-full"
-                                          x-text="$store.atc.aircraftDetailsHistoryCount"></span>
-                                </button>
-                                
-                                <!-- Proximity Viewer Button -->
-                                <button @click="$store.atc.showTimelineView = false; $store.atc.showProximityView = true; $store.atc.aircraftDetailsShowHistoryView = false; $store.atc.stopPhaseHistoryRefresh(); $store.atc.loadProximityData(); $store.atc.startProximityRefresh()"
-                                        :class="{ 'bg-black/50 border-amber-500 text-amber-400': $store.atc.showProximityView && !$store.atc.showTimelineView, 'bg-black/30 border-border/50 hover:border-amber-500/30 text-text/80 hover:text-amber-400/80': !$store.atc.showProximityView || $store.atc.showTimelineView }"
-                                        class="flex-1 py-1.5 px-3 border rounded-md transition-all duration-200 text-xs flex items-center justify-center gap-1.5">
-                                    <i class="fas fa-broadcast-tower text-xs"></i>
-                                    <span>PROXIMITY</span>
-                                </button>
-                            </div>
+                    <div class="flex-1 min-h-0 flex flex-col" :aria-label="$store.atc.storyHead ? $store.atc.storyHead.callsign : ''">
+                        <div class="cl-tabs cl-tabs--column">
+                            <button class="cl-btn cl-btn--icon cl-mono" :aria-label="$store.atc.storyBackLabel" @click="$store.atc.stopFollowing()">‹</button>
+                            <button class="cl-plain" @click="$store.atc.stopFollowing()" x-text="$store.atc.storyBackLabel"></button>
                         </div>
-                        
-                        <!-- Header removed entirely as it's redundant with flight strip -->
-                        
-                        <!-- History View -->
-                        <!-- Timeline View: the flight's story -->
-                        <div x-show="$store.atc.showTimelineView" class="mb-4">
-                            <template x-if="$store.atc.aircraftRadio.loading && !$store.atc.aircraftRadio.transcriptions.length">
-                                <div class="text-[11px] text-text/50 mb-2">Loading the transmissions…</div>
-                            </template>
-                            <template x-if="!$store.atc.flightTimeline.length">
-                                <div class="p-4 text-center text-xs text-text/50">Nothing recorded on this aircraft yet.</div>
-                            </template>
-                            <ol class="relative border-l border-border/60 ml-2">
-                                <template x-for="(ev, i) in $store.atc.flightTimeline" :key="i + ev.kind + ev.at.getTime()">
-                                    <li class="ml-4 mb-2.5">
-                                        <span class="absolute -left-[9px] w-[18px] h-[18px] rounded-full bg-panel border border-border flex items-center justify-center"
-                                              :class="{
-                                                  'text-sky-300': ev.kind === 'transmission',
-                                                  'text-emerald-300': ev.kind === 'transfer',
-                                                  'text-amber-300': ev.kind === 'runway' || ev.kind === 'go_around' || ev.kind === 'clearance',
-                                                  'text-text/60': ev.kind === 'phase' || ev.kind === 'seen' || ev.kind === 'lost'
-                                              }">
-                                            <i class="fas text-[9px]" :class="ev.icon"></i>
-                                        </span>
-                                        <div class="flex items-baseline gap-2 text-[11px]">
-                                            <span class="font-mono text-text/50 shrink-0" x-text="$store.atc.timelineTime(ev.at)"></span>
-                                            <span class="text-text/90" :class="ev.help ? 'cursor-help' : ''" x-text="ev.text"
-                                                  data-help-title="Timeline" :data-help="ev.help || ''"></span>
-                                            <span x-show="ev.transmission && $store.atc.matchStrength(ev.transmission)" class="inline-flex items-end gap-px h-2.5 cursor-help shrink-0"
-                                                  data-help-title="Why this aircraft" :data-help="$store.atc.matchProofText(ev.transmission)">
-                                                <template x-for="n in 3" :key="n">
-                                                    <span class="w-[3px] rounded-sm"
-                                                          :style="'height:' + (n * 3 + 1) + 'px'"
-                                                          :class="n <= ({ weak: 1, medium: 2, strong: 3 })[$store.atc.matchStrength(ev.transmission)] ? ({ weak: 'bg-amber-400', medium: 'bg-sky-300', strong: 'bg-green-400' })[$store.atc.matchStrength(ev.transmission)] : 'bg-text/20'"></span>
-                                                </template>
-                                            </span>
-                                            <button x-show="ev.transmission && $store.atc.audioArchive.available"
-                                                    class="w-4 text-center hover:text-highlight shrink-0"
-                                                    :class="ev.transmission && $store.atc.clip.id === ev.transmission.id ? 'text-highlight' : 'text-text/60'"
-                                                    @click.stop="$store.atc.playClip(ev.transmission.id)"
-                                                    data-help-title="Listen again" :data-help="ev.transmission ? $store.atc.clipHelp(ev.transmission.id) : ''">
-                                                <i class="fas text-[10px]" :class="ev.transmission ? $store.atc.clipIcon(ev.transmission.id) : ''"></i>
-                                            </button>
+                        <template x-if="$store.atc.storyHead">
+                            <div class="cl-story__head">
+                                <div class="cl-story__id">
+                                    <span class="cl-phase cursor-help" :class="$store.atc.phaseClasses($store.atc.selectedAircraft)" x-text="$store.atc.storyHead.phase"
+                                          data-help-title="Flight phase" :data-help="$store.atc.phaseHelp ? $store.atc.phaseHelp($store.atc.storyHead.phase) : ''"></span>
+                                    <span class="cl-story__callsign" x-html="$store.atc.highlightSearchMatch($store.atc.storyHead.callsign)"></span>
+                                    <span x-show="$store.atc.storyHead.airport" class="cl-badge" title="Followed airport" x-text="$store.atc.storyHead.airport"></span>
+                                </div>
+                                <span x-show="$store.atc.storyHead.who" class="cl-plain" x-text="$store.atc.storyHead.who"></span>
+                                <div class="cl-story__grid">
+                                    <template x-for="c in $store.atc.storyHead.cells" :key="c.label">
+                                        <div class="cursor-help" :data-help-title="c.label" :data-help="c.help">
+                                            <div class="cl-label" x-text="c.label"></div>
+                                            <div class="cl-story__val"><span x-text="c.value"></span><span x-show="c.unit" class="cl-unit" x-text="c.unit"></span><span x-text="c.extra"></span></div>
                                         </div>
-                                        <template x-if="ev.transmission">
-                                            <div class="text-xs text-text/80 leading-snug mt-0.5"
-                                                 x-html="$store.atc.transcriptHtml(ev.transmission.content_processed || ev.transmission.content, (ev.transmission.callsign_source !== 'fr' && ev.transmission.content_processed) ? ev.transmission.callsign_evidence : null)"></div>
-                                        </template>
-                                        <!-- In plain words, from the phraseology grammar (audit 3.5). -->
-                                        <template x-if="ev.transmission && ev.transmission.plain && ev.transmission.plain.length">
-                                            <div class="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] cursor-help"
-                                                 data-help-title="In plain words" :data-help="$store.atc.plainHelp(ev.transmission)">
-                                                <span class="text-text/40" x-text="$store.atc.plainLead(ev.transmission)"></span>
-                                                <template x-for="p in ev.transmission.plain" :key="p.text">
-                                                    <span class="px-1.5 rounded border"
-                                                          :class="p.role === 'clearance' ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/25' : 'bg-amber-400/15 text-amber-300 border-amber-400/25'"
-                                                          x-text="p.text"></span>
-                                                </template>
-                                            </div>
-                                        </template>
-                                        <template x-if="ev.quote">
-                                            <div class="text-[11px] text-text/60 italic mt-0.5" x-text="'“' + ev.quote + '”'"></div>
-                                        </template>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        <div class="cl-tabs cl-tabs--inset" role="tablist">
+                            <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.storyTab === 'story'" @click="$store.atc.setStoryTab('story')"
+                                    data-help-title="Story" data-help="The flight as the station saw and heard it: first seen, phases, runways, every transmission on every frequency with its audio, transfers to other controllers.">Story</button>
+                            <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.storyTab === 'details'" @click="$store.atc.setStoryTab('details')"
+                                    data-help-title="Details" data-help="The phase history, the instructions heard and what the aircraft did next, and everything its ADS-B messages say.">Details</button>
+                            <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.storyTab === 'track'" @click="$store.atc.setStoryTab('track')"
+                                    data-help-title="Track" data-help="Its positions, on a small map and in a table, with the predicted ones ahead.">Track <span x-show="$store.atc.aircraftDetailsHistoryCount > 0" class="cl-tabs__count" x-text="$store.atc.aircraftDetailsHistoryCount"></span></button>
+                            <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.storyTab === 'nearby'" @click="$store.atc.setStoryTab('nearby')"
+                                    data-help-title="Nearby" data-help="The aircraft within a few nautical miles of this one, with their height and bearing from it.">Nearby</button>
+                        </div>
+                        <div class="cl-app__scroll">
+                        <div class="h-full overflow-y-auto overflow-x-hidden">
+
+                        <!-- Story: the flight's timeline (www/timeline/), as facts. -->
+                        <div x-show="$store.atc.storyTab === 'story'">
+                            <template x-if="$store.atc.aircraftRadio.loading && !$store.atc.aircraftRadio.transcriptions.length">
+                                <div class="cl-section"><span class="cl-plain">Loading the transmissions…</span></div>
+                            </template>
+                            <template x-if="!$store.atc.storyEvents.length">
+                                <div class="cl-section"><span class="cl-plain">Nothing recorded on this aircraft yet.</span></div>
+                            </template>
+                            <ol class="cl-story__events">
+                                <template x-for="item in $store.atc.storyEvents" :key="item.key">
+                                    <li :class="item.next ? 'is-next' : ''">
+                                        <time x-text="item.time"></time><i :class="item.dot"></i>
+                                        <div class="min-w-0">
+                                            <span :class="item.ev.help ? 'cursor-help' : ''" x-text="item.ev.text"
+                                                  data-help-title="Story" :data-help="item.ev.help || ''"></span>
+                                            <span x-show="item.ev.transmission && $store.atc.strengthBars(item.ev.transmission)" class="cl-strength cursor-help ml-1"
+                                                  :class="item.ev.transmission ? 'cl-strength--' + $store.atc.strengthBars(item.ev.transmission) : ''"
+                                                  data-help-title="Why this aircraft" :data-help="item.ev.transmission ? $store.atc.matchProofText(item.ev.transmission) : ''"><i></i><i></i><i></i></span>
+                                            <button class="cl-exchange__play align-middle" x-show="item.ev.transmission && $store.atc.audioArchive.available"
+                                                    :aria-label="item.ev.transmission ? $store.atc.clipHelp(item.ev.transmission.id) : ''" @click.stop="$store.atc.playClip(item.ev.transmission.id)"
+                                                    data-help-title="Listen again" :data-help="item.ev.transmission ? $store.atc.clipHelp(item.ev.transmission.id) : ''">
+                                                <svg x-show="!(item.ev.transmission && $store.atc.clip.id === item.ev.transmission.id && $store.atc.clip.state !== 'idle')" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M5 3.5v9l7-4.5-7-4.5Z"/></svg>
+                                                <svg x-show="item.ev.transmission && $store.atc.clip.id === item.ev.transmission.id && $store.atc.clip.state !== 'idle'" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1"/></svg>
+                                            </button>
+                                            <template x-if="item.ev.transmission">
+                                                <p class="cl-exchange__text mt-0.5"
+                                                   x-html="$store.atc.transcriptHtml(item.ev.transmission.content_processed || item.ev.transmission.content, (item.ev.transmission.callsign_source !== 'fr' && item.ev.transmission.content_processed) ? item.ev.transmission.callsign_evidence : null)"></p>
+                                            </template>
+                                            <!-- In plain words, from the phraseology grammar (audit 3.5). -->
+                                            <template x-if="item.ev.transmission && item.ev.transmission.plain && item.ev.transmission.plain.length">
+                                                <div class="cl-exchange__explain cursor-help" data-help-title="In plain words" :data-help="$store.atc.plainHelp(item.ev.transmission)">
+                                                    <span x-text="$store.atc.plainLead(item.ev.transmission)"></span>
+                                                    <template x-for="p in item.ev.transmission.plain" :key="p.text"><b class="ml-1" x-text="p.text"></b></template>
+                                                </div>
+                                            </template>
+                                            <template x-if="item.ev.quote">
+                                                <div class="cl-plain italic" x-text="'“' + item.ev.quote + '”'"></div>
+                                            </template>
+                                        </div>
                                     </li>
                                 </template>
                             </ol>
-                            <div class="text-[10px] text-text/40 mt-1">Transmissions: the last 50 matched to this callsign, on every frequency of the day.</div>
+                            <p class="cl-section cl-plain">Transmissions: the last 50 matched to this callsign, on every frequency of the day.</p>
                         </div>
 
-                        <div x-show="$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showTimelineView" class="mb-4">
+                        <div id="story-track" x-show="$store.atc.storyTab === 'track'" class="p-3">
                             
                             <!-- Mini-Map for Tracks -->
                             <div class="mb-4 bg-black/30 border border-border rounded-lg overflow-hidden">
@@ -1892,120 +1780,66 @@
                             </div>
                         </div>
                         
-                        <!-- Regular Details View -->
-                        <div x-show="!$store.atc.showTimelineView && !$store.atc.aircraftDetailsShowHistoryView && !$store.atc.showProximityView">
-                            <!-- Phase History Table at top of Details tab -->
-                            <div class="mb-4 overflow-x-auto w-full">
-                                <div class="mb-2 text-sm font-semibold text-highlight border-b border-border pb-1">
-                                    Flight Phase History
-                                </div>
-                                <table class="w-full table-fixed text-xs">
-                                    <thead>
-                                        <tr>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[45%]">Time</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[25%]">Phase</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[30%]">ADSB ID</th>
-                                        </tr>
-                                    </thead>
+
+                        <!-- Details: the phase history, the instructions heard with what the
+                             aircraft did next, the radio, then the ADS-B facts. -->
+                        <div x-show="$store.atc.storyTab === 'details'">
+                            <div class="cl-section">
+                                <button class="cl-disclosure" :aria-expanded="$store.atc.storyOpen.phases" @click="$store.atc.toggleStorySection('phases')">Phase history</button>
+                                <table x-show="$store.atc.storyOpen.phases" class="cl-table">
+                                    <thead><tr><th>Time</th><th>Phase</th><th class="is-num">Point</th></tr></thead>
                                     <tbody>
                                         <template x-if="$store.atc.phaseHistoryLoading">
-                                            <tr><td colspan="3" class="p-4 text-center"><div class="flex justify-center items-center"><div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-highlight"></div><span class="ml-2">Loading...</span></div></td></tr>
+                                            <tr><td colspan="3" class="is-dim">Loading…</td></tr>
                                         </template>
                                         <template x-if="!$store.atc.phaseHistoryLoading && $store.atc.safePhaseHistoryData.length === 0">
-                                            <tr><td colspan="3" class="p-4 text-center">No phase history available</td></tr>
+                                            <tr><td colspan="3" class="is-dim">No phase history yet</td></tr>
                                         </template>
                                         <template x-for="phase in $store.atc.safePhaseHistoryData" :key="phase.timestamp + (phase.is_current ? '-current' : '-history')">
-                                            <tr class="hover:bg-hover/50 transition-colors" :class="{ 'font-bold': phase.is_current }">
-                                                <td class="p-1.5 text-left border-b border-border">
-                                                    <span x-text="$store.atc.formatDate(phase.timestamp, true)"></span>
-                                                    <span class="text-text/70 text-[10px] ml-1" x-text="Math.floor(($store.atc.currentTimeForPhases - new Date(phase.timestamp)) / 1000) + 's'"></span>
-                                                </td>
-                                                <td class="p-1.5 text-left border-b border-border">
-                                                    <div class="flex items-center gap-2">
-                                                        <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
-                                                              :class="$store.atc.phaseCodeBadgeClasses(phase.phase)"
-                                                              x-text="phase.phase"></span>
-                                                    </div>
-                                                </td>
-                                                <td class="p-1.5 text-left border-b border-border text-xs font-mono">
-                                                    <span x-show="phase.adsb_id"
-                                                          @click="$store.atc.navigateToTracksWithHighlight(phase.adsb_id)"
-                                                          class="cursor-pointer text-highlight hover:text-highlight/80 underline transition-colors"
-                                                          x-text="phase.adsb_id"></span>
-                                                    <span x-show="!phase.adsb_id" class="text-text/50">-</span>
+                                            <tr>
+                                                <td><span x-text="$store.atc.formatDate(phase.timestamp, true)"></span>
+                                                    <span class="is-dim" x-text="Math.floor(($store.atc.currentTimeForPhases - new Date(phase.timestamp)) / 1000) + 's'"></span></td>
+                                                <td><span class="cl-phase cl-phase--small" :class="window.PhaseFamilies ? 'cl-phase--' + PhaseFamilies.modifierOf(phase.phase) : ''" x-text="phase.phase"></span></td>
+                                                <td class="is-num">
+                                                    <button x-show="phase.adsb_id" class="underline" @click="$store.atc.navigateToTracksWithHighlight(phase.adsb_id)"
+                                                            data-help-title="Point" data-help="The track point where the phase changed: opens it in the Track tab." x-text="'#' + phase.adsb_id"></button>
+                                                    <span x-show="!phase.adsb_id" class="is-dim">—</span>
                                                 </td>
                                             </tr>
                                         </template>
                                     </tbody>
                                 </table>
                             </div>
-                            
-                            <!-- Issued Clearances Table -->
-                            <div class="mb-4 overflow-x-auto w-full">
-                                <div class="mb-2 text-sm font-semibold text-highlight border-b border-border pb-1">
-                                    Issued Clearances
-                                </div>
-                                <table class="w-full table-fixed text-xs">
-                                    <thead>
-                                        <tr>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[18%]">Time</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">Type</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[10%]">Rwy</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[34%]">Said</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[14%]">Status</th>
-                                            <th class="p-1.5 text-left border-b border-border text-highlight font-normal uppercase tracking-wider text-[10px] w-[10%]">Age</th>
-                                        </tr>
-                                    </thead>
+
+                            <!-- Instructions heard, and Then: what the aircraft did next, from its
+                                 track, never a verdict (D78, decision 6; www/story/then.js). -->
+                            <div class="cl-section">
+                                <button class="cl-disclosure" :aria-expanded="$store.atc.storyOpen.instructions" @click="$store.atc.toggleStorySection('instructions')">Instructions heard</button>
+                                <table x-show="$store.atc.storyOpen.instructions" class="cl-table">
+                                    <thead><tr><th>Time</th><th>Instruction</th>
+                                        <th class="cursor-help" data-help-title="Then" data-help="What the aircraft did after the instruction, read from its ADS-B track in the next six minutes: a fact, not a judgement. Speeds are ground speeds, since the wind sits between them and the airspeed a controller gives. — when the track says nothing about it.">Then</th></tr></thead>
                                     <tbody>
-                                        <template x-if="!$store.atc.selectedAircraft?.clearances || $store.atc.selectedAircraft.clearances.length === 0">
-                                            <tr><td colspan="6" class="p-4 text-center">No clearances issued</td></tr>
+                                        <template x-if="!$store.atc.instructionsHeard.length">
+                                            <tr><td colspan="3" class="is-dim" style="white-space: normal">No instruction heard for this aircraft yet.</td></tr>
                                         </template>
-                                        <template x-for="clearance in $store.atc.selectedAircraft?.clearances || []" :key="clearance.id">
-                                            <tr class="hover:bg-hover/50 transition-colors">
-                                                <td class="p-1.5 text-left border-b border-border">
-                                                    <span x-text="$store.atc.formatDate(clearance.timestamp, true)"></span>
-                                                </td>
-                                                <td class="p-1.5 text-left border-b border-border">
-                                                    <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
-                                                          :class="{
-                                                              'bg-green-500/20 text-green-400 border border-green-500/30': clearance.type === 'takeoff',
-                                                              'bg-blue-500/20 text-blue-400 border border-blue-500/30': clearance.type === 'landing',
-                                                              'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': clearance.type === 'approach'
-                                                          }"
-                                                          x-text="clearance.type"></span>
-                                                </td>
-                                                <td class="p-1.5 text-left border-b border-border font-mono">
-                                                    <span x-text="clearance.runway || '-'"></span>
-                                                </td>
-                                                <td class="p-1.5 text-left border-b border-border text-text/70 italic" :title="clearance.text">
-                                                    <span x-text="clearance.text || '-'"></span>
-                                                </td>
-                                                <td class="p-1.5 text-left border-b border-border">
-                                                    <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
-                                                          :class="{
-                                                              'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30': clearance.status === 'issued',
-                                                              'bg-green-500/20 text-green-400 border border-green-500/30': clearance.status === 'complied',
-                                                              'bg-red-500/20 text-red-400 border border-red-500/30': clearance.status === 'deviation'
-                                                          }"
-                                                          x-text="clearance.status"></span>
-                                                </td>
-                                                <td class="p-1.5 text-left border-b border-border text-text/70">
-                                                    <span x-text="clearance.time_since_issued"></span>
-                                                </td>
+                                        <template x-for="row in $store.atc.instructionsHeard" :key="row.key">
+                                            <tr>
+                                                <td x-text="row.time"></td>
+                                                <td style="white-space: normal" x-text="row.text"></td>
+                                                <td style="white-space: normal" :class="row.known ? '' : 'is-dim'" x-text="row.then"></td>
                                             </tr>
                                         </template>
                                     </tbody>
                                 </table>
                             </div>
-                            
+
                             <!-- Radio: the transmissions matched to this aircraft, and the
                                  facts the phraseology grammar recovered from them. -->
-                            <div class="mb-4 w-full">
-                                <div class="mb-2 text-sm font-semibold text-amber-400 border-b border-border pb-1 flex items-center justify-between">
-                                    <span>Radio</span>
-                                    <span class="text-[10px] text-text/50 font-normal"
-                                          x-text="($store.atc.aircraftRadio.loading && !$store.atc.aircraftRadio.transcriptions.length) ? 'loading…' : ($store.atc.aircraftRadio.transcriptions.length + ' transmission(s)')"></span>
-                                </div>
+                            <div class="cl-section">
+                                <button class="cl-disclosure" :aria-expanded="$store.atc.storyOpen.radio" @click="$store.atc.toggleStorySection('radio')">
+                                    <span>Radio</span><span class="cl-plain ml-auto" x-text="($store.atc.aircraftRadio.loading && !$store.atc.aircraftRadio.transcriptions.length) ? 'loading…' : ($store.atc.aircraftRadio.transcriptions.length + ' transmission(s)')"></span>
+                                </button>
+                                <div x-show="$store.atc.storyOpen.radio">
 
                                 <template x-if="$store.atc.aircraftRadio.error">
                                     <div class="p-4 text-center text-xs text-red-400" x-text="$store.atc.aircraftRadio.error"></div>
@@ -2069,12 +1903,22 @@
                                     </div>
                                 </template>
                             </div>
+                            </div>
 
-                            <div x-html="$store.atc.formatAircraftDetails()"></div>
+                            <template x-for="g in $store.atc.aircraftDetailGroups" :key="g.key">
+                                <div class="cl-section">
+                                    <button class="cl-disclosure" :aria-expanded="!!$store.atc.storyOpen[g.key]" @click="$store.atc.toggleStorySection(g.key)" x-text="g.name"></button>
+                                    <dl x-show="$store.atc.storyOpen[g.key]" class="cl-kv">
+                                        <template x-for="r in g.rows" :key="r.k">
+                                            <div class="contents"><dt x-text="r.k"></dt><dd :class="r.none ? 'is-none' : ''" x-text="r.v"></dd></div>
+                                        </template>
+                                    </dl>
+                                </div>
+                            </template>
                         </div>
 
                         <!-- Proximity View -->
-                        <div x-show="$store.atc.showProximityView && !$store.atc.showTimelineView" class="mb-4">
+                        <div x-show="$store.atc.storyTab === 'nearby'" class="p-3">
                             
                             <!-- Distance Slider -->
                             <div class="mb-4 flex items-center">
@@ -2127,7 +1971,8 @@
                         </div>
 
 
-                        <!-- Navigation Buttons - Removed from bottom as they're now at the top -->
+                        </div>
+                        </div>
                     </div>
                 </template>
             </aside>
@@ -2379,6 +2224,7 @@
     <script defer src="login.js"></script>
     <script defer src="altitude/altitude-scale.js"></script>
     <script defer src="timeline/flight-timeline.js"></script>
+    <script defer src="story/then.js"></script>
     <script defer src="altitude/altitude-filter.js"></script>
     <script defer src="events.js"></script>
     <script defer src="help-tips.js"></script>
@@ -2395,6 +2241,7 @@
     <script defer src="store/sidebar.js"></script>
     <script defer src="store/now.js"></script>
     <script defer src="store/thread.js"></script>
+    <script defer src="store/story.js"></script>
     <script defer src="server-settings.js"></script>
     <script defer src="app.js"></script>
     <!-- Alpine starts after every script above has registered its stores and

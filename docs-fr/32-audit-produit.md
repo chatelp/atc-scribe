@@ -492,6 +492,27 @@ sur la carte.
 
 ## État
 
+- 14/10 : **étape 8 livrée sur `migration`** (suivre un vol, `AircraftStory`). Choisir un avion
+  remplace le contenu de la colonne : « ‹ Back to Traffic » (ou « Back to Right now », l'onglet
+  d'où l'on vient), l'en-tête (phase, indicatif, aérodrome, exploitant · type · immatriculation ;
+  altitude, distance à la piste et temps restant quand l'avion est dans une séquence d'arrivée,
+  sinon distance à la station ; vitesse sol ; cap), les onglets Story, Details, Track et Nearby
+  (anciens Timeline, Details, Tracks, Proximity, contenus et rafraîchissements inchangés, Story
+  par défaut) ; ✕ « Stop following » dans la barre du haut ; une note sur la carte, « Following X ·
+  its track since 14:23Z ». Details en sections repliables (`cl-disclosure`) : historique des
+  phases, **consignes entendues avec « Then »**, radio (repliée), puis les faits ADS-B regroupés
+  comme c-details. **Écart au plan** : le tableau des consignes ne lit pas `clearances` : le flux
+  WebSocket ne les porte pas, la page ne les recevait presque jamais (seule la ligne Nearby, par
+  REST). Il lit les valeurs `plain` (déjà munies de `value` et `unit`) de ce que le contrôleur a dit
+  à l'avion : les 4 h 30 serveur prévues ne sont pas nécessaires. Sur l'instance d'essai, vrai
+  modèle : « climbing through FL 148, 2 min later », « turned to 309° », « level at 3 900 ft, 1 min
+  later ». La vitesse se dit « ground speed » (demande de la relecture de K). Le mot « deviation »
+  n'apparaît plus. Au passage : un appel à une fonction disparue (`selectAircraft`, à chaque
+  clairance de l'avion choisi) retiré, et le filet le retire de ses défauts connus ; la règle du
+  système `.cl-story__events i` visait toutes les `<i>` du récit (barres de force, icônes) et ne
+  vise plus que la pastille (source `bundle.css`, exportée). Vérifié sans fenêtre : depuis la
+  liste, Échap, depuis le fil, depuis la PAR et le journal (`selectAircraftByHex`), un autre avion,
+  les quatre onglets, ‹ et ✕, aucun débordement à 390 et 1 440 px.
 - 14/10 : **étape 7 versée dans `local`** (3ef997e). **Alarme ADS-B** (choix du propriétaire,
   sans test de coupure Wi-Fi) : le voyant dit « Unreachable · N min » quand chaque lecture de la
   station échoue, avec la raison en mots et le conseil de relancer Clairance si la station

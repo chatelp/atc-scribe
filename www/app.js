@@ -774,25 +774,7 @@ document.addEventListener('alpine:init', () => {
                 
                 // ESC key to close aircraft details
                 if (e.key === 'Escape' && this.selectedAircraft) {
-                    const previousHex = this.selectedAircraft.hex;
-                    this.selectedAircraft = null;
-                    this.aircraftDetailsShowHistoryView = false;
-                    this.showProximityView = false;
-                    this.aircraftDetailsHistoryData = [];
-                    this.aircraftDetailsFutureData = [];
-                this.aircraftDetailsHindcastData = [];
-                    this.aircraftDetailsHistoryCount = 0;
-                    this.phaseHistoryData = [];
-                    this.phaseHistoryAircraftHex = null;
-                    this.aircraftDetailsStopHistoryRefresh();
-                    this.stopProximityRefresh();
-                    this.stopPhaseHistoryRefresh();
-                    this.clearProximityView();
-
-                    // Clear map trails for the deselected aircraft
-                    if (this.mapManager && previousHex) {
-                        this.mapManager.clearAircraftTrails(previousHex);
-                    }
+                    this.stopFollowing();
                 }
                 
                 // TAB key for aircraft navigation (only when not in input fields)
