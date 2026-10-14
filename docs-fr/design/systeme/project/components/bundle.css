@@ -223,8 +223,9 @@
 .cl-exchange__play { margin-left: auto; width: var(--size-target-desk); height: var(--size-target-desk); border: 0; background: none; color: var(--color-text-secondary); display: inline-grid; place-items: center; border-radius: var(--radius-md); cursor: pointer; }
 .cl-exchange__play:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
 .cl-exchange__text { margin: 0; font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
-/* the words that named the aircraft: weight, not colour (amber means doubt) */
-.cl-exchange__text b { font-weight: var(--font-weight-strong); color: var(--color-text-primary); }
+/* the words that named the aircraft: the tool's reading, so its voice (accent-strong, 6.6:1 on the
+   selected surface, 8.1:1 on panel; dE 38 from the transcript under deuteranopia) and weight */
+.cl-exchange__text b { font-weight: var(--font-weight-strong); color: var(--color-accent-strong); }
 /* a search hit: the highlighter of find-in-page */
 .cl-exchange mark { background: var(--color-status-warn); color: var(--color-text-on-warn); border-radius: var(--radius-sm); padding: 0 1px; }
 .cl-exchange__instr { display: flex; gap: var(--space-1); flex-wrap: wrap; }
@@ -368,8 +369,11 @@
 .cl-app__bottom { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
 .cl-sky__top { position: absolute; top: var(--space-3); left: var(--space-3); right: var(--space-3); display: flex; gap: var(--space-2); align-items: flex-start; z-index: var(--z-map-overlay); }
 .cl-sky__end { margin-left: auto; display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-end; }
+/* the folded card hangs under the row's end: it does not take the notes' width */
+.cl-sky__end { position: relative; }
+.cl-sky__end > .cl-card--sky { position: absolute; top: calc(100% + var(--space-2)); right: 0; }
 .cl-sky__corner { position: absolute; bottom: var(--space-3); right: var(--space-3); display: flex; gap: var(--space-1-5); z-index: var(--z-map-overlay); }
-.cl-sky__note { padding: var(--space-1-5) var(--space-2); background: color-mix(in srgb, var(--color-surface-page) 85%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); font-size: var(--font-size-small); color: var(--color-text-secondary); }
+.cl-sky__note { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: var(--space-1-5) var(--space-2); background: color-mix(in srgb, var(--color-surface-page) 85%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); font-size: var(--font-size-small); color: var(--color-text-secondary); }
 .cl-sky__note b { font-family: var(--font-family-mono); color: var(--color-text-primary); font-weight: var(--font-weight-regular); }
 .cl-sky > svg.cl-sky__map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
@@ -476,6 +480,8 @@
 .cl-field { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-4); align-items: center; }
 .cl-field__label { font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
 .cl-field__help { grid-column: 1 / -1; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
+/* a field whose value is a sentence (On air) goes under its label on the phone, never the label cut in two */
+@media (max-width: 767px) { .cl-field--text { grid-template-columns: 1fr; } }
 .cl-select { height: var(--size-control-large); padding: 0 var(--space-2); background: var(--color-surface-page); border: var(--border-width-default) solid var(--color-border-control); border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-small); }
 
 /* ------------------------------------------------------------ SignIn: the first page */
@@ -527,10 +533,13 @@
 .cl-signin__console { position: absolute; right: var(--space-8); top: var(--space-8); width: 420px; padding: var(--space-4); background: color-mix(in srgb, var(--color-surface-page) 88%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); }
 .cl-signin__foot { position: absolute; left: 0; right: 0; bottom: var(--space-6); text-align: center; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); color: var(--color-text-tertiary); }
 @media (max-width: 767px) {
-    .cl-signin__brand { left: var(--space-4); top: var(--space-4); font-size: 32px; gap: var(--space-2); }
+    /* One column in the flow: the brand, the card, then the console (the sky stays behind). */
+    .cl-signin--sky { display: flex; flex-direction: column; gap: var(--space-4); height: auto; min-height: 100%; padding: var(--space-4) 0 var(--space-6); }
+    .cl-signin__brand { position: relative; left: auto; top: auto; margin: 0 var(--space-4); font-size: 32px; gap: var(--space-2); }
     .cl-signin__brand svg { width: 36px; height: 36px; }
-    .cl-signin--sky .cl-signin__card { width: calc(100% - 2 * var(--space-4)); padding: var(--space-6) var(--space-4); }
-    .cl-signin__console { position: static; width: auto; margin: 0 var(--space-4); }
+    .cl-signin--sky .cl-signin__card { position: relative; left: auto; top: auto; transform: none; width: auto; margin: 0 var(--space-4); padding: var(--space-6) var(--space-4); }
+    .cl-signin__console { position: relative; right: auto; top: auto; order: 3; width: auto; margin: 0 var(--space-4); }
+    .cl-signin__foot { position: relative; bottom: auto; order: 4; padding: 0 var(--space-4); }
 }
 
 /* ------------------------------------------------------------ StationVitals: the station's console, aggregated figures only */

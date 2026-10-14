@@ -147,6 +147,13 @@ l'interface, elle, reste sur le Mac.
 
 ## Les risques suivis
 
+- **Latence de transcription** (mesurée le 14/10 au soir, relevée par la console de la page de
+  connexion) : sur l'instance d'essai, seul sidecar du Mac (Apple M4 Pro, large-v3 ATCO2 + seconde
+  lecture française pour 484 transmissions sur 896 + détecteur), le décodage prend 9,2 s en médiane
+  (premier quartile 5,0 s, troisième 16,4 s, 90ᵉ centile 28,6 s) pour 6,5 s d'audio : plus lent que
+  le temps réel ; la moyenne requête → texte affichée oscille entre 12 et 20 s. Le fil arrive donc
+  plusieurs secondes après chaque émission. Non mesuré : la part d'attente (deux fréquences en même
+  temps) dans ce temps. À porter au labo (le sidecar est son domaine) avant d'en parler ailleurs.
 - **Brevet US12277862B1** (Aerlogics, 2025) : corrélation transcription ATC / ADS-B pour la
   conformité ; aucun dépôt européen trouvé, revendications non lues. À faire lire avant toute
   diffusion hors de France (Q53).

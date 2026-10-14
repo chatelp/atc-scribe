@@ -328,24 +328,22 @@
             this._renderRangeRings();
         }
 
+        // The sheet of an airport, a heliport or a navaid (design system, a
+        // KeyValues card; migration step 9b, a-calques): a cl-card over the map,
+        // closed by its ×, by Escape or by a click beside it.
         _ensureReferencePopup() {
             if (!this._olMap || this._referencePopupOverlay) return;
 
             const container = document.createElement('div');
-            container.className = 'ref-popup-container ol-ref-popup';
-            container.style.display = 'none';
-
-            const content = document.createElement('div');
-            content.className = 'ref-popup';
-
-            const closeButton = document.createElement('button');
-            closeButton.type = 'button';
-            closeButton.className = 'ref-popup-close';
-            closeButton.textContent = '✕';
-            closeButton.addEventListener('click', () => this._closeReferencePopup());
-
-            container.appendChild(closeButton);
-            container.appendChild(content);
+            container.className = 'cl-root cl-card';
+            container.style.cssText = 'display: none; width: 280px; max-height: 60vh; overflow-y: auto;';
+            container.setAttribute('role', 'dialog');
+            container.addEventListener('click', (event) => {
+                if (event.target.closest('[data-ref-close]')) this._closeReferencePopup();
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && container.style.display !== 'none') this._closeReferencePopup();
+            });
 
             const overlay = new window.ol.Overlay({
                 element: container,
@@ -356,7 +354,7 @@
             });
 
             this._referencePopupOverlay = overlay;
-            this._referencePopupElement = content;
+            this._referencePopupElement = container;
             this._olMap.addOverlay(overlay);
         }
 
@@ -379,60 +377,104 @@
             this._referencePopupElement.innerHTML = html || '';
             const element = this._referencePopupOverlay.getElement();
             if (element) {
-                element.style.display = 'block';
+                element.style.display = 'flex';
+                const title = element.querySelector('.cl-menu__title');
+                element.setAttribute('aria-label', title ? title.textContent : 'Sheet');
             }
             this._referencePopupOverlay.setPosition(coordinate);
         }
 
-        _airportPopupHtml(airport) {
-            const frequencyRows = (airport?.frequencies || []).map((frequency) => {
-                const type = frequency?.type || '';
-                const description = frequency?.description || '';
-                const mhz = frequency?.frequency_mhz || '';
-                return `<tr><td class="ref-popup-type">${type}</td><td>${description}</td><td class="ref-popup-freq">${mhz}</td></tr>`;
+        // The sheet's head: the ident in mono, the name, and ×.
+        _sheetHead(ident, name) {
+            const e = this._escapeSheet;
+            return `<div class="cl-row"><span class="cl-menu__title cl-mono">${e(ident)}</span>` +
+                (name ? `<span class="cl-menu__title" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${e(name)}</span>` : '') +
+                `<button class="cl-btn cl-btn--icon" type="button" aria-label="Close" data-ref-close style="margin-left: auto;">×</button></div>`;
+        }
+
+        _escapeSheet(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // KeyValues: the rows with a value, "—" for none.
+        _sheetKv(rows) {
+            const e = this._escapeSheet;
+            return '<dl class="cl-kv">' + rows.map(([k, v]) => {
+                const none = v === undefined || v === null || v === '';
+                return `<dt>${e(k)}</dt><dd${none ? ' class="is-none"' : ''}>${none ? '—' : e(v)}</dd>`;
+            }).join('') + '</dl>';
+        }
+
+        // "371 ft", "1 220 ft": the brand's numbers.
+        _sheetFeet(ft) {
+            const n = Number(ft);
+            return Number.isFinite(n) ? String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ft' : '';
+        }
+
+        // The frequencies; the Desc column only when one of them has one.
+        _sheetFrequencies(list) {
+            const e = this._escapeSheet;
+            const desc = (list || []).some((f) => String(f?.description || '').trim());
+            const rows = (list || []).map((f) => {
+                const mhz = Number(f?.frequency_mhz);
+                return `<tr><td>${e(f?.type || '')}</td>` + (desc ? `<td style="white-space: normal;">${e(f?.description || '')}</td>` : '') +
+                    `<td class="is-num">${Number.isFinite(mhz) && mhz > 0 ? mhz.toFixed(3) : e(f?.frequency_mhz || '')}</td></tr>`;
             }).join('');
-
-            const frequencyTable = frequencyRows
-                ? `<table class="ref-popup-table"><tr><th>Type</th><th>Desc</th><th>MHz</th></tr>${frequencyRows}</table>`
+            return rows
+                ? `<table class="cl-table"><thead><tr><th>Type</th>${desc ? '<th>Desc</th>' : ''}<th class="is-num">MHz</th></tr></thead><tbody>${rows}</tbody></table>`
                 : '';
+        }
 
-            return `<div class="ref-popup-title">${airport?.name || airport?.ident || 'Airport'}</div>
-                <div class="ref-popup-subtitle">${airport?.ident || ''} · ${(airport?.type || '').replace(/_/g, ' ')} · ${airport?.elevation_ft ?? '?'} ft</div>
-                ${airport?.municipality ? `<div class="ref-popup-detail">${airport.municipality}, ${airport?.iso_country || ''}</div>` : ''}
-                ${airport?.iata_code ? `<div class="ref-popup-detail">IATA: ${airport.iata_code}</div>` : ''}
-                ${frequencyTable}`;
+        // The name as the column says it ("Saint-Cyr-l'École", not "… Airport").
+        _sheetName(place) {
+            const R = window.RightNow;
+            return R && typeof R.shortName === 'function' ? R.shortName({ name: place?.name, code: place?.ident }) : (place?.name || '');
+        }
+
+        // "BOTH" -> "Both": the base's capitals, for a word that is not an acronym.
+        _sheetWord(value) {
+            const t = String(value || '').trim();
+            return t && t === t.toUpperCase() ? t.charAt(0) + t.slice(1).toLowerCase() : t;
+        }
+
+        _airportPopupHtml(airport) {
+            const town = [airport?.municipality, airport?.iso_country].filter(Boolean).join(', ');
+            return this._sheetHead(airport?.ident || '', this._sheetName(airport)) +
+                this._sheetKv([
+                    ['Type', (airport?.type || '').replace(/_/g, ' ')],
+                    ['Elevation', this._sheetFeet(airport?.elevation_ft)],
+                    ...(town ? [['Town', town]] : []),
+                    ...(airport?.iata_code ? [['IATA', airport.iata_code]] : []),
+                ]) +
+                this._sheetFrequencies(airport?.frequencies);
         }
 
         _navaidPopupHtml(navaid) {
-            const frequencyKHz = Number(navaid?.frequency_khz);
-            let frequencyDisplay = '';
-            if (Number.isFinite(frequencyKHz)) {
-                frequencyDisplay = `${(frequencyKHz / 1000).toFixed(frequencyKHz >= 100000 ? 2 : 1)} ${frequencyKHz >= 100000 ? 'MHz' : 'kHz'}`;
+            const khz = Number(navaid?.frequency_khz);
+            let frequency = '';
+            if (Number.isFinite(khz) && khz > 0) {
+                frequency = khz >= 100000 ? `${(khz / 1000).toFixed(2)} MHz` : `${khz} kHz`;
             }
-
-            return `<div class="ref-popup-title">${navaid?.ident || ''} - ${navaid?.name || 'Navaid'}</div>
-                <div class="ref-popup-subtitle">${navaid?.type || ''}${frequencyDisplay ? ` · ${frequencyDisplay}` : ''}</div>
-                ${navaid?.elevation_ft ? `<div class="ref-popup-detail">Elev: ${navaid.elevation_ft} ft</div>` : ''}
-                ${navaid?.associated_airport ? `<div class="ref-popup-detail">Airport: ${navaid.associated_airport}</div>` : ''}
-                ${navaid?.usage_type ? `<div class="ref-popup-detail">Usage: ${navaid.usage_type}${navaid?.power ? ` · ${navaid.power}` : ''}</div>` : ''}`;
+            return this._sheetHead(navaid?.ident || '', navaid?.name || '') +
+                this._sheetKv([
+                    ['Type', navaid?.type || ''],
+                    ['Frequency', frequency],
+                    ...(navaid?.elevation_ft ? [['Elevation', this._sheetFeet(navaid.elevation_ft)]] : []),
+                    ...(navaid?.associated_airport ? [['Airport', navaid.associated_airport]] : []),
+                    ...(navaid?.usage_type ? [['Usage', this._sheetWord(navaid.usage_type)]] : []),
+                    ...(navaid?.power ? [['Power', this._sheetWord(navaid.power)]] : []),
+                ]);
         }
 
         _heliportPopupHtml(heliport) {
-            const frequencyRows = (heliport?.frequencies || []).map((frequency) => {
-                const type = frequency?.type || '';
-                const description = frequency?.description || '';
-                const mhz = frequency?.frequency_mhz || '';
-                return `<tr><td class="ref-popup-type">${type}</td><td>${description}</td><td class="ref-popup-freq">${mhz}</td></tr>`;
-            }).join('');
-
-            const frequencyTable = frequencyRows
-                ? `<table class="ref-popup-table"><tr><th>Type</th><th>Desc</th><th>MHz</th></tr>${frequencyRows}</table>`
-                : '';
-
-            return `<div class="ref-popup-title">${heliport?.name || heliport?.ident || 'Heliport'}</div>
-                <div class="ref-popup-subtitle">${heliport?.ident || ''} · heliport · ${heliport?.elevation_ft ?? '?'} ft</div>
-                ${heliport?.municipality ? `<div class="ref-popup-detail">${heliport.municipality}, ${heliport?.iso_country || ''}</div>` : ''}
-                ${frequencyTable}`;
+            const town = [heliport?.municipality, heliport?.iso_country].filter(Boolean).join(', ');
+            return this._sheetHead(heliport?.ident || '', this._sheetName(heliport)) +
+                this._sheetKv([
+                    ['Type', 'heliport'],
+                    ['Elevation', this._sheetFeet(heliport?.elevation_ft)],
+                    ...(town ? [['Town', town]] : []),
+                ]) +
+                this._sheetFrequencies(heliport?.frequencies);
         }
 
         _navaidSvgMarkup(type, size = 18) {
@@ -832,7 +874,14 @@
 
         _getTrailColorForAircraft(aircraft) {
             if (!aircraft) return '#4CAF50';
-            if (aircraft.status === 'signal_lost') return '#9CA3AF';
+            // The tertiary text colour, as its glyph and label (MapLabel, signal lost).
+            if (aircraft.status === 'signal_lost') {
+                if (!this._tertiaryText) {
+                    const v = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
+                    this._tertiaryText = v || '#949494';
+                }
+                return this._tertiaryText;
+            }
             if (aircraft.status === 'stale') return '#FFC107';
             if (aircraft.on_ground) return '#60A5FA';
             return '#4CAF50';

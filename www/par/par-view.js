@@ -27,10 +27,13 @@
 
     const ELEV_H_FULL = 230;     // elevation band height, px
     const AZ_H_FULL = 64;        // azimuth band height, px
-    // The frame under the map while a flight is followed (step 8, c-suivre): one
-    // runway, lower bands.
+    // The frame under the map while a flight is followed (step 8, c-suivre):
+    // one runway, lower bands.
     const ELEV_H_SINGLE = 140;
     const AZ_H_SINGLE = 36;
+    // The PAR view's frames fit the view's height, down to this elevation band
+    // (owner, 14/10); below it they scroll.
+    const ELEV_H_MIN = 80;
     const LEFT = 70;        // room for the level labels
     const RIGHT = 14;
     const TRAIL_SECONDS = 60;
@@ -164,14 +167,29 @@
     // cl-parframe head and "Open the PAR view" (the frame under the map, step 8).
     function create(container, store, options) {
         const single = !!(options && options.single);
+        // The full view is the design system's ParView over the sky.
+        if (!single) container.classList.add('cl-root', 'cl-parview');
         const runwaysByAirport = new Map();   // code -> Promise<RunwayInfo[]>
         const previousFrame = new Map();      // hex -> frame id, for the hysteresis
         const trails = new Map();             // hex -> [{t, lat, lon, altBaro}]
         let timer = null;
         let airport = '';
+        // The elevation band's height that lets every open frame, with its
+        // arrival tables, fit the view's height (owner, 14/10: adapt to what the
+        // screen can show); measured after each render, used by the next.
+        let fitElevH = null;
+        let refitting = false;
 
-        let collapsed = new Set();
-        try { collapsed = new Set(JSON.parse(localStorage.getItem('parCollapsed') || '[]')); } catch (e) { /* none kept */ }
+        // A frame's fold, as chosen (key -> true folded, false open); without a
+        // choice, a runway not in use is folded to its head (ParView, step 9e).
+        let foldChoice = {};
+        try {
+            foldChoice = JSON.parse(localStorage.getItem('parFold') || 'null') || {};
+            if (!localStorage.getItem('parFold')) {
+                for (const k of JSON.parse(localStorage.getItem('parCollapsed') || '[]')) foldChoice[k] = true;
+            }
+        } catch (e) { /* none kept */ }
+        const isFolded = (key, inUse) => (key in foldChoice ? foldChoice[key] : !inUse);
 
         // One tooltip for the whole view, outside the part redrawn every second.
         const tip = document.createElement('div');
@@ -237,8 +255,8 @@
             const toggle = ev.target.closest('[data-par-toggle]');
             if (toggle) {
                 const key = toggle.getAttribute('data-par-toggle');
-                if (collapsed.has(key)) collapsed.delete(key); else collapsed.add(key);
-                try { localStorage.setItem('parCollapsed', JSON.stringify([...collapsed])); } catch (e) { /* kept for this page only */ }
+                foldChoice[key] = toggle.getAttribute('aria-expanded') === 'true';
+                try { localStorage.setItem('parFold', JSON.stringify(foldChoice)); } catch (e) { /* kept for this page only */ }
                 render();
                 return;
             }
@@ -340,6 +358,38 @@
             return `<div class="par-message">${text}</div>`;
         }
 
+        // The bands for an elevation height: the azimuth band in proportion, the
+        // empty margin under it only at full height.
+        function bandsFor(elevH) {
+            if (!Number.isFinite(elevH) || elevH >= ELEV_H_FULL) return {};
+            return { elevH, azH: Math.max(24, Math.round(elevH * AZ_H_FULL / ELEV_H_FULL)), bottomPad: 6 };
+        }
+
+        // After a render: the elevation height at which the open frames fill
+        // the view's height without scrolling, between ELEV_H_MIN and full.
+        // Drawn again at once when it moved, then kept for the next renders.
+        function fit(openCount) {
+            const svgs = [...container.querySelectorAll('.cl-parframe svg.par-svg')];
+            if (!openCount || !svgs.length || refitting) return;
+            const vb = svgs[0].viewBox && svgs[0].viewBox.baseVal;
+            const shown = svgs[0].getBoundingClientRect();
+            if (!vb || !vb.height || !shown.height) return;
+            const scale = shown.height / vb.height;
+            const svgTotal = svgs.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0);
+            const other = container.scrollHeight - svgTotal;
+            const perFrame = (container.clientHeight - other) / svgs.length / scale;
+            const cur = bandsFor(fitElevH);
+            const fixed = vb.height - (cur.elevH || ELEV_H_FULL) - (cur.azH || AZ_H_FULL) - (cur.bottomPad != null ? 6 : 20);
+            const ratio = 1 + AZ_H_FULL / ELEV_H_FULL;
+            let next = Math.floor((perFrame - fixed - 6) / ratio);
+            next = Math.max(ELEV_H_MIN, Math.min(ELEV_H_FULL, next));
+            if (fitElevH !== null && Math.abs(next - fitElevH) < 4) return;
+            if (fitElevH === null && next >= ELEV_H_FULL) { fitElevH = ELEV_H_FULL; return; }
+            fitElevH = next;
+            refitting = true;
+            try { render(); } finally { refitting = false; }
+        }
+
         function draw(apt, runways) {
             // The placement is shared with the store's arrival sequence
             // (par-arrivals.js, 13/10): one logic, drawn here, listed there.
@@ -369,27 +419,33 @@
             // The SIA's chart, in a new tab: its terms allow a link, not a frame.
             const vac = window.ParVac ? window.ParVac.vacLink(apt.code, new Date()) : null;
             const vacLink = vac
-                ? `<a class="par-vac" href="${esc(vac.url)}" target="_blank" rel="noopener"${helpAttr('VAC',
+                ? `<a class="cl-link" href="${esc(vac.url)}" target="_blank" rel="noopener"${helpAttr('VAC',
                     `Visual approach chart of ${apt.code}, from the SIA, AIRAC cycle of ${vac.cycle}. Opens in a new tab.`)}>VAC</a>`
                 : '';
+            // ParHead (step 9e): the words in text, the values in mono.
             const header = `
-                <div class="par-header">
-                    <span class="par-airport"${HELP.view()}>${esc(apt.code)}</span>
-                    <span class="par-name"${HELP.view()}>${esc(apt.name || '')}</span>
+                <div class="cl-parhead">
+                    <span class="cl-parhead__airport"${HELP.view()}>${esc(apt.code)}</span>
+                    <span${HELP.view()}>${esc(window.RightNow ? window.RightNow.shortName(apt) : (apt.name || ''))}</span>
                     ${vacLink}
-                    <span class="par-sep">·</span>
-                    <span${HELP.inUse(inUse.length > 1)}>${inUse.length > 1 ? 'Runways' : 'Runway'} in use <b>${inUse.length
-                        ? inUse.map((r) => esc(r.end) + ` <span class="par-dim">${Math.round(r.probability * 100)}%</span>`).join(' · ')
-                        : '<span class="par-dim">unknown</span>'}</b></span>
-                    <span class="par-sep">·</span>
-                    <span${HELP.qnh(est)}>QNH <b>${est ? Math.round(qnh) + ' hPa' : '—'}</b> <span class="par-dim">${est ? `(ADS-B, ${est.count} aircraft)` : '(standard)'}</span></span>
-                    <span class="par-sep">·</span>
-                    <span${HELP.ta(opts.transitionAltitudeFt)}>TA <b>${opts.transitionAltitudeFt} ft</b></span>
-                    <span class="par-sep">·</span>
-                    <span${HELP.tl(tl, opts.transitionAltitudeFt)}>TL <b>FL${pad3(tl)}</b> <span class="par-dim">(computed)</span></span>
+                    <span class="cl-parhead__sep">·</span>
+                    <span${HELP.inUse(inUse.length > 1)}>${inUse.length > 1 ? 'Runways' : 'Runway'} in use ${inUse.length
+                        ? inUse.map((r) => `<b>${esc(r.end)}</b> ${Math.round(r.probability * 100)}\u202f%`).join(' · ')
+                        : '<span class="cl-age">unknown</span>'}</span>
+                    <span class="cl-parhead__sep">·</span>
+                    <span${HELP.qnh(est)}>QNH <b>${est ? Math.round(qnh) : '—'}</b> hPa <span class="cl-age">${est ? `(ADS-B, ${est.count} aircraft)` : '(standard)'}</span></span>
+                    <span class="cl-parhead__sep">·</span>
+                    <span${HELP.ta(opts.transitionAltitudeFt)}>TA <b>${opts.transitionAltitudeFt}</b> ft</span>
+                    <span class="cl-parhead__sep">·</span>
+                    <span${HELP.tl(tl, opts.transitionAltitudeFt)}>TL <b>FL${pad3(tl)}</b> <span class="cl-age">(computed)</span></span>
                 </div>`;
 
             const selected = store.selectedAircraft && store.selectedAircraft.hex;
+            // Two runways open or more: each frame is drawn low, as under the
+            // map, so that they are seen together on one screen; one alone keeps
+            // the full height (owner, 14/10).
+            const openCount = ordered.filter((f) => !isFolded(`${apt.code} ${f.id}`, usage(f) > 0)).length;
+            const compact = bandsFor(fitElevH);
             const body = ordered.map((f) => {
                 const key = `${apt.code} ${f.id}`;
                 const isInUse = usage(f) > 0;
@@ -397,20 +453,21 @@
                 const A = arrivalEnd(f, inUse);
                 const a = f[A].ident;
                 const b = f[A === 'le' ? 'he' : 'le'].ident;
+                const folded = isFolded(key, isInUse);
                 const head = `
-                    <div class="par-frame-head" data-par-toggle="${esc(key)}">
-                        <i class="fas ${collapsed.has(key) ? 'fa-chevron-right' : 'fa-chevron-down'}"${HELP.fold()}></i>
-                        <span class="par-runway"${HELP.runway(a, b)}>${esc(a + ' → ' + b)}</span>
-                        ${isInUse ? `<span class="par-badge"${HELP.inUse(inUse.length > 1)}>IN USE</span>` : ''}
-                        <span class="par-dim"${HELP.count()}>${items.length} aircraft</span>
+                    <div class="cl-parframe__head" style="cursor: pointer;" data-par-toggle="${esc(key)}" role="button" aria-expanded="${folded ? 'false' : 'true'}">
+                        <span class="cl-age"${HELP.fold()}>${folded ? '▸' : '▾'}</span>
+                        <b${HELP.runway(a, b)}>${esc(a + ' → ' + b)}</b>
+                        ${isInUse ? `<span class="cl-parframe__inuse"${HELP.inUse(inUse.length > 1)}>IN USE</span>` : ''}
+                        <span class="cl-age"${HELP.count()}>${items.length} aircraft</span>
                     </div>`;
-                if (collapsed.has(key)) return `<section class="par-frame par-collapsed">${head}</section>`;
-                return `<section class="par-frame${isInUse ? ' par-in-use' : ''}">${head}${frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse })}${sequenceHtml(f, A, items, selected, true)}${sequenceHtml(f, A === 'le' ? 'he' : 'le', items, selected, false)}</section>`;
+                const cls = `cl-parframe${isInUse ? ' is-in-use' : ''}`;
+                if (folded) return `<section class="${cls}">${head}</section>`;
+                return `<section class="${cls}">${head}${frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse, ...compact })}${sequenceHtml(f, A, items, selected, true)}${sequenceHtml(f, A === 'le' ? 'he' : 'le', items, selected, false)}</section>`;
             }).join('');
 
-            // Start below the buttons in the map's top left corner.
-            container.style.paddingTop = '56px';
             container.innerHTML = header + body;
+            fit(openCount);
         }
 
         // The frame holding the followed aircraft, alone; nothing when it is in
@@ -460,26 +517,29 @@
         function sequenceHtml(f, A, items, selected, always) {
             const seq = G.arrivalSequence(f, A, items);
             const ident = f[A].ident;
-            const title = `<span class="par-seq-title"${HELP.sequence(ident)}>Arrivals to ${esc(ident)}</span>`;
-            if (!seq.length) return always ? `<div class="par-seq">${title} <span class="par-dim">none in the cone</span></div>` : '';
+            const title = `<span class="cl-label"${HELP.sequence(ident)}>Arrivals to ${esc(ident)}</span>`;
+            if (!seq.length) {
+                return always ? `<div class="cl-section" style="border: 0; padding: 0;">${title}<span class="cl-plain">None in the approach cone.</span></div>` : '';
+            }
             const mmss = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+            // ArrivalSequence (step 9e): the table of Right now, here under its frame.
             const rows = seq.map((x, i) => {
                 const a = x.a;
                 const cs = esc(((a.flight || '').trim()) || a.hex.toUpperCase());
                 const type = esc((a.adsb && a.adsb.t) || (a.bsdb && a.bsdb.icao_type_code) || '');
                 const eta = x.etaSec != null
-                    ? `${mmss(x.etaSec)} <span class="par-dim">${esc(store.formatDate(new Date(Date.now() + x.etaSec * 1000), true))}</span>`
-                    : '<span class="par-dim">—</span>';
+                    ? `<span title="${esc(store.formatDate(new Date(Date.now() + x.etaSec * 1000), true))}">${mmss(x.etaSec)}</span>`
+                    : '—';
                 const tight = x.gapNM != null && x.gapNM < SEQUENCE_TIGHT_NM;
-                const gap = x.gapNM == null ? '<span class="par-dim">first</span>'
-                    : `<span class="${tight ? 'par-seq-tight' : ''}"${tight ? HELP.tight() : ''}>+${x.gapNM.toFixed(1)} NM` +
-                      (x.gapSec != null ? ` · +${mmss(Math.max(0, x.gapSec))}` : '') + '</span>';
-                return `<tr data-hex="${esc(a.hex)}" class="${a.hex === selected ? 'par-seq-selected' : ''}">` +
-                    `<td class="par-dim">${i + 1}</td><td><b>${cs}</b> <span class="par-dim">${type}</span></td>` +
-                    `<td>${x.distNM.toFixed(1)} NM</td><td>${eta}</td><td>${gap}</td></tr>`;
+                const gap = x.gapNM == null ? 'first' : `+${x.gapNM.toFixed(1)} NM`;
+                const sel = a.hex === selected ? ' style="background: var(--color-surface-selected); cursor: pointer;"' : ' style="cursor: pointer;"';
+                return `<tr data-hex="${esc(a.hex)}"${sel}>` +
+                    `<td class="is-dim">${i + 1}</td><td><b>${cs}</b> <span class="is-dim">${type}</span></td>` +
+                    `<td class="is-num">${x.distNM.toFixed(1)} NM</td><td class="is-num">${eta}</td>` +
+                    `<td class="is-num${x.gapNM == null ? ' is-dim' : tight ? ' is-tight' : ''}"${tight ? HELP.tight() : ''}>${gap}</td></tr>`;
             }).join('');
-            return `<div class="par-seq">${title}<table><thead><tr>` +
-                `<th></th><th>Aircraft</th><th${HELP.seqDist()}>To threshold</th><th${HELP.seqEta()}>Time, ETA</th><th${HELP.seqGap()}>Behind the one ahead</th>` +
+            return `<div class="cl-section" style="border: 0; padding: 0; gap: var(--space-1);">${title}<table class="cl-table" style="margin-top: 0;"><thead><tr>` +
+                `<th></th><th>Aircraft</th><th class="is-num"${HELP.seqDist()}>To thr.</th><th class="is-num"${HELP.seqEta()}>Time</th><th class="is-num"${HELP.seqGap()}>Behind</th>` +
                 `</tr></thead><tbody>${rows}</tbody></table></div>`;
         }
 
@@ -497,7 +557,7 @@
             const ceil = opts.ceilingFt;
             const elevTop = 18;
             const azTop = elevTop + ELEV_H + 22;
-            const height = azTop + AZ_H + 20;
+            const height = azTop + AZ_H + (Number.isFinite(ctx.bottomPad) ? ctx.bottomPad : 20);
 
             // Display coordinate u: arrivals to A come from u < 0; the runway is [0, L].
             const u = (s) => (A === 'le' ? s : L - s);
