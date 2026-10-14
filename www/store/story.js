@@ -148,10 +148,21 @@
 
         // The airport whose runway frame shows under the map: the followed
         // aircraft's arrival, while the map (not the PAR view) is on.
+        // Also before it is on a runway's axis: an arriving aircraft (ARR,
+        // APP) whose airport is followed and plausible, the frame then being
+        // the runway in use (seen by the owner, 14/10: 5 of 21 arriving
+        // aircraft were in a sequence, the others still on vectors).
         get storyFrameAirport() {
-            if (!this.selectedAircraft || this.mainView !== 'map') return '';
-            const arr = this.storyArrival(this.selectedAircraft);
-            return arr ? arr.airport : '';
+            const a = this.selectedAircraft;
+            if (!a || this.mainView !== 'map') return '';
+            const arr = this.storyArrival(a);
+            if (arr) return arr.airport;
+            const phase = this.getCurrentPhase(a);
+            const code = this.getPhaseAirport(a);
+            const adsb = a.adsb || {};
+            if ((phase !== 'ARR' && phase !== 'APP') || !code) return '';
+            if (!(this.followedAirports || []).some((x) => x.code === code)) return '';
+            return this.plausibleAirport(code, adsb.alt_baro, adsb.lat, adsb.lon, a) ? code : '';
         },
 
         // The head of the story: who, and four numbers.

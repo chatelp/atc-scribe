@@ -492,6 +492,16 @@ sur la carte.
 
 ## État
 
+- 14/10 (fin d'après-midi) : **trois retours du propriétaire sur l'étape 8.** (1) « Le cadre de
+  piste n'apparaît pas » pour un avion [ARR] : il ne venait que pour un avion déjà dans le cône
+  d'une piste, 3 à 5 des 21 avions ARR/APP mesurés. Il vient maintenant pour tout avion ARR ou APP
+  dont l'aérodrome est suivi et plausible : le cadre de la piste en service, sa tête disant
+  « AFR1855 not on the axis yet » tant qu'il n'y est pas ; 14 sur 21 mesurés (les 7 autres, un
+  aérodrome non plausible). (2) « Antenna: no report since 14:20:38Z » : vrai, l'instance d'essai
+  n'avait reçu qu'un rapport (`radio-ctl-sync -once`) ; il tourne désormais en continu à côté
+  d'elle. (3) « Showing 8 of 70 sans filtre » : le filtre « Heard » de l'onglet Traffic, gardé dans
+  le navigateur d'une visite précédente ; la note de carte nomme maintenant chaque filtre actif
+  (« Showing 9 of 72 · heard on the radio only »).
 - 14/10 : **étape 8, corrections de la relecture design** (sept points). La colonne garde ses
   380 px pendant un suivi (elle passait à 480 et décalait la carte). **Le cadre PAR sous la carte**
   : `par-view.js` gagne un mode « un seul cadre » (`create(…, { single: true })`), qui dessine le

@@ -418,11 +418,18 @@
         function drawSingle(apt, placement) {
             const { opts, frames, inUse, qnh, tl, placed } = placement;
             const selected = store.selectedAircraft && store.selectedAircraft.hex;
-            const f = selected && frames.find((fr) => (placed.get(fr.id) || []).some((it) => it.a.hex === selected));
+            // Its frame; before it is on an axis, the frame of the runway in use.
+            const holding = selected && frames.find((fr) => (placed.get(fr.id) || []).some((it) => it.a.hex === selected));
+            const usage = (fr) => Math.max(0, ...inUse.filter((r) => r.end === fr.le.ident || r.end === fr.he.ident).map((r) => r.score));
+            const f = holding || frames.slice().sort((p, q) => usage(q) - usage(p))[0];
             if (!f) {
                 container.innerHTML = '';
                 return;
             }
+            const sel = store.selectedAircraft;
+            const away = holding ? '' : `<span class="cl-age"${helpAttr('Not on the axis yet',
+                'The aircraft is not yet in this runway\'s approach cone: it shows in the frame once it turns onto the final approach.')}>` +
+                `${esc(((sel && sel.flight) || '').trim() || selected)} not on the axis yet</span>`;
             const items = placed.get(f.id);
             const isInUse = inUse.some((r) => r.end === f.le.ident || r.end === f.he.ident);
             const A = arrivalEnd(f, inUse);
@@ -432,7 +439,7 @@
             container.innerHTML =
                 `<div class="cl-parframe__head"><b${HELP.runway(a, b)}>${esc(a + ' → ' + b)}</b>` +
                 (isInUse ? `<span class="cl-parframe__inuse"${HELP.inUse(inUse.length > 1)}>IN USE</span>` : '') +
-                `<span class="cl-age"${HELP.count()}>${items.length} aircraft</span>` +
+                `<span class="cl-age"${HELP.count()}>${items.length} aircraft</span>` + away +
                 `<button class="cl-btn" style="margin-left: auto;" data-par-open>Open the PAR view</button></div>` +
                 frameSvg(f, A, items, { width, qnh, tl, opts, selected, isInUse, elevH: ELEV_H_SINGLE, azH: AZ_H_SINGLE });
         }
