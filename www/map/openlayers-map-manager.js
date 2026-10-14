@@ -832,7 +832,14 @@
 
         _getTrailColorForAircraft(aircraft) {
             if (!aircraft) return '#4CAF50';
-            if (aircraft.status === 'signal_lost') return '#9CA3AF';
+            // The tertiary text colour, as its glyph and label (MapLabel, signal lost).
+            if (aircraft.status === 'signal_lost') {
+                if (!this._tertiaryText) {
+                    const v = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
+                    this._tertiaryText = v || '#949494';
+                }
+                return this._tertiaryText;
+            }
             if (aircraft.status === 'stale') return '#FFC107';
             if (aircraft.on_ground) return '#60A5FA';
             return '#4CAF50';
