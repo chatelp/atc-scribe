@@ -39,6 +39,15 @@
             return `Connection to the server lost${since}: reconnecting${attempt}${next}. The map shows the last positions.`;
         },
 
+        // Nothing to listen to: the receiver lent or off, or no frequency. The
+        // thread's head then offers no channel to play (design review of step
+        // 10); the search stays, for the exchanges heard before.
+        get nothingOnAir() {
+            const rx = this.serverStatus && this.serverStatus.receiver;
+            if (rx && !rx.stale && (rx.state === 'lent' || rx.state === 'off')) return true;
+            return !(this.audioFrequencies || []).length;
+        },
+
         // The thread with nothing in it says why, and what will fill it
         // (EmptyState, step 10, etats.html).
         get threadEmptyText() {

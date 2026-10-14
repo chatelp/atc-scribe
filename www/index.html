@@ -162,7 +162,7 @@
                                     data-help-title="Search" data-help="Find exchanges by their words, a callsign, a speaker or an instruction.">
                                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>
                             </button>
-                            <button class="cl-btn" x-show="$store.atc.audioFrequencies.length" @click="$store.atc.toggleAllListening()"
+                            <button class="cl-btn" x-show="!$store.atc.nothingOnAir" @click="$store.atc.toggleAllListening()"
                                     x-text="$store.atc.anyUnmuted ? 'Mute all' : 'Listen to all'"
                                     data-help-title="Listening" data-help="Play or mute every frequency in this browser. The station chooses what is on air; this only chooses what you hear."></button>
                         </span>
@@ -173,7 +173,7 @@
                                @keydown.escape="$store.atc.threadSearch = ''; $store.atc.threadSearchOpen = false">
                     </div>
                     <!-- ChannelButton (split) per frequency, and its ChannelMenu. -->
-                    <div class="cl-threadhead__row cl-threadhead__row--channels" x-show="$store.atc.audioFrequencies.length">
+                    <div class="cl-threadhead__row cl-threadhead__row--channels" x-show="!$store.atc.nothingOnAir">
                         <template x-for="freq in $store.atc.audioFrequencies" :key="freq.id">
                             <span class="cl-channel cl-channel--split relative"
                                   :class="{ 'is-on': $store.atc.isUnmuted(freq.id), 'is-menu-open': $store.atc.threadMenuFor === freq.id,
@@ -219,7 +219,7 @@
                             </span>
                         </template>
                     </div>
-                    <div class="cl-threadhead__row" x-show="$store.atc.audioFrequencies.length > 1">
+                    <div class="cl-threadhead__row" x-show="!$store.atc.nothingOnAir && $store.atc.audioFrequencies.length > 1">
                         <span class="cl-label">Show</span>
                         <div class="cl-seg">
                             <button class="cl-seg__item" :aria-pressed="String($store.atc.threadShow === 'all')" @click="$store.atc.setThreadShow('all')">All</button>
