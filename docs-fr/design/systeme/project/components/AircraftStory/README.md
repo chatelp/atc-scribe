@@ -6,4 +6,14 @@ The aircraft story is what the context column shows while a flight is followed: 
 
 **Rules.** The column's content is replaced, not overlaid; ‹ returns to the tab it came from and ✕ in the top bar stops following. Each line says a fact and its source: "Seen by the receiver", "Handed to Approche De Gaulle", "Expected touchdown, from its distance and speed".
 
+**Then.** What the aircraft did after an instruction, from its track, in one of sixteen forms and never a verdict (card K, `www/story/then.js`). `L` is a level as the brand writes it ("4 000 ft" under the transition altitude, "FL 110" above), `D` a delay (", 2 min later", ", 40 s later").
+- Level: "level at L, D" (reached and held 30 s) · "at L, D" (already there, or no movement) · "climbing through L, D" / "descending through L, D" · "climbing through L" (still on its way when the window ends) · "on the ground, D".
+- Heading: "turned to 270°" · "turning through 270°, D" · "heading 254°, still turning" · "heading 254°, D".
+- Speed, always named as ground speed, since the instruction gives an airspeed and the wind sits between them: "ground speed 225 kt, D" · "slowing through 250 kt ground speed, D" · "slowing, 241 kt ground speed".
+- Frequency: "next heard on 119.255, D" · "next heard, D" · "no later transmission heard here".
+- Runway and clearance: "landed on 27R" · "took off from 09".
+- Nothing to say (no value, no track point in the window, a QNH, a squawk, a report rather than a request): "—".
+
+Never "deviation", "complied", "error", "violation", "wrong", nor "still" except in "still turning"; no colour, no ranking.
+
 **Data.** The aircraft's `created_at` and first track point; matched transmissions whose `plain` has a frequency role (hand-offs); `store.arrivals` (touchdown estimate).
