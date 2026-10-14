@@ -488,7 +488,9 @@
         const callsign = (aircraft.flight || aircraft.hex || '').trim();
         const phase = (aircraft?.phase?.current?.[0]?.phase || '').toString().trim().toUpperCase();
         const phaseText = phase ? `[${phase}] ` : '';
-        const phaseColor = getPhaseLabelColor(phase || 'NEW');
+        // Lost, it has no current phase: the code stays written, in the
+        // label's tertiary (MapLabel, signal lost).
+        const phaseColor = aircraft.status === 'signal_lost' ? labelTextColor('tertiary') : getPhaseLabelColor(phase || 'NEW');
         const shortType = getAircraftShortIcaoType(aircraft);
         // As the list says it: feet on the QNH below the transition altitude,
         // flight level above (store.altitudeReading, www/altitude/).
