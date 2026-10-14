@@ -61,6 +61,10 @@
                 this.handleTranscriptionUpdateMessage(data);
             });
 
+            wsClient.addEventListener('transcription_second', (data) => {
+                this.handleTranscriptionSecondMessage(data);
+            });
+
             // Add event listeners for phase changes
             wsClient.addEventListener('phase_change', (data) => {
                 this.handlePhaseChangeMessage(data);

@@ -108,3 +108,54 @@ func TestCallsignEvidenceIsReadBackByThePageReaders(t *testing.T) {
 		t.Errorf("damaged evidence should read as none, got %v", again[0].CallsignEvidence)
 	}
 }
+
+// A second reading asked for later (14/10) arrives after the first was stored.
+// A transmission processed without an aircraft goes back to the queue, to be
+// tried with it; one already matched keeps its match and gains the text.
+func TestALateSecondReadingRequeuesOnlyAnUnmatchedTransmission(t *testing.T) {
+	log := testLog(t)
+	aircraft, err := NewAircraftStorage(DailyPath(t.TempDir(), time.Now()), log)
+	if err != nil {
+		t.Fatalf("NewAircraftStorage: %v", err)
+	}
+	s := NewTranscriptionStorage(aircraft.GetDB(), log)
+	store := func(callsign string) int64 {
+		id, err := s.StoreTranscription(&TranscriptionRecord{
+			FrequencyID: "126425", CreatedAt: time.Now().UTC(), Content: "bonjour quatre sept",
+			IsComplete: true, IsProcessed: true, Callsign: callsign, Language: "en",
+		})
+		if err != nil {
+			t.Fatalf("StoreTranscription: %v", err)
+		}
+		return id
+	}
+	state := func(id int64) (second string, processed bool) {
+		if err := s.db.QueryRow(`SELECT COALESCE(content_second, ''), is_processed FROM transcriptions WHERE id = ?`, id).
+			Scan(&second, &processed); err != nil {
+			t.Fatalf("read back: %v", err)
+		}
+		return
+	}
+
+	unmatched := store("")
+	again, err := s.SetSecondReading(unmatched, "Air France quatre sept")
+	if err != nil || !again {
+		t.Fatalf("unmatched: again=%v err=%v, want true", again, err)
+	}
+	if second, processed := state(unmatched); second != "Air France quatre sept" || processed {
+		t.Errorf("unmatched: second=%q processed=%v, want the text and back in the queue", second, processed)
+	}
+
+	matched := store("AFR47KX")
+	again, err = s.SetSecondReading(matched, "Air France quatre sept")
+	if err != nil || again {
+		t.Fatalf("matched: again=%v err=%v, want false", again, err)
+	}
+	if second, processed := state(matched); second == "" || !processed {
+		t.Errorf("matched: second=%q processed=%v, want the text and still processed", second, processed)
+	}
+
+	if again, err := s.SetSecondReading(999999, "x"); err != nil || again {
+		t.Errorf("unknown id: again=%v err=%v", again, err)
+	}
+}

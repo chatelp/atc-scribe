@@ -142,6 +142,23 @@
         },
         
         // Handle transcription update messages (processed transcriptions)
+        // A second (French) reading that came after the first (14/10): only
+        // that field changes, wherever the exchange is held. If it may name an
+        // aircraft the first did not, the server matches again and a
+        // transcription_update follows.
+        handleTranscriptionSecondMessage(data) {
+            if (!data || !data.id) return;
+            const patch = (list) => {
+                if (!Array.isArray(list)) return;
+                const i = list.findIndex((t) => t.id === data.id);
+                if (i !== -1) list.splice(i, 1, { ...list[i], content_second: data.content_second });
+            };
+            patch(this.transcriptions);
+            patch(this.frequencyTranscriptions && this.frequencyTranscriptions[data.frequency_id]);
+            patch(this.originalTranscriptions && this.originalTranscriptions[data.frequency_id]);
+            patch(this.aircraftRadio && this.aircraftRadio.transcriptions);
+        },
+
         handleTranscriptionUpdateMessage(data) {
             console.log('Received transcription update:', data);
             

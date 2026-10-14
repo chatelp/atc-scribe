@@ -118,3 +118,65 @@ func TestOnlyTranscribedTransmissionsAreTimed(t *testing.T) {
 		t.Errorf("after one transcription of about 20 ms: %v %v", m, ok)
 	}
 }
+
+// The first reading is stored as soon as the sidecar gives it; a second one,
+// asked for later (14/10), is fetched from /second/{id} once ready -- after a
+// "pending" -- and stored on the same transmission.
+func TestASecondReadingAskedForLaterJoinsItsTransmission(t *testing.T) {
+	var polls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/transcribe":
+			if r.Header.Get("X-Second") != "later" {
+				t.Errorf("X-Second = %q, want later", r.Header.Get("X-Second"))
+			}
+			_, _ = w.Write([]byte(`{"text":"air france four seven bonjour","language":"en","second_pending":"k1"}`))
+		case "/second/k1":
+			polls++
+			if polls == 1 {
+				_, _ = w.Write([]byte(`{"status":"pending"}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"status":"done","second_text":"Air France quatre sept bonjour","second_language":"fr"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	log := testLogger(t)
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "test.db"), log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	ws := websocket.NewServer(log)
+	go ws.Run()
+	storage := sqlite.NewTranscriptionStorage(db, log)
+	p := &LocalProcessor{
+		frequencyID: "126425",
+		language:    "en",
+		config:      Config{Local: LocalSTTConfig{ServerURL: srv.URL}},
+		client:      srv.Client(),
+		ctx:         context.Background(),
+		logger:      log,
+		sink:        &transcriptionSink{frequencyID: "126425", storage: storage, wsServer: ws, logger: log},
+	}
+	p.send([]byte{0, 0, 0, 0}, 16000, time.Now())
+
+	var first, second string
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		_ = db.QueryRow(`SELECT content, COALESCE(content_second, '') FROM transcriptions LIMIT 1`).Scan(&first, &second)
+		if second != "" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if first != "air france four seven bonjour" {
+		t.Errorf("first reading %q", first)
+	}
+	if second != "Air France quatre sept bonjour" || polls != 2 {
+		t.Errorf("second reading %q after %d polls, want it after 2", second, polls)
+	}
+}

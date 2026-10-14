@@ -34,7 +34,7 @@ import threading
 import time
 import unicodedata
 import wave
-from concurrent.futures import ThreadPoolExecutor
+import uuid
 from dataclasses import dataclass
 
 import numpy as np
@@ -45,6 +45,7 @@ sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from config import Config, from_args  # noqa: E402
 from device import backend_name  # noqa: E402
 from loops import cut_loops  # noqa: E402
+from lanes import FIRST, SECOND, PriorityWorker  # noqa: E402
 
 WHISPER_RATE = 16000
 
@@ -273,15 +274,13 @@ _decode_lock = threading.Lock()
 # needed more. 256 MiB is reserved, not used -- pages are only committed as the
 # stack grows -- and the size applies to this thread alone.
 _MLX_STACK = 256 * 1024 * 1024
-_default_stack = threading.stack_size(_MLX_STACK)
-_mlx_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mlx")
-_mlx_thread.submit(lambda: None).result()  # the thread is created now, with that stack
-threading.stack_size(_default_stack)
+# Two lanes on that one thread (lanes.py): the first reading of a transmission
+# before any detector pass or second reading still waiting (14/10).
+_mlx_thread = PriorityWorker(name="mlx", stack_size=_MLX_STACK)
 
 
-async def on_mlx(fn, *args, **kwargs):
-    return await asyncio.get_running_loop().run_in_executor(
-        _mlx_thread, functools.partial(fn, *args, **kwargs))
+async def on_mlx(fn, *args, lane=FIRST, **kwargs):
+    return await asyncio.wrap_future(_mlx_thread.submit(functools.partial(fn, *args, **kwargs), lane))
 
 
 def decode(mlx_whisper, audio, **kwargs):
@@ -360,6 +359,10 @@ def health():
         # rate in production was logged only at Debug, so "is the night-time
         # parasite absent in daylight?" had no instrument.
         "transcribed": _counters["transcribed"],
+        # The model's queue now, by lane (lanes.py), and the second readings
+        # asked for later and not fetched yet.
+        "queue": _mlx_thread.waiting(),
+        "second_pending": sum(1 for v in _pending.values() if not v["done_at"]),
         "rejected_no_speech": _counters["rejected_no_speech"],
         "archiving": bool(cfg.save_audio) and _disk["ok"],
         "archiving_stopped_low_disk": bool(_counters["archiving_stopped"]),
@@ -405,8 +408,14 @@ async def transcribe(
     x_frequency_id: str = Header(default=""),
     x_segment_at: str = Header(default=""),
     x_created_at: str = Header(default=""),
+    x_second: str = Header(default=""),
 ):
     """Transcribe raw PCM.
+
+    With `X-Second: later` the answer comes as soon as the first reading is
+    done, with `second_pending` set when a second reading may follow; that one
+    is fetched from GET /second/{id}. Without it, the answer waits for both,
+    as before (the lab's tools ask that way).
 
     `X-Language` is the caller's expectation, taken from the frequency catalogue.
     It is honoured, not second-guessed: measured language detection is wrong on
@@ -470,33 +479,79 @@ async def transcribe(
          "no_speech_prob": round(s.get("no_speech_prob", 0.0), 4)}
         for s in result.get("segments", [])
     ]
-    # Second opinion. The two models fail on different recordings -- on French
-    # transmissions they agreed on only 8 of the 34 they matched -- so a second
-    # reading of the same audio reaches transmissions the first one misses. The
-    # gate matters: asked on every transmission the French model also answers
-    # where it has nothing to say, and invents callsigns on English audio.
+    later = x_second.strip().lower() == "later"
+    can_second = bool(cfg.second_opinion and language == "en" and cfg.model_fr and text)
+    keep = functools.partial(keep_reading, raw, x_sample_rate, x_channels,
+                             identity(x_frequency_id, started, x_segment_at, x_created_at),
+                             duration, speech, language, model, text, result)
+
+    if later and can_second:
+        pending = new_pending()
+        asyncio.get_running_loop().create_task(
+            second_later(pending, mlx_whisper, audio, text, x_frequency_id, keep))
+        second, gate, p_fr = None, "", None
+    else:
+        pending = ""
+        second, gate, p_fr = (await second_reading(mlx_whisper, audio, text, x_frequency_id)
+                              if can_second else (None, "", None))
+        keep(second, gate, p_fr)
+    _counters["transcribed"] += 1
+
+    elapsed = time.time() - started
+    log.info("%s %.1fs speech=%.1fs %s %.2fs %r",
+             x_frequency_id or "-", duration, speech.seconds, language, elapsed, text[:80])
+    return {
+        "text": text,
+        "segments": segments,
+        "language": language,
+        "second_text": (second or {}).get("text", ""),
+        "second_language": (second or {}).get("language", ""),
+        "second_model": (second or {}).get("model", ""),
+        "second_gate": gate if second else "",
+        "second_pending": pending,
+        "p_fr": None if p_fr is None else round(p_fr, 4),
+        "duration": round(duration, 3),
+        "speech_seconds": round(speech.seconds, 3),
+        "speech_fraction": round(speech.fraction, 3),
+        "model": model,
+        "frequency_id": x_frequency_id,
+        "elapsed": round(elapsed, 3),
+        "realtime_factor": round(duration / elapsed, 2) if elapsed else None,
+    }
+
+
+async def second_reading(mlx_whisper, audio, text: str, frequency_id: str):
+    """The French gate and, when it opens, the second reading: (second, gate, p_fr).
+
+    Second opinion. The two models fail on different recordings -- on French
+    transmissions they agreed on only 8 of the 34 they matched -- so a second
+    reading of the same audio reaches transmissions the first one misses. The
+    gate matters: asked on every transmission the French model also answers
+    where it has nothing to say, and invents callsigns on English audio. Both
+    the detector and the reading run in the SECOND lane: a first reading of the
+    other frequency waiting passes before them.
+    """
     second = None
     gate, p_fr = "", None
-    if cfg.second_opinion and language == "en" and cfg.model_fr and text:
-        if looks_french(text):
-            gate = "words"
-        elif cfg.fr_detector:
-            # Only where no French word opened the gate: the detector costs an
-            # encoder pass, and a French word already says what it would.
-            try:
-                p_fr = await on_mlx(french_probability, audio)
-                if p_fr >= cfg.fr_threshold:
-                    gate = "detector"
-            except Exception as e:
-                # A detector that fails leaves the word gate, as before; counted
-                # so /health can say it is happening.
-                _counters["detector_failed"] += 1
-                log.warning("language detection failed (%d so far): %s", _counters["detector_failed"], e)
+    if looks_french(text):
+        gate = "words"
+    elif cfg.fr_detector:
+        # Only where no French word opened the gate: the detector costs an
+        # encoder pass, and a French word already says what it would.
+        try:
+            p_fr = await on_mlx(french_probability, audio, lane=SECOND)
+            if p_fr >= cfg.fr_threshold:
+                gate = "detector"
+        except Exception as e:
+            # A detector that fails leaves the word gate, as before; counted
+            # so /health can say it is happening.
+            _counters["detector_failed"] += 1
+            log.warning("language detection failed (%d so far): %s", _counters["detector_failed"], e)
     if gate:
         try:
             t1 = time.time()
             fr_kwargs = {"temperature": 0.0} if cfg.fr_no_fallback else {}
-            r2 = await on_mlx(decode, mlx_whisper, audio,
+            r2 = await on_mlx(decode, mlx_whisper, audio, lane=SECOND,
                               path_or_hf_repo=cfg.model_fr, language="fr", **fr_kwargs)
             raw_second = " ".join(r2["text"].split())
             text_second = cut_loops(raw_second) if cfg.fr_cut_loops else raw_second
@@ -513,7 +568,7 @@ async def transcribe(
             _counters["second_opinion_ok"] += 1
             if gate == "detector":
                 _counters["second_opinion_by_detector"] += 1
-            log.info("%s second opinion (fr, %s%s) %r", x_frequency_id or "-", gate,
+            log.info("%s second opinion (fr, %s%s) %r", frequency_id or "-", gate,
                      f" p_fr={p_fr:.2f}" if p_fr is not None else "", second["text"][:80])
         except Exception as e:
             # A failed second opinion is not a failed transcription: the primary
@@ -522,10 +577,14 @@ async def transcribe(
             _counters["second_opinion_failed"] += 1
             log.warning("second opinion failed (%d so far): %s",
                         _counters["second_opinion_failed"], e)
+    return second, gate, p_fr
 
-    _counters["transcribed"] += 1
-    keep_audio(raw, x_sample_rate, x_channels, {
-        **identity(x_frequency_id, started, x_segment_at, x_created_at),
+
+def keep_reading(raw, rate, channels, ident, duration, speech, language, model, text, result,
+                 second, gate, p_fr):
+    """The kept audio's record, once both readings are known."""
+    keep_audio(raw, rate, channels, {
+        **ident,
         "duree": round(duration, 3),
         "speech_seconds": round(speech.seconds, 3),
         "langue": language,
@@ -542,26 +601,60 @@ async def transcribe(
         "segments_second": (second or {}).get("details", []),
     })
 
-    elapsed = time.time() - started
-    log.info("%s %.1fs speech=%.1fs %s %.2fs %r",
-             x_frequency_id or "-", duration, speech.seconds, language, elapsed, text[:80])
-    return {
-        "text": text,
-        "segments": segments,
-        "language": language,
+
+# Second readings asked for later: id -> {"event", "result", "at"}. An entry
+# leaves when it is fetched, or PENDING_KEEP_SECONDS after it is done.
+_pending: dict = {}
+PENDING_KEEP_SECONDS = 600
+
+
+def new_pending() -> str:
+    now = time.time()
+    for key in [k for k, v in _pending.items() if v["done_at"] and now - v["done_at"] > PENDING_KEEP_SECONDS]:
+        _pending.pop(key, None)
+    key = uuid.uuid4().hex
+    _pending[key] = {"event": asyncio.Event(), "result": None, "done_at": None}
+    return key
+
+
+async def second_later(key, mlx_whisper, audio, text, frequency_id, keep):
+    try:
+        second, gate, p_fr = await second_reading(mlx_whisper, audio, text, frequency_id)
+    except Exception as e:  # never left pending for ever
+        log.warning("second reading lost: %s", e)
+        second, gate, p_fr = None, "", None
+    keep(second, gate, p_fr)
+    entry = _pending.get(key)
+    if entry is None:
+        return
+    entry["result"] = {
+        "status": "done",
         "second_text": (second or {}).get("text", ""),
         "second_language": (second or {}).get("language", ""),
         "second_model": (second or {}).get("model", ""),
         "second_gate": gate if second else "",
         "p_fr": None if p_fr is None else round(p_fr, 4),
-        "duration": round(duration, 3),
-        "speech_seconds": round(speech.seconds, 3),
-        "speech_fraction": round(speech.fraction, 3),
-        "model": model,
-        "frequency_id": x_frequency_id,
-        "elapsed": round(elapsed, 3),
-        "realtime_factor": round(duration / elapsed, 2) if elapsed else None,
     }
+    entry["done_at"] = time.time()
+    entry["event"].set()
+
+
+@app.get("/second/{key}")
+async def second(key: str, wait: float = 60.0):
+    """A second reading asked for later: waits up to `wait` seconds for it.
+
+    {"status": "done", "second_text": ...} (empty when the gate stayed shut),
+    {"status": "pending"} when it is not done yet, 404 for an unknown id.
+    """
+    entry = _pending.get(key)
+    if entry is None:
+        return JSONResponse({"error": "unknown"}, status_code=404)
+    try:
+        await asyncio.wait_for(entry["event"].wait(), timeout=max(0.0, min(wait, 300.0)))
+    except asyncio.TimeoutError:
+        return {"status": "pending"}
+    _pending.pop(key, None)
+    return entry["result"]
 
 
 def watch_parent(interval: float = 5.0) -> None:

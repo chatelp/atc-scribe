@@ -26,7 +26,7 @@ type transcriptionSink struct {
 // in the broadcast so the UI can tell a French transmission from an English one;
 // on a bilingual band that distinction matters, and a wrong-language transcript
 // must never be silently indistinguishable from a right one.
-func (s *transcriptionSink) emit(text string, at time.Time, language, second string) error {
+func (s *transcriptionSink) emit(text string, at time.Time, language, second string) (int64, error) {
 	record := &sqlite.TranscriptionRecord{
 		FrequencyID:      s.frequencyID,
 		CreatedAt:        at,
@@ -40,7 +40,7 @@ func (s *transcriptionSink) emit(text string, at time.Time, language, second str
 
 	id, err := s.storage.StoreTranscription(record)
 	if err != nil {
-		return fmt.Errorf("failed to store transcription: %w", err)
+		return 0, fmt.Errorf("failed to store transcription: %w", err)
 	}
 
 	if s.fileLogger != nil {
@@ -62,5 +62,26 @@ func (s *transcriptionSink) emit(text string, at time.Time, language, second str
 			"language":          language,
 		},
 	})
-	return nil
+	return id, nil
+}
+
+// second stores a second reading that came after the first, and tells the
+// browser: "transcription_second" patches that one field of the exchange
+// already shown. If the transmission had found no aircraft, it is matched
+// again with this reading, and its "transcription_update" follows.
+func (s *transcriptionSink) second(id int64, text string) {
+	again, err := s.storage.SetSecondReading(id, text)
+	if err != nil {
+		s.logger.Error("Failed to store the second reading", Error(err))
+		return
+	}
+	s.wsServer.Broadcast(&websocket.Message{
+		Type: "transcription_second",
+		Data: map[string]interface{}{
+			"id":             id,
+			"frequency_id":   s.frequencyID,
+			"content_second": text,
+			"rematch":        again,
+		},
+	})
 }

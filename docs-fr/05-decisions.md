@@ -4891,7 +4891,37 @@ système de design : la séquence d'arrivée calculée dans le store pour tous l
 (la PAR la relit), les gabarits français des consignes, puis la migration elle-même
 (`04-migration.md`).
 
-### D80 — Le mouvement des avions : prolonger la trajectoire (stratégie A) *(14/10)*
+### D81 — La première lecture d'abord, la seconde ensuite *(14/10)*
+
+**Décidé par le propriétaire le 14/10** (« oui »), sur la proposition du labo. **Le constat** :
+la console de la page de connexion affichait 12 à 20 s par transmission. Le labo a décomposé le
+journal de l'instance d'essai, 300 transmissions sur 48 min et deux fréquences. De la requête au
+texte : 7,8 s en médiane, 31,7 s au 90ᵉ centile. Le calcul seul : 3,1 s, soit 0,40 s par seconde
+d'audio. Le reste est de l'attente : 0,5 s en médiane, 26,5 s au 90ᵉ centile, par rafales.
+**Tout le travail du modèle passe par un seul fil**, et la seconde lecture française d'une
+transmission passait devant la première lecture de l'autre fréquence.
+
+**Décidé** :
+- **Deux voies sur ce fil** (`sidecar/lanes.py`) : la première lecture d'une transmission passe
+  avant tout passage du détecteur et toute seconde lecture encore en attente ; une tâche en cours
+  n'est jamais interrompue.
+- **Avec `X-Second: later`** (ce que le serveur demande désormais), le sidecar répond dès la
+  lecture anglaise avec `second_pending`. Le détecteur et la lecture française passent ensuite
+  dans la seconde voie. Le serveur les attend sur `GET /second/{id}`, par appels longs d'une
+  minute, dix minutes au plus.
+- **Le fil affiche l'échange tout de suite.** La lecture française le rejoint en mise à jour :
+  message `transcription_second`.
+- **La reconnaissance n'y perd rien.** Si la première lecture n'a reconnu aucun avion, la
+  transmission repasse au processeur avec sa seconde lecture. Si elle en a reconnu un, il reste :
+  la première l'emporte de toute façon en cas de désaccord, et aucune clairance n'est enregistrée
+  deux fois.
+- **Sans l'en-tête, rien ne change** : la réponse attend les deux lectures, comme les outils du
+  labo le demandent.
+
+**Reste à mesurer**, avec le vrai sidecar, quand le labo aura rendu le GPU : la queue de
+distribution de la première lecture, avant et après ce changement.
+
+
 
 **Décidé par le propriétaire le 14/10** (« on garde A »), sur la recommandation de la fiche M.
 Trois façons de dessiner un avion entre deux positions reçues ont été mesurées sur deux bancs
