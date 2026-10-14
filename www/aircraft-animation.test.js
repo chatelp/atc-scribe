@@ -237,3 +237,49 @@ test("a symbol just created starts where the engine draws its aircraft (fiche M,
     assert.ok(metres > 350 && metres < 480, `${metres.toFixed(0)} m on from the fix decoded 2 s ago, want about 412`);
     assert.equal(e.currentPose('nobody'), null);
 });
+
+test('a silent aircraft glides back to its last observed position and waits there (14/10)', () => {
+    const { e } = engine();
+    e.updateAircraft(sample(48.5, 2.0, { alt_baro: 1600 }));
+    e.updateAircraft(sample(48.5, 2.0028, { alt_baro: 1600 }));
+    const state = e.aircraftStates.get('abc123');
+    const at = state.lastFixAt;
+    // Flown ahead while the positions come.
+    const ahead = e._computePose(state, at + 3000);
+    assert.ok(ahead.lon > 2.0028 + 1e-5, 'predicted ahead of the fix');
+    state.lastRendered = { lat: ahead.lat, lon: ahead.lon, alt: ahead.alt, timestamp: at + 3000 };
+    // Silent past the hold: back to the fix, then held.
+    const silent = at + e.config.holdAfterSilenceMs + 1;
+    const start = e._computePose(state, silent);
+    assert.ok(start.held && Math.abs(start.lon - ahead.lon) < 1e-9, 'starts from where it was drawn');
+    const end = e._computePose(state, silent + e.config.holdGlideMs + 10);
+    assert.equal(end.lat, 48.5);
+    assert.equal(end.lon, 2.0028);
+    const later = e._computePose(state, silent + 60000);
+    assert.equal(later.lon, 2.0028, 'it waits at the last fix');
+});
+
+test('a silent aircraft takes no estimate, and a new fix lets it go (14/10)', () => {
+    const { e } = engine();
+    e.updateAircraft(sample(48.5, 2.0, { alt_baro: 1600 }));
+    e.updateAircraft(sample(48.5, 2.0028, { alt_baro: 1600 }));
+    const state = e.aircraftStates.get('abc123');
+    state.lastFixAt = performance.now() - e.config.holdAfterSilenceMs - 1000;
+    e.estimate('abc123', { lat: 48.5, lon: 2.02, track: 90, gs: 400, confidence: 1 });
+    assert.equal(state.lastReal.lon, 2.0028, 'the estimate is left out');
+    e.updateAircraft(sample(48.5, 2.0056, { alt_baro: 1600 }));
+    assert.equal(state.hold, null);
+    assert.ok(!e._isSilent(state, performance.now()), 'flying again');
+});
+
+test('high up, a silence is flown ahead until the aircraft is declared lost (14/10)', () => {
+    const { e } = engine();
+    e.updateAircraft(sample(48.5, 2.0));
+    e.updateAircraft(sample(48.5, 2.0028));
+    const state = e.aircraftStates.get('abc123');
+    const at = state.lastFixAt;
+    assert.ok(!e._computePose(state, at + 20000).held, 'a 20 s hole at FL 300 is flown ahead');
+    assert.ok(e._computePose(state, at + e.config.holdAfterSilenceHighMs + 1).held, 'held once a minute has passed');
+    state.status = 'signal_lost';
+    assert.ok(e._isSilent(state, at + 1000), 'and as soon as it is declared lost');
+});

@@ -199,6 +199,8 @@
             }
 
             aircraft.status = data.new_status;
+            // Its symbol's colour follows (grey once lost).
+            if (this.mapManager && typeof this.mapManager.updateVisualState === 'function') this.mapManager.updateVisualState(data.hex);
         },
         
         // Request initial aircraft data via WebSocket

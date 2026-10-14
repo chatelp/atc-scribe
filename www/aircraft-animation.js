@@ -59,6 +59,20 @@ class AircraftAnimationEngine {
             // between two samples and caught up the rest on each one, a
             // sawtooth of speed once a second (D79).
             predictionGain: 1.0,
+            // No new position for this long: the receiver has lost the aircraft
+            // for now. It is no longer flown ahead; it glides back to the last
+            // position observed and waits there (owner, 14/10: a lost aircraft
+            // stood frozen beside its track, where a straight prediction had
+            // taken it as it turned onto final). Low, a silence is the aircraft
+            // going below the radio horizon, often turning: held after about
+            // nine positions missed. Higher up, a silence is a hole in the
+            // reception and the straight prediction holds (the replay's 30 s
+            // gap in cruise: 97 m of mean error flown ahead, 414 m held), so
+            // only once the aircraft is declared lost, a minute.
+            holdAfterSilenceMs: 12000,
+            holdAfterSilenceHighMs: 60000,
+            holdBelowFt: 5000,
+            holdGlideMs: 1200,
             // Duration of the fading correction of an aircraft at rest (below
             // 1 m/s), in ms; a moving one takes three times the gap over its
             // speed, so it catches up at no more than half its own speed (D79).
@@ -269,6 +283,8 @@ class AircraftAnimationEngine {
         if (Number.isFinite(sample.confidence) && sample.confidence < this.config.minEstimateConfidence) return;
 
         const state = this.aircraftStates.get(hex);
+        // A silent aircraft is not estimated: where it goes is not known.
+        if (state && this._isSilent(state, performance.now())) return;
         if (state && Number.isFinite(sample.basedOn) && Number.isFinite(state.lastObservedAt) && sample.basedOn < state.lastObservedAt) {
             return;
         }
@@ -464,6 +480,9 @@ class AircraftAnimationEngine {
         state.lastReal = snapshot;
         if (snapshot.source !== 'predicted') {
             state.lastRealFix = { lat: snapshot.lat, lon: snapshot.lon };
+            state.lastFixAt = now;
+            state.hold = null;
+            state.holdSettled = false;
             state.fixes.push(snapshot);
             while (state.fixes.length > 2 && (state.fixes.length > 12 || state.fixes[0].timestamp < now - 30000)) {
                 state.fixes.shift();
@@ -633,7 +652,8 @@ class AircraftAnimationEngine {
 
             const hex = targets[i];
             const state = this.aircraftStates.get(hex);
-            if (!state || state.status === 'signal_lost') continue;
+            // A lost aircraft is drawn until it is back at its last position.
+            if (!state || (state.status === 'signal_lost' && state.holdSettled)) continue;
 
             const pose = this._computePose(state, now);
             if (!pose) continue;
@@ -674,6 +694,39 @@ class AircraftAnimationEngine {
         }
     }
 
+    // No new position decoded for holdAfterSilenceMs (low) or
+    // holdAfterSilenceHighMs, or declared lost.
+    _isSilent(state, now) {
+        if (!Number.isFinite(state.lastFixAt) || !state.lastRealFix) return false;
+        const fix = state.fixes.length ? state.fixes[state.fixes.length - 1] : state.lastReal;
+        const low = fix && Number.isFinite(fix.alt) && fix.alt < this.config.holdBelowFt;
+        const after = low ? this.config.holdAfterSilenceMs : this.config.holdAfterSilenceHighMs;
+        return now - state.lastFixAt > after || state.status === 'signal_lost';
+    }
+
+    // A silent aircraft: from where it was drawn back to its last observed
+    // position over holdGlideMs, then held there, facing its last heading.
+    _heldPose(state, now, heading) {
+        const fix = state.fixes.length ? state.fixes[state.fixes.length - 1] : state.lastReal;
+        if (!state.hold) {
+            const r = state.lastRendered;
+            state.hold = { startAt: now, from: r && Number.isFinite(r.lat) ? { lat: r.lat, lon: r.lon, alt: r.alt } : { lat: fix.lat, lon: fix.lon, alt: fix.alt } };
+            state.correction = null;
+            state.relocation = null;
+        }
+        const t = Math.min(1, Math.max(0, (now - state.hold.startAt) / Math.max(1, this.config.holdGlideMs)));
+        state.holdSettled = t >= 1;
+        const k = t * t * (3 - 2 * t);
+        const f = state.hold.from;
+        return {
+            lat: f.lat + (fix.lat - f.lat) * k,
+            lon: f.lon + (fix.lon - f.lon) * k,
+            alt: f.alt + (fix.alt - f.alt) * k,
+            heading: Number.isFinite(fix.heading) ? fix.heading : heading,
+            held: true,
+        };
+    }
+
     _computePose(state, now) {
         const real = state.lastReal;
         if (!real) return null;
@@ -687,6 +740,8 @@ class AircraftAnimationEngine {
                     : (Number.isFinite(state.velocity?.headingDeg)
                         ? state.velocity.headingDeg
                         : null)));
+
+        if (this._isSilent(state, now)) return this._heldPose(state, now, heading);
 
         const pose = (this._drawsPast() && this._pastPose(state, now, heading)) || this._predictedPose(state, real, now, heading);
         if (state.velocity) this._secPredictedCount++;
@@ -948,7 +1003,7 @@ class AircraftAnimationEngine {
     _cleanupStaleStates() {
         const cutoff = Date.now() - 120000;
         for (const [hex, state] of this.aircraftStates.entries()) {
-            if (state.lastSeenAt < cutoff || state.status === 'signal_lost') {
+            if (state.lastSeenAt < cutoff || (state.status === 'signal_lost' && state.holdSettled)) {
                 this.aircraftStates.delete(hex);
             }
         }

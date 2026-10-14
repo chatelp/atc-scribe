@@ -361,7 +361,11 @@
         return textColorCache[level] || textColorCache.primary;
     }
 
+    // A lost aircraft (no message for a minute) is drawn in the tertiary text
+    // colour where the receiver last placed it, not on the altitude ramp: it is
+    // no longer at that altitude for sure (owner, 14/10; AircraftStrip is-lost).
     function getAircraftSymbolColor(aircraft, visualState, store) {
+        if (aircraft && aircraft.status === 'signal_lost') return labelTextColor('tertiary');
         return getAltitudeBandColor(aircraft, store);
     }
 
@@ -469,12 +473,21 @@
             phaseColor,
             callsignText: callsign,
             typeText: shortType ? ` ${shortType}` : '',
-            detailsText: `${altitude} ${trendArrow} ${speed}`.trim(),
-            ageText: (ageSeconds === null || !Number.isFinite(ageSeconds) || ageSeconds < 5)
+            // Lost: since when, and the last altitude it reported.
+            detailsText: aircraft.status === 'signal_lost'
+                ? `lost ${lostAgeText(ageSeconds)}· last ${altitude}`
+                : `${altitude} ${trendArrow} ${speed}`.trim(),
+            ageText: (aircraft.status === 'signal_lost' || ageSeconds === null || !Number.isFinite(ageSeconds) || ageSeconds < 5)
                 ? ''
                 : `-${Math.max(0, ageSeconds)}s`,
             voiceText: getVoiceLabelLine(aircraft, store),
         };
+    }
+
+    // "40 s ", "3 min ": how long ago a lost aircraft was last heard.
+    function lostAgeText(seconds) {
+        if (!Number.isFinite(seconds)) return '';
+        return seconds < 60 ? `${Math.max(0, Math.round(seconds))} s ` : `${Math.floor(seconds / 60)} min `;
     }
 
     // The last transmission matched to the aircraft, as a third line of its
