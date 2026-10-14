@@ -492,6 +492,13 @@ sur la carte.
 
 ## État
 
+- 14/10 : **étape 7 versée dans `local`** (3ef997e). **Alarme ADS-B** (choix du propriétaire,
+  sans test de coupure Wi-Fi) : le voyant dit « Unreachable · N min » quand chaque lecture de la
+  station échoue, avec la raison en mots et le conseil de relancer Clairance si la station
+  répond ailleurs ; `/api/v1/status` porte `failing_since` et `failing_why`. Vérifié sur une
+  instance jetable et une source factice coupée puis rétablie. La cause du blocage du 13/10
+  reste non prouvée. L'instance d'essai tourne avec le **vrai modèle** (choix du propriétaire,
+  créneau inscrit au planning du labo). Purge GitHub reportée par le propriétaire.
 - 14/10 : **correctif, la barre du haut tient au téléphone** (6a816f6, sur `main`), défaut trouvé
   par la relecture design de l'étape 7 et présent depuis l'étape 3 : à 375 px la barre courait
   jusqu'à 780 px, la cloche et les réglages hors de l'écran (journal et réglages inaccessibles au
