@@ -322,6 +322,8 @@
         return { text: `heading ${headingText(last.hdg)}${later(last.t - ctx.at)}`, at: last.t };
     }
 
+    // What is measured is the ground speed, not the airspeed the controller
+    // asks for: the text says so (a 30 kt wind is the whole tolerance).
     function speed(target, list, ctx) {
         const o = ctx.o;
         const pts = within(list, 'gs');
@@ -331,21 +333,21 @@
         const kt = (v) => `${Math.round(v)} kt`;
         const last = pts[pts.length - 1];
         const r = reach(pts, near, o.holdSec, dist, o.speedTolKt);
-        if (r && r.held) return { text: `${kt(median(r.hold.map((p) => p.gs)))}${later(r.p.t - ctx.at)}`, at: r.p.t };
+        if (r && r.held) return { text: `ground speed ${kt(median(r.hold.map((p) => p.gs)))}${later(r.p.t - ctx.at)}`, at: r.p.t };
         if (r) {
             const x = crossing(pts, r.i, dist);
             const a = x ? x.a : r.p;
             const b = x ? x.b : pts[r.i + 1] || r.p;
             const t = x ? x.t : r.p.t;
             const way = b.gs >= a.gs ? 'accelerating' : 'slowing';
-            return { text: `${way} through ${kt(x ? target.n : r.p.gs)}${later(t - ctx.at)}`, at: Math.round(t) };
+            return { text: `${way} through ${kt(x ? target.n : r.p.gs)} ground speed${later(t - ctx.at)}`, at: Math.round(t) };
         }
         const prev = before(pts, o.trendSec);
         const delta = prev ? last.gs - prev.gs : 0;
         if (Math.abs(delta) >= o.speedChangeKt) {
-            return { text: `${delta < 0 ? 'slowing' : 'accelerating'}, ${kt(last.gs)}${ctx.endDelay(last)}`, at: last.t };
+            return { text: `${delta < 0 ? 'slowing' : 'accelerating'}, ${kt(last.gs)} ground speed${ctx.endDelay(last)}`, at: last.t };
         }
-        return { text: `${kt(last.gs)}${later(last.t - ctx.at)}`, at: last.t };
+        return { text: `ground speed ${kt(last.gs)}${later(last.t - ctx.at)}`, at: last.t };
     }
 
     function frequency(target, ctx) {

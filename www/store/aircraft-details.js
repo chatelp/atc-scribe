@@ -162,9 +162,11 @@
             };
         },
 
-        // RESTORING formatAircraftDetails
-        formatAircraftDetails() {
-            if (!this.selectedAircraft) return '';
+        // Every fact the panel shows about the selected aircraft, by category:
+        // [[category, [[label, value, seconds ago]]]]. The Details tab groups
+        // them (store/story.js, aircraftDetailGroups).
+        aircraftDetailFields() {
+            if (!this.selectedAircraft) return null;
 
             const aircraft = this.selectedAircraft;
             const adsbData = aircraft.adsb || {};
@@ -310,52 +312,7 @@
                 ]]
             ];
 
-            // Initialize collapsible sections state if not already done
-            if (!this.collapsibleSections) {
-                this.collapsibleSections = {};
-                fields.forEach(([category]) => {
-                    // Default to expanded, except for ADSB Info and Signal which are collapsed by default
-                    this.collapsibleSections[category] = !['ADSB Info', 'Signal'].includes(category);
-                });
-            }
-            
-            return `
-                <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                    ${fields.map(([category, items]) => `
-                        <div class="col-span-2 mt-2 first:mt-0">
-                            <div class="flex justify-between items-center mb-1 cursor-pointer relative pb-1"
-                                 onclick="Alpine.store('atc').toggleSection('${category}')">
-                                <h4 class="text-highlight font-bold text-[11px] uppercase tracking-wider">${category}</h4>
-                                <i class="fas fa-chevron-${this.collapsibleSections[category] ? 'down' : 'right'} text-highlight/70 text-xs"></i>
-                                <!-- Subtle green underline -->
-                                <div class="absolute bottom-0 left-0 right-0 h-px bg-highlight/30"></div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-x-4 gap-y-0.5 transition-all duration-300 overflow-hidden"
-                                 style="${this.collapsibleSections[category] ? '' : 'max-height: 0; opacity: 0; margin: 0; padding: 0;'}">
-                                ${items.map(([label, value, seconds]) => `
-                                    <div class="contents">
-                                        <div class="text-text/70">${label}:</div>
-                                        <div class="font-mono">
-                                            ${seconds ? `
-                                                <span>${value}</span>
-                                                <span class="text-text/70 text-[10px] ml-1">${seconds}</span>
-                                            ` : value}
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-        },
-
-        // Toggle collapsible sections in aircraft details
-        toggleSection(category) {
-            if (!this.collapsibleSections) {
-                this.collapsibleSections = {};
-            }
-            this.collapsibleSections[category] = !this.collapsibleSections[category];
+            return fields;
         },
 
         // Properties for Aircraft Details Panel (moved from x-data in HTML)
@@ -370,7 +327,7 @@
         
         // Properties for Proximity View
         showProximityView: false,
-        showTimelineView: false, // the flight's story, www/timeline/ (audit 3.3)
+        showTimelineView: true, // the Story tab, www/timeline/ (audit 3.3): the one a followed flight opens on (step 8)
         proximityDistance: 5, // Default to 5 NM
         proximityAircraft: [],
         proximityLoading: false,
@@ -785,11 +742,7 @@
         navigateToTracksWithHighlight(adsbId) {
             if (!adsbId) return;
             
-            // Switch to tracks view
-            this.aircraftDetailsShowHistoryView = true;
-            this.showProximityView = false;
-            this.stopProximityRefresh();
-            this.clearProximityView();
+            this.setStoryTab('track');
             
             // Store the ADSB ID to highlight
             this.highlightedAdsbId = adsbId;
@@ -826,7 +779,7 @@
                 if (targetIndex === -1) return;
                 
                 // Find the tracks view container and scroll to the appropriate position
-                const tracksContainer = document.querySelector('[x-show="$store.atc.aircraftDetailsShowHistoryView"] .overflow-x-auto');
+                const tracksContainer = document.querySelector('#story-track .overflow-x-auto');
                 if (!tracksContainer) return;
                 
                 // Calculate approximate row height and scroll position
@@ -958,7 +911,8 @@
             return timeDiffMinutes > 10; // Return true if gap is more than 10 minutes
         },
 
-        // Phone: back from the aircraft panel to the list.
+        // Deselect, and the map with it (store/story.js, stopFollowing, does
+        // the rest).
         closeAircraftPanel() {
             this.selectedAircraft = null;
             if (this.mapManager) {

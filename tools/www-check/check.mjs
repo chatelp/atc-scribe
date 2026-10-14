@@ -243,8 +243,6 @@ for (const f of jsFiles) {
 // are defects already there on main, left to the rewrite of their area; one
 // that disappears must leave this list too, so that the list stays true.
 const KNOWN_BROKEN = new Map([
-    // After a clearance for the selected aircraft (palier 3 of docs-fr/32 rewrites clearances).
-    ['refreshSelectedAircraftDetails reads this.selectAircraft', 'a clearance for the selected aircraft calls a function that does not exist'],
 ]);
 let thisReads = 0;
 const brokenSeen = new Set();

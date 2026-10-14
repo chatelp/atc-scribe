@@ -92,6 +92,7 @@
                 kind: 'phase', icon: p.phase === 'T/O' ? 'fa-plane-departure' : p.phase === 'T/D' ? 'fa-plane-arrival' : 'fa-chart-line',
                 text: `${name}${p.airport ? ' at ' + p.airport : ''}`,
                 help: `Flight phase ${p.phase}: ${what}. Judged by the server from altitude, speed and position.`,
+                phase: p.phase, airport: p.airport || '', adsbId: p.adsb_id ?? null,
             });
         }
 
@@ -139,6 +140,7 @@
                 push(t.created_at, {
                     kind: 'transfer', icon: 'fa-right-left',
                     text: `Told to contact ${v.text}` + (to ? `, ${to.name}, which the station listens to` : ''),
+                    frequency: v.text, toName: to ? to.name : '', transmission: t,
                     help: 'A transfer to another controller: the frequency was heard in the transmission. ' +
                         (to ? 'The station listens to it too, so the rest of the flight may be heard there.' : 'The station does not listen to it now.'),
                 });
