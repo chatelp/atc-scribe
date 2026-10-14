@@ -219,7 +219,10 @@ Indépendante de la disposition, elle passe en premier.
 
 - **Change** : les calques de la carte (`MapControls`) ; la bascule Map / PAR en
   `SegmentedControl` dans `cl-sky__top` (« Map », « PAR · LFPG »…), où la carte « Right now »
-  repliée la rejoint au bout de la rangée (oubli du plan relevé à l'étape 5) ; les fiches d'aérodrome et de balise
+  repliée la rejoint au bout de la rangée (oubli du plan relevé à l'étape 5) ; la vue PAR elle-même, sa tête en `ParHead` (les mots en texte, les valeurs en mono) et ses
+  tableaux d'arrivées en `ArrivalSequence` (`cl-table`), la piste qui n'est pas en service repliée sur une
+  ligne, comme `par.html` (second oubli du plan, relevé à l'étape 9a : la tête et les tableaux sont encore
+  ceux d'avant) ; les fiches d'aérodrome et de balise
   (`KeyValues`), le journal (`cl-menu` : six sortes, sons, effacer), la page des réglages
   (`SettingsPage` : Listening, Callsign matching, Display, Account, System), la connexion et le
   premier lancement (`SignIn`, variante « ciel », palette propre de `login.js` retirée), avec la
