@@ -28,6 +28,35 @@
         // 10 s for 117 exchanges, measured 13/10).
         threadChipInfo: {},
 
+        // The connection's banner (ErrorBanner, migration step 10): what failed,
+        // since when, what happens next, and what still works.
+        connectionLostAt: null,
+        get connectionBannerText() {
+            const since = this.connectionLostAt ? ` since ${this.clockText(this.connectionLostAt)}` : '';
+            const attempt = this.wsReconnectAttempt > 0 ? ` (attempt ${this.wsReconnectAttempt})` : '';
+            const next = this.wsNextRetryDelayMs !== null && this.wsNextRetryDelayMs !== undefined
+                ? `, next in ${Math.ceil(this.wsNextRetryDelayMs / 1000)} s` : '';
+            return `Connection to the server lost${since}: reconnecting${attempt}${next}. The map shows the last positions.`;
+        },
+
+        // The thread with nothing in it says why, and what will fill it
+        // (EmptyState, step 10, etats.html).
+        get threadEmptyText() {
+            if (this.threadSearch) return 'No exchange matches this search.';
+            const rx = this.serverStatus && this.serverStatus.receiver;
+            const since = rx && rx.since ? ` since ${this.clockText(rx.since)}` : '';
+            if (rx && !rx.stale && rx.state === 'lent') {
+                return `Nothing to listen to: the station's receiver is lent to another use${since}. The thread comes back when it is on air again; the map and the PAR keep working.`;
+            }
+            if (rx && !rx.stale && rx.state === 'off') {
+                return `Nothing to listen to: the station's receiver is off${since}. The thread comes back when it is on air again; the map and the PAR keep working.`;
+            }
+            const freqs = this.audioFrequencies || [];
+            if (!freqs.length) return 'No frequency: the station has nothing on air. The map and the PAR keep working.';
+            const names = freqs.map((f) => this.freqLabel(f.id)).join(' + ');
+            return `No transcription yet on ${names}. Lines appear here as soon as someone speaks.`;
+        },
+
         startThread() {
             if (this._threadStarted) return;
             this._threadStarted = true;

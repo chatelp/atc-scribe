@@ -234,7 +234,7 @@
                 <div class="cl-app__bottom relative" x-data="threadView()">
                     <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" x-ref="scroller" @scroll.passive="onScroll()">
                         <template x-if="$store.atc.threadExchanges.length === 0">
-                            <p class="cl-plain px-4 py-3" x-text="$store.atc.threadSearch ? 'No exchange matches this search.' : ($store.atc.audioFrequencies.length ? 'No exchange yet: they appear here as the frequencies are transcribed.' : 'No frequency: the station has nothing on air.')"></p>
+                            <div class="cl-empty"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 6.5a5.5 5.5 0 0 1 10 0M5 8.5a3 3 0 0 1 6 0"/><circle cx="8" cy="11" r="1.2"/></svg><span x-text="$store.atc.threadEmptyText"></span></div>
                         </template>
                         <!-- Exchange: who spoke to whom, what was said, what it means. -->
                         <template x-for="t in $store.atc.threadExchanges" :key="t.id || (t.frequency_id + '-' + t.timestamp)">
@@ -884,6 +884,13 @@
                         <div id="par-frame" x-show="$store.atc.storyFrameAirport" x-cloak class="cl-root cl-parframe absolute left-0 right-0 bottom-0 z-20"></div>
 
 
+                        <!-- ErrorBanner (step 10, etats.html): the connection lost says so at the
+                             top of the sky, which stays usable underneath (it replaced a
+                             full-screen "Connection Lost"). -->
+                        <div x-show="$store.atc.connected === false && $store.atc.initialDataLoaded" x-cloak role="alert"
+                             class="cl-root cl-banner absolute left-3 right-3 top-14" style="z-index: 10001;"
+                             x-text="$store.atc.connectionBannerText"></div>
+
                         <!-- MapControls (step 9, a-calques): the base map and the layers, behind the
                              layers button in the corner; saved in this browser as before. Above
                              the PAR frame while it shows; hidden with the PAR view. -->
@@ -950,27 +957,14 @@
                         </div>
                     </div>
 
-                    <!-- Connection Lost Overlay - Only show after initialization and when connection is lost -->
-                    <div class="fixed inset-0 bg-black/50 flex justify-center items-center z-[9000] transition-all duration-500"
-                         :class="{ 'opacity-100 visible': $store.atc.connected === false && $store.atc.initialDataLoaded, 'opacity-0 invisible pointer-events-none': $store.atc.connected !== false || !$store.atc.initialDataLoaded }">
-                        <div class="text-center text-danger text-4xl font-bold uppercase tracking-wider animate-pulse bg-black/50 p-8 rounded-lg shadow-2xl">
-                            <i class="fas fa-wifi-slash text-6xl mb-4 block"></i>
-                            Connection Lost
-                            <div class="mt-3 text-base text-text/80 normal-case tracking-normal" x-show="$store.atc.wsReconnectAttempt > 0">
-                                Reconnect attempt #<span x-text="$store.atc.wsReconnectAttempt"></span>
-                                <span x-show="$store.atc.wsNextRetryDelayMs !== null"> · next in <span x-text="Math.ceil($store.atc.wsNextRetryDelayMs / 1000)"></span>s</span>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <!-- Resume listening. Browsers let a page play sound only after a click
                          on it; upstream asked for that click with a welcome screen over the
                          whole map, at every load. Now the first click or key anywhere resumes
                          the frequencies listened to last time, and this line says so while
                          something is waiting for it (10/10, audit 1.5). -->
                     <div x-show="$store.atc.resumeListeningPending" x-transition.opacity
-                         class="absolute left-1/2 -translate-x-1/2 bottom-4 z-40 px-3 py-1.5 rounded-full bg-panel/90 border border-highlight/40 text-xs text-text shadow pointer-events-none">
-                        <i class="fas fa-volume-high mr-1.5 text-highlight"></i>Click anywhere to resume listening
+                         class="cl-root cl-resume absolute left-1/2 -translate-x-1/2 bottom-6 pointer-events-none" style="z-index: 10001; background: var(--color-surface-raised);">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6v4h2.5l3.5 3V3L5 6Z"/><path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.8a6 6 0 0 1 0 8.4"/></svg>Click anywhere to resume listening
                     </div>
                 </main>
                 
