@@ -411,21 +411,35 @@
             return Number.isFinite(n) ? String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ft' : '';
         }
 
+        // The frequencies; the Desc column only when one of them has one.
         _sheetFrequencies(list) {
             const e = this._escapeSheet;
+            const desc = (list || []).some((f) => String(f?.description || '').trim());
             const rows = (list || []).map((f) => {
                 const mhz = Number(f?.frequency_mhz);
-                return `<tr><td>${e(f?.type || '')}</td><td style="white-space: normal;">${e(f?.description || '')}</td>` +
+                return `<tr><td>${e(f?.type || '')}</td>` + (desc ? `<td style="white-space: normal;">${e(f?.description || '')}</td>` : '') +
                     `<td class="is-num">${Number.isFinite(mhz) && mhz > 0 ? mhz.toFixed(3) : e(f?.frequency_mhz || '')}</td></tr>`;
             }).join('');
             return rows
-                ? `<table class="cl-table"><thead><tr><th>Type</th><th>Desc</th><th class="is-num">MHz</th></tr></thead><tbody>${rows}</tbody></table>`
+                ? `<table class="cl-table"><thead><tr><th>Type</th>${desc ? '<th>Desc</th>' : ''}<th class="is-num">MHz</th></tr></thead><tbody>${rows}</tbody></table>`
                 : '';
+        }
+
+        // The name as the column says it ("Saint-Cyr-l'École", not "… Airport").
+        _sheetName(place) {
+            const R = window.RightNow;
+            return R && typeof R.shortName === 'function' ? R.shortName({ name: place?.name, code: place?.ident }) : (place?.name || '');
+        }
+
+        // "BOTH" -> "Both": the base's capitals, for a word that is not an acronym.
+        _sheetWord(value) {
+            const t = String(value || '').trim();
+            return t && t === t.toUpperCase() ? t.charAt(0) + t.slice(1).toLowerCase() : t;
         }
 
         _airportPopupHtml(airport) {
             const town = [airport?.municipality, airport?.iso_country].filter(Boolean).join(', ');
-            return this._sheetHead(airport?.ident || '', airport?.name || '') +
+            return this._sheetHead(airport?.ident || '', this._sheetName(airport)) +
                 this._sheetKv([
                     ['Type', (airport?.type || '').replace(/_/g, ' ')],
                     ['Elevation', this._sheetFeet(airport?.elevation_ft)],
@@ -447,14 +461,14 @@
                     ['Frequency', frequency],
                     ...(navaid?.elevation_ft ? [['Elevation', this._sheetFeet(navaid.elevation_ft)]] : []),
                     ...(navaid?.associated_airport ? [['Airport', navaid.associated_airport]] : []),
-                    ...(navaid?.usage_type ? [['Usage', navaid.usage_type]] : []),
-                    ...(navaid?.power ? [['Power', navaid.power]] : []),
+                    ...(navaid?.usage_type ? [['Usage', this._sheetWord(navaid.usage_type)]] : []),
+                    ...(navaid?.power ? [['Power', this._sheetWord(navaid.power)]] : []),
                 ]);
         }
 
         _heliportPopupHtml(heliport) {
             const town = [heliport?.municipality, heliport?.iso_country].filter(Boolean).join(', ');
-            return this._sheetHead(heliport?.ident || '', heliport?.name || '') +
+            return this._sheetHead(heliport?.ident || '', this._sheetName(heliport)) +
                 this._sheetKv([
                     ['Type', 'heliport'],
                     ['Elevation', this._sheetFeet(heliport?.elevation_ft)],

@@ -16,7 +16,30 @@
     // aircraft landing against the flow does not log two changes.
     const RUNWAY_HOLD_MS = 120000;
 
-    const SQUAWKS = { '7500': 'hijack', '7600': 'radio failure', '7700': 'emergency' };
+    const SQUAWKS = { '7500': 'unlawful interference squawk', '7600': 'radio failure squawk', '7700': 'emergency squawk' };
+    const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+
+    // ", FL 110, 18 NM north-east": where the aircraft is, from the station,
+    // in the brand's numbers (EventList). Each part only when known.
+    function whereText(a, atc, withLevel) {
+        const parts = [];
+        if (withLevel && atc && typeof atc.altitudeReading === 'function') {
+            const r = atc.altitudeReading(a);
+            if (r && r.kind === 'fl') parts.push('FL ' + String(r.fl).padStart(3, '0'));
+            else if (r && r.kind === 'ft') parts.push(String(Math.round(r.ft / 100) * 100).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f') + ' ft');
+            else if (r && r.kind === 'gnd') parts.push('on the ground');
+        }
+        const t = a.adsb || {};
+        if (Number.isFinite(a.distance) && atc && atc.stationLatitude != null && t.lat != null) {
+            const r = Math.PI / 180;
+            const y = Math.sin((t.lon - atc.stationLongitude) * r) * Math.cos(t.lat * r);
+            const x = Math.cos(atc.stationLatitude * r) * Math.sin(t.lat * r) -
+                Math.sin(atc.stationLatitude * r) * Math.cos(t.lat * r) * Math.cos((t.lon - atc.stationLongitude) * r);
+            const deg = (Math.atan2(y, x) / r + 360) % 360;
+            parts.push(`${Math.round(a.distance)} NM ${COMPASS[Math.round(deg / 45) % 8]}`);
+        }
+        return parts.length ? ', ' + parts.join(', ') : '';
+    }
 
     // Types worth looking out of the window for: the very large and the rare.
     const INTEREST_TYPES = new Set(['A388', 'A3ST', 'A337', 'A124', 'A225', 'B748', 'B744', 'A400', 'C17']);
@@ -240,21 +263,24 @@
                     if (SQUAWKS[squawk]) {
                         this.add({
                             kind: 'emergency', hex: a.hex, key: `sq:${a.hex}:${squawk}`,
-                            text: `${callsign(a)} squawks ${squawk}, ${SQUAWKS[squawk]}`,
+                            // "7700 AFR6TZ, emergency squawk, FL 110, 18 NM north-east."
+                            text: `${squawk} ${callsign(a)}, ${SQUAWKS[squawk]}${whereText(a, atc, true)}.`,
                         });
                     }
                     const ga = a.runway && a.runway.go_around;
                     if (ga) {
                         this.add({
                             kind: 'go_around', hex: a.hex, key: `ga:${a.hex}:${ga.since}`,
-                            text: `${callsign(a)} goes around, ${ga.airport} runway ${ga.runway}`,
+                            // "Go-around EZY14LM on 27R at LFPG, now climbing back."
+                            text: `Go-around ${callsign(a)} on ${ga.runway} at ${ga.airport}, now climbing back.`,
                         });
                     }
                     const type = ((a.adsb && a.adsb.t) || (a.bsdb && a.bsdb.icao_type_code) || '').toUpperCase();
                     if (INTEREST_TYPES.has(type)) {
                         this.add({
                             kind: 'interest', hex: a.hex, key: `type:${a.hex}`,
-                            text: `${callsign(a)}, ${article(type)} ${type}, is in range`,
+                            // "AFR18GH, an A388, is in range, 34 NM west."
+                            text: `${callsign(a)}, ${article(type)} ${type}, is in range${whereText(a, atc, false)}.`,
                         });
                     }
                 }
