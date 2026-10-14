@@ -492,6 +492,15 @@ sur la carte.
 
 ## État
 
+- 14/10 (soir) : **étape 9b livrée sur `migration`**. Les fiches d'aérodrome, d'héliport et de
+  balise deviennent des `cl-card` (tête : indicatif en mono, nom, × ; `KeyValues` ; fréquences en
+  `cl-table`, MHz à trois décimales), fermées par ×, Échap ou un clic à côté ; les valeurs venues
+  de la base sont échappées ; les règles `ref-popup` de `style.css` (couleurs en dur) sont
+  retirées. Le journal devient un `cl-menu` sous la cloche (a-journal) : « Sounds » et « Clear »
+  dans sa tête, « Ring a bell for » en cinq cases (la station et ses flux sous une), les lignes
+  marquées comme dans Right now (■ ▲ ●), à l'horloge de la page (UTC par défaut ; il affichait
+  l'heure locale avec les secondes). Au passage, la trace d'un avion perdu passe au gris tertiaire
+  du système (relecture design).
 - 14/10 (soir) : **trois retours du propriétaire pendant 9a.** (1) **Perte de signal** : un
   avion trop bas avant l'atterrissage restait figé à côté de sa trace. Cause mesurée : pendant la
   minute qui précède « signal lost », le serveur envoie des positions prédites en ligne droite et

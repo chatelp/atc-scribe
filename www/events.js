@@ -182,6 +182,32 @@
                 saveLog(this.list);
             },
 
+            // "Ring a bell for" (EventList, a-journal): five choices, the
+            // station's channels and its audio streams under one.
+            soundGroups: [
+                { key: 'emergency', label: 'Emergencies', kinds: ['emergency'] },
+                { key: 'go_around', label: 'Go-arounds', kinds: ['go_around'] },
+                { key: 'runway', label: 'Runway changes', kinds: ['runway'] },
+                { key: 'interest', label: 'Aircraft of interest', kinds: ['interest'] },
+                { key: 'station', label: 'Station and audio', kinds: ['station', 'stream'] },
+            ],
+
+            soundGroupOn(group) {
+                return group.kinds.every((k) => !!this.sounds[k]);
+            },
+
+            toggleSoundGroup(group) {
+                const on = !this.soundGroupOn(group);
+                for (const k of group.kinds) this.sounds[k] = on;
+                try { localStorage.setItem('eventSounds', JSON.stringify(this.sounds)); } catch (e) { /* lasts the page */ }
+            },
+
+            // The mark of an event's kind, as Right now shows it (■ ▲ ●).
+            markOf(ev) {
+                return window.RightNow && typeof window.RightNow.eventMark === 'function'
+                    ? window.RightNow.eventMark(ev.kind) : { mark: '', cls: '' };
+            },
+
             toggleSound(kind) {
                 this.sounds[kind] = !this.sounds[kind];
                 try { localStorage.setItem('eventSounds', JSON.stringify(this.sounds)); } catch (e) { /* lasts the page */ }
@@ -193,8 +219,12 @@
                 atc.selectAircraftByHex(ev.hex);
             },
 
+            // The page's clock (UTC or local, Settings > Display), as Right now.
             time(ev) {
-                const t = ev.at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const atc = window.Alpine && Alpine.store('atc');
+                const t = atc && typeof atc.clockText === 'function'
+                    ? atc.clockText(ev.at)
+                    : ev.at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 // A restored event from another day says which one.
                 return sameDay(ev.at, new Date()) ? t : `${ev.at.toLocaleDateString([], { day: '2-digit', month: '2-digit' })} ${t}`;
             },

@@ -948,55 +948,49 @@
                         </div>
                     </div>
 
-                    <!-- The settings and the event log open from the top bar (step 3);
-                         the log's panel still hangs here, at the top left of the sky,
-                         until the windows step. -->
-                    <div x-show="$store.events.open" x-cloak @keydown.escape.window="$store.events.open = false"
-                         class="absolute left-2 top-12 w-[24rem] max-w-[calc(100%-1rem)] max-h-[60vh] z-50 flex flex-col bg-panel border border-border rounded-lg shadow-[0_5px_15px_rgba(0,0,0,0.5)] text-text text-xs">
-                        <div class="flex items-center gap-2 px-3 py-2 border-b border-border">
-                            <span class="font-medium text-sm">Event log</span>
-                            <span class="text-text/50" x-text="$store.events.list.length ? $store.events.list.length + ' events' : ''"></span>
-                            <span class="flex-1"></span>
-                            <button class="text-text/60 hover:text-text" title="Choose which events ring" @click="$store.events.soundsOpen = !$store.events.soundsOpen">
-                                <i class="fas fa-volume-high"></i>
-                            </button>
-                            <button class="text-text/60 hover:text-text" title="Clear the log" @click="$store.events.clear()" x-show="$store.events.list.length">
-                                <i class="fas fa-trash-can"></i>
-                            </button>
-                            <button class="text-text/60 hover:text-text" title="Close" @click="$store.events.open = false">
-                                <i class="fas fa-times"></i>
-                            </button>
+                    <!-- The event log (EventList, migration step 9b, a-journal): a cl-menu
+                         under the bell; a click on a line with an aircraft follows it. -->
+                    <div x-show="$store.events.open" x-cloak role="dialog" aria-label="Event log"
+                         class="cl-root cl-menu cl-menu--wide fixed right-3 top-[52px] max-h-[70vh] overflow-y-auto"
+                         style="z-index: 10002; width: 360px; max-width: calc(100vw - 1.5rem);"
+                         @keydown.escape.window="$store.events.open = false"
+                         @click.outside="if (!$event.target.closest('[aria-label=&quot;Event log&quot;]')) $store.events.open = false">
+                        <div class="cl-menu__head">
+                            <span class="cl-menu__title">Event log</span>
+                            <span class="cl-age" x-text="$store.events.list.length ? $store.events.list.length + ($store.events.list.length > 1 ? ' events' : ' event') : ''"></span>
+                            <span class="cl-row ml-auto">
+                                <button class="cl-btn" :class="$store.events.soundsOpen ? 'is-on' : ''" :aria-expanded="$store.events.soundsOpen"
+                                        @click="$store.events.soundsOpen = !$store.events.soundsOpen"
+                                        data-help-title="Sounds" data-help="Which events ring a bell in this browser. Emergencies ring by default.">Sounds</button>
+                                <button class="cl-btn cl-btn--quiet" x-show="$store.events.list.length" @click="$store.events.clear()"
+                                        data-help-title="Clear" data-help="Empty the log in this browser. The events themselves are not lost: they come again if they happen again.">Clear</button>
+                            </span>
                         </div>
-                        <div x-show="$store.events.soundsOpen" class="border-b border-border">
-                            <div class="px-3 py-2 grid grid-cols-2 gap-1">
-                                <div class="col-span-2 text-text/50 mb-1">Ring a bell for:</div>
-                                <template x-for="(k, kind) in $store.events.kinds" :key="kind">
-                                    <label class="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" :checked="!!$store.events.sounds[kind]" @change="$store.events.toggleSound(kind)">
-                                        <i class="fas w-4 text-center" :class="[k.icon, k.color]"></i>
-                                        <span x-text="k.label"></span>
+                        <template x-if="$store.events.soundsOpen">
+                            <div class="cl-menu__group">
+                                <span class="cl-label">Ring a bell for</span>
+                                <template x-for="g in $store.events.soundGroups" :key="g.key">
+                                    <label class="cl-check" :class="$store.events.soundGroupOn(g) ? 'is-on' : ''" @click.prevent="$store.events.toggleSoundGroup(g)">
+                                        <span class="cl-check__box"></span><span x-text="g.label"></span>
                                     </label>
                                 </template>
                             </div>
-                        </div>
-                        <div class="overflow-y-auto">
-                            <div x-show="!$store.events.list.length" class="px-3 py-4 text-text/50">
-                                Nothing yet. Emergencies, go-arounds, runway changes, aircraft of interest
-                                and changes of the station's channels will show here.
-                            </div>
+                        </template>
+                        <template x-if="$store.events.soundsOpen"><div class="cl-menu__sep"></div></template>
+                        <p x-show="!$store.events.list.length" class="cl-plain">
+                            Nothing yet. Emergencies, go-arounds, runway changes, aircraft of interest
+                            and changes of the station's channels will show here.
+                        </p>
+                        <ul class="cl-events" x-show="$store.events.list.length">
                             <template x-for="ev in $store.events.list" :key="ev.id">
-                                <div class="flex items-start gap-2 px-3 py-1.5 border-b border-border/40"
-                                     :class="ev.hex ? 'cursor-pointer hover:bg-hover' : ''"
-                                     :title="ev.hex ? 'Show this aircraft' : ''"
-                                     @click="$store.events.select(ev)">
-                                    <span class="text-text/50 tabular-nums shrink-0" x-text="$store.events.time(ev)"></span>
-                                    <i class="fas w-4 text-center mt-0.5 shrink-0" :class="[$store.events.kinds[ev.kind].icon, $store.events.kinds[ev.kind].color]"></i>
-                                    <span x-text="ev.text"></span>
-                                </div>
+                                <li :class="ev.hex ? 'is-clickable' : ''" @click="$store.events.select(ev)" :title="ev.hex ? 'Show this aircraft' : ''">
+                                    <time x-text="$store.events.time(ev)"></time>
+                                    <span><span x-show="$store.events.markOf(ev).mark" :class="$store.events.markOf(ev).cls" x-text="$store.events.markOf(ev).mark + ' '"></span><span x-text="ev.text"></span></span>
+                                </li>
                             </template>
-                        </div>
+                        </ul>
                     </div>
-                    
+
                     <!-- Map Container -->
                     <div class="flex-1 relative z-10">
                         <div id="map" class="h-full w-full bg-black"></div>
