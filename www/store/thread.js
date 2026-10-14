@@ -175,8 +175,18 @@
             this.threadShow = freqId && freqId !== 'all' ? freqId : 'all';
         },
 
+        // The volume the open menu shows: audioClient keeps the volumes outside
+        // the store, so the menu reads this copy, set when it opens.
+        threadMenuVolume: 1,
+
         toggleThreadMenu(freqId) {
             this.threadMenuFor = this.threadMenuFor === freqId ? null : freqId;
+            if (this.threadMenuFor) this.threadMenuVolume = Number(this.volumeOf(freqId));
+        },
+
+        setThreadVolume(freqId, value) {
+            this.threadMenuVolume = Number(value);
+            this.setVolume(freqId, this.threadMenuVolume);
         },
 
         // In the frequency's menu: its state in this browser, in a word.

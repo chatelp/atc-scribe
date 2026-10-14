@@ -167,50 +167,50 @@
                                @keydown.escape="$store.atc.threadSearch = ''; $store.atc.threadSearchOpen = false">
                     </div>
                     <!-- ChannelButton (split) per frequency, and its ChannelMenu. -->
-                    <div class="cl-threadhead__row relative" x-show="$store.atc.audioFrequencies.length">
+                    <div class="cl-threadhead__row cl-threadhead__row--channels" x-show="$store.atc.audioFrequencies.length">
                         <template x-for="freq in $store.atc.audioFrequencies" :key="freq.id">
-                            <span class="cl-channel cl-channel--split"
+                            <span class="cl-channel cl-channel--split relative"
                                   :class="{ 'is-on': $store.atc.isUnmuted(freq.id), 'is-menu-open': $store.atc.threadMenuFor === freq.id,
                                             'is-failed': $store.atc.isFrequencyFailed(freq.id), 'is-connecting': $store.atc.isFrequencyConnecting(freq.id) }">
                                 <button class="cl-channel__main" :aria-pressed="String($store.atc.isUnmuted(freq.id))"
                                         :disabled="$store.atc.isFrequencyFailed(freq.id) || $store.atc.isFrequencyConnecting(freq.id)"
-                                        @click="$store.atc.toggleMute(freq)"
+                                        @click="$store.atc.toggleMute(freq)" :title="freq.name"
                                         data-help-title="Listen" :data-help="$store.atc.tileHelp(freq)">
                                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 6h2.5l3.5-3v10l-3.5-3H2.5V6Z"/><path x-show="$store.atc.isUnmuted(freq.id)" d="M11 5.5a3.5 3.5 0 0 1 0 5"/><path x-show="!$store.atc.isUnmuted(freq.id)" d="m11 6 3 4m0-4-3 4"/></svg>
                                     <span class="cl-channel__freq" x-text="$store.atc.freqLabel(freq.id)"></span>
-                                    <span x-text="$store.atc.freqShortName(freq)"></span>
+                                    <span class="cl-channel__name" x-text="$store.atc.freqShortName(freq)"></span>
                                 </button>
                                 <button class="cl-channel__caret" :aria-label="$store.atc.freqLabel(freq.id) + ': volume and options'"
                                         :aria-expanded="String($store.atc.threadMenuFor === freq.id)"
                                         @click.stop="$store.atc.toggleThreadMenu(freq.id)">
                                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></svg>
                                 </button>
-                            </span>
-                        </template>
-                        <template x-for="freq in $store.atc.audioFrequencies.filter((f) => f.id === $store.atc.threadMenuFor)" :key="'menu-' + freq.id">
-                            <div class="cl-menu absolute left-0 top-full z-[1100] mt-1" role="dialog" :aria-label="$store.atc.freqLabel(freq.id) + ' ' + freq.name"
-                                 x-data="{ v: Number($store.atc.volumeOf(freq.id)) }"
-                                 @click.outside="$store.atc.threadMenuFor = null" @keydown.escape.window="$store.atc.threadMenuFor = null">
-                                <div class="cl-menu__head"><span class="cl-channel__freq cl-menu__title" x-text="$store.atc.freqLabel(freq.id)"></span><span class="cl-menu__title" x-text="$store.atc.freqShortName(freq)"></span></div>
-                                <div class="cl-menu__row"><span class="cl-light" :class="'cl-light--' + $store.atc.channelState(freq).level" x-text="$store.atc.channelState(freq).text"></span></div>
-                                <div class="cl-menu__row">
-                                    <span class="cl-label">Volume</span>
-                                    <div class="cl-slider">
-                                        <span class="cl-slider__rail"></span>
-                                        <span class="cl-slider__fill" :style="'left:0;width:' + Math.round(v * 100) + '%'"></span>
-                                        <span class="cl-slider__thumb" :style="'left:' + Math.round(v * 100) + '%'"></span>
-                                        <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="0" max="1" step="0.05"
-                                               :value="v" aria-label="Volume" @input="v = Number($event.target.value); $store.atc.setVolume(freq.id, v)">
+                                <!-- ChannelMenu: under its own button, left edges aligned. -->
+                                <div class="cl-menu absolute left-0 top-full z-[1100] mt-1 whitespace-normal cursor-auto"
+                                     x-show="$store.atc.threadMenuFor === freq.id" x-cloak @click.stop role="dialog" :aria-label="$store.atc.freqLabel(freq.id) + ' ' + freq.name"
+                                    
+                                     @click.outside="if ($store.atc.threadMenuFor === freq.id) $store.atc.threadMenuFor = null" @keydown.escape.window="$store.atc.threadMenuFor = null">
+                                    <div class="cl-menu__head"><span class="cl-channel__freq cl-menu__title" x-text="$store.atc.freqLabel(freq.id)"></span><span class="cl-menu__title" x-text="$store.atc.freqShortName(freq)"></span></div>
+                                    <div class="cl-menu__row"><span class="cl-light" :class="'cl-light--' + $store.atc.channelState(freq).level" x-text="$store.atc.channelState(freq).text"></span></div>
+                                    <div class="cl-menu__row">
+                                        <span class="cl-label">Volume</span>
+                                        <div class="cl-slider">
+                                            <span class="cl-slider__rail"></span>
+                                            <span class="cl-slider__fill" :style="'left:0;width:' + Math.round($store.atc.threadMenuVolume * 100) + '%'"></span>
+                                            <span class="cl-slider__thumb" :style="'left:' + Math.round($store.atc.threadMenuVolume * 100) + '%'"></span>
+                                            <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="0" max="1" step="0.05"
+                                                   :value="$store.atc.threadMenuVolume" aria-label="Volume" @input="$store.atc.setThreadVolume(freq.id, $event.target.value)">
+                                        </div>
+                                        <span class="cl-channel__age" x-text="Math.round($store.atc.threadMenuVolume * 100) + ' %'"></span>
                                     </div>
-                                    <span class="cl-channel__age" x-text="Math.round(v * 100) + ' %'"></span>
+                                    <div class="cl-menu__sep"></div>
+                                    <label class="cl-check" :class="$store.atc.threadShow === freq.id ? 'is-on' : ''"
+                                           @click.prevent="$store.atc.setThreadShow($store.atc.threadShow === freq.id ? 'all' : freq.id)">
+                                        <span class="cl-check__box"></span>Only this frequency in the thread
+                                    </label>
+                                    <span class="cl-plain" x-text="$store.atc.channelNote(freq)"></span>
                                 </div>
-                                <div class="cl-menu__sep"></div>
-                                <label class="cl-check" :class="$store.atc.threadShow === freq.id ? 'is-on' : ''"
-                                       @click.prevent="$store.atc.setThreadShow($store.atc.threadShow === freq.id ? 'all' : freq.id)">
-                                    <span class="cl-check__box"></span>Only this frequency in the thread
-                                </label>
-                                <span class="cl-plain" x-text="$store.atc.channelNote(freq)"></span>
-                            </div>
+                            </span>
                         </template>
                     </div>
                     <div class="cl-threadhead__row" x-show="$store.atc.audioFrequencies.length > 1">
