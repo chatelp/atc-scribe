@@ -492,6 +492,15 @@ sur la carte.
 
 ## État
 
+- 14/10 (nuit) : **étapes 9b, 9d et 9e livrées sur `migration`, relues conformes pour 9b et 9d**
+  (9e en relecture ; 9c, les réglages, en cours). 9b : les phrases d'événements alignées sur la fiche
+  EventList, écrites en un seul endroit (`events.js`) pour la colonne et la cloche (« 7700 EZY306H,
+  emergency squawk, FL 390, 36 NM north. »), les fiches au nom court. 9d : la connexion et le
+  premier lancement sur le ciel (`SignIn` variante ciel), la console de la station lue sur
+  `/api/v1/vitals` (route publique, cache 10 s, déjà côté serveur) ; `login.js` perd sa palette ;
+  au téléphone une colonne dans le flux (règle du système corrigée, acceptée par la relecture) ;
+  aperçu `?signin=1` / `?signin=setup` sur une instance de cette machine. 9e : la vue PAR sur le
+  système (ParHead, ParFrame, ArrivalSequence), la piste hors service repliée par défaut.
 - 14/10 (soir) : **étape 9b livrée sur `migration`**. Les fiches d'aérodrome, d'héliport et de
   balise deviennent des `cl-card` (tête : indicatif en mono, nom, × ; `KeyValues` ; fréquences en
   `cl-table`, MHz à trois décimales), fermées par ×, Échap ou un clic à côté ; les valeurs venues
