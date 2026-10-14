@@ -174,7 +174,9 @@
     border-radius: var(--radius-md); border: var(--border-width-default) solid var(--color-border-default);
     background: var(--color-surface-raised); font-size: var(--font-size-small); white-space: nowrap; color: var(--color-text-primary);
 }
-.cl-chip--callsign { font-family: var(--font-family-mono); font-weight: var(--font-weight-strong); cursor: pointer; }
+.cl-chip--callsign { position: relative; font-family: var(--font-family-mono); font-weight: var(--font-weight-strong); cursor: pointer; }
+/* drawn 20 px high, clicked on 24: the target grows, not the chip */
+.cl-chip--callsign::after { content: ""; position: absolute; inset: -3px -1px; }
 .cl-chip--callsign:hover { border-color: var(--color-border-control); }
 .cl-chip--callsign.is-selected { border-color: var(--color-accent-default); }
 .cl-chip--callsign.is-away { color: var(--color-text-tertiary); border-style: dashed; cursor: default; font-weight: var(--font-weight-regular); }
@@ -222,6 +224,10 @@
 .cl-exchange__play { margin-left: auto; width: var(--size-target-desk); height: var(--size-target-desk); border: 0; background: none; color: var(--color-text-secondary); display: inline-grid; place-items: center; border-radius: var(--radius-md); cursor: pointer; }
 .cl-exchange__play:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
 .cl-exchange__text { margin: 0; font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
+/* the words that named the aircraft: weight, not colour (amber means doubt) */
+.cl-exchange__text b { font-weight: var(--font-weight-strong); color: var(--color-text-primary); }
+/* a search hit: the highlighter of find-in-page */
+.cl-exchange mark { background: var(--color-status-warn); color: var(--color-text-on-warn); border-radius: var(--radius-sm); padding: 0 1px; }
 .cl-exchange__instr { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 .cl-exchange__explain { font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
 .cl-exchange__explain--boxed { padding: var(--space-2) var(--space-3); background: var(--color-surface-raised); border-radius: var(--radius-md); }
@@ -361,13 +367,17 @@
 /* ------------------------------------------------------------ ThreadHead: title, listen to all, channels, search */
 .cl-threadhead { padding: var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); border-bottom: var(--border-width-default) solid var(--color-border-default); }
 .cl-threadhead__row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* the channel buttons hold one row: a long name is cut, never the row */
+.cl-threadhead__row--channels { flex-wrap: nowrap; }
+.cl-threadhead__row--channels .cl-channel { flex: 0 1 auto; min-width: 0; }
+.cl-channel__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .cl-threadhead__title { margin: 0; font-size: var(--font-size-title); line-height: var(--font-line-height-title); font-weight: var(--font-weight-strong); }
 .cl-threadhead__end { margin-left: auto; display: flex; gap: var(--space-1-5); align-items: center; }
 
 /* ChannelButton, split: the frequency toggles listening, the caret opens its menu */
 .cl-channel--split { padding: 0; gap: 0; cursor: default; }
 .cl-channel--split:hover { background: var(--color-surface-panel); }
-.cl-channel__main { display: inline-flex; align-items: center; gap: var(--space-2); height: 100%; padding: 0 var(--space-2); border-radius: var(--radius-md) 0 0 var(--radius-md); color: inherit; cursor: pointer; }
+.cl-channel__main { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; height: 100%; padding: 0 var(--space-2); border-radius: var(--radius-md) 0 0 var(--radius-md); color: inherit; cursor: pointer; }
 .cl-channel__main:hover { background: var(--color-surface-hover); }
 .cl-channel__caret { height: 100%; width: var(--size-target-desk); display: inline-grid; place-items: center; border: 0; border-left: var(--border-width-default) solid var(--color-border-default); background: none; color: var(--color-text-secondary); cursor: pointer; border-radius: 0 var(--radius-md) var(--radius-md) 0; }
 .cl-channel__caret:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
