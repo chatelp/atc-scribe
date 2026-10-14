@@ -69,11 +69,11 @@ func (s *transcriptionSink) emit(text string, at time.Time, language, second str
 // browser: "transcription_second" patches that one field of the exchange
 // already shown. If the transmission had found no aircraft, it is matched
 // again with this reading, and its "transcription_update" follows.
-func (s *transcriptionSink) second(id int64, text string) {
+func (s *transcriptionSink) second(id int64, text string) bool {
 	again, err := s.storage.SetSecondReading(id, text)
 	if err != nil {
 		s.logger.Error("Failed to store the second reading", Error(err))
-		return
+		return false
 	}
 	s.wsServer.Broadcast(&websocket.Message{
 		Type: "transcription_second",
@@ -84,4 +84,5 @@ func (s *transcriptionSink) second(id int64, text string) {
 			"rematch":        again,
 		},
 	})
+	return again
 }

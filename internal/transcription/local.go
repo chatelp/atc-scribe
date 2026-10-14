@@ -294,7 +294,7 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 		return
 	}
 	if out.SecondPending != "" {
-		go p.awaitSecond(id, out.SecondPending)
+		go p.awaitSecond(id, out.SecondPending, time.Now())
 	}
 }
 
@@ -451,7 +451,7 @@ const secondWaitTotal = 10 * time.Minute
 
 // awaitSecond fetches a second reading asked for later, long-polling the
 // sidecar a minute at a time, and stores it when it says something.
-func (p *LocalProcessor) awaitSecond(id int64, key string) {
+func (p *LocalProcessor) awaitSecond(id int64, key string, firstAt time.Time) {
 	deadline := time.Now().Add(secondWaitTotal)
 	client := &http.Client{Timeout: 75 * time.Second}
 	for time.Now().Before(deadline) && p.ctx.Err() == nil {
@@ -485,10 +485,15 @@ func (p *LocalProcessor) awaitSecond(id int64, key string) {
 		if out.SecondText == "" {
 			return // the French gate stayed shut
 		}
+		// "after": how long the exchange was shown without its French
+		// reading, what the listener sees of D81.
+		again := p.sink.second(id, out.SecondText)
 		p.logger.Info("Second opinion",
+			logger.Int64("id", id),
+			String("after", fmt.Sprintf("%.1fs", time.Since(firstAt).Seconds())),
+			logger.Bool("rematch", again),
 			String("language", out.SecondLanguage),
 			String("text", out.SecondText))
-		p.sink.second(id, out.SecondText)
 		return
 	}
 }
