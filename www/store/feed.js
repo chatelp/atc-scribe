@@ -113,6 +113,7 @@
             wsClient.addEventListener('open', () => {
                 console.log('App.js: WebSocket connection now open.');
                 this.connected = true;
+                this.connectionLostAt = null;
                 // From now on a lost connection is shown; never during the first load.
                 this.initialDataLoaded = true;
                 this.wsReconnectAttempt = 0;
@@ -132,6 +133,7 @@
                 // This prevents the CONNECTION LOST overlay from showing on initial page load
                 if (this.connected === true) {
                     console.log('Connection was previously established and is now lost');
+                    this.connectionLostAt = new Date();
                     this.connected = false;
                     
                     // Play connection lost sound once when connection is lost
@@ -146,6 +148,7 @@
                 updateWsStatus(status);
 
                 if (status?.state === 'reconnecting' || status?.state === 'closed') {
+                    if (this.connected !== false) this.connectionLostAt = new Date();
                     this.connected = false;
                 }
                 if (status?.state === 'connecting' && this.connected === false) {
@@ -156,6 +159,7 @@
             wsClient.addEventListener('reconnect_scheduled', (payload) => {
                 this.wsReconnectAttempt = Number.isFinite(payload?.attempt) ? payload.attempt : this.wsReconnectAttempt;
                 this.wsNextRetryDelayMs = Number.isFinite(payload?.delayMs) ? payload.delayMs : this.wsNextRetryDelayMs;
+                if (this.connected !== false) this.connectionLostAt = new Date();
                 this.connected = false;
             });
             
