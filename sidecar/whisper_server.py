@@ -245,11 +245,47 @@ def load(path: str):
     if path not in _models:
         t0 = time.time()
         import mlx_whisper
+        keep_every_model()
         # mlx-whisper resolves the model lazily on first transcribe; touching it
         # here just makes the cost visible in the logs instead of in the first request.
         _models[path] = mlx_whisper
         log.info("model registered: %s (%.2fs)", path, time.time() - t0)
     return _models[path]
+
+
+_kept_models: dict = {}
+
+
+def keep_every_model() -> None:
+    """One model kept in memory per path, instead of mlx_whisper's single place.
+
+    mlx_whisper keeps one model at a time (ModelHolder): each switch between the
+    English and the French reading built the model again, and the first decode
+    of a model just built pays its start-up. Measured by whisper-lab on 14/10
+    (latence-etapes, 200 + 50 transmissions of the 02-04/10 archive, compared in
+    pairs): the English reading took 4.58 s alternating against 0.90 s kept, the
+    French one 4.66 s against 0.99 s -- about 7.5 s more of the model's thread
+    for every transmission whose French gate opens. The cost is one model more
+    in memory, about 3 GB in fp16. The models are built where they are used, on
+    the model's thread (lanes.py): MLX ties them to the stream that made them.
+    The same way as the lab's bench, so that their figures stay comparable.
+    """
+    import sys
+    holder = sys.modules["mlx_whisper.transcribe"].ModelHolder
+    if getattr(holder, "_clairance_keeps_every_model", False):
+        return
+    from mlx_whisper.load_models import load_model
+
+    def get_model(cls, path, dtype):
+        key = (path, dtype)
+        if key not in _kept_models:
+            t0 = time.time()
+            _kept_models[key] = load_model(path, dtype=dtype)
+            log.info("model built: %s (%.2fs)", path, time.time() - t0)
+        return _kept_models[key]
+
+    holder.get_model = classmethod(get_model)
+    holder._clairance_keeps_every_model = True
 
 
 # One decode at a time, off the event loop. /transcribe is async, and a model
