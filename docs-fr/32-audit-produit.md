@@ -492,6 +492,18 @@ sur la carte.
 
 ## État
 
+- 14/10 : **étape 6 versée dans `local`** (bb56782) après le coup d'œil du propriétaire (« ça me
+  va »). **Étape 7 livrée sur `migration`** (944c8c4) : la barre radio quitte le grand écran,
+  le fil y fait tout ce qu'elle faisait (table de `09-ecrans.md`, lignes de la barre : écouter /
+  couper, volume, tout couper, un seul fil avec filtre, recherche et « ↓ N new », niveau, échec
+  et connexion) ; la page des réglages ne lui garde plus ses 80 px. **Au téléphone la barre
+  reste** jusqu'à l'étape 12, où le fil y est encore caché : ses fenêtres et leur recalcul de
+  disposition partent alors. Mesuré (Chrome sans fenêtre) : à 1 440 × 900, carte, fil et colonne
+  jusqu'en bas ; à 375 × 812, la barre est là, le fil caché, aucun débordement. Écart à la fiche
+  ChannelMenu : pas de bouton « Retry » pour une fréquence en échec ; la barre n'en avait pas
+  non plus (elle réessaie seule), parité tenue, l'ajout reste possible. L'instance d'essai a
+  désormais deux configurations : `config-migration.toml` avec le vrai sidecar (créneau GPU à
+  inscrire), `config-migration-fake.toml` avec le faux, sans GPU.
 - 14/10 (matin) : **étape 6, corrections de la relecture design** (migration 3caa41f, 54069f8 ;
   serveur 24f060f). Le fil **ne décroche plus du bas tout seul** : un échange grandit après son
   arrivée et le plafond en retire en haut, ce qui déplaçait la lecture sans le lecteur (290 px en
