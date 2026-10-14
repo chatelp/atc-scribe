@@ -496,7 +496,9 @@ sur la carte.
   piste n'apparaît pas » pour un avion [ARR] : il ne venait que pour un avion déjà dans le cône
   d'une piste, 3 à 5 des 21 avions ARR/APP mesurés. Il vient maintenant pour tout avion ARR ou APP
   dont l'aérodrome est suivi et plausible : le cadre de la piste en service, sa tête disant
-  « AFR1855 not on the axis yet » tant qu'il n'y est pas ; 14 sur 21 mesurés (les 7 autres, un
+  « AFR1855 off the axis » tant qu'il n'y est pas (relecture design : « yet » jugeait), la piste en
+  service retenue étant celle dont l'axe prolongé passe le plus près de l'avion (le score ne
+  départage qu'à égalité ; un doublet de De Gaulle ne range plus un avion du nord sous 26L) ; 14 sur 21 mesurés (les 7 autres, un
   aérodrome non plausible). (2) « Antenna: no report since 14:20:38Z » : vrai, l'instance d'essai
   n'avait reçu qu'un rapport (`radio-ctl-sync -once`) ; il tourne désormais en continu à côté
   d'elle. (3) « Showing 8 of 70 sans filtre » : le filtre « Heard » de l'onglet Traffic, gardé dans

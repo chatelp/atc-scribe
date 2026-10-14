@@ -418,18 +418,25 @@
         function drawSingle(apt, placement) {
             const { opts, frames, inUse, qnh, tl, placed } = placement;
             const selected = store.selectedAircraft && store.selectedAircraft.hex;
-            // Its frame; before it is on an axis, the frame of the runway in use.
+            // Its frame; before it is in a cone, the runway in use whose extended
+            // axis passes closest to it (a De Gaulle doublet: an aircraft north
+            // goes to 27R even when 26L scores higher), the score only breaking
+            // a tie; with no runway in use, the closest axis of all.
             const holding = selected && frames.find((fr) => (placed.get(fr.id) || []).some((it) => it.a.hex === selected));
             const usage = (fr) => Math.max(0, ...inUse.filter((r) => r.end === fr.le.ident || r.end === fr.he.ident).map((r) => r.score));
-            const f = holding || frames.slice().sort((p, q) => usage(q) - usage(p))[0];
+            const pos = store.selectedAircraft && store.selectedAircraft.adsb;
+            const off = (fr) => (pos && pos.lat != null && pos.lon != null ? Math.abs(G.project(fr, pos.lat, pos.lon).c) : 0);
+            const used = frames.filter((fr) => usage(fr) > 0);
+            const f = holding || (used.length ? used : frames).slice()
+                .sort((p, q) => (off(p) - off(q)) || (usage(q) - usage(p)))[0];
             if (!f) {
                 container.innerHTML = '';
                 return;
             }
             const sel = store.selectedAircraft;
-            const away = holding ? '' : `<span class="cl-age"${helpAttr('Not on the axis yet',
-                'The aircraft is not yet in this runway\'s approach cone: it shows in the frame once it turns onto the final approach.')}>` +
-                `${esc(((sel && sel.flight) || '').trim() || selected)} not on the axis yet</span>`;
+            const away = holding ? '' : `<span class="cl-age"${helpAttr('Off the axis',
+                'The aircraft is not in this runway\'s approach cone. It appears in the frame if it turns onto this runway\'s final approach.')}>` +
+                `${esc(((sel && sel.flight) || '').trim() || selected)} off the axis</span>`;
             const items = placed.get(f.id);
             const isInUse = inUse.some((r) => r.end === f.le.ident || r.end === f.he.ident);
             const A = arrivalEnd(f, inUse);
