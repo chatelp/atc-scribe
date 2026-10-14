@@ -369,8 +369,11 @@
 .cl-app__bottom { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
 .cl-sky__top { position: absolute; top: var(--space-3); left: var(--space-3); right: var(--space-3); display: flex; gap: var(--space-2); align-items: flex-start; z-index: var(--z-map-overlay); }
 .cl-sky__end { margin-left: auto; display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-end; }
+/* the folded card hangs under the row's end: it does not take the notes' width */
+.cl-sky__end { position: relative; }
+.cl-sky__end > .cl-card--sky { position: absolute; top: calc(100% + var(--space-2)); right: 0; }
 .cl-sky__corner { position: absolute; bottom: var(--space-3); right: var(--space-3); display: flex; gap: var(--space-1-5); z-index: var(--z-map-overlay); }
-.cl-sky__note { padding: var(--space-1-5) var(--space-2); background: color-mix(in srgb, var(--color-surface-page) 85%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); font-size: var(--font-size-small); color: var(--color-text-secondary); }
+.cl-sky__note { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: var(--space-1-5) var(--space-2); background: color-mix(in srgb, var(--color-surface-page) 85%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); font-size: var(--font-size-small); color: var(--color-text-secondary); }
 .cl-sky__note b { font-family: var(--font-family-mono); color: var(--color-text-primary); font-weight: var(--font-weight-regular); }
 .cl-sky > svg.cl-sky__map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
