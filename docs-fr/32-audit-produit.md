@@ -492,6 +492,13 @@ sur la carte.
 
 ## État
 
+- 14/10 (soir) : **étape 9a livrée sur `migration`** : la rangée du haut du ciel (`cl-sky__top` :
+  la bascule Map / PAR · LFPG… en `SegmentedControl`, les notes de carte, la colonne repliée à son
+  bout), le bouton des calques dans le coin (`cl-sky__corner`) et son menu `cl-menu--map` (fond de
+  carte en `SegmentedControl`, Aircraft, Layers avec interrupteurs et opacités ; mêmes réglages,
+  même enregistrement dans le navigateur, domaine `store/sky.js`). L'ancien bouton « Radar / PAR »
+  en haut à droite et le panneau « Map Controls » sont retirés. Les notes se raccourcissent avec
+  des points de suspension plutôt que de pousser la carte repliée hors de l'écran.
 - 14/10 : **étape 8 versée dans `local`** (b0c4e23) après le coup d'œil du propriétaire (« ok pour
   l'étape 8 »). Dernier détail de la relecture : le voyant d'antenne dit les jours au-delà de 48 h
   (« 5 days ago » au lieu de « 126 h 27 ago »).

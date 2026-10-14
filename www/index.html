@@ -590,7 +590,7 @@
                                         </label>
                                     </div>
                                     </div>
-                            <div class="text-xs opacity-70">Base map and layers: <span class="text-highlight">Map Controls</span>, at the bottom right of the map.</div>
+                            <div class="text-xs opacity-70">Base map and layers: the <span class="text-highlight">layers button</span>, at the bottom right of the map.</div>
                             </div>
                         </section>
                         <section id="set-account" class="scroll-mt-4">
@@ -1000,41 +1000,24 @@
                     <!-- Map Container -->
                     <div class="flex-1 relative z-10">
                         <div id="map" class="h-full w-full bg-black"></div>
-                        <!-- What the map shows while a filter narrows it (step 4). -->
-                        <!-- Clear of the Map/PAR switch in the top right corner until step 9 joins them. -->
-                        <div x-show="$store.atc.filterSummary || $store.atc.selectedAircraft" x-cloak class="cl-root absolute left-2 top-2 z-20 pointer-events-none flex flex-col items-start gap-1" style="max-width: calc(100% - 16rem)">
-                            <template x-if="$store.atc.storySkyNote">
-                                <div class="cl-sky__note whitespace-nowrap"><b x-text="$store.atc.storySkyNote.callsign"></b><span x-text="$store.atc.storySkyNote.since"></span></div>
+                        <!-- The sky's top row (step 9; a-calques, a-trafic, b-replie): what the sky
+                             shows, the map or the PAR of a followed airport; what the map shows
+                             (followed flight, filters); the folded column at its end. -->
+                        <div class="cl-root cl-sky__top pointer-events-none" style="z-index: 10001; background: transparent">
+                            <div class="cl-seg pointer-events-auto" role="group" aria-label="What the sky shows">
+                                <button class="cl-seg__item" :aria-pressed="$store.atc.mainView === 'map'" @click="$store.atc.setMainView('map')"
+                                        data-help-title="Map" data-help="The radar map: every aircraft the receiver hears, from above.">Map</button>
+                                <template x-for="apt in $store.atc.followedAirports" :key="apt.code">
+                                    <button class="cl-seg__item" :aria-pressed="$store.atc.mainView === 'par' && $store.atc.parAirport === apt.code"
+                                            @click="$store.atc.setMainView('par', apt.code)" x-text="'PAR · ' + apt.code"
+                                            data-help-title="PAR" :data-help="'The approaches to ' + (apt.name || apt.code) + ' in profile, runway by runway, after the Precision Approach Radar scope.'"></button>
+                                </template>
+                            </div>
+                            <template x-if="$store.atc.mainView === 'map' && $store.atc.storySkyNote">
+                                <div class="cl-sky__note whitespace-nowrap min-w-0 overflow-hidden text-ellipsis"><b x-text="$store.atc.storySkyNote.callsign"></b><span x-text="$store.atc.storySkyNote.since"></span></div>
                             </template>
-                            <div x-show="$store.atc.filterSummary" class="cl-sky__note" x-text="$store.atc.filterSummary"></div>
-                        </div>
-
-                        <!-- The main screen shows the radar map or the PAR view of one
-                             followed airport; the side panels stay as they are. -->
-                        <div id="par-view" x-show="$store.atc.mainView === 'par'" style="display: none"></div>
-                        <!-- ParFrame (step 8, c-suivre): the followed aircraft's approach, drawn by par-view.js. -->
-                        <div id="par-frame" x-show="$store.atc.storyFrameAirport" x-cloak class="cl-root cl-parframe absolute left-0 right-0 bottom-0 z-20"></div>
-                        <div class="absolute top-4 right-4 z-[10001] flex items-center gap-0.5 px-1 py-1 rounded border border-border bg-panel/85 backdrop-blur-sm text-xs shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-                            <button type="button" @click="$store.atc.setMainView('map')"
-                                    :class="$store.atc.mainView === 'map' ? 'bg-highlight/20 text-highlight' : 'text-text/70 hover:text-text'"
-                                    class="px-2 py-1 rounded uppercase tracking-wide cursor-pointer"
-                                    title="Radar map">Radar</button>
-                            <span class="pl-2 pr-1 text-text/40 uppercase tracking-wide"
-                                  title="Profile view of each runway, after the Precision Approach Radar scope">PAR</span>
-                            <template x-for="apt in $store.atc.followedAirports" :key="apt.code">
-                                <button type="button" @click="$store.atc.setMainView('par', apt.code)"
-                                        :class="$store.atc.mainView === 'par' && $store.atc.parAirport === apt.code ? 'bg-highlight/20 text-highlight' : 'text-text/70 hover:text-text'"
-                                        class="px-2 py-1 rounded cursor-pointer"
-                                        :title="apt.name" x-text="apt.code"></button>
-                            </template>
-                        </div>
-
-                        <!-- The column folded (layout B, b-replie): Right now as a card over
-                             the sky, under the Map/PAR switch, which keeps the top right
-                             corner until its own step. -->
-                        <div x-show="$store.atc.columnFolded && !$store.atc.selectedAircraft" x-cloak
-                             class="cl-root hidden md:block absolute top-16 right-4 z-[10001]">
-                            <div class="cl-sky__end">
+                            <div x-show="$store.atc.mainView === 'map' && $store.atc.filterSummary" x-cloak class="cl-sky__note whitespace-nowrap min-w-0 overflow-hidden text-ellipsis" x-text="$store.atc.filterSummary"></div>
+<div x-show="$store.atc.columnFolded && !$store.atc.selectedAircraft" x-cloak class="cl-sky__end pointer-events-auto hidden md:flex shrink-0">
                                 <div class="cl-row">
                                     <button class="cl-btn" @click="$store.atc.setColumnFolded(false, 'traffic')"
                                             data-help-title="Traffic" data-help="Bring the column back on the list of aircraft.">Traffic <span class="cl-tabs__count" x-text="$store.atc.activeAircraftCount"></span></button>
@@ -1050,151 +1033,73 @@
                             </div>
                         </div>
 
-                        <div x-data="{ open: false }" x-show="$store.atc.mainView === 'map'" class="absolute bottom-4 right-4 z-[10001]"
-                             :style="$store.atc.storyFrameAirport && $store.atc.parFrameHeight ? 'bottom: ' + ($store.atc.parFrameHeight + 8) + 'px' : ''">
-                            <button @click="open = !open"
-                                    @keydown.escape.window="open = false"
-                                    type="button"
-                                    title="Map controls"
-                                    class="filter-input text-xs px-3 py-1.5 rounded border border-border bg-panel/85 text-text min-w-[180px] flex items-center justify-between backdrop-blur-sm hover:border-highlight/60 transition-colors shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-                                <span class="uppercase tracking-wide text-text/80">Map Controls</span>
-                                <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
-                            </button>
+                        <!-- The main screen shows the radar map or the PAR view of one
+                             followed airport; the side panels stay as they are. -->
+                        <div id="par-view" x-show="$store.atc.mainView === 'par'" style="display: none"></div>
+                        <!-- ParFrame (step 8, c-suivre): the followed aircraft's approach, drawn by par-view.js. -->
+                        <div id="par-frame" x-show="$store.atc.storyFrameAirport" x-cloak class="cl-root cl-parframe absolute left-0 right-0 bottom-0 z-20"></div>
 
-                            <div x-show="open"
-                                 @click.outside="open = false"
-                                 x-transition.origin.bottom.right
-                                                                     class="absolute bottom-full right-0 mb-2 w-[340px] max-w-[calc(100vw-1rem)] max-h-[65vh] overflow-y-auto overflow-x-hidden bg-panel/95 border border-border rounded-md shadow-[0_8px_20px_rgba(0,0,0,0.45)] p-3 space-y-3">
-                                <div>
-                                    <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Map Style</div>
-                                    <div class="grid grid-cols-2 gap-1.5">
-                                        <button type="button" @click="$store.atc.settings.mapStyle='ign-dark'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='ign-dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IGN dark</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='ign'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='ign' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IGN</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='osm-dark'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='osm-dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">OSM dark</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='osm'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='osm' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">OpenStreetMap</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='none'; $store.atc.setMapStyle()" class="col-span-2 px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='none' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">None (black)</button>
+
+                        <!-- MapControls (step 9, a-calques): the base map and the layers, behind the
+                             layers button in the corner; saved in this browser as before. Above
+                             the PAR frame while it shows; hidden with the PAR view. -->
+                        <div x-show="$store.atc.mainView === 'map'" class="cl-root cl-sky__corner"
+                             :style="$store.atc.storyFrameAirport && $store.atc.parFrameHeight ? 'z-index: 10001; background: transparent; bottom: ' + ($store.atc.parFrameHeight + 8) + 'px' : 'z-index: 10001; background: transparent'"
+                             @keydown.escape.window="$store.atc.layersOpen = false">
+                            <div class="relative" @click.outside="$store.atc.layersOpen = false">
+                                <button class="cl-btn cl-btn--icon" aria-label="Layers and base map" :aria-expanded="$store.atc.layersOpen"
+                                        :class="$store.atc.layersOpen ? 'is-on' : ''" @click="$store.atc.layersOpen = !$store.atc.layersOpen"
+                                        data-help-title="Layers and base map" data-help="The base map under the aircraft, and what is drawn on it: labels, tracks, rings, airspace, airports, beacons.">
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5 14 5.5 8 8.5 2 5.5Z"/><path d="M2 8.2 8 11.2 14 8.2"/><path d="M2 10.9 8 13.9 14 10.9"/></svg>
+                                </button>
+                                <div x-show="$store.atc.layersOpen" x-cloak class="cl-menu cl-menu--map absolute right-0 bottom-full mb-2 max-h-[75vh] overflow-y-auto" role="dialog" aria-label="Layers and base map">
+                                    <div class="cl-menu__head"><span class="cl-menu__title">Base map</span></div>
+                                    <div class="cl-seg">
+                                        <template x-for="b in $store.atc.mapBaseStyles" :key="b.id">
+                                            <button class="cl-seg__item" :aria-pressed="$store.atc.settings.mapStyle === b.id" @click="$store.atc.setMapBase(b.id)" x-text="b.label"></button>
+                                        </template>
                                     </div>
-                                </div>
-
-                                <div>
-                                    <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Aircraft</div>
-                                    <div class="space-y-1.5">
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showLabels" @change="$store.atc.toggleLabels()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Labels</span>
+                                    <div class="cl-menu__sep"></div>
+                                    <div class="cl-menu__group">
+                                        <span class="cl-label">Aircraft</span>
+                                        <div class="cl-menu__row">
+                                            <button class="cl-switch" role="switch" :class="$store.atc.settings.showLabels ? 'is-on' : ''" :aria-checked="!!$store.atc.settings.showLabels"
+                                                    aria-label="Labels" @click="$store.atc.flipSetting('showLabels', 'toggleLabels')"></button>
+                                            <span class="cl-menu__label cursor-help" data-help-title="Labels" data-help="Each aircraft's callsign, type, altitude and speed beside it, and the last thing heard from it.">Labels</span>
                                         </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showPaths" @change="$store.atc.togglePaths()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Tracks</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showPaths">
-                                                <input type="range"
-                                                       x-model.number="$store.atc.settings.trailLength"
-                                                       min="1"
-                                                       max="10"
-                                                       step="1"
-                                                       @input="$store.atc.applyFilters()"
-                                                       class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs whitespace-nowrap" x-text="$store.atc.settings.trailLength + 'min'"></span>
+                                        <div class="cl-menu__row">
+                                            <button class="cl-switch" role="switch" :class="$store.atc.settings.showPaths ? 'is-on' : ''" :aria-checked="!!$store.atc.settings.showPaths"
+                                                    aria-label="Tracks" @click="$store.atc.flipSetting('showPaths', 'togglePaths')"></button>
+                                            <span class="cl-menu__label cursor-help" x-text="'Tracks, last ' + $store.atc.settings.trailLength + ' min'"
+                                                  data-help-title="Tracks" data-help="The line behind each aircraft: where it flew in the last minutes. The slider sets how many."></span>
+                                            <div class="cl-slider cl-slider--short">
+                                                <span class="cl-slider__rail"></span>
+                                                <span class="cl-slider__fill" :style="'left:0;width:' + Math.round(($store.atc.settings.trailLength - 1) / 9 * 100) + '%'"></span>
+                                                <span class="cl-slider__thumb" :style="'left:' + Math.round(($store.atc.settings.trailLength - 1) / 9 * 100) + '%'"></span>
+                                                <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="1" max="10" step="1" aria-label="Track length, minutes"
+                                                       :value="$store.atc.settings.trailLength" @input="$store.atc.settings.trailLength = Number($event.target.value); $store.atc.applyFilters()">
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div>
-                                    <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Layers</div>
-                                    <div class="space-y-1.5">
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showRings" @change="$store.atc.toggleRings()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Distance Rings</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showRings">
-                                                <input type="range" x-model.number="$store.atc.settings.ringsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setRingsOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.ringsOpacity * 100) + '%'" ></span>
+                                    <div class="cl-menu__sep"></div>
+                                    <div class="cl-menu__group">
+                                        <span class="cl-label">Layers <span class="cl-age">switch · opacity</span></span>
+                                        <template x-for="row in $store.atc.mapLayerRows" :key="row.key">
+                                            <div class="cl-menu__row">
+                                                <button class="cl-switch" role="switch" :class="$store.atc.settings[row.show] ? 'is-on' : ''" :aria-checked="!!$store.atc.settings[row.show]"
+                                                        :aria-label="row.label" @click="$store.atc.flipSetting(row.show, row.toggle)"></button>
+                                                <span class="cl-menu__label cursor-help" x-text="row.label" :data-help-title="row.label" :data-help="row.help"></span>
+                                                <template x-if="row.op">
+                                                    <div class="cl-slider cl-slider--short">
+                                                <span class="cl-slider__rail"></span>
+                                                <span class="cl-slider__fill" :style="'left:0;width:' + Math.round(($store.atc.settings[row.op] - 0.1) / 0.9 * 100) + '%'"></span>
+                                                <span class="cl-slider__thumb" :style="'left:' + Math.round(($store.atc.settings[row.op] - 0.1) / 0.9 * 100) + '%'"></span>
+                                                <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="0.1" max="1" step="0.1" :aria-label="row.label + ' opacity'"
+                                                           :value="$store.atc.settings[row.op]" @input="$store.atc.setLayerOpacity(row, $event.target.value)">
                                             </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showAirspaceBoundaries" @change="$store.atc.toggleAirspaceBoundaries()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Airspace</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAirspaceBoundaries">
-                                                <input type="range" x-model.number="$store.atc.settings.airspaceOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAirspaceOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.airspaceOpacity * 100) + '%'" ></span>
+                                                </template>
                                             </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showAirports" @change="$store.atc.toggleAirports()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Airports</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAirports">
-                                                <input type="range" x-model.number="$store.atc.settings.airportsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAirportsOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.airportsOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showHeliports" @change="$store.atc.toggleHeliports()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Heliports</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showHeliports">
-                                                <input type="range" x-model.number="$store.atc.settings.heliportsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setHeliportsOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.heliportsOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showNavaids" @change="$store.atc.toggleNavaids()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Navaids</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showNavaids">
-                                                <input type="range" x-model.number="$store.atc.settings.navaidsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setNavaidsOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.navaidsOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showAllRunways" @change="$store.atc.toggleAllRunways()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Other Runways</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAllRunways">
-                                                <input type="range" x-model.number="$store.atc.settings.allRunwaysOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAllRunwaysOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.allRunwaysOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <!-- Runways, taxiways, aprons from OpenStreetMap: tools/airport-layout/fetch.py -->
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showAirportLayout" @change="$store.atc.toggleAirportLayout()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Airport layout</span>
-                                        </div>
+                                        </template>
                                     </div>
                                 </div>
                             </div>
@@ -2275,6 +2180,7 @@
     <script defer src="store/now.js"></script>
     <script defer src="store/thread.js"></script>
     <script defer src="store/story.js"></script>
+    <script defer src="store/sky.js"></script>
     <script defer src="server-settings.js"></script>
     <script defer src="app.js"></script>
     <!-- Alpine starts after every script above has registered its stores and
