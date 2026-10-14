@@ -1,7 +1,9 @@
 package phraseology
 
 import (
+	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -92,17 +94,19 @@ func (r Result) Plain() []Instruction {
 		verb := verbOf(toks, v)
 		switch v.Role {
 		case RoleFlightLevel, RoleAltitude:
-			level := v.Text
 			value, unit := strings.TrimPrefix(v.Text, "FL"), "FL"
+			// "FL 050": a space after FL and three digits, as the design system
+			// writes a level everywhere (review of migration step 6, 14/10).
+			level := "FL " + threeDigits(value)
 			if v.Role == RoleAltitude {
 				value, unit = noLeadingZeros(v.Text), "ft"
 				level = value + " ft"
 			}
-			// "niveau 100" for a flight level, "3000 ft" for an altitude: the
+			// "niveau 050" for a flight level, "3000 ft" for an altitude: the
 			// French phraseology says "niveau", never "FL".
 			levelFR := level
 			if v.Role == RoleFlightLevel {
-				levelFR = "niveau " + strings.TrimPrefix(level, "FL")
+				levelFR = "niveau " + threeDigits(value)
 			}
 			switch verb {
 			case "descend":
@@ -141,10 +145,12 @@ func (r Result) Plain() []Instruction {
 				add(string(v.Role), "Speed "+kt, "Vitesse "+kt, value, "kt")
 			}
 		case RoleFrequency:
+			// "128.750": three decimals, as a frequency is written on a chart.
+			mhz := threeDecimals(v.Text)
 			if verb == "contact" {
-				add(string(v.Role), "Contact "+v.Text, "Contactez "+v.Text, v.Text, "MHz")
+				add(string(v.Role), "Contact "+mhz, "Contactez "+mhz, mhz, "MHz")
 			} else {
-				add(string(v.Role), "Frequency "+v.Text, "Fréquence "+v.Text, v.Text, "MHz")
+				add(string(v.Role), "Frequency "+mhz, "Fréquence "+mhz, mhz, "MHz")
 			}
 		case RoleQNH:
 			add(string(v.Role), "QNH "+v.Text, "QNH "+v.Text, v.Text, "hPa")
@@ -193,4 +199,22 @@ func noLeadingZeros(s string) string {
 		return s
 	}
 	return t
+}
+
+// threeDigits pads a flight level to three digits: "50" -> "050".
+func threeDigits(level string) string {
+	n, err := strconv.Atoi(strings.TrimSpace(level))
+	if err != nil || n < 0 {
+		return level
+	}
+	return fmt.Sprintf("%03d", n)
+}
+
+// threeDecimals writes a frequency with three decimals: "124.35" -> "124.350".
+func threeDecimals(mhz string) string {
+	f, err := strconv.ParseFloat(strings.TrimSpace(mhz), 64)
+	if err != nil || f <= 0 {
+		return mhz
+	}
+	return strconv.FormatFloat(f, 'f', 3, 64)
 }

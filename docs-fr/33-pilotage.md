@@ -106,11 +106,13 @@ dettes de sécurité (CORS, WebSocket, rôle lecture seule, purges) ; **J** la c
 Windows ; **K** « Then » sans verdict ; **L** (ajoutée le 13/10 au soir, après D79) le bloc
 position, trajectoire, prédiction remis d'équerre : banc de rejeu synthétique avec métriques de
 mouvement, un seul prédicteur, la prédiction en direct hors de `service.go`, l'observé séparé
-du déduit dans la page, interface écrite du moteur — à métriques égales ou meilleures. Indépendantes, **G, H et I lancées par le propriétaire le 13/10 au soir** (A, B, C relancées par erreur puis arrêtées, aucune branche à intégrer) ; **G intégrée le 13/10** (route `/api/v1/vitals`, `since` de la piste, valeur et unité des consignes, version et commit du binaire) ; H et I terminées, relues vertes, à intégrer ; **J, K et M lancées par le propriétaire le 13/10 dans la nuit** ; **M** (écrite par la session design, relue ici) : le mouvement mesuré dans un vrai navigateur, les trois cas restants (première minute, reprise après un trou, onglet remontré) et la comparaison de stratégies (extrapolation, dessin dans le passé, hybride), le choix par défaut restant au propriétaire ; **L lancée par le propriétaire le 13/10 au soir, intégrée la nuit même** (le mouvement : vitesse dessinée qui varie de 8 à 13 % contre 38 à 48 %, plus aucun pas à reculons hors trous de réception)  ;
+du déduit dans la page, interface écrite du moteur — à métriques égales ou meilleures. Indépendantes, **G, H et I lancées par le propriétaire le 13/10 au soir** (A, B, C relancées par erreur puis arrêtées, aucune branche à intégrer) ; **G intégrée le 13/10** (route `/api/v1/vitals`, `since` de la piste, valeur et unité des consignes, version et commit du binaire) ; H et I terminées, relues vertes, à intégrer ; **J, K et M lancées par le propriétaire le 13/10 dans la nuit, intégrées le 14/10 au matin** (Windows compile ; « Then » prêt pour l'étape 8 ; banc du mouvement et cinq corrections, stratégie A gardée par défaut en attendant le choix du propriétaire) ; **M** (écrite par la session design, relue ici) : le mouvement mesuré dans un vrai navigateur, les trois cas restants (première minute, reprise après un trou, onglet remontré) et la comparaison de stratégies (extrapolation, dessin dans le passé, hybride), le choix par défaut restant au propriétaire ; **L lancée par le propriétaire le 13/10 au soir, intégrée la nuit même** (le mouvement : vitesse dessinée qui varie de 8 à 13 % contre 38 à 48 %, plus aucun pas à reculons hors trous de réception)  ;
 chaque branche `cloud/…` revient sur le Mac pour relecture et intégration. La migration de
 l'interface, elle, reste sur le Mac.
 
 ## Les décisions attendues du propriétaire
+
+0. **La stratégie du mouvement** (fiche M, 14/10) : A, l'actuelle (prolonger la trajectoire, corriger en douceur), recommandée ; B, dessiner l'avion quelques secondes dans le passé (plus régulier de 2 à 6 points, mais 600 m à 1,1 km de retard) ; C, un mélange, moins bon des deux côtés. A reste en place tant que rien n'est décidé.
 
 1. ~~Le nom~~ — **décidé le 13/10 : Clairance** (D74 complétée, Q53 close), renommage fait le
    même jour : dépôt `chatelp/clairance`, page, lanceur `Clairance.app`, dossier de configuration
@@ -160,7 +162,7 @@ l'interface, elle, reste sur le Mac.
   audio et les journaux bruts n'ont pas de purge ; Docker est mort (compile un seul fichier)~~
   — **soldées le 13/10 par les fiches H et I** (CORS et WebSocket limités aux pages du serveur
   et à `allowed_origins`, rôle `viewer`, `audio_replay`, purges réglables, Docker amont retiré,
-  serveur sans transcription) ; reste **la compilation Windows** (fiche J, à lancer). Sans
+  serveur sans transcription) ; la compilation Windows est faite (fiche J, 14/10 ; l'exécution sous Windows reste à vérifier). Sans
   gravité tant que D5 tient (réseau local seulement) ; bloquante le jour où quelqu'un expose le
   serveur.
 
