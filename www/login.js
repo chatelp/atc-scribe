@@ -98,9 +98,10 @@
             ]),
             line('up', [
                 has(v.uptime_seconds) && uptime(v.uptime_seconds),
-                // A build without a version tag gives its commit as the version: once.
-                v.version && v.version !== v.commit && `Clairance ${v.version}`,
-                v.commit,
+                // A build without a version tag gives its commit as the version:
+                // "Clairance 3016b7d", once.
+                (v.version || v.commit) && `Clairance ${v.version || v.commit}`,
+                v.commit && v.commit !== v.version && v.commit,
             ]),
         ].join('');
         return `<div class="cl-vitals"><div class="cl-vitals__head"><span>This station, live</span><span>refreshed every 10 s</span></div>` +
