@@ -492,6 +492,67 @@ sur la carte.
 
 ## État
 
+- 14/10 : **étape 8 versée dans `local`** (b0c4e23) après le coup d'œil du propriétaire (« ok pour
+  l'étape 8 »). Dernier détail de la relecture : le voyant d'antenne dit les jours au-delà de 48 h
+  (« 5 days ago » au lieu de « 126 h 27 ago »).
+- 14/10 (fin d'après-midi) : **trois retours du propriétaire sur l'étape 8.** (1) « Le cadre de
+  piste n'apparaît pas » pour un avion [ARR] : il ne venait que pour un avion déjà dans le cône
+  d'une piste, 3 à 5 des 21 avions ARR/APP mesurés. Il vient maintenant pour tout avion ARR ou APP
+  dont l'aérodrome est suivi et plausible : le cadre de la piste en service, sa tête disant
+  « AFR1855 off the axis » tant qu'il n'y est pas (relecture design : « yet » jugeait), la piste en
+  service retenue étant celle dont l'axe prolongé passe le plus près de l'avion (le score ne
+  départage qu'à égalité ; un doublet de De Gaulle ne range plus un avion du nord sous 26L) ; 14 sur 21 mesurés (les 7 autres, un
+  aérodrome non plausible). (2) « Antenna: no report since 14:20:38Z » : vrai, l'instance d'essai
+  n'avait reçu qu'un rapport (`radio-ctl-sync -once`) ; il tourne désormais en continu à côté
+  d'elle. (3) « Showing 8 of 70 sans filtre » : le filtre « Heard » de l'onglet Traffic, gardé dans
+  le navigateur d'une visite précédente ; la note de carte nomme maintenant chaque filtre actif
+  (« Showing 9 of 72 · heard on the radio only »).
+- 14/10 : **étape 8, corrections de la relecture design** (sept points). La colonne garde ses
+  380 px pendant un suivi (elle passait à 480 et décalait la carte). **Le cadre PAR sous la carte**
+  : `par-view.js` gagne un mode « un seul cadre » (`create(…, { single: true })`), qui dessine le
+  cadre de piste de l'avion suivi avec les mêmes fonctions, en plus bas (bandes 140 et 36 px au
+  lieu de 230 et 64), sous une tête « 25 → 07 · IN USE · 2 aircraft · Open the PAR view » ;
+  affiché quand l'avion est dans une séquence d'arrivée et que la carte est à l'écran. Dans la
+  barre du haut, « Following » et la puce de l'indicatif avec ✕ après la marque. La note de carte
+  dit ce qu'elle montre (« VLG9EJ · its track since 14:29Z », sur une ligne). **Le vol en cours
+  seulement** : il commence à la dernière réapparition (phase NEW, ou trace muette plus de 10 min),
+  les vols précédents de la journée se replient (« Earlier today: 2 flights ») dans Story et dans
+  l'historique des phases ; un T/O ou un T/D jugé dans la minute d'une réapparition n'est pas
+  raconté (daté de la réapparition, pas observé). **Une ligne par événement radio** (« Controller
+  on 124.350: FL 100 », « Handed to Approche De Gaulle ») ; un clic amène l'échange au milieu du
+  fil, filtres levés. « Seen by the receiver, FL 110, 15 NM south », du premier point de chaque vol.
+  **L'aérodrome d'une phase n'est nommé que s'il est plausible** (point de la phase sous 10 000 ft
+  et à moins de 20 NM, ou avion dans sa séquence d'arrivée) ; même règle pour le badge de
+  l'en-tête. Constaté : un A321 à FL 110, 15 NM au sud, en « Arrival at LFPZ » pour le détecteur ;
+  l'attribution elle-même, côté serveur, reste à revoir (le détecteur nomme un aérodrome suivi
+  quel que soit l'éloignement). Petits points : secondes retirées de l'historique des phases,
+  « Radio · none matched », types en casse normale (« Airbus A-321 », un mot à chiffres reste
+  tel quel), âges en heures et minutes. « Map controls » se pose 8 px au-dessus du cadre PAR
+  tant qu'il s'affiche (hauteur mesurée ; bas du bouton 619 px, haut du cadre 627 px, à
+  1 440 × 900), à la demande du recompte design ; le reste de `MapControls` attend l'étape 9.
+  Recompte design : conforme. Noté pour le détecteur de phases, avec l'aérodrome des phases : un
+  avion aligné sur 27R à 2 300 ft retombe de APP à UNK en courte finale.
+- 14/10 : **étape 8 livrée sur `migration`** (suivre un vol, `AircraftStory`). Choisir un avion
+  remplace le contenu de la colonne : « ‹ Back to Traffic » (ou « Back to Right now », l'onglet
+  d'où l'on vient), l'en-tête (phase, indicatif, aérodrome, exploitant · type · immatriculation ;
+  altitude, distance à la piste et temps restant quand l'avion est dans une séquence d'arrivée,
+  sinon distance à la station ; vitesse sol ; cap), les onglets Story, Details, Track et Nearby
+  (anciens Timeline, Details, Tracks, Proximity, contenus et rafraîchissements inchangés, Story
+  par défaut) ; ✕ « Stop following » dans la barre du haut ; une note sur la carte, « Following X ·
+  its track since 14:23Z ». Details en sections repliables (`cl-disclosure`) : historique des
+  phases, **consignes entendues avec « Then »**, radio (repliée), puis les faits ADS-B regroupés
+  comme c-details. **Écart au plan** : le tableau des consignes ne lit pas `clearances` : le flux
+  WebSocket ne les porte pas, la page ne les recevait presque jamais (seule la ligne Nearby, par
+  REST). Il lit les valeurs `plain` (déjà munies de `value` et `unit`) de ce que le contrôleur a dit
+  à l'avion : les 4 h 30 serveur prévues ne sont pas nécessaires. Sur l'instance d'essai, vrai
+  modèle : « climbing through FL 148, 2 min later », « turned to 309° », « level at 3 900 ft, 1 min
+  later ». La vitesse se dit « ground speed » (demande de la relecture de K). Le mot « deviation »
+  n'apparaît plus. Au passage : un appel à une fonction disparue (`selectAircraft`, à chaque
+  clairance de l'avion choisi) retiré, et le filet le retire de ses défauts connus ; la règle du
+  système `.cl-story__events i` visait toutes les `<i>` du récit (barres de force, icônes) et ne
+  vise plus que la pastille (source `bundle.css`, exportée). Vérifié sans fenêtre : depuis la
+  liste, Échap, depuis le fil, depuis la PAR et le journal (`selectAircraftByHex`), un autre avion,
+  les quatre onglets, ‹ et ✕, aucun débordement à 390 et 1 440 px.
 - 14/10 : **étape 7 versée dans `local`** (3ef997e). **Alarme ADS-B** (choix du propriétaire,
   sans test de coupure Wi-Fi) : le voyant dit « Unreachable · N min » quand chaque lecture de la
   station échoue, avec la raison en mots et le conseil de relancer Clairance si la station

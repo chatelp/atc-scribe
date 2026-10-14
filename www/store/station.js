@@ -130,6 +130,8 @@
                 if (m < 1) return 'just now';
                 if (m < 60) return `${m} min ago`;
                 const h = Math.floor(m / 60);
+                // Past two days, in days ("126 h 27 ago" read badly, design review 14/10).
+                if (h >= 48) return `${Math.floor(h / 24)} days ago`;
                 return `${h} h ${String(m % 60).padStart(2, '0')} ago`;
             };
             const since = rx.since ? ago(rx.since) : '';

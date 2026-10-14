@@ -271,6 +271,9 @@ window.threadView = function () {
             new MutationObserver(() => { if (this.atBottom) this.toBottom(false); })
                 .observe(el, { childList: true, subtree: true, characterData: true });
             this.$nextTick(() => this.toBottom(false));
+            // A line of a followed aircraft's story leads to its exchange
+            // (step 8): the filters let it through, the bottom is let go of.
+            window.addEventListener('thread-show', (e) => this.showExchange(e.detail && e.detail.id));
             this.$watch(() => this.$store.atc.threadExchanges.length, (n) => {
                 const added = Math.max(0, n - this.lastLength);
                 this.lastLength = n;
@@ -286,6 +289,20 @@ window.threadView = function () {
             const el = this.$refs.scroller;
             this.atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
             if (this.atBottom) this.newCount = 0;
+        },
+        showExchange(id) {
+            const atc = this.$store.atc;
+            const filtered = atc.threadShow !== 'all' || atc.threadSearch;
+            if (filtered) { atc.threadShow = 'all'; atc.threadSearch = ''; }
+            // After the filters' own return to the bottom.
+            setTimeout(() => {
+                const el = this.$refs.scroller && this.$refs.scroller.querySelector(`[data-exchange="${CSS.escape(String(id))}"]`);
+                if (!el) return;
+                this.atBottom = false;
+                this._userUntil = Date.now() + 800;
+                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                if (el.animate) el.animate([{ background: 'var(--color-surface-hover)' }, { background: 'transparent' }], { duration: 1800 });
+            }, filtered ? 80 : 0);
         },
         toBottom(smooth) {
             const el = this.$refs.scroller;

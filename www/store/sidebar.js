@@ -542,6 +542,15 @@
             let text = `Showing ${shown} of ${Math.max(total, shown)}`;
             const A = window.AltitudeScale;
             if (band && A && typeof A.bandLabel === 'function') text += ` · ${A.bandLabel(Number(s.minAltitude) || 0, Number(s.maxAltitude) || 60000)}`;
+            // Every filter at work is named: "Heard" kept on from an earlier
+            // visit read as no filter at all (owner, 14/10: "Showing 8 of 70").
+            if (s.voiceOnly) text += ' · heard on the radio only';
+            if (s.showAirAircraft === false) text += ' · airborne hidden';
+            if (s.showGroundAircraft === false) text += ' · ground hidden';
+            const off = Object.values(f).filter((v) => v === false).length;
+            if (off) text += ` · ${off} ${off > 1 ? 'phases' : 'phase'} hidden`;
+            const term = (this.searchTerm || '').trim();
+            if (term) text += ` · “${term}”`;
             return text;
         },
 

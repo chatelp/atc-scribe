@@ -253,27 +253,12 @@
             }
         },
 
-        // Handle clearance issued messages
+        // A clearance was stored. The followed aircraft's instructions come
+        // from its transmissions (store/story.js), which load again when its
+        // voice count grows: nothing to refresh here. (It called a
+        // selectAircraft that no longer exists.)
         handleClearanceIssued(data) {
-            console.log('Clearance issued:', data);
-            
-            // Update aircraft clearances if currently selected
-            const selectedAircraft = this.selectedAircraft;
-            if (selectedAircraft && selectedAircraft.flight === data.callsign) {
-                // Refresh aircraft details to show new clearance
-                this.refreshSelectedAircraftDetails();
-            }
-            
-            // Log to console for debugging
-            console.log(`Clearance issued: ${data.callsign} → ${data.clearance_type.toUpperCase()} CLEARANCE`);
-        },
-
-        // Refresh selected aircraft details
-        refreshSelectedAircraftDetails() {
-            if (this.selectedAircraft) {
-                // Re-fetch aircraft data to get updated clearances
-                this.selectAircraft(this.selectedAircraft.hex);
-            }
+            console.log(`Clearance issued: ${data.callsign} → ${String(data.clearance_type || '').toUpperCase()} CLEARANCE`);
         },
 
         // Aircraft events are now handled as phase changes (T/O and T/D)
