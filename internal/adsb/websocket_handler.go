@@ -1,6 +1,8 @@
 package adsb
 
 import (
+	"time"
+
 	"github.com/yegors/co-atc/internal/websocket"
 	"github.com/yegors/co-atc/pkg/logger"
 )
@@ -49,13 +51,18 @@ func (h *WebSocketHandler) handleBulkRequest(client *websocket.Client, data map[
 		return err
 	}
 
-	// Send response back to client
+	// Send response back to client. sent_at is the server's clock as it
+	// answers: the page dates the aircraft's positions by it, as it dates the
+	// stream's by observed_at; without it the page took its clock from the
+	// aircraft's poll times, up to a second and a half late, and drew every
+	// aircraft that much behind for the first seconds (fiche M).
 	message := &websocket.Message{
 		Type: websocket.MessageTypeAircraftBulkResponse,
 		Data: map[string]interface{}{
 			"aircraft": response.Aircraft,
 			"count":    response.Count,
 			"counts":   response.Counts,
+			"sent_at":  time.Now().UTC().Format(time.RFC3339Nano),
 		},
 	}
 

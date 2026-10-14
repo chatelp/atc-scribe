@@ -1256,7 +1256,23 @@
             this._updateLiveTrailForAircraft(hex, aircraft);
 
             const visible = this._aircraftMatchesFilters(aircraft);
+            const hadFeature = !!this._getAircraftFeature(hex);
             this._setFeatureVisible(hex, aircraft, visible);
+            // The animation engine moves the aircraft of visibleAircraftOnMap
+            // only, and the renderer keeps a symbol's pose while smoothing is
+            // on: an aircraft that appeared between two full refreshes (a pan,
+            // a filter) stood where it first appeared until the next one
+            // (browser bench, 13/10/2026: 6 aircraft of 60, 4 to 6 km behind,
+            // for as long as nobody touched the map).
+            if (hadFeature !== !!this._getAircraftFeature(hex)) {
+                this.updateVisibleAircraftList();
+                // A new symbol stands at the position the station gave; the
+                // engine draws the aircraft where that position, dated, puts it
+                // now: on a page just loaded, 450 m further on its next frame
+                // (browser bench, scenario a). It starts there.
+                const pose = !hadFeature && this.store?.animationEngine?.currentPose?.(hex);
+                if (pose) this.updateAnimatedAircraftPose(hex, pose);
+            }
             this.updateProximityCircle();
             this._stats.singleAircraftUpdateDurationMs += (performance.now() - startedAt);
         }
@@ -1285,6 +1301,12 @@
             if (Number.isFinite(headingDeg)) {
                 feature.set('heading', headingDeg);
                 feature.set('rotationRad', (headingDeg * Math.PI) / 180);
+            }
+            // The symbol's opacity while the engine relocates it (a gap too
+            // wide to glide over), in tenths: the renderer caches a style per
+            // value.
+            if (Number.isFinite(pose.fade)) {
+                feature.set('fade', Math.round(pose.fade * 10) / 10);
             }
 
             feature.changed();
@@ -1601,6 +1623,7 @@
             if (!hex) return;
             if (this._aircraftRenderer && typeof this._aircraftRenderer.removeAircraftFeature === 'function') {
                 this._aircraftRenderer.removeAircraftFeature(hex);
+                this.updateVisibleAircraftList();
             }
             this._replaceTrailFeatures(hex, []);
 

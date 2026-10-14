@@ -135,3 +135,105 @@ test("an aircraft's sample is dated as the server dates its position", () => {
     assert.equal(s.at, observedAt + 1000 - 2300);
     assert.equal(e.sampleFromAircraft({ hex: 'abc123', adsb: { lat: 0, lon: 0 } }), null, 'no position, no sample');
 });
+
+test('the first sample flies at its own speed (fiche M, scenario a)', () => {
+    const { e } = engine();
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 1000, now));
+    const state = e.aircraftStates.get('abc123');
+    assert.ok(state.velocity, 'a velocity from the first sample');
+    const a = e._computePose(state, performance.now());
+    const b = e._computePose(state, performance.now() + 1000);
+    const metres = (b.lon - a.lon) * 111320 * Math.cos(48.5 * Math.PI / 180);
+    assert.ok(Math.abs(metres - 400 * 0.514444) < 5, `${metres.toFixed(1)} m in a second, want about 206`);
+});
+
+test("the bulk load's aircraft is dated by its last_seen, as the stream's are", () => {
+    const { e } = engine();
+    const lastSeen = '2026-10-13T12:00:00Z';
+    const aircraft = { hex: 'abc123', last_seen: lastSeen, adsb: { lat: 48.5, lon: 2.0, gs: 400, track: 90, seen: 0.4, seen_pos: 1.7 } };
+    const s = e.sampleFromAircraft(aircraft, Date.parse(aircraft.last_seen));
+    assert.equal(s.at, Date.parse(lastSeen) - 1700);
+});
+
+test('after a pause of the frames, the aircraft goes on from where its samples put it (fiche M, scenario e)', () => {
+    const { e, poses } = engine();
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 1000, now));
+    e.observe('abc123', fix(2.0028, now - 500, now));
+    const state = e.aircraftStates.get('abc123');
+    // Drawn 30 s ago, far behind, with a gap fading from there.
+    const t = performance.now();
+    state.lastRendered = { lat: 48.5, lon: 1.9, alt: 30000, track: 90, timestamp: t - 30000 };
+    state.correction = { dLat: 0, dLon: -0.1, dAlt: 0, startAt: t, endAt: t + 2500 };
+    globalThis.requestAnimationFrame = () => 0;
+    e.isRunning = true;
+    e.lastFrameAt = t - 30000;
+    e.rafLoop(t);
+    assert.equal(state.correction, null, 'no sweep from the pose drawn before the pause');
+    const drawn = poses[poses.length - 1];
+    const fresh = e._predictedPose(state, state.lastReal, t, null);
+    assert.ok(Math.abs(drawn.lon - fresh.lon) < 1e-6, 'drawn where the samples put it now');
+});
+
+test('a gap the glide cannot close without outrunning the aircraft relocates it (fiche M, scenario f)', () => {
+    // At 400 kt (206 m/s) the capped glide (2.5 s) outruns the aircraft
+    // backwards past 1.67 s of flight (343 m), at three times its speed past
+    // 3.33 s (686 m).
+    const at = (drawnLon) => {
+        const { e, poses } = engine();
+        const now = Date.now();
+        e.observe('abc123', fix(2.0, now, now));
+        const state = e.aircraftStates.get('abc123');
+        state.lastRendered = { lat: 48.5, lon: drawnLon, alt: 30000, track: 90, timestamp: performance.now() };
+        e.observe('abc123', fix(2.0028, now, now));
+        return { e, state, poses };
+    };
+    const metresPerDeg = 111320 * Math.cos(48.5 * Math.PI / 180);
+    // Drawn 300 m ahead: glided (no relocation), never backwards.
+    let { e, state } = at(2.0028 + 300 / metresPerDeg);
+    assert.ok(state.correction && !state.relocation, 'glided');
+    // Drawn 400 m ahead: relocated, and never drawn moving west.
+    ({ e, state } = at(2.0028 + 400 / metresPerDeg));
+    assert.ok(state.relocation && !state.correction, 'relocated');
+    const t0 = performance.now();
+    let prev = null;
+    for (let ms = 0; ms <= 400; ms += 33) {
+        const p = e._computePose(state, t0 + ms);
+        if (prev && p.fade >= 1 && prev.fade >= 1) assert.ok(p.lon >= prev.lon, 'no step west once shown');
+        if (ms < 150) assert.ok(p.fade < 1, 'fading out');
+        prev = p;
+    }
+    assert.equal(state.relocation, null, 'done after two fades');
+    // Drawn 600 m behind: glided; 800 m behind: relocated.
+    ({ state } = at(2.0028 - 600 / metresPerDeg));
+    assert.ok(state.correction && !state.relocation, '600 m behind: glided');
+    ({ state } = at(2.0028 - 800 / metresPerDeg));
+    assert.ok(state.relocation, '800 m behind: relocated');
+});
+
+test('strategy B draws the aircraft in the past, between two observed fixes (fiche M, step 3)', () => {
+    const { e } = engine();
+    e.updateConfig({ strategy: 'B', renderDelayMs: 1000 });
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 2000, now));
+    e.observe('abc123', fix(2.0028, now - 1000, now));
+    e.observe('abc123', fix(2.0056, now, now));
+    const state = e.aircraftStates.get('abc123');
+    e.estimate('abc123', { lat: 48.5, lon: 2.01, gs: 400, track: 90, alt: 30000, confidence: 0.9, at: now, sentAt: now, basedOn: now });
+    assert.equal(state.lastSampleSource, 'real', 'estimates are left out');
+    const p = e._pastPose(state, performance.now() - 500, null);
+    // 1.5 s ago: half-way between the first two fixes.
+    assert.ok(Math.abs(p.lon - 2.0014) < 0.0002, `drawn at ${p.lon.toFixed(5)}, want about 2.0014`);
+    assert.equal(new AircraftAnimationEngine({}, {}).config.strategy, 'A', 'A stays the default');
+});
+
+test("a symbol just created starts where the engine draws its aircraft (fiche M, step 4)", () => {
+    const { e } = engine();
+    const now = Date.now();
+    e.observe('abc123', fix(2.0, now - 2000, now));
+    const p = e.currentPose('abc123');
+    const metres = (p.lon - 2.0) * 111320 * Math.cos(48.5 * Math.PI / 180);
+    assert.ok(metres > 350 && metres < 480, `${metres.toFixed(0)} m on from the fix decoded 2 s ago, want about 412`);
+    assert.equal(e.currentPose('nobody'), null);
+});

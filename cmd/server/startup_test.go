@@ -1,3 +1,9 @@
+//go:build !windows
+
+// Not built on Windows: these tests start main() in a process group of its own,
+// stop it with SIGTERM and kill the group, none of which Windows has. The
+// helpers below serve only this file.
+
 package main
 
 import (

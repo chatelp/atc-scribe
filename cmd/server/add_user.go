@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/yegors/co-atc/internal/auth"
+	"golang.org/x/term"
 )
 
 // printNewUser reads a password twice without echoing it and prints the TOML block
@@ -78,29 +78,28 @@ var stdinReader = bufio.NewReader(os.Stdin)
 
 var warnedAboutEcho bool
 
-// readPassword turns off terminal echo through stty rather than pulling in a
-// dependency for it. If echo cannot be turned off -- a pipe, a terminal that does
-// not support it -- the caller is told plainly rather than typing a password into
-// a visible line without knowing.
+// readPassword reads a line without echoing it when the input is a terminal,
+// through golang.org/x/term, which does so on every system the server builds for.
+// If it is not -- a pipe -- the caller is told plainly rather than typing a
+// password into a visible line without knowing.
 func readPassword(prompt string) (string, error) {
 	fmt.Fprint(os.Stderr, prompt)
 
-	stty := exec.Command("stty", "-echo")
-	stty.Stdin = os.Stdin
-	echoOff := stty.Run() == nil
-	if !echoOff && !warnedAboutEcho {
+	fd := int(os.Stdin.Fd())
+	if term.IsTerminal(fd) {
+		password, err := term.ReadPassword(fd)
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return "", err
+		}
+		return string(password), nil
+	}
+
+	if !warnedAboutEcho {
 		warnedAboutEcho = true
 		fmt.Fprint(os.Stderr, "\n[!] this terminal will not hide input; type with that in mind\n"+prompt)
 	}
-
 	line, err := stdinReader.ReadString('\n')
-
-	if echoOff {
-		restore := exec.Command("stty", "echo")
-		restore.Stdin = os.Stdin
-		restore.Run()
-		fmt.Fprintln(os.Stderr)
-	}
 	if err != nil {
 		return "", err
 	}
