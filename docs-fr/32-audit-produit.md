@@ -492,6 +492,28 @@ sur la carte.
 
 ## État
 
+- 14/10 (matin) : **fiches J, K et M intégrées** (vague 3 cloud, relues sur le Mac ; aucune ne
+  touche aux fichiers de la migration, aucune valeur privée). **J** : le serveur compile pour
+  Windows (groupe de processus du sidecar et espace disque séparés par système, saisie du mot
+  de passe par `golang.org/x/term`) ; vérifié ici : compilation Windows et Linux, l'espace disque
+  de `/api/v1/server` identique à `df` ; pas exécuté sous Windows ; limites dites dans
+  `J-rapport.md` (pas de Job Object, arrêt sans SIGTERM). **K** : `www/story/then.js`, ce qu'un
+  avion a fait après une consigne, sans verdict, 43 cas ; pas encore branché (étape 8). **M** :
+  le banc du mouvement dans un vrai navigateur (`tools/motion-bench`, générateur `simtraffic`),
+  cinq corrections (un avion apparu page ouverte n'était jamais animé ; première minute après
+  rechargement ; retour d'onglet sans balayage ; reprise après un long trou en fondu au lieu
+  d'une glissade ; moteur à 30 i/s au lieu de 20 ; `sent_at` dans la réponse groupée), et les
+  stratégies B (dessin dans le passé) et C (hybride) en option, **A gardée par défaut** : B ne
+  gagne que 2 à 6 points de régularité pour 1,1 km de retard. **Le choix A/B/C revient au
+  propriétaire.** Après intégration : `go test -race` sur les 17 paquets, filet, compilations
+  croisées, verts. **Observation** : l'instance d'essai, lancée par la session Claude, a perdu
+  l'ADS-B à la coupure réseau de 20 h 42 et ne l'a jamais retrouvé (« no route to host »,
+  43 962 échecs en douze heures) alors qu'un processus neuf se connectait ; relancée, elle a
+  retrouvé 74 avions. Hypothèse non prouvée : le filtrage « réseau local » de macOS par
+  processus. À surveiller en production, qui est lancée depuis le Terminal. Le banc de M, rejoué
+  sur le Mac (scénario b, Chrome sans fenêtre) : 0 % de reculs, 0,13 % d'images lentes, 11,6 %
+  d'écart-type de vitesse dans le moteur, 26 m d'erreur moyenne, une pose toutes les 33 ms ;
+  les chiffres du cloud (11,5 %, 25 m) tiennent sur la vraie machine.
 - 13/10 (nuit) : **étape 6 de la migration livrée sur `migration`** (a15da0e), en relecture
   design. La colonne de gauche devient **le fil** : tous les échanges de toutes les fréquences
   en une liste qui grandit vers le bas, l'en-tête des fréquences (écouter / couper, menu avec
