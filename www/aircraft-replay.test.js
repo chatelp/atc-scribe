@@ -13,6 +13,9 @@
 //
 //     REPLAY_UPDATE_REFERENCE=1 node --test www/aircraft-replay.test.js
 //
+// REPLAY_ENGINE='{"strategy":"B"}' plays it with another engine config and
+// prints the metrics only (fiche M, step 3).
+//
 // and never worse at all than those of the upstream engine with the D79
 // fixes, measured before fiche L changed anything (step1.json, fixed).
 const test = require('node:test');
@@ -79,7 +82,7 @@ function loadPage(clock, station) {
         },
         updateAnimatedAircraftPose(hex, pose) {
             if (!drawn.has(hex)) return false;
-            drawn.set(hex, { lat: pose.lat, lon: pose.lon, heading: pose.heading });
+            drawn.set(hex, { lat: pose.lat, lon: pose.lon, heading: pose.heading, fade: Number.isFinite(pose.fade) ? pose.fade : 1 });
             return true;
         },
         removeAircraft(hex) { drawn.delete(hex); },
@@ -99,6 +102,9 @@ function loadPage(clock, station) {
         _performFiltering() {},
     });
     const engine = new Engine(mapManager, store);
+    // Another engine config, to compare (fiche M, step 3): the metrics are
+    // printed, not compared with the reference.
+    if (process.env.REPLAY_ENGINE) engine.updateConfig(JSON.parse(process.env.REPLAY_ENGINE));
     store.animationEngine = engine;
     return { store, engine, drawn, timers };
 }
@@ -148,6 +154,8 @@ function replay() {
     const per = new Map(); // hex -> { steps: [{speed, along, trueSpeed}], errors: [] }
     for (const t of rec.truth) per.set(t.hex, { kind: t.kind, steps: [], errors: [], prev: null });
     let maxCorrectionM = 0;
+    let relocations = 0;
+    let maxRelocationM = 0;
     const seenCorrections = new WeakSet();
 
     const noteCorrections = () => {
@@ -188,7 +196,13 @@ function replay() {
             if (!acc || !tr) continue;
             const truthNow = truthAt(tr, frameMs);
             acc.errors.push(metresBetween(truthNow.lat, truthNow.lon, p.lat, p.lon).d);
-            if (acc.prev) {
+            // A step taken while the symbol fades out or in is a relocation
+            // (a gap too wide to glide over, aircraft-animation.js), not a
+            // motion: counted apart, with its distance.
+            if (acc.prev && (acc.prev.fade < 1 || p.fade < 1)) {
+                const m = metresBetween(acc.prev.lat, acc.prev.lon, p.lat, p.lon).d;
+                if (m > 1) { relocations++; maxRelocationM = Math.max(maxRelocationM, m); }
+            } else if (acc.prev) {
                 const step = metresBetween(acc.prev.lat, acc.prev.lon, p.lat, p.lon);
                 const trackRad = truthNow.track * Math.PI / 180;
                 acc.steps.push({
@@ -236,6 +250,9 @@ function replay() {
         jumpsPct: pct(jumps),
         speedStdPct: Number((100 * std(ratios)).toFixed(2)),
         maxCorrectionM: Number(maxCorrectionM.toFixed(1)),
+        // Gaps relocated rather than glided over (fiche M), and the widest.
+        relocations,
+        maxRelocationM: Number(maxRelocationM.toFixed(1)),
         meanErrorM: Number(mean(errors).toFixed(1)),
         p95ErrorM: Number(sortedErrors[Math.floor(sortedErrors.length * 0.95)].toFixed(1)),
         // By kind of flight: mean error (m); backwards, slow and jump steps,
@@ -261,6 +278,7 @@ test('the replayed motion is no worse than the reference', () => {
     const m = replay();
     console.log('replay metrics', JSON.stringify(m).replace(/,"(?=[a-zA-Z])/g, ',\n "'));
     const refPath = path.join(DATA, 'reference.json');
+    if (process.env.REPLAY_ENGINE) return;
     if (process.env.REPLAY_UPDATE_REFERENCE === '1') {
         fs.writeFileSync(refPath, JSON.stringify(m, null, 2) + '\n');
         return;
@@ -271,7 +289,7 @@ test('the replayed motion is no worse than the reference', () => {
     }
 });
 
-test('the replayed motion is no worse than before fiche L', () => {
+test('the replayed motion is no worse than before fiche L', { skip: !!process.env.REPLAY_ENGINE }, () => {
     const m = replay();
     const before = JSON.parse(fs.readFileSync(path.join(DATA, 'step1.json'), 'utf8'));
     for (const k of Object.keys(GUARDED)) {

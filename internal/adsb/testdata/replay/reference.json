@@ -1,12 +1,14 @@
 {
-  "steps": 81000,
+  "steps": 80980,
   "backwardsPct": 0,
   "slowPct": 1.36,
-  "jumpsPct": 0.41,
-  "speedStdPct": 29.57,
-  "maxCorrectionM": 3254,
-  "meanErrorM": 38.3,
-  "p95ErrorM": 34.4,
+  "jumpsPct": 0.05,
+  "speedStdPct": 17.68,
+  "maxCorrectionM": 185.4,
+  "relocations": 10,
+  "maxRelocationM": 3286.4,
+  "meanErrorM": 32.2,
+  "p95ErrorM": 30.8,
   "byKind": {
     "climb": [
       8.1,
@@ -30,11 +32,11 @@
       9.2
     ],
     "gap": [
-      121.6,
+      97.1,
       0,
       5.5,
-      1.6,
-      55.5
+      0.1,
+      28.6
     ],
     "slow": [
       6.2,

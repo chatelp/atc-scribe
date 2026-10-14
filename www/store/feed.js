@@ -238,6 +238,7 @@
 
             // Clear current aircraft data
             this.aircraft = {};
+            const sentAtMs = Date.parse(data.sent_at || '');
             
             // Process each aircraft
             if (data.aircraft && Array.isArray(data.aircraft)) {
@@ -245,9 +246,22 @@
                     // Calculate distance
                     this.calculateAircraftDistance(aircraft);
                     
-                    // Update animation engine with aircraft data
+                    // The engine, dated as the stream's samples are: last_seen
+                    // is the server's observed_at (the poll less the whole
+                    // seconds of seen). Dated on arrival, as before, each
+                    // position was taken for current although decoded up to
+                    // two seconds earlier: on a page just loaded, aircraft
+                    // were drawn 300 m behind and caught up over 7 s
+                    // (browser bench, scenario a).
                     if (this.animationEngine) {
-                        this.animationEngine.updateAircraft(aircraft);
+                        const sample = this.animationEngine.sampleFromAircraft(aircraft, Date.parse(aircraft.last_seen || ''));
+                        // The server's clock when it answered (sent_at), the
+                        // page's evidence of the server's clock; the aircraft's
+                        // poll times, before, put it up to 1.4 s late and every
+                        // aircraft that much behind for 5 s (browser bench,
+                        // scenario a). A server without it: the poll times.
+                        if (sample && Number.isFinite(sentAtMs)) sample.sentAt = sentAtMs;
+                        this.animationEngine.observe(aircraft.hex, sample);
                     }
                     
                     // Add to aircraft map (all aircraft from bulk response are pre-filtered)
