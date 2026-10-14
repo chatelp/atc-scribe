@@ -253,7 +253,7 @@ def column_now():
 <div class="cl-app__scroll">
 <div class="cl-section"><p class="cl-summary">De Gaulle has been using runway <b>26L</b> since 11:40. Three aircraft on final, next touchdown in about 2 min. Orly uses <b>06</b>.</p><p class="cl-summary__source">Read from the ADS-B tracks, not announced by the controllers.</p></div>
 <div class="cl-section"><span class="cl-label">Arrivals to LFPG 26L</span>{SEQ}</div>
-<div class="cl-section"><span class="cl-label">Worth knowing · last 30 min</span><ul class="cl-events"><li><time>13:09</time><span><span class="is-warn">▲ Go-around</span> EZY14LM on 27R, now climbing back.</span></li><li><time>13:05</time><span>LFPG switched to landing west (26L, was 08R).</span></li></ul></div>
+<div class="cl-section"><span class="cl-label">Worth knowing · last 30 min</span><ul class="cl-events"><li><time>13:09</time><span><span class="is-warn">▲ Go-around</span> EZY14LM on 27R at LFPG, now climbing back.</span></li><li><time>13:05</time><span>LFPG switched to landing west (26L, was 08R).</span></li></ul></div>
 <div class="cl-section"><span class="cl-label">Weather at LFPG</span><span class="cl-metar">LFPG 131300Z 25012KT 9999 FEW030 17/09 Q1018</span><span class="cl-metar__plain">Wind from the west, 12 kt; visibility over 10 km; a few clouds at 3 000 ft; QNH 1018.</span><span class="cl-row"><button class="cl-btn">TAF</button><button class="cl-btn">NOTAM <span class="cl-tabs__count">4</span></button></span></div>
 <div class="cl-section"><span class="cl-label">Traffic</span><div class="cl-stats"><span><b>107</b> airborne</span><span><b>12</b> heard</span><span><b>3</b> on the ground</span></div></div>
 </div>
@@ -393,7 +393,7 @@ def event_log():
   <div class="cl-menu__head"><span class="cl-menu__title">Event log</span><span class="cl-age">5 events</span><span class="cl-row" style="margin-left: auto;"><button class="cl-btn">Sounds</button><button class="cl-btn cl-btn--quiet">Clear</button></span></div>
   <ul class="cl-events">
     <li class="is-clickable"><time>13:12</time><span><span class="is-urgent">■ 7700</span> AFR6TZ, emergency squawk, FL 110, 18 NM north-east.</span></li>
-    <li class="is-clickable"><time>13:09</time><span><span class="cl-warn">▲ Go-around</span> EZY14LM on 27R, now climbing back.</span></li>
+    <li class="is-clickable"><time>13:09</time><span><span class="cl-warn">▲ Go-around</span> EZY14LM on 27R at LFPG, now climbing back.</span></li>
     <li><time>13:05</time><span>LFPG switched to landing west (26L, was 08R).</span></li>
     <li class="is-clickable"><time>12:57</time><span><span class="is-info">●</span> AFR18GH, an A388, is in range, 34 NM west.</span></li>
     <li><time>12:51</time><span>The station switched to Approche De Gaulle + De Gaulle App. (L).</span></li>
