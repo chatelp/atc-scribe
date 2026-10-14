@@ -492,6 +492,16 @@ sur la carte.
 
 ## État
 
+- 14/10 (matin) : **étape 6, corrections de la relecture design** (migration 3caa41f, 54069f8 ;
+  serveur 24f060f). Le fil **ne décroche plus du bas tout seul** : un échange grandit après son
+  arrivée et le plafond en retire en haut, ce qui déplaçait la lecture sans le lecteur (290 px en
+  12 s) ; seule une molette, un toucher, une touche ou la barre lâchent le bas. Les consignes
+  s'écrivent « FL 050 » et « Contact 128.750 » à la source (`explain.go`, valeur comprise), et
+  « no aircraft in range was named ». Une rangée de boutons de fréquence, nom coupé d'une
+  ellipse ; chaque menu sous son bouton ; `<b>` et `<mark>` du système. Vérifié dans un Chrome
+  sans fenêtre (`tools/design/capture.mjs`) : rangée de 32 px, menu à 1 px de son bouton. Leçon
+  de test : le volet du navigateur intégré, masqué, ne produit aucune image ; Alpine y laisse
+  masqué ce qu'il affiche à l'image suivante, ce qui imite un défaut qui n'existe pas.
 - 14/10 (matin) : **fiches J, K et M intégrées** (vague 3 cloud, relues sur le Mac ; aucune ne
   touche aux fichiers de la migration, aucune valeur privée). **J** : le serveur compile pour
   Windows (groupe de processus du sidecar et espace disque séparés par système, saisie du mot
