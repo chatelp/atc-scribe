@@ -492,6 +492,14 @@ sur la carte.
 
 ## État
 
+- 14/10 : **correctif, la barre du haut tient au téléphone** (6a816f6, sur `main`), défaut trouvé
+  par la relecture design de l'étape 7 et présent depuis l'étape 3 : à 375 px la barre courait
+  jusqu'à 780 px, la cloche et les réglages hors de l'écran (journal et réglages inaccessibles au
+  téléphone). Sous 768 px : le signe, le voyant d'antenne coupé d'une ellipse, l'UTC, la cloche et
+  les réglages à 44 px ; le nom, l'heure locale et les voyants « ok » s'effacent. Mesuré à
+  375 × 812 (Chrome sans fenêtre) : page de 375 px, cloche à x 275, réglages à x 327. Ma mesure de
+  l'étape 7 (« aucun débordement ») regardait la barre du bas, pas la largeur de la page : au
+  téléphone, mesurer `document.documentElement.scrollWidth`. Étape 7 relue conforme au grand écran.
 - 14/10 : **étape 6 versée dans `local`** (bb56782) après le coup d'œil du propriétaire (« ça me
   va »). **Étape 7 livrée sur `migration`** (944c8c4) : la barre radio quitte le grand écran,
   le fil y fait tout ce qu'elle faisait (table de `09-ecrans.md`, lignes de la barre : écouter /
