@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/yegors/co-atc/pkg/logger"
@@ -256,12 +255,8 @@ func (s *Sidecar) Stop() {
 	pid := cmd.Process.Pid
 	s.logger.Info("Stopping local STT sidecar", logger.Int("pid", pid))
 
-	// Signal the whole process group. The sidecar's dependencies fork helpers of
-	// their own -- Silero leaves a multiprocessing resource_tracker behind -- and
-	// signalling only the parent orphans them.
-	if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
-		_ = cmd.Process.Signal(syscall.SIGTERM)
-	}
+	// Signal the whole process group (sidecar_unix.go says why).
+	terminateGroup(cmd)
 
 	s.mu.Lock()
 	done := s.done
@@ -270,15 +265,14 @@ func (s *Sidecar) Stop() {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		s.logger.Warn("Local STT sidecar did not stop on SIGTERM, killing", logger.Int("pid", pid))
-		_ = syscall.Kill(-pid, syscall.SIGKILL)
+		killGroup(cmd)
 		<-done
 	}
 }
 
 func (s *Sidecar) spawn() error {
 	cmd := exec.Command(s.command[0], s.command[1:]...)
-	// Its own process group, so Stop can reach the children too.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	startInOwnGroup(cmd)
 	// Tells our sidecar to stop if we are killed outright. Stop() handles every
 	// ordinary exit, but not SIGKILL -- and a sidecar that outlives us holds the
 	// port, which is how seventeen servers came to share one in a night. A
@@ -529,6 +523,7 @@ func (s *Sidecar) warnIfDegraded() {
 // process groups -- ours runs in its own, set at spawn, and every descendant
 // shares it. That covers a command that is a wrapper script as well as one that
 // is the interpreter itself.
+// On Windows, which has no process groups, only the pid itself is matched.
 func (s *Sidecar) notOurs() (string, bool) {
 	s.mu.Lock()
 	cmd := s.cmd
@@ -550,7 +545,7 @@ func (s *Sidecar) notOurs() (string, bool) {
 	if reported == cmd.Process.Pid {
 		return "", true
 	}
-	if pgid, err := syscall.Getpgid(reported); err == nil && pgid == cmd.Process.Pid {
+	if inGroupOf(reported, cmd.Process.Pid) {
 		return "", true
 	}
 	return fmt.Sprintf("pid %d answered, ours is %d", reported, cmd.Process.Pid), false

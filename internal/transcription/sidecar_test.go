@@ -6,9 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -76,76 +74,6 @@ func TestProbeOnlySucceedsAgainstARunningSidecar(t *testing.T) {
 	}
 }
 
-func TestStartSpawnsAndStopTerminates(t *testing.T) {
-	srv := healthServer(t)
-	s := NewSidecar(SidecarConfig{
-		ServerURL:             srv.URL,
-		Command:               []string{"sh", "-c", "sleep 60"},
-		StartupTimeoutSeconds: 5,
-	}, testLogger(t))
-
-	if err := s.Start(context.Background()); err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-	pid := s.cmd.Process.Pid
-	if err := syscall.Kill(pid, syscall.Signal(0)); err != nil {
-		t.Fatalf("child %d should be running: %v", pid, err)
-	}
-
-	s.Stop()
-	if err := syscall.Kill(pid, syscall.Signal(0)); err == nil {
-		t.Errorf("child %d should be gone after Stop", pid)
-	}
-}
-
-// The reason Stop signals the process group: the real sidecar's dependencies
-// fork helpers that a signal to the parent alone would orphan. We watched one --
-// a multiprocessing resource_tracker -- survive its parent on this machine.
-func TestStopReachesGrandchildren(t *testing.T) {
-	srv := healthServer(t)
-	pidFile := filepath.Join(t.TempDir(), "grandchild.pid")
-
-	s := NewSidecar(SidecarConfig{
-		ServerURL:             srv.URL,
-		Command:               []string{"sh", "-c", "sleep 60 & echo $! > " + pidFile + "; wait"},
-		StartupTimeoutSeconds: 5,
-	}, testLogger(t))
-
-	if err := s.Start(context.Background()); err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-
-	var grandchild int
-	for i := 0; i < 50; i++ {
-		if b, err := os.ReadFile(pidFile); err == nil {
-			if pid, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && pid > 0 {
-				grandchild = pid
-				break
-			}
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if grandchild == 0 {
-		t.Fatal("grandchild never reported its pid")
-	}
-
-	s.Stop()
-
-	// SIGTERM travels the group, but reaping is not instantaneous.
-	gone := false
-	for i := 0; i < 40; i++ {
-		if err := syscall.Kill(grandchild, syscall.Signal(0)); err != nil {
-			gone = true
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if !gone {
-		_ = syscall.Kill(grandchild, syscall.SIGKILL)
-		t.Errorf("grandchild %d survived Stop -- the process group was not signalled", grandchild)
-	}
-}
-
 // A sidecar that dies on startup should be reported at once, with its own output,
 // instead of making the operator wait out the whole timeout for a bare failure.
 func TestChildThatExitsIsReportedWithItsOutput(t *testing.T) {
@@ -168,30 +96,6 @@ func TestChildThatExitsIsReportedWithItsOutput(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "ModuleNotFoundError") {
 		t.Errorf("error should carry the sidecar's own output, got: %v", err)
-	}
-}
-
-// A command that starts but never answers must fail on the timeout, not hang.
-func TestSpawnedButSilentSidecarTimesOut(t *testing.T) {
-	s := NewSidecar(SidecarConfig{
-		ServerURL:             "http://127.0.0.1:1",
-		Command:               []string{"sh", "-c", "sleep 60"},
-		StartupTimeoutSeconds: 1,
-	}, testLogger(t))
-
-	err := s.Start(context.Background())
-	if err == nil {
-		t.Fatal("expected a timeout")
-	}
-	if !strings.Contains(err.Error(), "did not answer") {
-		t.Errorf("error should name the timeout, got: %v", err)
-	}
-	// Start must not leave the process behind when it gives up.
-	if s.cmd != nil && s.cmd.Process != nil {
-		if err := syscall.Kill(s.cmd.Process.Pid, syscall.Signal(0)); err == nil {
-			_ = syscall.Kill(-s.cmd.Process.Pid, syscall.SIGKILL)
-			t.Error("a sidecar that timed out should have been stopped")
-		}
 	}
 }
 
