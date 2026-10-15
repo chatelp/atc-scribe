@@ -4,6 +4,16 @@ An icon in the menu bar that says whether co-atc's production runs, starts and
 stops it, and opens the page. Nothing starts on its own: production runs only
 when asked.
 
+Below, every co-atc running on this Mac, production and test alike, found by
+process name and read from its own config and server: the page it serves (the
+branch and commit when its `www` is a checkout's), the server's version, its
+aircraft and transmissions of the day, its transcription (real model or fake,
+the sidecar's health and queue), its station link (`radio-ctl-sync`), its
+ports, config, databases and log. A test instance can be stopped from there:
+by its own PIDs, co-atc, its station link and a sidecar co-atc did not start,
+after a confirmation. Sidecars and station links running without an instance
+are listed apart.
+
 It does not run production itself. It runs the script a double-click would
 (`production_command`, by default `runs/production.command`), so sign-in, the
 station link and the clean stop stay in one place, and stops it with SIGTERM,
