@@ -492,6 +492,12 @@ sur la carte.
 
 ## État
 
+- 15/10 (soir) : **migration du design versée dans `local` et prête pour la production**
+  (efaaa7a) : étapes 12 et 13 et tout ce qui a suivi le même jour, relu conforme par la session
+  design. Le propriétaire a choisi de la regarder en production plutôt que sur l'instance d'essai
+  (l'iPhone y accède déjà, avec connexion, et le vrai modèle y tourne). Avant le versement : `go
+  vet`, tous les tests Go, les tests du sidecar et le filet de la page, verts. Binaire de
+  production reconstruit ; `runs/production.command` fige la page au lancement.
 - 15/10 : **un avion perdu pointait au nord**, à 90° de sa trajectoire sur l'axe est-ouest de
   Roissy (vu par le propriétaire). Mesuré sur l'instance : sur dix avions perdus récents, sept
   n'avaient plus ni `track` ni cap dans leur dernier relevé (le récepteur les fait expirer) ; le
