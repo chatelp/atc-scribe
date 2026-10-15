@@ -961,30 +961,49 @@ document.addEventListener('alpine:init', () => {
         });
     }
 
-    // The keyboard's focus follows a flight (step 11): the strip it was on
-    // goes when the column turns to the story, and the story goes when the
-    // flight is let go. When the focus was lost that way, it moves to the
-    // story's back button, or back to the aircraft's strip, else the column.
+    // The keyboard's focus follows a flight (step 11), wherever it was
+    // started from (a strip, an arrival row, a Nearby row, a thread chip,
+    // the map): the element that started it often goes when the column
+    // turns to the story. While the focus is on that element or nowhere, it
+    // moves to the story's back button; when the flight is let go, it goes
+    // back to that element if it is still there, else to the aircraft's
+    // strip, else to the column's tab it came from.
     {
         const store = Alpine.store('atc');
+        const shown = (el) => !!el && el.isConnected && el.getClientRects().length > 0;
         let previous = null;
+        let origin = null;
+        // Only for the keyboard: a mouse user's focus is left where it is,
+        // and the list not scrolled to a strip they did not ask for.
+        let keyboard = false;
+        document.addEventListener('keydown', () => { keyboard = true; }, true);
+        document.addEventListener('pointerdown', () => { keyboard = false; }, true);
         Alpine.effect(() => {
             const hex = store.selectedAircraft ? store.selectedAircraft.hex : null;
             if (hex === previous) return;
             const left = previous;
             previous = hex;
-            // The new column is drawn in a frame or two: tried a few times.
+            const startedFrom = document.activeElement;
+            if (hex && !left) origin = startedFrom;
+            const lost = (a) => !a || a === document.body || a === startedFrom || !shown(a);
             const place = () => {
-                const a = document.activeElement;
-                if (a && a !== document.body) return true;
+                if (!keyboard || !lost(document.activeElement)) return true;
                 const column = document.getElementById('region-column');
-                const target = hex
-                    ? column && [...column.querySelectorAll('.cl-tabs--column button')].find((b) => b.offsetParent !== null)
-                    : (left && column && column.querySelector(`[data-aircraft-hex="${left}"]`)) || column;
-                if (!target || target.offsetParent === null) return false;
+                let target = null;
+                if (hex) {
+                    target = column && [...column.querySelectorAll('.cl-tabs--column button')].find(shown);
+                } else {
+                    target = (shown(origin) && origin)
+                        || (left && column && column.querySelector(`[data-aircraft-hex="${left}"]`))
+                        || (column && [...column.querySelectorAll('[role="tab"][aria-selected="true"]')].find(shown))
+                        || column;
+                    origin = null;
+                }
+                if (!target || !shown(target)) return false;
                 target.focus();
                 return true;
             };
+            // The new column is drawn in a frame or two: tried a few times.
             for (const ms of [30, 150, 500]) setTimeout(place, ms);
         });
     }
