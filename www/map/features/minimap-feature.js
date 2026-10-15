@@ -18,6 +18,22 @@
         return window.ol.proj.fromLonLat([lon, lat]);
     }
 
+    // The track's colours are the design system's (step 13 review): the
+    // received track in the text greys, the estimates (before the first
+    // contact and ahead) dotted in the accent, as a followed flight's trail.
+    // The legend in index.html names the same three.
+    function token(name, fallback) {
+        const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return v || fallback;
+    }
+
+    // A canvas colour: the tokens are #rrggbb.
+    function withAlpha(hex, alpha) {
+        const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+        if (!m) return hex;
+        return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alpha})`;
+    }
+
     function isValidLatLon(lat, lon) {
         return typeof lat === 'number' && typeof lon === 'number' && Number.isFinite(lat) && Number.isFinite(lon);
     }
@@ -135,6 +151,10 @@
         const aircraft = store.selectedAircraft;
         if (!aircraft) return;
 
+        const accent = token('--color-accent-default', '#4caf50');
+        const secondary = token('--color-text-secondary', '#b8b8b8');
+        const tertiary = token('--color-text-tertiary', '#949494');
+
         const currentLat = aircraft?.adsb?.lat;
         const currentLon = aircraft?.adsb?.lon;
         const allPoints = [];
@@ -144,8 +164,8 @@
             const currentStyle = new window.ol.style.Style({
                 image: new window.ol.style.Circle({
                     radius: 6,
-                    fill: new window.ol.style.Fill({ color: aircraft.status === 'signal_lost' ? '#F44336' : '#4CAF50' }),
-                    stroke: new window.ol.style.Stroke({ color: aircraft.status === 'signal_lost' ? '#F44336' : '#4CAF50', width: 2 }),
+                    fill: new window.ol.style.Fill({ color: aircraft.status === 'signal_lost' ? secondary : accent }),
+                    stroke: new window.ol.style.Stroke({ color: aircraft.status === 'signal_lost' ? secondary : accent, width: 2 }),
                 }),
             });
             manager.tracksMiniMapLayers.current.addFeature(createPointFeature(currentLat, currentLon, currentStyle));
@@ -158,7 +178,7 @@
         allPoints.push(...historyPoints);
 
         const historyLine = createLineFeature(historyPoints, new window.ol.style.Style({
-            stroke: new window.ol.style.Stroke({ color: '#888888', width: 1, lineDash: [3, 3] }),
+            stroke: new window.ol.style.Stroke({ color: tertiary, width: 1, lineDash: [3, 3] }),
         }));
         if (historyLine) manager.tracksMiniMapLayers.historical.addFeature(historyLine);
 
@@ -169,8 +189,8 @@
                 new window.ol.style.Style({
                     image: new window.ol.style.Circle({
                         radius: 2,
-                        fill: new window.ol.style.Fill({ color: 'rgba(136,136,136,0.3)' }),
-                        stroke: new window.ol.style.Stroke({ color: 'rgba(136,136,136,0.5)', width: 1 }),
+                        fill: new window.ol.style.Fill({ color: withAlpha(tertiary, 0.3) }),
+                        stroke: new window.ol.style.Stroke({ color: withAlpha(tertiary, 0.5), width: 1 }),
                     }),
                 })
             ));
@@ -188,7 +208,7 @@
         }
 
         const hindcastLine = createLineFeature(hindcastWithJoin, new window.ol.style.Style({
-            stroke: new window.ol.style.Stroke({ color: '#00BCD4', width: 1.5, lineDash: [4, 6] }),
+            stroke: new window.ol.style.Stroke({ color: accent, width: 1.5, lineDash: [4, 6] }),
         }));
         if (hindcastLine) manager.tracksMiniMapLayers.hindcast.addFeature(hindcastLine);
 
@@ -199,8 +219,8 @@
                 new window.ol.style.Style({
                     image: new window.ol.style.Circle({
                         radius: 2,
-                        fill: new window.ol.style.Fill({ color: 'rgba(0,188,212,0.2)' }),
-                        stroke: new window.ol.style.Stroke({ color: 'rgba(0,188,212,0.4)', width: 1 }),
+                        fill: new window.ol.style.Fill({ color: withAlpha(accent, 0.2) }),
+                        stroke: new window.ol.style.Stroke({ color: withAlpha(accent, 0.4), width: 1 }),
                     }),
                 })
             ));
@@ -213,7 +233,7 @@
         allPoints.push(...futurePoints);
 
         const futureLine = createLineFeature(futurePoints, new window.ol.style.Style({
-            stroke: new window.ol.style.Stroke({ color: '#FFC107', width: 2, lineDash: [10, 5] }),
+            stroke: new window.ol.style.Stroke({ color: accent, width: 2, lineDash: [4, 6] }),
         }));
         if (futureLine) manager.tracksMiniMapLayers.future.addFeature(futureLine);
 
@@ -224,8 +244,8 @@
                 new window.ol.style.Style({
                     image: new window.ol.style.Circle({
                         radius: 3,
-                        fill: new window.ol.style.Fill({ color: 'rgba(255,193,7,0.6)' }),
-                        stroke: new window.ol.style.Stroke({ color: 'rgba(255,193,7,0.8)', width: 1 }),
+                        fill: new window.ol.style.Fill({ color: withAlpha(accent, 0.6) }),
+                        stroke: new window.ol.style.Stroke({ color: withAlpha(accent, 0.8), width: 1 }),
                     }),
                 })
             ));

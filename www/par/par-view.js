@@ -25,6 +25,14 @@
         highlight: '#4CAF50', transition: '#FFC107', runway: '#bdbdbd', cone: '#4a4a4a',
     };
 
+    let tertiary = '';
+    function tertiaryText() {
+        if (!tertiary) {
+            tertiary = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim() || '#949494';
+        }
+        return tertiary;
+    }
+
     const ELEV_H_FULL = 230;     // elevation band height, px
     const AZ_H_FULL = 64;        // azimuth band height, px
     // The frame under the map while a flight is followed (step 8, c-suivre):
@@ -665,8 +673,11 @@
                 poly(path, col, `stroke-width="${strong ? 1.5 : 1}" stroke-dasharray="6 4"`);
                 hitPoly(path, HELP.glide(e, strong));
                 const at = path[Math.min(path.length - 1, 16)];
-                text(at[0], at[1] - 5, `${e.slopeDeg}°`, col,
-                    `text-anchor="middle" font-size="10"${strong ? '' : ' fill-opacity="0.7"'}${HELP.glide(e, strong)}`);
+                // The slope is read, not drawn: its figure takes the
+                // tertiary text colour, where the line's #555 gave 2.7:1
+                // (step 13 contrast probe).
+                text(at[0], at[1] - 5, `${e.slopeDeg}°`, strong ? col : tertiaryText(),
+                    `text-anchor="middle" font-size="10"${HELP.glide(e, strong)}`);
             };
             glide(B, false);
             glide(A, isInUse);

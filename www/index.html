@@ -1400,10 +1400,10 @@
                                         })() : null
                                      ">
                                     <div class="cl-sky__note absolute top-2 left-2 flex items-center gap-3" style="z-index: 1000;">
-                                        <span class="flex items-center gap-1"><i class="inline-block w-2 h-2 rounded-full" :style="'background:' + ($store.atc.selectedAircraft?.status === 'signal_lost' ? 'var(--color-status-urgent)' : 'var(--color-accent-default)')"></i>
-                                            <span x-text="$store.atc.selectedAircraft?.status === 'signal_lost' ? 'Past' : 'Current'"></span></span>
-                                        <span class="flex items-center gap-1"><i class="inline-block w-3" style="border-top: 1px dashed var(--color-text-tertiary);"></i>History</span>
-                                        <span class="flex items-center gap-1"><i class="inline-block w-3" style="border-top: 1px dashed var(--color-status-warn);"></i>Future</span>
+                                        <span class="flex items-center gap-1"><i class="inline-block w-2 h-2 rounded-full" :style="'background:' + ($store.atc.selectedAircraft?.status === 'signal_lost' ? 'var(--color-text-secondary)' : 'var(--color-accent-default)')"></i>
+                                            <span x-text="$store.atc.selectedAircraft?.status === 'signal_lost' ? 'Last fix' : 'Now'"></span></span>
+                                        <span class="flex items-center gap-1"><i class="inline-block w-3" style="border-top: 1px dotted var(--color-text-tertiary);"></i>Received</span>
+                                        <span class="flex items-center gap-1 cursor-help" data-help-title="Estimated" data-help="Where it was before the station first heard it, and where it should be next: worked out from its track, not received."><i class="inline-block w-3" style="border-top: 1px dotted var(--color-accent-default);"></i>Estimated</span>
                                     </div>
                                 </div>
                             </div>
@@ -1456,7 +1456,6 @@
                                                 <template x-if="item.type === 'row'">
                                                     <td>
                                                         <span x-text="$store.atc.formatDate(item.position.timestamp, true)"></span>
-                                                        <span class="is-dim" x-text="Math.floor((new Date() - new Date(item.position.timestamp)) / 1000) + 's'"></span>
                                                         <span x-show="item.position.lat === 0 && item.position.lon === 0" class="is-dim cursor-help"
                                                               data-help-title="Mode S" data-help="A Mode S reply without a position.">S</span>
                                                     </td>

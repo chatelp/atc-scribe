@@ -492,6 +492,16 @@ sur la carte.
 
 ## État
 
+- 15/10 : **relecture design de l'étape 13**. Le « 3° » de la PAR passe en texte tertiaire
+  (#949494, environ 6,8:1 ; il était à 2,7:1) ; le « 10 NM » de la portée de la connexion reste,
+  décoratif et `aria-hidden` (WCAG 1.4.3, noté dans la fiche SignIn). La légende de la mini-carte
+  disait « Past » en rouge d'urgence et « Future » en jaune des avions très bas, alors que la trace
+  était grise : la mini-carte et sa légende prennent les mêmes jetons (position en accent, ou en
+  texte secondaire si le signal est perdu ; trace reçue en tertiaire pointillé ; estimations en
+  accent pointillé). Les positions estimées avant le premier contact, en cyan et absentes de la
+  légende, rejoignent les estimations, d'où « Estimated » plutôt que « Future ». La colonne des
+  secondes du tableau est retirée, l'heure suffit. La palette de la carte attend le choix du
+  propriétaire.
 - 15/10 : **étape 13 (nettoyage) livrée sur `migration`**. Mesuré par `tools/design/inventory.mjs`,
   avant la migration → avant le nettoyage → après : utilisations de classes Tailwind 3 879 → 834
   → 433 ; couleurs distinctes 215 → 122 → 82 ; valeurs en dur 284 → 241 → 177 ; `style.css`
