@@ -190,32 +190,13 @@ input:checked + .slider:before {
 }
 
 /* Radio Bar Enhancements */
-#radio-bar {
-    backdrop-filter: blur(2px);
-}
 
 /* Frequency Box Enhancements */
-#radio-bar .rounded-lg {
-    transition: all 0.25s ease-in-out;
-}
 
-#radio-bar .rounded-lg:hover {
-    /* Removed hover animation */
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
 
 /* Button Enhancements */
-#radio-bar button {
-    transition: all 0.2s ease;
-}
 
-#radio-bar button:hover {
-    transform: scale(1.1);
-}
 
-#radio-bar button:active {
-    transform: scale(0.95);
-}
 
 /* Canvas pane optimization */
 .ol-layer canvas {
@@ -295,7 +276,6 @@ input:checked + .slider:before {
 .vol-range::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 8px; margin-top: -3px; border-radius: 50%; background: #999; }
 .vol-range::-moz-range-thumb { width: 8px; height: 8px; border: 0; border-radius: 50%; background: #999; }
 .vol-range:hover::-webkit-slider-thumb { background: #4CAF50; }
-#radio-bar .vol-range:hover { transform: none; }
 
 /* The transcript row opened on by a link (store.openTranscriptionAt). */
 .tx-flash { animation: tx-flash 1.8s ease-out; }
@@ -319,3 +299,12 @@ input:checked + .slider:before {
 /* The regions the skip links lead to (step 11; the links are the system's
    .cl-skip): a target for the focus, not a control. */
 #region-thread:focus, #region-column:focus { outline: none; }
+
+/* The page's own controls at touch size under 768 px (step 12): the altitude
+   range's two thumbs and the list's sort. */
+@media (max-width: 767px) {
+    .alt-track-wrap { height: 44px; }
+    .alt-range, .alt-range::-webkit-slider-runnable-track { height: 44px; }
+    .alt-range::-webkit-slider-thumb { margin-top: 15px; }
+    select[aria-label="Sort"] { height: 44px; min-width: 64px; font-size: 13px; }
+}

@@ -1052,7 +1052,10 @@ document.addEventListener('alpine:init', () => {
     // in the list pane (audit 4.2).
     Alpine.effect(() => {
         const store = Alpine.store('atc');
-        if (store.selectedAircraft && window.matchMedia('(max-width: 767px)').matches) store.mobilePane = 'list';
+        // On the phone a flight's story is in the column (PhoneShell): chosen
+        // from the thread or the sky, it opens in Traffic; from Traffic or
+        // Right now, it stays there and its back button returns there.
+        if (store.selectedAircraft && window.matchMedia('(max-width: 767px)').matches && !store.phoneColumn) store.showPane('traffic');
     });
 
     // Watch for aircraft selection changes to clear pending requests and trails

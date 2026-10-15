@@ -563,3 +563,21 @@
 /* above the map library's own layers, which count from 10000 */
 .cl-skip a { position: fixed; left: var(--space-2); top: -48px; z-index: 100000; padding: var(--space-1-5) var(--space-3); background: var(--color-surface-raised); color: var(--color-text-primary); border: var(--border-width-strong) solid var(--color-border-focus); border-radius: var(--radius-md); font-size: var(--font-size-small); text-decoration: none; }
 .cl-skip a:focus { top: var(--space-2); }
+
+/* ------------------------------------------------------------ Touch sizes under 768 px (migration step 12) */
+/* Every target 44 px at least: measured on the four phone panes, 18 of 79 were
+   smaller (a channel's caret 15 px wide, the column's tabs 30 px high, an
+   arrival row 25 px). A callsign chip keeps its drawing: its hit area grows. */
+@media (max-width: 767px) {
+    .cl-channel__main, .cl-channel__caret { min-height: var(--size-target-touch); }
+    .cl-channel__caret { min-width: var(--size-target-touch); }
+    .cl-seg__item, .cl-btn { min-width: var(--size-target-touch); }
+    .cl-tabs__tab { min-height: var(--size-target-touch); }
+    .cl-table tr[role="button"] td { height: var(--size-target-touch); }
+    .cl-exchange .cl-chip--callsign::after { inset: -12px -6px; }
+    .cl-sky__top .cl-seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+    .cl-tabs__tab { min-width: var(--size-target-touch); }
+    .cl-tabs--column button, .cl-disclosure { min-height: var(--size-target-touch); }
+    .cl-story__events button { min-height: var(--size-target-touch); }
+    .cl-table button { min-height: var(--size-target-touch); min-width: var(--size-target-touch); }
+}

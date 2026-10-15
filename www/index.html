@@ -157,7 +157,7 @@
                  until step 7 to be compared. Wide screens only; the phone keeps
                  its panes until step 12. Folded (layout B), it takes the width the
                  column gave up. -->
-            <section id="region-thread" tabindex="-1" class="cl-root cl-app__thread hidden md:flex" aria-label="Radio"
+            <section id="region-thread" tabindex="-1" class="cl-root cl-app__thread md:flex" :class="$store.atc.mobilePane === 'radio' ? 'flex' : 'hidden'" aria-label="Radio"
                      :style="$store.atc.columnFolded && !$store.atc.selectedAircraft ? 'flex-basis: 640px' : ''">
                 <div class="cl-threadhead">
                     <div class="cl-threadhead__row">
@@ -335,7 +335,7 @@
             <!-- Left Content Area (Settings, Map). On a phone (under 768 px) the
                  map and the list take turns, chosen by the tabs above the radio bar
                  (audit 4.2). -->
-            <div class="flex-col flex-1 relative min-w-0" :class="$store.atc.mobilePane === 'map' ? 'flex' : 'hidden md:flex'">
+            <div class="flex-col flex-1 relative min-w-0" :class="$store.atc.mobilePane === 'sky' ? 'flex' : 'hidden md:flex'">
                 <!-- Main Content -->
                 <main class="flex flex-1 overflow-hidden relative">
                     <!-- Settings: a page of its own (audit 2.1, 10/10), SettingsPage since
@@ -347,7 +347,7 @@
                          @keydown.escape.window="$store.atc.settingsOpen = false"
                          x-data="serverSettings()" x-init="load()"
                          role="dialog" aria-modal="true" aria-label="Settings"
-                         class="cl-root cl-page fixed inset-x-0 top-0 bottom-20 md:bottom-0" style="z-index: 10010;">
+                         class="cl-root cl-page fixed inset-x-0 top-0 bottom-0" style="z-index: 10010;">
                         <div class="cl-page__inner max-md:grid-cols-1 max-md:grid-rows-[auto_minmax(0,1fr)] max-md:border-x-0">
                             <nav class="cl-page__nav max-md:flex-row max-md:overflow-x-auto max-md:border-r-0 max-md:border-b max-md:border-border-default max-md:px-3 max-md:py-2" aria-label="Sections">
                                 <template x-for="s in sections" :key="s[0]">
@@ -992,11 +992,11 @@
                  phone's list pane is not affected. -->
             <aside class="cl-root cl-app__column w-full min-w-0 overflow-hidden z-50"
                    :class="[($store.atc.columnFolded && !$store.atc.selectedAircraft)
-                              ? ($store.atc.mobilePane === 'list' ? 'flex md:hidden' : 'hidden')
-                              : ($store.atc.mobilePane === 'list' ? 'flex' : 'hidden md:flex')]"
+                              ? ($store.atc.phoneColumn ? 'flex md:hidden' : 'hidden')
+                              : ($store.atc.phoneColumn ? 'flex' : 'hidden md:flex')]"
                    id="region-column" tabindex="-1" aria-label="Context">
                 <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col">
-                    <div class="cl-tabs cl-tabs--column" role="tablist">
+                    <div class="cl-tabs cl-tabs--column max-md:!hidden" role="tablist">
                         <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.columnTab === 'now'" @click="$store.atc.columnTab = 'now'"
                                 data-help-title="Right now" data-help="What the sky is doing now: the runway each airport uses, who lands next, what happened in the last half hour, the weather.">Right now</button>
                         <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.columnTab === 'traffic'" @click="$store.atc.columnTab = 'traffic'"
@@ -1762,245 +1762,18 @@
             </aside>
         </div>
         
-        <!-- Phone: which pane is shown (audit 4.2). -->
-        <div class="md:hidden flex border-t border-border bg-panel text-xs" x-show="!$store.atc.settingsOpen">
-            <button class="flex-1 py-2 flex items-center justify-center gap-1.5"
-                    :class="$store.atc.mobilePane === 'map' && $store.atc.mainView === 'map' ? 'text-highlight bg-highlight/10' : 'text-text/60'"
-                    @click="$store.atc.showPane('map')"><i class="fas fa-map"></i> Map</button>
-            <button class="flex-1 py-2 flex items-center justify-center gap-1.5 border-l border-border"
-                    :class="$store.atc.mobilePane === 'map' && $store.atc.mainView === 'par' ? 'text-highlight bg-highlight/10' : 'text-text/60'"
-                    x-show="$store.atc.followedAirports.length"
-                    @click="$store.atc.showPane('par')"><i class="fas fa-plane-arrival"></i> PAR</button>
-            <button class="flex-1 py-2 flex items-center justify-center gap-1.5 border-l border-border"
-                    :class="$store.atc.mobilePane === 'list' ? 'text-highlight bg-highlight/10' : 'text-text/60'"
-                    @click="$store.atc.showPane('list')"><i class="fas fa-list"></i>
-                <span x-text="$store.atc.selectedAircraft ? 'Aircraft' : 'List'"></span></button>
-        </div>
-        <!-- The radio bar, on the phone only since migration step 7: on a wide
-             screen the thread (step 6) does all it did. The phone keeps it until
-             step 12, where the thread is still hidden; its per-frequency windows
-             and their layout code go then. -->
-        <template x-if="$store.atc">
-            <div id="radio-bar" class="md:hidden h-20 bg-panel border-t border-border flex items-center z-[1001] relative overflow-x-auto md:overflow-visible shadow-[0_-5px_10px_rgba(0,0,0,0.3)]">
-                <!-- Left side - the frequencies (audit 4.1): narrow tiles in a strip
-                     that scrolls when there are more than fit, so that the runway in
-                     use, the status and the clocks stay on screen at 1 440 px. -->
-                <div class="flex-shrink-0 md:flex-1 md:min-w-0 h-full flex items-center pl-1 pr-2 gap-1.5">
-                    <!-- Listen to all, or mute all. -->
-                    <button x-show="$store.atc.audioFrequencies.length > 1"
-                            class="flex-shrink-0 w-7 h-14 rounded-md border flex flex-col items-center justify-center gap-0.5 text-[10px] cursor-pointer"
-                            :class="$store.atc.anyUnmuted ? 'border-highlight/50 bg-highlight/10 text-highlight' : 'border-border bg-panel text-text/60 hover:text-text'"
-                            @click="$store.atc.toggleAllListening()"
-                            data-help-title="All frequencies" :data-help="$store.atc.anyUnmuted ? 'Mute every frequency.' : 'Listen to every frequency at once.'">
-                        <i class="fas" :class="$store.atc.anyUnmuted ? 'fa-volume-xmark' : 'fa-volume-high'"></i>
-                        <span class="uppercase tracking-wider text-[8px]">all</span>
-                    </button>
-                    <div class="radio-strip flex gap-1.5 items-stretch h-full py-2 md:min-w-0 md:flex-1 md:overflow-x-auto">
-                        <template x-for="freq in $store.atc.audioFrequencies" :key="freq.id">
-                            <div
-                                :class="{
-                                    'bg-highlight/10 border-highlight/50 text-highlight': $store.atc.isUnmuted(freq.id) && !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
-                                    'bg-panel hover:bg-hover border-border text-text/80 hover:text-text': !$store.atc.isUnmuted(freq.id) && !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
-                                    'border-red-400/30 bg-red-950/30 text-red-300/60 opacity-80': $store.atc.isFrequencyFailed(freq.id),
-                                    'border-amber-600/30 bg-amber-950/20 text-amber-200/50 opacity-80': $store.atc.isFrequencyConnecting(freq.id)
-                                }"
-                                class="relative flex flex-col justify-between px-2 py-1 border rounded-lg transition-colors duration-200 w-[160px] flex-shrink-0 cursor-pointer select-none"
-                                :data-freq-id="freq.id"
-                                data-help-title="Frequency" :data-help="$store.atc.tileHelp(freq)">
-                                <!-- Muted or listening, said in so many words: upstream said it
-                                     only by the colour of the bars, and a silent page with text
-                                     arriving read as a fault. -->
-                                <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)"
-                                     class="font-semibold text-[12px] leading-tight flex items-center gap-1.5 min-w-0">
-                                    <i class="fas text-[11px] flex-shrink-0"
-                                       :class="$store.atc.isUnmuted(freq.id) ? 'fa-volume-high' : 'fa-volume-xmark opacity-50'"></i>
-                                    <span class="truncate" x-text="freq.name"></span>
-                                </div>
-                                <div @click="!$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id) && $store.atc.toggleMute(freq)"
-                                     class="flex items-center gap-1.5">
-                                    <!-- A mixed stream has no single frequency; showing one
-                                         would be a fiction. The name carries the meaning then. -->
-                                    <span class="text-[10px] opacity-70 flex-shrink-0" x-show="$store.atc.tileShowsMhz(freq)" x-text="freq.frequency_mhz + ' MHz'"></span>
-                                    <span class="text-[10px] opacity-50 flex-shrink-0" x-show="!(freq.frequency_mhz > 0)">mixed</span>
-                                    <span x-show="$store.atc.isFrequencyFailed(freq.id)" class="text-[10px] text-red-300/60 flex-shrink-0">failed</span>
-                                    <span x-show="$store.atc.isFrequencyConnecting(freq.id)" class="text-[10px] text-amber-200/50 flex-shrink-0">retry</span>
-                                    <div class="audio-visualizer-container flex-1 min-w-0 h-4 flex items-center relative bg-black/70 rounded-md border overflow-hidden"
-                                         :class="{
-                                             'border-highlight/50': !$store.atc.isFrequencyFailed(freq.id) && !$store.atc.isFrequencyConnecting(freq.id),
-                                             'border-red-400/30': $store.atc.isFrequencyFailed(freq.id),
-                                             'border-amber-600/30': $store.atc.isFrequencyConnecting(freq.id)
-                                         }">
-                                        <div :id="`vis-bar-${freq.id}`"
-                                             class="audio-visualizer-bar h-full rounded-r-sm"
-                                             :style="{
-                                                 width: '0%',
-                                                 backgroundColor: $store.atc.isFrequencyFailed(freq.id) ? '#b45555' : ($store.atc.isUnmuted(freq.id) ? '#4CAF50' : '#888888')
-                                             }"></div>
-                                        <span x-text="$store.atc.isFrequencyFailed(freq.id) ? '!' : ($store.atc.secondsSinceLastAudio[freq.id] || '--s')"
-                                              class="absolute top-0 right-1 p-0.5"
-                                              :class="$store.atc.isFrequencyFailed(freq.id) ? 'text-red-300/60 font-bold' : 'text-neutral-400'"
-                                              style="font-size: 0.6rem; line-height: 1; pointer-events: none;">
-                                        </span>
-                                    </div>
-                                    <button @click.stop="$store.atc.toggleTranscriptionViewer(freq.id)"
-                                            data-help-title="Transcript" data-help="Open this frequency's transcript: what was said, who said it, and to which aircraft. The badge counts transmissions not read yet."
-                                            x-show="freq.transcribe_audio !== false"
-                                            class="p-0.5 rounded w-6 h-5 flex items-center justify-center text-[11px] focus:outline-none relative flex-shrink-0"
-                                            :class="$store.atc.transcriptionViewerVisible[freq.id] ? 'bg-highlight/80 hover:bg-highlight text-black' : 'bg-black/30 hover:bg-black/50 text-text/80 hover:text-text'">
-                                        <i class="fas fa-comments"></i>
-                                        <span x-text="$store.atc.getTranscriptionCount(freq.id)"
-                                              x-show="$store.atc.getTranscriptionCount(freq.id) > 0"
-                                              class="absolute -top-1.5 -right-1.5 bg-danger text-white text-[8px] font-bold min-w-[14px] h-[14px] px-0.5 rounded-full flex items-center justify-center"></span>
-                                    </button>
-                                </div>
-                                <!-- This frequency's volume, kept by the browser. -->
-                                <input type="range" class="vol-range" min="0" max="1" step="0.05"
-                                       :value="$store.atc.volumeOf(freq.id)"
-                                       aria-label="Volume" @click.stop
-                                       @input.stop="$store.atc.setVolume(freq.id, $event.target.value)">
+        <!-- PhoneShell (migration step 12, telephone.html): one pane at a time under
+             768 px, chosen in the tab bar; the thread is home. Hidden by the
+             settings page, which takes the whole screen. -->
+        <nav class="cl-root cl-tabbar md:hidden" role="tablist" aria-label="Panes" x-show="!$store.atc.settingsOpen">
+            <template x-for="t in $store.atc.phoneTabs" :key="t.id">
+                <button class="cl-tabbar__tab" role="tab" :aria-selected="String($store.atc.mobilePane === t.id)"
+                        @click="$store.atc.showPane(t.id)" :aria-label="t.label">
+                    <span x-html="t.icon" aria-hidden="true"></span><span x-text="t.label"></span>
+                </button>
+            </template>
+        </nav>
 
-                                <!-- Transcription Viewer -->
-                                <div x-show="$store.atc.transcriptionViewerVisible[freq.id]"
-                                     :data-viewer-id="freq.id"
-                                     class="absolute bottom-full left-0 mb-2 w-full bg-panel border border-border rounded-lg shadow-2xl overflow-hidden flex flex-col"
-                                     style="height: 400px; z-index: 10000; position: fixed; width: 300px;">
-                                    <div class="flex justify-between items-center p-1.5 border-b border-border">
-                                        <div class="flex-grow flex items-center">
-                                            <div class="relative w-full">
-                                                <input type="text"
-                                                       placeholder="Search transcriptions..."
-                                                       class="w-full py-1 px-2 text-xs bg-background border border-border text-text rounded"
-                                                       x-model="$store.atc.transcriptionSearchTerm"
-                                                       @input.debounce.300ms="$store.atc.filterTranscriptions(freq.id)">
-                                                <i class="fas fa-search absolute right-2 top-1/2 transform -translate-y-1/2 text-text/50 text-xs"></i>
-                                            </div>
-                                        </div>
-                                        <button aria-label="Close" @click="$store.atc.transcriptionViewerVisible[freq.id] = false" class="text-text/70 hover:text-text ml-2">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                    <div class="p-1.5 space-y-1 overflow-y-auto flex-grow custom-scrollbar">
-                                        <template x-if="!$store.atc.frequencyTranscriptions[freq.id] || $store.atc.frequencyTranscriptions[freq.id].length === 0">
-                                            <p class="text-xs text-text/50 italic p-2 text-center">No transcriptions yet for this frequency.</p>
-                                        </template>
-                                        <template x-if="$store.atc.transcriptionSearchTerm && $store.atc.frequencyTranscriptions[freq.id] && $store.atc.frequencyTranscriptions[freq.id].length === 0">
-                                            <p class="text-xs text-text/50 italic p-2 text-center">No results found for "<span x-text="$store.atc.transcriptionSearchTerm"></span>"</p>
-                                        </template>
-                                        <template x-for="(transcription, idx) in $store.atc.frequencyTranscriptions[freq.id]" :key="transcription.id || ('tx-' + idx)">
-                                            <div>
-                                            <!-- Read divider: shows at the boundary between new unread and previously read entries -->
-                                            <div x-show="transcription.id && transcription.id === $store.atc._readDividerId[freq.id]"
-                                                 class="flex items-center my-1.5 text-text/30 text-[8px] select-none">
-                                                <div class="flex-grow border-t border-highlight/40"></div>
-                                                <span class="px-2 uppercase tracking-wider text-highlight/50">New above</span>
-                                                <div class="flex-grow border-t border-highlight/40"></div>
-                                            </div>
-                                            <!-- Historical divider: shows at the boundary between live and historical entries -->
-                                            <div x-show="transcription._historical && (idx === 0 || !$store.atc.frequencyTranscriptions[freq.id][idx-1]?._historical)"
-                                                 class="flex items-center my-1.5 text-text/30 text-[8px] select-none">
-                                                <div class="flex-grow border-t border-border/30"></div>
-                                                <span class="px-2 uppercase tracking-wider">Earlier</span>
-                                                <div class="flex-grow border-t border-border/30"></div>
-                                            </div>
-                                            <div class="text-xs p-1 rounded bg-background/30 border-l-2 mb-1"
-                                                 :id="transcription.id ? 'tx-' + transcription.id : null"
-                                                 :class="{
-                                                    'border-orange-400': transcription.speaker_type === 'ATC',
-                                                    'border-green-400': transcription.speaker_type === 'PILOT',
-                                                    'border-gray-400': !transcription.speaker_type
-                                                 }">
-                                                <!-- Who speaks, and the aircraft the transmission was matched to:
-                                                     on every matched line, the controller's too (audit 3.1). -->
-                                                <div class="text-text/60 text-[11px] mb-0.5 flex items-center gap-1.5 flex-wrap">
-                                                    <button :aria-label="$store.atc.clipHelp(transcription.id)" x-show="$store.atc.audioArchive.available && transcription.id"
-                                                            class="w-4 text-center hover:text-highlight"
-                                                            :class="$store.atc.clip.id === transcription.id ? 'text-highlight' : ($store.atc.clip.failed[transcription.id] ? 'text-text/30' : 'text-text/60')"
-                                                            @click.stop="$store.atc.playClip(transcription.id)"
-                                                            data-help-title="Listen again" :data-help="$store.atc.clipHelp(transcription.id)">
-                                                        <i class="fas text-[10px]" :class="$store.atc.clipIcon(transcription.id)"></i>
-                                                    </button>
-                                                    <span x-text="$store.atc.formatTimeAgo(transcription.timestamp)"></span>
-                                                    <span class="font-semibold cursor-help"
-                                                          :class="{
-                                                              'text-orange-400': transcription.speaker_type === 'ATC',
-                                                              'text-green-400': transcription.speaker_type === 'PILOT',
-                                                              'text-gray-400': transcription.speaker_type !== 'ATC' && transcription.speaker_type !== 'PILOT'
-                                                          }"
-                                                          x-text="transcription.speaker_type || '?'"
-                                                          data-help-title="Who is speaking" :data-help="$store.atc.speakerHelp(transcription.speaker_type)"></span>
-                                                    <template x-if="transcription.callsign">
-                                                        <span class="inline-flex items-center gap-1">
-                                                            <span x-show="transcription.speaker_type === 'ATC'" class="text-text/40">→</span>
-                                                            <span class="font-semibold px-1 rounded border"
-                                                                  :class="$store.atc.aircraftByCallsign(transcription.callsign)
-                                                                      ? 'text-sky-300 border-sky-400/40 bg-sky-400/10 cursor-pointer hover:bg-sky-400/20'
-                                                                      : 'text-text/50 border-border cursor-help'"
-                                                                  @click="$store.atc.aircraftByCallsign(transcription.callsign) && $store.atc.selectAircraftByCallsign(transcription.callsign)"
-                                                                  x-text="transcription.callsign"
-                                                                  data-help-title="Aircraft" :data-help="$store.atc.transcriptAircraftHelp(transcription)"></span>
-                                                            <!-- How strong the clues of the match are (D72). -->
-                                                            <span x-show="$store.atc.matchStrength(transcription)" class="inline-flex items-end gap-px h-2.5 cursor-help"
-                                                                  data-help-title="Match" :data-help="$store.atc.matchProofText(transcription)">
-                                                                <template x-for="n in 3" :key="n">
-                                                                    <span class="w-[3px] rounded-sm"
-                                                                          :style="'height:' + (n * 3 + 1) + 'px'"
-                                                                          :class="n <= ({ weak: 1, medium: 2, strong: 3 })[$store.atc.matchStrength(transcription)] ? ({ weak: 'bg-amber-400', medium: 'bg-sky-300', strong: 'bg-green-400' })[$store.atc.matchStrength(transcription)] : 'bg-text/20'"></span>
-                                                                </template>
-                                                            </span>
-                                                        </span>
-                                                    </template>
-                                                </div>
-                                                <!-- Show processed content if available, otherwise show original.
-                                                     The words that named the aircraft are in bold: kept when the
-                                                     match was made, in this text unless the French reading made it. -->
-                                                <p class="text-text/90 leading-tight cursor-help"
-                                                   x-show="transcription.is_processed && transcription.content_processed"
-                                                   x-html="$store.atc.transcriptHtml(transcription.content_processed, transcription.callsign_source !== 'fr' ? transcription.callsign_evidence : null)"
-                                                   :title="'Original: ' + transcription.text"></p>
-                                                
-                                                <!-- Show original content if not processed -->
-                                                <p class="text-text/90 leading-tight"
-                                                   x-show="!transcription.is_processed || !transcription.content_processed"
-                                                   x-html="$store.atc.transcriptHtml(transcription.text, null)"></p>
-
-                                                <!-- When the French reading named the aircraft, the words are in it:
-                                                     shown, or the highlight would have nowhere to go. -->
-                                                <div x-show="transcription.callsign_source === 'fr' && transcription.content_second"
-                                                     class="mt-0.5 leading-tight">
-                                                    <span class="text-[10px] text-text/40 mr-1 cursor-help" data-help-title="French reading" data-help="Every transmission is transcribed twice, by an English and a French model. This second, French reading is the one that named the aircraft; the words in bold are the ones that matched.">FR</span>
-                                                    <span class="text-text/70 italic"
-                                                          x-html="$store.atc.transcriptHtml(transcription.content_second, transcription.callsign_evidence)"></span>
-                                                </div>
-                                                <!-- In plain words, from the phraseology grammar (audit 3.5). -->
-                                                <template x-if="transcription.plain && transcription.plain.length">
-                                                    <div class="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] cursor-help"
-                                                         data-help-title="In plain words" :data-help="$store.atc.plainHelp(transcription)">
-                                                        <span class="text-text/40" x-text="$store.atc.plainLead(transcription)"></span>
-                                                        <template x-for="p in transcription.plain" :key="p.text">
-                                                            <span class="px-1.5 rounded border"
-                                                                  :class="p.role === 'clearance' ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/25' : 'bg-amber-400/15 text-amber-300 border-amber-400/25'"
-                                                                  x-text="p.text"></span>
-                                                        </template>
-                                                    </div>
-                                                </template>
-                                            </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                        <!-- Why there is nothing to listen to (receiver lent, off,
-                             switching) is said by the antenna light of the top bar (step 3). -->
-                    </div>
-                </div>
-                
-                <!-- The weather (METAR, TAF, NOTAM) and the runway in use moved to
-                     Right now (step 5). -->
-
-                <!-- The lights and the clocks moved to the top bar (step 3). -->
-            </div>
-        </template>
     </div>
 
     <!-- Custom JavaScript -->
