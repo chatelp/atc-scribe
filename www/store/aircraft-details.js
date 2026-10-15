@@ -795,7 +795,7 @@
                 // Scroll to the calculated position
                 tracksContainer.scrollTo({
                     top: scrollPosition,
-                    behavior: 'smooth'
+                    behavior: window.smoothScroll()
                 });
             }, 300);
         },

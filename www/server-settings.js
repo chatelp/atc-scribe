@@ -72,7 +72,7 @@ function serverSettings() {
 
         goTo(id) {
             const el = document.getElementById('set-' + id);
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (el) el.scrollIntoView({ behavior: window.smoothScroll(), block: 'start' });
             this.current = id;
         },
 

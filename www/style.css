@@ -303,3 +303,19 @@ input:checked + .slider:before {
     0% { background-color: rgba(76, 175, 80, 0.45); }
     100% { background-color: transparent; }
 }
+
+/* "Reduce motion" (migration step 11, 03-systeme): durations fall to zero and
+   nothing pulses, urgency included (its badge stays); the aircraft's own
+   movement on the map is drawn by script and stays, being information. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* The regions the skip links lead to (step 11; the links are the system's
+   .cl-skip): a target for the focus, not a control. */
+#region-thread:focus, #region-column:focus { outline: none; }

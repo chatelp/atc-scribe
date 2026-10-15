@@ -35,6 +35,13 @@ const setup = opt('--setup', null);
 const after = opt('--after', null);
 const keep = opt('--profile', null);
 const probe = flag('--probe');
+// --keys "Tab*12,j,Enter,Escape": real key presses (CDP), after --after; with
+// --trace, what has the focus after each one is printed (step 11: a walk
+// through the page without a mouse; a synthetic KeyboardEvent moves no focus).
+const keys = opt('--keys', null);
+const trace = flag('--trace');
+const reducedMotion = flag('--reduced-motion');   // as "Reduce motion" ticked in the system
+const traceJs = opt('--trace-js', null);   // an expression printed after each key too
 const [url, out] = argv;
 if (!url || !out) { console.error('usage: capture.mjs URL OUT.png [options]'); process.exit(2); }
 
@@ -80,6 +87,7 @@ try {
         } else if (msg.method === 'Page.loadEventFired' && onLoad) { onLoad(); onLoad = null; }
     };
     await send('Page.enable');
+    if (reducedMotion) await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w < 768 });
     await loaded(() => send('Page.navigate', { url }));
     if (setup) {
@@ -91,6 +99,34 @@ try {
         const said = await evaluate(after);
         if (said !== undefined) console.log(JSON.stringify(said, null, 1));
         await sleep(Math.min(wait, 3000));
+    }
+    if (keys) {
+        const codes = { Tab: 9, Enter: 13, Escape: 27, ' ': 32, Space: 32, ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39 };
+        const steps = keys.split(',').flatMap((k) => { const [name, n] = k.split('*'); return Array(Number(n || 1)).fill(name); });
+        for (const name of steps) {
+            const mods = { Alt: 1, Ctrl: 2, Meta: 4, Shift: 8 };
+            const parts = name.split('+');
+            const last = parts.pop();
+            const shift = parts.includes('Shift');
+            const modifiers = parts.reduce((m, p) => m | (mods[p] || 0), 0);
+            const key = last === 'Space' ? ' ' : last;
+            const code = codes[key] || key.toUpperCase().charCodeAt(0);
+            // Enter carries "\r": without it the browser clicks no real <button>
+            // (design review of step 11), only a page's own handler answered.
+            const text = key === 'Enter' && !(modifiers & 7) ? '\r' : key.length === 1 && !(modifiers & 7) ? key : undefined;
+            const base = { key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code, modifiers };
+            await send('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', ...base, ...(text ? { text } : {}) });
+            await send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+            await sleep(250);
+            if (trace) {
+                const where = await evaluate(`(() => { const e = document.activeElement; if (!e || e === document.body) return 'body';
+                    const name = (e.getAttribute('aria-label') || e.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 50);
+                    return e.tagName.toLowerCase() + (e.getAttribute('role') ? '[' + e.getAttribute('role') + ']' : '') + ' ' + JSON.stringify(name); })()`);
+                const extra = traceJs ? '  | ' + JSON.stringify(await evaluate(traceJs)) : '';
+                console.log(`${name.padEnd(10)} -> ${where}${extra}`);
+            }
+        }
+        await sleep(500);
     }
     if (probe) {
         const src = fs.readFileSync(path.join(here, 'contrast-probe.js'), 'utf8');

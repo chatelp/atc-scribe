@@ -559,3 +559,8 @@
 .cl-seg__item { white-space: nowrap; }
 /* SegmentedControl, dense: six presets in the 380 px column */
 .cl-seg--dense .cl-seg__item { padding: 0 var(--space-1-5); }
+
+/* ------------------------------------------------------------ SkipLinks: off screen until focused */
+/* above the map library's own layers, which count from 10000 */
+.cl-skip a { position: fixed; left: var(--space-2); top: -48px; z-index: 100000; padding: var(--space-1-5) var(--space-3); background: var(--color-surface-raised); color: var(--color-text-primary); border: var(--border-width-strong) solid var(--color-border-focus); border-radius: var(--radius-md); font-size: var(--font-size-small); text-decoration: none; }
+.cl-skip a:focus { top: var(--space-2); }

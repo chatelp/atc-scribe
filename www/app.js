@@ -57,6 +57,13 @@ const CONFIG = {
 
 // Base maps the map engine offers (map/core/map-engine.js). None needs a key: the
 // Carto ones, which now do, are gone (docs-fr/audit-2026-10-09/fonds-de-carte.md).
+// "Reduce motion" (macOS, and the other systems' equivalents) is honoured
+// (migration step 11): a scroll asked for in code is then instant, as the
+// stylesheet makes every transition and animation; the aircraft still move
+// between two positions, which is information, not decoration (03-systeme).
+window.smoothScroll = () =>
+    (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+
 const MAP_STYLES = ['ign-dark', 'ign', 'osm-dark', 'osm', 'none'];
 
 // The base map shown until one is chosen: none, the aircraft and the airport layout on
@@ -765,64 +772,72 @@ document.addEventListener('alpine:init', () => {
         },
 
         // Setup keyboard event listeners
+        // Keyboard (migration step 11): Tab is the browser's again, to move
+        // through the page; J and K, or the down and up arrows on the map, go
+        // from one aircraft to the next (the owner's choice, 13/10). The single
+        // letters never fire with Cmd, Ctrl or Alt: Cmd-A no longer toggles the
+        // airborne filter. Enter and Space activate what plays the part of a
+        // button without being one (role="button", role="checkbox").
         setupKeyboardEvents() {
             document.addEventListener('keydown', (e) => {
-                // Skip if user is typing in an input field
-                const isInInputField = e.target.tagName === 'INPUT' || 
-                                     e.target.tagName === 'TEXTAREA' || 
-                                     e.target.contentEditable === 'true';
-                
-                // ESC key to close aircraft details
-                if (e.key === 'Escape' && this.selectedAircraft) {
-                    this.stopFollowing();
-                }
-                
-                // TAB key for aircraft navigation (only when not in input fields)
-                if (e.key === 'Tab' && !isInInputField) {
+                const t = e.target;
+                const isInInputField = t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' ||
+                    t.tagName === 'SELECT' || t.isContentEditable;
+
+                // Not when the element handled the key itself (its own
+                // @keydown.space.prevent): it would toggle twice.
+                if ((e.key === 'Enter' || e.key === ' ') && !e.defaultPrevented && !isInInputField && t.tagName !== 'BUTTON' && t.tagName !== 'A' &&
+                    t.matches && t.matches('[role="button"], [role="checkbox"], [role="radio"], [role="switch"]')) {
                     e.preventDefault();
-                    
-                    if (e.shiftKey) {
-                        this.cycleToPreviousAircraft();
-                    } else {
-                        this.cycleToNextAircraft();
+                    t.click();
+                    return;
+                }
+
+                // Escape stops following, unless a page or a menu is open: that
+                // one closes first, by its own handler.
+                if (e.key === 'Escape' && this.selectedAircraft) {
+                    const events = window.Alpine && Alpine.store('events');
+                    if (!this.settingsOpen && !this.layersOpen && !(events && events.open) && !this.threadMenuFor) {
+                        this.stopFollowing();
                     }
                 }
-                
-                // Skip other hotkeys if user is typing in an input field
-                if (isInInputField) return;
-                
-                // Air/Ground filter hotkeys
-                if (e.key.toLowerCase() === 'a') {
+
+                if (isInInputField || e.metaKey || e.ctrlKey || e.altKey) return;
+
+                // The arrows only where they move nothing else: on the map, or
+                // with the focus nowhere.
+                const onSky = t === document.body || (t.closest && t.closest('#map, .cl-sky__top, .cl-sky__corner'));
+                const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+                if (key === 'j' || (key === 'ArrowDown' && onSky)) {
+                    e.preventDefault();
+                    this.cycleToNextAircraft();
+                    return;
+                }
+                if (key === 'k' || (key === 'ArrowUp' && onSky)) {
+                    e.preventDefault();
+                    this.cycleToPreviousAircraft();
+                    return;
+                }
+
+                if (key === 'a') {
                     e.preventDefault();
                     this.toggleAirAircraft();
-                    console.log('[Hotkey] Toggled Air filter:', this.settings.showAirAircraft);
+                    return;
                 }
-                
-                if (e.key.toLowerCase() === 'g') {
+                if (key === 'g') {
                     e.preventDefault();
                     this.toggleGroundAircraft();
-                    console.log('[Hotkey] Toggled Ground filter:', this.settings.showGroundAircraft);
+                    return;
                 }
-                
-                // Flight phase hotkeys (1-9, 0) - matches UI filter bar order
+
+                // Flight phase filters (1-9, 0), in the order of the filter bar.
                 const phaseKeys = {
-                    '1': 'NEW',   // New
-                    '2': 'TAX',   // Taxi
-                    '3': 'T/O',   // Takeoff
-                    '4': 'CLB',   // Climb
-                    '5': 'DEP',   // Departure
-                    '6': 'CRZ',   // Cruise
-                    '7': 'ARR',   // Arrival
-                    '8': 'APP',   // Approach
-                    '9': 'T/D',   // Touchdown
-                    '0': 'UNK'    // Unknown
+                    '1': 'NEW', '2': 'TAX', '3': 'T/O', '4': 'CLB', '5': 'DEP',
+                    '6': 'CRZ', '7': 'ARR', '8': 'APP', '9': 'T/D', '0': 'UNK',
                 };
-                
                 if (phaseKeys[e.key]) {
                     e.preventDefault();
-                    const phase = phaseKeys[e.key];
-                    this.togglePhaseFilter(phase);
-                    console.log(`[Hotkey] Toggled ${phase} phase filter:`, this.settings.phaseFilters[phase]);
+                    this.togglePhaseFilter(phaseKeys[e.key]);
                 }
             });
         },
@@ -855,6 +870,161 @@ document.addEventListener('alpine:init', () => {
     // The PAR view takes the map's place when chosen (docs-fr/31-vue-par.md)
     Alpine.store('atc').parView = window.ParView.create(document.getElementById('par-view'), Alpine.store('atc'));
     Alpine.store('atc').setMainView(Alpine.store('atc').mainView);
+
+    // Dialogs and popovers take the focus (design review of step 11, AppShell).
+    // The settings page is a modal dialog: the rest of the page is inert while
+    // it is open, the focus goes into it, and comes back to the gear when it
+    // closes. A popover (the event log, a channel's menu, the layers) puts the
+    // focus on its first control and gives it back to the button that opened
+    // it. Before this, Tab went on behind them: unreachable by keyboard.
+    {
+        const store = Alpine.store('atc');
+        const events = Alpine.store('events');
+        const SELECTABLE = 'button:not([disabled]):not([tabindex="-1"]), a[href], input:not([type="hidden"]):not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
+        const shown = (el) => !!el && el.isConnected && el.getClientRects().length > 0;
+        const firstIn = (el) => el && [...el.querySelectorAll(SELECTABLE)].find(shown);
+        const madeInert = [];
+        const inertAround = (root) => {
+            for (let node = root; node && node.parentElement && node !== document.body; node = node.parentElement) {
+                for (const sib of node.parentElement.children) {
+                    if (sib !== node && !sib.inert && sib.tagName !== 'SCRIPT') { sib.inert = true; madeInert.push(sib); }
+                }
+            }
+        };
+        const releaseInert = () => { while (madeInert.length) madeInert.pop().inert = false; };
+
+        const follow = ({ isOpen, root, opener, modal, close }) => {
+            let last = false;
+            let from = null;
+            let watched = null;
+            // A popover closes when the focus leaves it (Tab past its last
+            // control): left open behind, Escape no longer reached it.
+            const onFocusOut = (e) => {
+                const el = watched;
+                if (!el || !close) return;
+                const to = e.relatedTarget;
+                if (to && !el.contains(to)) close();
+            };
+            Alpine.effect(() => {
+                const open = !!isOpen();
+                if (open === last) return;
+                last = open;
+                if (open) {
+                    from = document.activeElement;
+                    const place = () => {
+                        const el = root();
+                        if (!shown(el)) return false;
+                        if (modal) inertAround(el);
+                        else if (close) { watched = el; el.addEventListener('focusout', onFocusOut); }
+                        const target = firstIn(el);
+                        if (target) target.focus();
+                        return true;
+                    };
+                    // Drawn in a frame or two.
+                    setTimeout(() => { if (!place()) setTimeout(place, 150); }, 30);
+                } else {
+                    if (modal) releaseInert();
+                    if (watched) { watched.removeEventListener('focusout', onFocusOut); watched = null; }
+                    setTimeout(() => {
+                        const a = document.activeElement;
+                        if (a && a !== document.body && shown(a)) return;
+                        const back = (from && shown(from)) ? from : opener();
+                        if (back && shown(back)) back.focus();
+                    }, 30);
+                }
+            });
+        };
+
+        follow({
+            isOpen: () => store.settingsOpen,
+            root: () => document.querySelector('.cl-page[role="dialog"]'),
+            opener: () => document.querySelector('header [aria-label="Settings"]'),
+            modal: true,
+        });
+        follow({
+            isOpen: () => events.open,
+            root: () => document.querySelector('[role="dialog"][aria-label="Event log"]'),
+            opener: () => document.querySelector('header [aria-label="Event log"]'),
+            close: () => { events.open = false; },
+        });
+        follow({
+            isOpen: () => store.layersOpen,
+            root: () => document.querySelector('.cl-menu--map'),
+            opener: () => document.querySelector('[aria-label="Layers and base map"]'),
+            close: () => { store.layersOpen = false; },
+        });
+        follow({
+            isOpen: () => store.threadMenuFor,
+            root: () => [...document.querySelectorAll('.cl-threadhead__row--channels .cl-menu')].find(shown),
+            opener: () => [...document.querySelectorAll('.cl-channel__caret[aria-expanded="true"]')][0] || null,
+            close: () => { store.threadMenuFor = null; },
+        });
+    }
+
+    // The keyboard's focus follows a flight (step 11), wherever it was
+    // started from (a strip, an arrival row, a Nearby row, a thread chip,
+    // the map): the element that started it often goes when the column
+    // turns to the story. While the focus is on that element or nowhere, it
+    // moves to the story's back button; when the flight is let go, it goes
+    // back to that element if it is still there, else to the aircraft's
+    // strip, else to the column's tab it came from.
+    {
+        const store = Alpine.store('atc');
+        const shown = (el) => !!el && el.isConnected && el.getClientRects().length > 0;
+        let previous = null;
+        let origin = null;
+        // Only for the keyboard: a mouse user's focus is left where it is,
+        // and the list not scrolled to a strip they did not ask for.
+        let keyboard = false;
+        document.addEventListener('keydown', () => { keyboard = true; }, true);
+        document.addEventListener('pointerdown', () => { keyboard = false; }, true);
+        Alpine.effect(() => {
+            const hex = store.selectedAircraft ? store.selectedAircraft.hex : null;
+            if (hex === previous) return;
+            const left = previous;
+            previous = hex;
+            const startedFrom = document.activeElement;
+            if (hex && !left) origin = startedFrom;
+            const lost = (a) => !a || a === document.body || a === startedFrom || !shown(a);
+            const place = () => {
+                if (!keyboard || !lost(document.activeElement)) return true;
+                const column = document.getElementById('region-column');
+                let target = null;
+                if (hex) {
+                    target = column && [...column.querySelectorAll('.cl-tabs--column button')].find(shown);
+                } else {
+                    target = (shown(origin) && origin)
+                        // Its strip or its arrival row, drawn again since.
+                        || (left && column && [...column.querySelectorAll(`[data-aircraft-hex="${left}"]`)].find(shown))
+                        || (column && [...column.querySelectorAll('[role="tab"][aria-selected="true"]')].find(shown))
+                        || column;
+                    origin = null;
+                }
+                if (!target || !shown(target)) return false;
+                target.focus();
+                return true;
+            };
+            // The new column is drawn in a frame or two: tried a few times.
+            for (const ms of [30, 150, 500]) setTimeout(place, ms);
+        });
+
+        // Folding the column takes its fold button away: the focus goes to
+        // the unfold button of the folded card, and back (design review of
+        // step 11). Only after a key, too.
+        let folded = store.columnFolded;
+        Alpine.effect(() => {
+            const now = store.columnFolded;
+            if (now === folded) return;
+            folded = now;
+            const place = () => {
+                const a = document.activeElement;
+                if (!keyboard || (a && a !== document.body && shown(a))) return;
+                const target = [...document.querySelectorAll(now ? '[aria-label="Unfold the column"]' : '[aria-label="Fold the column"]')].find(shown);
+                if (target) target.focus();
+            };
+            for (const ms of [30, 150, 500]) setTimeout(place, ms);
+        });
+    }
     // The followed aircraft's approach, in its runway's frame under the map
     // (step 8): shown while it is in an arrival sequence and the map is on.
     {

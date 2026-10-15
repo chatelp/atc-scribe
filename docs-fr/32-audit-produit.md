@@ -492,6 +492,16 @@ sur la carte.
 
 ## État
 
+- 15/10 : **étape 11 versée dans `local`** après trois recomptes design et le coup d'œil du
+  propriétaire. Tab rendu au navigateur ; J/K (et ↓/↑ sur la carte, qui ne se déplace plus aux
+  flèches) d'un avion à l'autre ; A, G et 0-9 sans Cmd/Ctrl/Alt ; rôles et tabulation pour ce qui
+  joue un bouton ; liens d'évitement (carte, colonne, fil) ; la page des réglages en dialogue
+  modal (reste de la page inerte, focus dedans, rendu à la roue) ; les popovers prennent le focus
+  et le rendent ; le focus suit un vol et le repli de la colonne, au clavier seulement ;
+  « Réduire les animations » : durées à zéro, défilements instantanés, les avions gardent leur
+  glissement (décidé par le propriétaire le 15/10). L'outil de capture envoie de vraies frappes
+  (`--keys`, `--trace`) ; sa première version oubliait le « \r » d'Entrée et masquait le défaut
+  des dialogues, trouvé par la relecture.
 - 15/10 (matin) : **nuit de mesure du 14 au 15/10** (instance d'essai, vrai modèle, D81 et modèles
   gardés en mémoire, 20 h 56 → 9 h). Première lecture, 3 850 transmissions : **1,0 s en médiane,
   2,4 s au 90ᵉ centile**, stable d'heure en heure, pic du matin compris (7 h : 464 transmissions,

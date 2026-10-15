@@ -150,6 +150,15 @@
 
             if (interactionDefaultsFactory) {
                 mapOptions.interactions = interactionDefaultsFactory({ doubleClickZoom: false });
+                // The arrows go from one aircraft to the next on the map (the
+                // owner's choice, 13/10; migration step 11), not pan it; + and -
+                // still zoom.
+                const KeyboardPan = window.ol.interaction && window.ol.interaction.KeyboardPan;
+                if (KeyboardPan && mapOptions.interactions && typeof mapOptions.interactions.getArray === 'function') {
+                    for (const it of mapOptions.interactions.getArray().slice()) {
+                        if (it instanceof KeyboardPan) mapOptions.interactions.remove(it);
+                    }
+                }
             }
 
             if (controlDefaultsFactory) {

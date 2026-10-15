@@ -338,14 +338,14 @@ window.threadView = function () {
                 if (!el) return;
                 this.atBottom = false;
                 this._userUntil = Date.now() + 800;
-                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                el.scrollIntoView({ block: 'center', behavior: window.smoothScroll() });
                 if (el.animate) el.animate([{ background: 'var(--color-surface-hover)' }, { background: 'transparent' }], { duration: 1800 });
             }, filtered ? 80 : 0);
         },
         toBottom(smooth) {
             const el = this.$refs.scroller;
             if (!el) return;
-            el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+            el.scrollTo({ top: el.scrollHeight, behavior: smooth ? window.smoothScroll() : 'auto' });
             this.atBottom = true;
             this.newCount = 0;
         },
