@@ -39,6 +39,19 @@ function altitudeFilter() {
             this.hi = Math.max(this.lo + 1, S.indexOf(this.list, st.maxAltitude));
             this.refresh();
             this._timer = setInterval(() => this.refresh(), REFRESH_MS);
+            // The band set elsewhere (a story's "Show only", the sky note's ✕):
+            // the handles follow, on the nearest stops.
+            const follow = () => {
+                const s = this.$store.atc.settings;
+                if (s.minAltitude === this.min && s.maxAltitude === this.max) return;
+                this.lo = S.indexOf(this.list, s.minAltitude);
+                this.hi = Math.max(this.lo + 1, S.indexOf(this.list, s.maxAltitude));
+                if (this.$refs.lo) this.$refs.lo.value = this.lo;
+                if (this.$refs.hi) this.$refs.hi.value = this.hi;
+                this.refresh();
+            };
+            this.$watch('$store.atc.settings.minAltitude', follow);
+            this.$watch('$store.atc.settings.maxAltitude', follow);
         },
 
         destroy() {
@@ -51,8 +64,16 @@ function altitudeFilter() {
         get loPct() { return (this.lo / this.last) * 100; },
         get hiPct() { return (this.hi / this.last) * 100; },
         get taPct() { return S.position(this.list, this.ta) * 100; },
-        get active() { return this.min > S.FLOOR || this.max < S.NO_CEILING; },
-        get band() { return S.bandLabel(this.min, this.max, this.ta); },
+        get active() { const st = this.$store.atc.settings; return st.minAltitude > S.FLOOR || st.maxAltitude < S.NO_CEILING; },
+        // The band as it filters: a "Show only" level reads as the story's
+        // toggle wrote it; a band set elsewhere is not always on a stop
+        // (FL 430 ± 500 ft, the stops going by 1 000 ft up there), and the
+        // handles sit on the nearest ones while the words say the band itself.
+        get band() {
+            const atc = this.$store.atc;
+            if (atc.onlyLevelOn) return atc._onlyLevel.label;
+            return S.bandLabel(atc.settings.minAltitude, atc.settings.maxAltitude, this.ta);
+        },
         get presets() { return S.presets(this.ta); },
         get peak() { return Math.max(1, ...this.counts); },
 
@@ -62,13 +83,21 @@ function altitudeFilter() {
                 { at: 0, text: 'SFC' },
                 { at: this.taPct, text: 'TA' },
                 { at: S.position(this.list, 10000) * 100, text: 'FL 100' },
+                // FL 300 went: at 347 px it overlapped FL 200 (Slider, 15/10).
                 { at: S.position(this.list, 20000) * 100, text: 'FL 200' },
-                { at: S.position(this.list, 30000) * 100, text: 'FL 300' },
                 { at: 100, text: '∞' },
             ];
         },
 
         label(ft) { return S.label(ft, this.ta); },
+
+        // The colour band of a bar: the colour the aircraft at its height
+        // wear on the map (altitude-bands.js), the dark palette always, the
+        // column being dark.
+        binBand(i) {
+            const at = Math.min(this.last, Math.floor(((i + 0.5) / BINS) * this.last));
+            return window.AltitudeBands.bandOf(this.list[at], this.$store.atc.stationCruiseAltitudeFt);
+        },
 
         binInBand(i) {
             const centre = ((i + 0.5) / BINS) * this.last;
@@ -106,7 +135,8 @@ function altitudeFilter() {
             const alts = this.altitudes();
             this.counts = S.histogram(this.list, alts, BINS);
             this.airborne = alts.length;
-            this.inBand = alts.filter((ft) => ft >= this.min && ft <= this.max).length;
+            const s = this.$store.atc.settings;
+            this.inBand = alts.filter((ft) => ft >= s.minAltitude && ft <= s.maxAltitude).length;
         },
 
         // While a handle moves: the two handles never cross, and the list

@@ -95,7 +95,9 @@
             }
         },
         // On a phone the map and the list take turns (audit 4.2): 'map' or 'list'.
-        mobilePane: 'map',
+        // The phone's pane (PhoneShell, step 12): 'radio' (the thread, home),
+        // 'sky' (the map or a PAR), 'traffic' or 'now' (the column).
+        mobilePane: 'radio',
 
         // Range rings around the station: addRangeRings() reads the station's
         // coordinates from the store.
@@ -167,13 +169,18 @@
                 // no sidecar configured; fiche H, 13/10) says status "off" without
                 // "reachable": neutral, not a failure.
                 const off = t.status === 'off';
-                const level = off ? 'off' : !t.reachable ? 'bad' : t.status === 'ok' ? 'ok' : t.status === 'degraded' ? 'warn' : 'unknown';
-                const text = off ? 'Off' : !t.reachable ? 'Down' : t.status === 'ok' ? 'OK' : t.status === 'degraded' ? 'Degraded' : '?';
+                // A test instance's stand-in sidecar answers "ok" too: it must
+                // not wear the same green as a real model (owner, 15/10).
+                const fake = !off && t.reachable && t.backend === 'fake';
+                const level = off ? 'off' : !t.reachable ? 'bad' : fake ? 'warn' : t.status === 'ok' ? 'ok' : t.status === 'degraded' ? 'warn' : 'unknown';
+                const text = off ? 'Off' : !t.reachable ? 'Down' : fake ? 'Simulated' : t.status === 'ok' ? 'OK' : t.status === 'degraded' ? 'Degraded' : '?';
+                const runsOn = [t.model, t.backend].filter(Boolean).join(', ');
                 lights.push({ key: 'stt', label: 'Transcription', level, text,
                     help: off ? 'The server runs without transcription: no source transcribes and no sidecar is configured. Turn "transcribe audio" on for a source once a sidecar answers.'
                         : !t.reachable ? 'The transcription sidecar does not answer: transmissions are not transcribed. co-atc restarts it if it crashed.'
+                        : fake ? 'A stand-in sidecar answers, for testing: no model listens, the texts are made up. Nothing heard here says what the radio said, and the matching figures mean nothing.'
                         : t.status === 'degraded' ? `The sidecar runs without some of its models (${(t.degraded || []).join(', ')}): fewer aircraft are identified.`
-                        : 'The transcription sidecar answers with all its models.' });
+                        : 'The transcription sidecar answers with all its models' + (runsOn ? ` (${runsOn}).` : '.') });
             }
             if (st.adsb) {
                 const age = st.adsb.last_fetch ? (Date.now() - Date.parse(st.adsb.last_fetch)) / 1000 : Infinity;
@@ -210,19 +217,23 @@
             return this.audioFrequencies.length ? '' : 'No frequency connected.';
         },
 
-        // Phone tabs: 'map', 'par' (the PAR view of the first airport followed,
-        // or the one last chosen) or 'list'.
+        // The phone's tab bar (PhoneShell, step 12, decision 5): the thread is
+        // home; Sky shows the map or a PAR, chosen in its own top row.
+        phoneTabs: [
+            { id: 'radio', label: 'Radio', icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 6.5a5.5 5.5 0 0 1 10 0M5 8.5a3 3 0 0 1 6 0"/><circle cx="8" cy="11" r="1.2"/></svg>' },
+            { id: 'sky', label: 'Sky', icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/><path d="M8 8 12.2 3.8"/></svg>' },
+            { id: 'traffic', label: 'Traffic', icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h10"/></svg>' },
+            { id: 'now', label: 'Right now', icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>' },
+        ],
+
+        // The column is the Traffic and the Right now panes on the phone.
+        get phoneColumn() {
+            return this.mobilePane === 'traffic' || this.mobilePane === 'now';
+        },
+
         showPane(which) {
-            if (which === 'list') { this.mobilePane = 'list'; return; }
-            this.mobilePane = 'map';
-            if (which === 'par') {
-                const apt = this.parAirport || (this.followedAirports[0] && this.followedAirports[0].code);
-                if (apt) this.setMainView('par', apt);
-            } else {
-                this.setMainView('map');
-            }
-            // The map was display:none: OpenLayers must measure it again.
-            this.remeasureMap();
+            this.mobilePane = which;
+            if (which === 'traffic' || which === 'now') this.columnTab = which;
         },
 
         async fetchStationData() {

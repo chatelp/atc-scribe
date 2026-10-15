@@ -116,7 +116,7 @@ qu'eux, et un réglage pour couper la console.
 
 | Date | Demande | Suite |
 |---|---|---|
-| 13/10 | Le propriétaire : des étiquettes d'avion allégées à faible zoom, par exemple l'indicatif seul sous un seuil (relayé par la session atc-scribe) | à mesurer avant de dessiner : nombre d'étiquettes et recouvrements par niveau de zoom, sur le ciel réel de l'instance d'essai ; puis une variante compacte de `MapLabel` et son seuil, proposés au propriétaire |
+| 13/10 | Le propriétaire : des étiquettes d'avion allégées à faible zoom, par exemple l'indicatif seul sous un seuil (relayé par la session atc-scribe) | **décidé le 15/10** sur le ciel réel de l'instance, mesures et planches à l'appui : trois paliers selon la largeur du ciel (étiquette complète jusqu'à 24 NM, indicatif seul de 24 à 67 NM sauf les avions qui comptent, au-delà seulement eux), et le dernier message dans une bulle sous l'étiquette au lieu d'une troisième ligne ; règles dans la fiche `MapLabel` |
 
 ## Ce qui n'est pas dessiné
 

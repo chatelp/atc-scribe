@@ -7,6 +7,7 @@ Clairance lets a listener hear the airband their station receives, read it in En
 - **Say where a fact comes from when it is inferred.** The runway in use and the arrival sequence are read from ADS-B tracks: the summary carries "Read from the ADS-B tracks, not announced by the controllers." An uncertain match says so: "probably TVF61WB", "AFR47KX or AFR52PB: left open".
 - **Write for a newcomer, explain on demand.** Every term a newcomer would stumble on (TA, QNH, FL, "26L") carries a help bubble (`HelpBubble`); the screen itself stays terse.
 - **Numbers.** Levels as flight levels from the transition level up ("FL 070"), in feet on the QNH below it ("2 400 ft"). Frequencies "124.350" (three decimals), speeds "158 kt", distances "6.2 NM", headings "270°", times "13:12:31" in UTC with a trailing "Z" where UTC and local time sit together. A thin space separates thousands; the unit follows the value in `text-label` size and `color-text-tertiary`.
+- **Names from the databases** (aircraft types, operators, navaids) are written in ordinary case when the source shouts: "CESSNA 560 Citation Ultra" reads "Cessna 560 Citation Ultra", "DE HAVILLAND CANADA DHC-8" "De Havilland Canada DHC-8". A word with a digit stays as it is ("PA-28", "737-800"); in a string all in capitals, a word of three letters or fewer stays in capitals ("ATR 72-600", "BAE Systems"), except the particles DE, DU, DA, LA, LE, VAN, VON, DOS; in a mixed string, only a word of four letters or more all in capitals changes.
 - **No emoji, no exclamation marks.** Glyphs that carry meaning are few and fixed: ✓ (a clearance), ↩ (a reply), ↑ ↓ ↔ (climbing, descending, level), ▲ ■ ● ○ (status shapes), → (from speaker to addressee).
 
 ## Colour
@@ -42,7 +43,7 @@ Clairance lets a listener hear the airband their station receives, read it in En
 ## States and motion
 
 - Hover `color-surface-hover` in `motion-duration-fast`; focus a solid 2 px `color-border-focus` ring, offset 2 px, on `:focus-visible` only; disabled `color-text-disabled`.
-- What moves is information: aircraft, a frequency's level meter. A change of state takes `motion-duration-fast` with `motion-easing-standard`; a popover opens in `motion-duration-base`. An emergency pulses three times and stops. Nothing loops. Under `prefers-reduced-motion` durations drop to 0.
+- What moves is information: aircraft, a frequency's level meter. A change of state takes `motion-duration-fast` with `motion-easing-standard`; a popover opens in `motion-duration-base`. An emergency pulses three times and stops. Nothing loops. Under `prefers-reduced-motion` durations drop to 0, the emergency pulse included; the aircraft keep gliding between positions, since their motion is information and jumps every two seconds would be busier (owner, 15/10).
 - A new line in the thread or the list appears; it does not slide or blink.
 
 ## Iconography

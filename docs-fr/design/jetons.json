@@ -65,6 +65,39 @@
         "cruise": { "$value": "#6e7b8f", "$description": "Cruise: slate, the quietest." }
       }
     },
+    "map": {
+      "$description": "The map's own layers, palette C chosen by the owner on 15/10: the hues of the map are kept (aerodromes and VOR blue, VORTAC indigo, NDB amber, small aerodromes, heliports and DME violet) and only what clashed with a colour that means something is changed: the selection and the followed track take the accent instead of a yellow that read as a very low aircraft, taxiways and range rings go grey, an aircraft's trail takes its altitude colour, estimates (future, hindcast) are the accent dotted. Colours the map draws on its own, read from these tokens.",
+      "airport": { "$value": "#60a5fa", "$description": "Large and medium airports, symbol and code (medium ones were #34D399, a green dE76 2.2 from the ground phase at worst, and the accent's family)." },
+      "airport-small": { "$value": "#a78bfa", "$description": "Small aerodromes and seaplane bases (these were #2DD4BF, dE76 3.4 from a low aircraft at worst)." },
+      "heliport": { "$value": "#a78bfa", "$description": "Heliport symbol and code: violet, with the small aerodromes; it was #FB923C, dE76 3.3 from the departure phase at worst." },
+      "navaid-vor": { "$value": "#60a5fa", "$description": "VOR and VOR-DME." },
+      "navaid-vortac": { "$value": "#818cf8", "$description": "VORTAC." },
+      "navaid-ndb": { "$value": "#f59e0b", "$description": "NDB." },
+      "navaid-dme": { "$value": "#a78bfa", "$description": "DME alone." },
+      "runway": { "$value": "#e4e4e4", "$description": "Runway in the airport layout." },
+      "centerline": { "$value": "#555555", "$description": "Extended runway centrelines, dashed: grey, were #76C76C, dE76 1.2 from the accent; they cross the whole map." },
+      "taxiway": { "$value": "#5c5c5c", "$description": "Taxiway: grey, was pale yellow (#efe3a0), dE76 6.6 from a very low aircraft at worst." },
+      "ring": { "$value": "#3d3d3d", "$description": "Range rings: grey, were the accent." },
+      "ring-label": { "$value": "#949494", "$description": "Range ring labels (\"10 NM\"): the tertiary text." },
+      "selected": { "$value": "#66c56a", "$description": "Ring of the selected aircraft, 2 px: the accent, was #FDE047." },
+      "hovered": { "$value": "#e0e0e0", "$description": "Ring of the hovered aircraft, 1.2 px: primary text, was #86EFAC." },
+      "trail-followed": { "$value": "#66c56a", "$description": "Track of the followed aircraft, dashed. Other aircraft's trails take their altitude colour at 50 %." },
+      "estimate": { "$value": "#66c56a", "$description": "Estimated positions, dotted: the future and the hindcast (were #FFC107 and #00BCD4)." },
+      "trail-stale": { "$value": "#949494", "$description": "Trail of an aircraft whose position is getting old or lost: tertiary, as the lost glyph." },
+      "proximity": { "$value": "#66c56a", "$description": "The Nearby tab's circle around the followed aircraft, dashed, fill at 6 %: it belongs to the followed flight; was #EB8C00, dE76 0.9 from the departure phase." },
+      "light": {
+        "ring": { "$value": "#b5b5b5", "$description": "Range rings on a light base map (IGN, OSM)." },
+        "centerline": { "$value": "#a8a8a8", "$description": "Extended centrelines on a light base map." },
+        "proximity": { "$value": "#2e7d32", "$description": "The Nearby circle on a light base map." },
+        "taxiway": { "$value": "#9a9a9a", "$description": "Taxiway on a light base map." },
+        "selected": { "$value": "#2e7d32", "$description": "Selection ring on a light base map (4.5:1 on the OSM ground)." },
+        "hovered": { "$value": "#333333", "$description": "Hover ring on a light base map." },
+        "trail-stale": { "$value": "#7a7a7a", "$description": "Old or lost trail on a light base map." },
+        "ground": { "$value": "#f2efe9", "$description": "Ground of a chip over a light base map (the altitude legend)." },
+        "text": { "$value": "#3a3a3a", "$description": "Text on that chip (10.5:1)." },
+        "text-dim": { "$value": "#5e5e5e", "$description": "Its label (5.7:1)." }
+      }
+    },
     "scrim": { "$value": "#000000b3", "$description": "Behind a full page (settings) over the map: black at 70 %." }
   },
   "font": {

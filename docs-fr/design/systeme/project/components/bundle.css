@@ -114,8 +114,15 @@
 .cl-altrange__value { font-family: var(--font-family-mono); font-size: var(--font-size-small); color: var(--color-text-primary); }
 .cl-altrange__value small { font-size: inherit; color: var(--color-text-tertiary); }
 .cl-altrange__histo { display: flex; align-items: flex-end; gap: 2px; height: 18px; }
-.cl-altrange__histo i { flex: 1; background: var(--color-surface-hover); }
-.cl-altrange__histo i.is-in { background: var(--color-accent-default); opacity: 0.4; }
+/* each bar in the colour its aircraft wear on the map (owner, 15/10); dimmed outside the chosen band */
+.cl-altrange__histo i { flex: 1; background: var(--color-surface-hover); opacity: 0.3; }
+.cl-altrange__histo i.is-in { opacity: 0.85; }
+.cl-altrange__histo i[data-band="very-low"] { background: var(--color-altitude-dark-very-low); }
+.cl-altrange__histo i[data-band="low"] { background: var(--color-altitude-dark-low); }
+.cl-altrange__histo i[data-band="mid"] { background: var(--color-altitude-dark-mid); }
+.cl-altrange__histo i[data-band="high"] { background: var(--color-altitude-dark-high); }
+.cl-altrange__histo i[data-band="cruise"] { background: var(--color-altitude-dark-cruise); }
+.cl-altrange__ta { border-left: var(--border-width-default) dashed var(--color-text-tertiary); }
 .cl-altrange__marks { display: flex; justify-content: space-between; font-family: var(--font-family-mono); font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); }
 
 /* ------------------------------------------------------------ StatusLight */
@@ -375,6 +382,10 @@
 .cl-sky__corner { position: absolute; bottom: var(--space-3); right: var(--space-3); display: flex; gap: var(--space-1-5); z-index: var(--z-map-overlay); }
 .cl-sky__note { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: var(--space-1-5) var(--space-2); background: color-mix(in srgb, var(--color-surface-page) 85%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); font-size: var(--font-size-small); color: var(--color-text-secondary); }
 .cl-sky__note b { font-family: var(--font-family-mono); color: var(--color-text-primary); font-weight: var(--font-weight-regular); }
+/* a note that ends with an action (the ✕ that clears the filters): only its text is cut, never the button */
+.cl-sky__note--action { display: flex; align-items: center; gap: var(--space-1); overflow: visible; padding-right: var(--space-0-5); }
+.cl-sky__note-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-sky__note--action .cl-btn--icon { flex: none; }
 .cl-sky > svg.cl-sky__map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 /* ------------------------------------------------------------ ThreadHead: title, listen to all, channels, search */
@@ -384,6 +395,7 @@
 .cl-threadhead__row--channels { flex-wrap: nowrap; }
 .cl-threadhead__row--channels .cl-channel { flex: 0 1 auto; min-width: 0; }
 .cl-channel__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cl-threadhead__pace { font-family: var(--font-family-mono); font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); }
 .cl-threadhead__title { margin: 0; font-size: var(--font-size-title); line-height: var(--font-line-height-title); font-weight: var(--font-weight-strong); }
 .cl-threadhead__end { margin-left: auto; display: flex; gap: var(--space-1-5); align-items: center; }
 
@@ -563,3 +575,61 @@
 /* above the map library's own layers, which count from 10000 */
 .cl-skip a { position: fixed; left: var(--space-2); top: -48px; z-index: 100000; padding: var(--space-1-5) var(--space-3); background: var(--color-surface-raised); color: var(--color-text-primary); border: var(--border-width-strong) solid var(--color-border-focus); border-radius: var(--radius-md); font-size: var(--font-size-small); text-decoration: none; }
 .cl-skip a:focus { top: var(--space-2); }
+
+/* ------------------------------------------------------------ Touch sizes under 768 px (migration step 12) */
+/* Every target 44 px at least: measured on the four phone panes, 18 of 79 were
+   smaller (a channel's caret 15 px wide, the column's tabs 30 px high, an
+   arrival row 25 px). A callsign chip keeps its drawing: its hit area grows. */
+@media (max-width: 767px) {
+    .cl-channel__main, .cl-channel__caret { min-height: var(--size-target-touch); }
+    .cl-channel__caret { min-width: var(--size-target-touch); }
+    .cl-seg__item, .cl-btn { min-width: var(--size-target-touch); }
+    .cl-tabs__tab { min-height: var(--size-target-touch); }
+    .cl-table tr[role="button"] td { height: var(--size-target-touch); }
+    .cl-exchange .cl-chip--callsign::after { inset: -12px -6px; }
+    .cl-sky__top .cl-seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+    .cl-tabs__tab { min-width: var(--size-target-touch); }
+    .cl-tabs--column button, .cl-disclosure { min-height: var(--size-target-touch); }
+    .cl-story__events button { min-height: var(--size-target-touch); }
+    .cl-table button { min-height: var(--size-target-touch); min-width: var(--size-target-touch); }
+}
+
+/* ------------------------------------------------------------ Phone: the thread's head and an exchange's head */
+/* The tab bar says "Radio": the head keeps the tools and the channels; "Show" is in each frequency's menu
+   ("Only this frequency in the thread"). An exchange's time goes on its own line, so that the play button
+   ends the second one instead of wrapping alone (step 12, 375 px). */
+@media (max-width: 767px) {
+    .cl-threadhead__title, .cl-threadhead__pace, .cl-threadhead__row--show { display: none; }
+    .cl-exchange__when { flex-basis: 100%; }
+}
+.cl-phone .cl-threadhead__title, .cl-phone .cl-threadhead__pace, .cl-phone .cl-threadhead__row--show { display: none; }
+.cl-phone .cl-exchange__when { flex-basis: 100%; }
+
+/* ------------------------------------------------------------ AltitudeLegend: the aircraft's colours, their bounds and how busy each band is */
+.cl-altlegend { position: absolute; left: var(--space-3); bottom: var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-1-5) var(--space-2); background: color-mix(in srgb, var(--color-surface-page) 85%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); pointer-events: none; }
+.cl-altlegend__head { display: flex; justify-content: space-between; gap: var(--space-4); }
+.cl-altlegend__title { font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); letter-spacing: var(--font-tracking-label); text-transform: uppercase; color: var(--color-text-tertiary); }
+.cl-altlegend__total { font-family: var(--font-family-mono); font-size: 10px; line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); }
+.cl-altlegend__bands { display: grid; grid-template-columns: repeat(5, 58px); column-gap: 2px; }
+.cl-altlegend__band { display: flex; flex-direction: column; align-items: stretch; }
+.cl-altlegend__histo { position: relative; display: flex; align-items: flex-end; gap: 1px; height: 22px; margin-bottom: 6px; }
+.cl-altlegend__histo::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 4px; border-radius: 1px; background: var(--band); }
+.cl-altlegend__histo i { flex: 1; min-height: 2px; background: var(--band); opacity: 0.9; }
+.cl-altlegend__histo i.is-empty { min-height: 0; height: 0; }
+.cl-altlegend__count { text-align: center; font-family: var(--font-family-mono); font-size: 10px; line-height: var(--font-line-height-caption); color: var(--color-text-primary); }
+.cl-altlegend__bounds { display: grid; grid-template-columns: repeat(5, 58px); column-gap: 2px; }
+.cl-altlegend__bounds span { justify-self: end; transform: translateX(50%); font-family: var(--font-family-mono); font-size: 10px; line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); white-space: nowrap; }
+.cl-altlegend__band--very-low { --band: var(--color-altitude-dark-very-low); }
+.cl-altlegend__band--low { --band: var(--color-altitude-dark-low); }
+.cl-altlegend__band--mid { --band: var(--color-altitude-dark-mid); }
+.cl-altlegend__band--high { --band: var(--color-altitude-dark-high); }
+.cl-altlegend__band--cruise { --band: var(--color-altitude-dark-cruise); }
+/* over a light base map (IGN, OSM) it says what is drawn there: the light palette on a light chip */
+.cl-altlegend.is-light { background: color-mix(in srgb, var(--color-map-light-ground) 92%, transparent); border-color: var(--color-map-light-ring); }
+.cl-altlegend.is-light .cl-altlegend__title, .cl-altlegend.is-light .cl-altlegend__total, .cl-altlegend.is-light .cl-altlegend__bounds span { color: var(--color-map-light-text-dim); }
+.cl-altlegend.is-light .cl-altlegend__count { color: var(--color-map-light-text); }
+.cl-altlegend.is-light .cl-altlegend__band--very-low { --band: var(--color-altitude-light-very-low); }
+.cl-altlegend.is-light .cl-altlegend__band--low { --band: var(--color-altitude-light-low); }
+.cl-altlegend.is-light .cl-altlegend__band--mid { --band: var(--color-altitude-light-mid); }
+.cl-altlegend.is-light .cl-altlegend__band--high { --band: var(--color-altitude-light-high); }
+.cl-altlegend.is-light .cl-altlegend__band--cruise { --band: var(--color-altitude-light-cruise); }
