@@ -504,7 +504,7 @@ sur la carte.
   points (un au bord du rayon près) et procédures que son script, et 41 positions de contrôle de plus
   qu'il manquait (PARIS Contrôle, REIMS Contrôle…) ; sur l'instance d'essai, de « Not made yet »
   à « Up to date · AIRAC 2026-10-01 » en un clic, sans rien télécharger (pages du labo en cache,
-  instance sans flux audio). Reste de Q55 : la grammaire, mesurée par paires avant activation.
+  instance sans flux audio). La grammaire, mesurée par paires le même soir sur le ciel témoin du labo (02-04/10), **n'est pas adoptée** : 35 appariements perdus, presque tous justes (indicatifs au nom de compagnie mal transcrit, « Eziad Three Foxtrot Four »), 0 gagné ; le code est retiré, la mesure gardée hors dépôt (D71 ; détail en Q55).
 - 15/10 (soir) : **migration du design versée dans `local` et prête pour la production**
   (efaaa7a) : étapes 12 et 13 et tout ce qui a suivi le même jour, relu conforme par la session
   design. Le propriétaire a choisi de la regarder en production plutôt que sur l'instance d'essai
