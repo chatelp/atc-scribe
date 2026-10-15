@@ -492,6 +492,14 @@ sur la carte.
 
 ## État
 
+- 15/10 : **un avion perdu pointait au nord**, à 90° de sa trajectoire sur l'axe est-ouest de
+  Roissy (vu par le propriétaire). Mesuré sur l'instance : sur dix avions perdus récents, sept
+  n'avaient plus ni `track` ni cap dans leur dernier relevé (le récepteur les fait expirer) ; le
+  rendu retombait alors sur 0° et écrasait le dernier cap à chaque mise à jour. Le glyphe garde
+  désormais l'orientation qu'il avait (vérifié par une perte simulée : 62° avant, 62° après).
+  Reste : une page ouverte après la perte n'a aucun cap à garder et dessine encore le nord ; le
+  remède est côté serveur (conserver le dernier cap valide quand un relevé n'en porte plus), sur
+  le chemin d'écriture des avions, à faire à part.
 - 15/10 : **« Show only » depuis un avion** (le propriétaire pensait au Shift+clic ; écarté :
   invisible, sans équivalent au doigt, et il n'y a pas de sélection multiple). Sous la grille du
   récit, une rangée « Show only » et deux bascules : « FL 290 ± 500 ft » (±500 ft, choix du

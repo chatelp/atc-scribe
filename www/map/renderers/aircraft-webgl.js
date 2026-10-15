@@ -160,7 +160,10 @@
         if (Number.isFinite(adsb.true_heading)) return adsb.true_heading;
         if (Number.isFinite(adsb.mag_heading)) return adsb.mag_heading;
         if (Number.isFinite(adsb.track)) return adsb.track;
-        return 0;
+        // None: the receiver lets track and heading expire when the messages
+        // stop, so a lost aircraft has none. The caller keeps the glyph's
+        // last orientation; north only for an aircraft never oriented.
+        return null;
     }
 
     function getAircraftPhase(aircraft) {
@@ -1091,7 +1094,7 @@
 
         function createFeatureProps(aircraft, visualState) {
             const headingDeg = getAircraftHeading(aircraft, store);
-            const headingRad = (headingDeg * Math.PI) / 180;
+            const headingRad = Number.isFinite(headingDeg) ? (headingDeg * Math.PI) / 180 : null;
             const phase = getAircraftPhase(aircraft);
             const color = getAircraftSymbolColor(aircraft, visualState, store);
             const iconClass = getAircraftIconClass(aircraft);
@@ -1132,6 +1135,16 @@
             const geometry = new window.ol.geom.Point(window.ol.proj.fromLonLat([lon, lat]));
             const props = createFeatureProps(aircraft, visualState || { selected: false, hovered: false });
             const preservePose = options?.preservePose === true;
+
+            // No heading in this update (a lost aircraft's expired track): the
+            // glyph keeps the way it faced, which drew it at 90° to its own
+            // track once it pointed north instead (owner, 15/10).
+            if (!Number.isFinite(props.heading)) {
+                const keptHeading = feature ? Number(feature.get('heading')) : NaN;
+                const keptRotation = feature ? Number(feature.get('rotationRad')) : NaN;
+                props.heading = Number.isFinite(keptHeading) ? keptHeading : 0;
+                props.rotationRad = Number.isFinite(keptRotation) ? keptRotation : 0;
+            }
 
             if (!feature) {
                 feature = new window.ol.Feature({ geometry });
