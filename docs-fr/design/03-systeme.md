@@ -524,3 +524,24 @@ Tranchés le 13/10, tous selon la proposition :
 
 Reste ouvert, sans effet sur le dessin : 5. l'interpolation des avions gardée sous
 `prefers-reduced-motion` (décidé par le propriétaire le 15/10 : gardée, c'est de l'information ; tout le reste s'arrête).
+
+## La palette de la carte (15/10)
+
+Choisie par le propriétaire sur une même scène dessinée trois fois (aujourd'hui, fond gris, seulement
+les conflits) : **seulement les conflits**. La carte garde ses teintes (aérodromes et VOR en bleu,
+VORTAC indigo, NDB et espaces aériens en ambre, héliports en violet) ; ce qui se confondait avec une
+couleur de sens change :
+
+| Rôle | Avant | Après | Pourquoi |
+|---|---|---|---|
+| Avion choisi | anneau `#FDE047` | anneau `color-map-selected` (#66c56a) | le jaune se lisait comme un avion très bas |
+| Avion survolé | `#86EFAC` | `color-map-hovered` (#e0e0e0) | un vert de plus diluait la voix de l'outil |
+| Taxiways | `#efe3a0` | `color-map-taxiway` (#5c5c5c) | ΔE 6,6 du jaune des avions très bas |
+| Anneaux de distance | vert d'accent | `color-map-ring` (#3d3d3d), libellés en tertiaire | le vert est la voix de l'outil |
+| Traces | toutes vertes | la couleur d'altitude de l'avion à 50 % ; le vol suivi en `color-map-trail-followed` pointillé | la trace se rattache à son avion |
+| Positions estimées (futur, rétro-prévision) | `#FFC107`, `#00BCD4` | `color-map-estimate`, pointillé | une estimation, une seule couleur |
+| Trace ancienne ou perdue | `#FFC107` | `color-map-trail-stale` (tertiaire) | comme le glyphe perdu |
+
+Les jetons `color-map-*` (et `color-map-light-*` sur les fonds IGN et OSM) sont dans `jetons.json` ;
+la carte les lit comme elle lit déjà `labelTextColor`. Les anneaux restent volontairement discrets
+(1,9:1 sur le noir) : ce sont des repères, pas de l'information à lire.
