@@ -5215,6 +5215,40 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
+### Q55 — Les noms officiels de l'AIP dans l'appariement *(15/10 — ouverte, proposée par le labo, choix du propriétaire attendu)*
+
+Le labo a tiré de l'eAIP France du SIA (cycle AIRAC du 01/10/2026, cinq pages : ENR 4.4, ENR 2.1,
+AD 2 LFPG, LFPO, LFPB), avec l'accord du propriétaire, une liste de noms réels autour de LFPG :
+465 points de report à moins de 120 NM, avec leurs coordonnées ; 94 indicatifs de positions de
+contrôle ; 11 procédures nommées dans le texte (les autres ne sont que sur les cartes PDF, mais
+portent le nom d'un point : OKIPA 1W). Script `whisper-lab/scripts/labo/noms-aip.py`, résultat
+`whisper-lab/resultats/labo/noms/noms-region-parisienne.json`, pages brutes sur le disque
+externe. Réutilisation libre comme information publique, **à condition de citer la source et la
+date** ; le cycle change tous les 28 jours.
+
+**Consigne du propriétaire : aucune donnée brute de l'AIP dans le dépôt public.** Ce qui entre
+dans le dépôt est un outil générique (centre et rayon configurables, cycle AIRAC en paramètre ou
+découvert sur le site du SIA) qui fabrique le fichier sur place, hors du dépôt, avec la source et
+la date écrites dedans. Chaque utilisateur fabrique la liste de sa région.
+
+Trois usages proposés, du plus sûr au moins sûr :
+1. **Grammaire** : lire « <POINT> <chiffre> <lettre> » comme une procédure, pour que « 7 Golf »
+   ne soit plus pris pour un morceau d'indicatif (7G). Le gain attendu est d'éviter de faux
+   indices. À mesurer par paires sur un ciel témoin : les appariements perdus doivent être des
+   faux.
+2. **Nouvel indice positif** : la direction prise par l'avion après le décollage (ADS-B),
+   comparée au relèvement du point de la procédure annoncée. À mesurer par paires avant
+   adoption, comme les autres raisons du matcher.
+3. **Affichage** : le nom réel (« HELCOP 7 Golf » → ELCOB 7G), et éventuellement le point sur la
+   carte.
+
+Le labo s'en sert déjà pour sa relecture par Claude dans l'atelier : la relecture ne peut
+proposer que des noms qui existent.
+
+**Recommandation (chef d'orchestre)** : commencer par l'outil générique et l'usage 1 après la
+migration, mesuré par paires ; puis le 2 ; le 3 avec la session design. C'est la ligne
+« procédures du SIA » de la liste « plus tard » du pilotage.
+
 ### Q54 — Le portage du sidecar hors Apple Silicon : par quoi commencer ? *(12/10 — cible tranchée, jalon à venir, pas immédiat)*
 
 > **Décision du propriétaire le 12/10** : la cible est celle que la session communauté
