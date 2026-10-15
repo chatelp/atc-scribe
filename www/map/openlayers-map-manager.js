@@ -362,8 +362,14 @@
             if (!this._referencePopupOverlay) return;
             this._referencePopupOverlay.setPosition(undefined);
             const element = this._referencePopupOverlay.getElement();
+            // The focus inside goes back to the map (step 11, AppShell).
+            const hadFocus = element && element.contains(document.activeElement);
             if (element) {
                 element.style.display = 'none';
+            }
+            if (hadFocus) {
+                const map = document.getElementById('map');
+                if (map) map.focus();
             }
             if (this._referencePopupElement) {
                 this._referencePopupElement.innerHTML = '';
@@ -380,6 +386,9 @@
                 element.style.display = 'flex';
                 const title = element.querySelector('.cl-menu__title');
                 element.setAttribute('aria-label', title ? title.textContent : 'Sheet');
+                // A popover takes the focus on its first control (step 11).
+                const close = element.querySelector('[data-ref-close]');
+                if (close) setTimeout(() => close.focus(), 0);
             }
             this._referencePopupOverlay.setPosition(coordinate);
         }
