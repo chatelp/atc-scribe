@@ -114,8 +114,15 @@
 .cl-altrange__value { font-family: var(--font-family-mono); font-size: var(--font-size-small); color: var(--color-text-primary); }
 .cl-altrange__value small { font-size: inherit; color: var(--color-text-tertiary); }
 .cl-altrange__histo { display: flex; align-items: flex-end; gap: 2px; height: 18px; }
-.cl-altrange__histo i { flex: 1; background: var(--color-surface-hover); }
-.cl-altrange__histo i.is-in { background: var(--color-accent-default); opacity: 0.4; }
+/* each bar in the colour its aircraft wear on the map (owner, 15/10); dimmed outside the chosen band */
+.cl-altrange__histo i { flex: 1; background: var(--color-surface-hover); opacity: 0.3; }
+.cl-altrange__histo i.is-in { opacity: 0.85; }
+.cl-altrange__histo i[data-band="very-low"] { background: var(--color-altitude-dark-very-low); }
+.cl-altrange__histo i[data-band="low"] { background: var(--color-altitude-dark-low); }
+.cl-altrange__histo i[data-band="mid"] { background: var(--color-altitude-dark-mid); }
+.cl-altrange__histo i[data-band="high"] { background: var(--color-altitude-dark-high); }
+.cl-altrange__histo i[data-band="cruise"] { background: var(--color-altitude-dark-cruise); }
+.cl-altrange__ta { border-left: var(--border-width-default) dashed var(--color-text-tertiary); }
 .cl-altrange__marks { display: flex; justify-content: space-between; font-family: var(--font-family-mono); font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); }
 
 /* ------------------------------------------------------------ StatusLight */
@@ -575,3 +582,23 @@
 }
 .cl-phone .cl-threadhead__title, .cl-phone .cl-threadhead__pace, .cl-phone .cl-threadhead__row--show { display: none; }
 .cl-phone .cl-exchange__when { flex-basis: 100%; }
+
+/* ------------------------------------------------------------ AltitudeLegend: the colours of the aircraft and their bounds */
+.cl-altlegend { position: absolute; left: var(--space-3); bottom: var(--space-3); display: grid; grid-template-columns: auto repeat(5, 56px); column-gap: 2px; row-gap: var(--space-1); align-items: center; padding: var(--space-1-5) var(--space-2); background: color-mix(in srgb, var(--color-surface-page) 85%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-md); pointer-events: none; }
+.cl-altlegend__title { grid-row: 1; padding-right: var(--space-2); font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); letter-spacing: var(--font-tracking-label); text-transform: uppercase; color: var(--color-text-tertiary); }
+.cl-altlegend__band { grid-row: 1; height: 10px; border-radius: var(--radius-sm); }
+.cl-altlegend__band--very-low { background: var(--color-altitude-dark-very-low); }
+.cl-altlegend__band--low { background: var(--color-altitude-dark-low); }
+.cl-altlegend__band--mid { background: var(--color-altitude-dark-mid); }
+.cl-altlegend__band--high { background: var(--color-altitude-dark-high); }
+.cl-altlegend__band--cruise { background: var(--color-altitude-dark-cruise); }
+.cl-altlegend__bound { grid-row: 2; justify-self: end; transform: translateX(50%); font-family: var(--font-family-mono); font-size: 10px; line-height: var(--font-line-height-caption); color: var(--color-text-secondary); white-space: nowrap; }
+/* over a light base map (IGN, OSM) it says what is drawn there: the light palette on a light chip */
+.cl-altlegend.is-light { background: color-mix(in srgb, var(--color-map-light-ground) 92%, transparent); border-color: var(--color-map-light-ring); }
+.cl-altlegend.is-light .cl-altlegend__title { color: var(--color-map-light-text-dim); }
+.cl-altlegend.is-light .cl-altlegend__bound { color: var(--color-map-light-text); }
+.cl-altlegend.is-light .cl-altlegend__band--very-low { background: var(--color-altitude-light-very-low); }
+.cl-altlegend.is-light .cl-altlegend__band--low { background: var(--color-altitude-light-low); }
+.cl-altlegend.is-light .cl-altlegend__band--mid { background: var(--color-altitude-light-mid); }
+.cl-altlegend.is-light .cl-altlegend__band--high { background: var(--color-altitude-light-high); }
+.cl-altlegend.is-light .cl-altlegend__band--cruise { background: var(--color-altitude-light-cruise); }
