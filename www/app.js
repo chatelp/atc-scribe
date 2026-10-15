@@ -871,6 +871,96 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('atc').parView = window.ParView.create(document.getElementById('par-view'), Alpine.store('atc'));
     Alpine.store('atc').setMainView(Alpine.store('atc').mainView);
 
+    // Dialogs and popovers take the focus (design review of step 11, AppShell).
+    // The settings page is a modal dialog: the rest of the page is inert while
+    // it is open, the focus goes into it, and comes back to the gear when it
+    // closes. A popover (the event log, a channel's menu, the layers) puts the
+    // focus on its first control and gives it back to the button that opened
+    // it. Before this, Tab went on behind them: unreachable by keyboard.
+    {
+        const store = Alpine.store('atc');
+        const events = Alpine.store('events');
+        const SELECTABLE = 'button:not([disabled]):not([tabindex="-1"]), a[href], input:not([type="hidden"]):not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
+        const shown = (el) => !!el && el.isConnected && el.getClientRects().length > 0;
+        const firstIn = (el) => el && [...el.querySelectorAll(SELECTABLE)].find(shown);
+        const madeInert = [];
+        const inertAround = (root) => {
+            for (let node = root; node && node.parentElement && node !== document.body; node = node.parentElement) {
+                for (const sib of node.parentElement.children) {
+                    if (sib !== node && !sib.inert && sib.tagName !== 'SCRIPT') { sib.inert = true; madeInert.push(sib); }
+                }
+            }
+        };
+        const releaseInert = () => { while (madeInert.length) madeInert.pop().inert = false; };
+
+        const follow = ({ isOpen, root, opener, modal, close }) => {
+            let last = false;
+            let from = null;
+            let watched = null;
+            // A popover closes when the focus leaves it (Tab past its last
+            // control): left open behind, Escape no longer reached it.
+            const onFocusOut = (e) => {
+                const el = watched;
+                if (!el || !close) return;
+                const to = e.relatedTarget;
+                if (to && !el.contains(to)) close();
+            };
+            Alpine.effect(() => {
+                const open = !!isOpen();
+                if (open === last) return;
+                last = open;
+                if (open) {
+                    from = document.activeElement;
+                    const place = () => {
+                        const el = root();
+                        if (!shown(el)) return false;
+                        if (modal) inertAround(el);
+                        else if (close) { watched = el; el.addEventListener('focusout', onFocusOut); }
+                        const target = firstIn(el);
+                        if (target) target.focus();
+                        return true;
+                    };
+                    // Drawn in a frame or two.
+                    setTimeout(() => { if (!place()) setTimeout(place, 150); }, 30);
+                } else {
+                    if (modal) releaseInert();
+                    if (watched) { watched.removeEventListener('focusout', onFocusOut); watched = null; }
+                    setTimeout(() => {
+                        const a = document.activeElement;
+                        if (a && a !== document.body && shown(a)) return;
+                        const back = (from && shown(from)) ? from : opener();
+                        if (back && shown(back)) back.focus();
+                    }, 30);
+                }
+            });
+        };
+
+        follow({
+            isOpen: () => store.settingsOpen,
+            root: () => document.querySelector('.cl-page[role="dialog"]'),
+            opener: () => document.querySelector('header [aria-label="Settings"]'),
+            modal: true,
+        });
+        follow({
+            isOpen: () => events.open,
+            root: () => document.querySelector('[role="dialog"][aria-label="Event log"]'),
+            opener: () => document.querySelector('header [aria-label="Event log"]'),
+            close: () => { events.open = false; },
+        });
+        follow({
+            isOpen: () => store.layersOpen,
+            root: () => document.querySelector('.cl-menu--map'),
+            opener: () => document.querySelector('[aria-label="Layers and base map"]'),
+            close: () => { store.layersOpen = false; },
+        });
+        follow({
+            isOpen: () => store.threadMenuFor,
+            root: () => [...document.querySelectorAll('.cl-threadhead__row--channels .cl-menu')].find(shown),
+            opener: () => [...document.querySelectorAll('.cl-channel__caret[aria-expanded="true"]')][0] || null,
+            close: () => { store.threadMenuFor = null; },
+        });
+    }
+
     // The keyboard's focus follows a flight (step 11): the strip it was on
     // goes when the column turns to the story, and the story goes when the
     // flight is let go. When the focus was lost that way, it moves to the

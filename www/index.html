@@ -346,7 +346,7 @@
                     <div x-show="$store.atc.settingsOpen" x-cloak
                          @keydown.escape.window="$store.atc.settingsOpen = false"
                          x-data="serverSettings()" x-init="load()"
-                         role="dialog" aria-label="Settings"
+                         role="dialog" aria-modal="true" aria-label="Settings"
                          class="cl-root cl-page fixed inset-x-0 top-0 bottom-20 md:bottom-0" style="z-index: 10010;">
                         <div class="cl-page__inner max-md:grid-cols-1 max-md:grid-rows-[auto_minmax(0,1fr)] max-md:border-x-0">
                             <nav class="cl-page__nav max-md:flex-row max-md:overflow-x-auto max-md:border-r-0 max-md:border-b max-md:border-border-default max-md:px-3 max-md:py-2" aria-label="Sections">

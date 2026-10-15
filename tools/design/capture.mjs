@@ -111,7 +111,9 @@ try {
             const modifiers = parts.reduce((m, p) => m | (mods[p] || 0), 0);
             const key = last === 'Space' ? ' ' : last;
             const code = codes[key] || key.toUpperCase().charCodeAt(0);
-            const text = key.length === 1 && !(modifiers & 7) ? key : undefined;
+            // Enter carries "\r": without it the browser clicks no real <button>
+            // (design review of step 11), only a page's own handler answered.
+            const text = key === 'Enter' && !(modifiers & 7) ? '\r' : key.length === 1 && !(modifiers & 7) ? key : undefined;
             const base = { key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code, modifiers };
             await send('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', ...base, ...(text ? { text } : {}) });
             await send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
