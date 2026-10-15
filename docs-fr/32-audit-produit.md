@@ -503,6 +503,12 @@ sur la carte.
   (barre info, texte de lecture, âge), pleine 2 min, à 55 % jusqu'à 10 min, qui suit le fondu du
   moteur de mouvement. Écart à la fiche, soumis : la bulle est opaque, et l'étiquette à deux
   lignes mordait de 7 px sur le glyphe ; avec une bulle, le bloc s'arrête 2 px au-dessus du glyphe.
+  **Relu conforme, écart accepté.** Recompte de la session design, au même instant sur le même
+  ciel (part des boîtes chevauchées, « avant » estimé à 140 px par étiquette) : 24 NM 67 → 21 % ;
+  34 NM (défaut) 67 → 37 % ; 48 NM 68 → 55 % ; 67 NM 81 → 20 % ; 135 NM 93 → 45 % ; 270 NM
+  97 → 58 %. Avions sous une étiquette à 67 NM : 28 → 5. Il reste des chevauchements entre 34 et
+  48 NM autour de l'approche de Roissy, où les avions qui comptent sont serrés : laissé tel quel
+  pour une soirée, choix du propriétaire.
 - 15/10 : **palette de la carte, choix C du propriétaire** (seulement les conflits ; jetons
   `color-map-*` et `color-map-light-*` de la session design, 34ecf70). Un module commun
   `www/map/core/map-palette.js` les lit, avec la variante des fonds clairs (IGN, OSM). Anneau de
