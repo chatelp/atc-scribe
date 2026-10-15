@@ -7,3 +7,5 @@ Sliders set a frequency's volume or the altitude range of the Traffic tab.
 **Altitude range** (`cl-altrange`): the value (mono) and the count shown, a histogram of the traffic (`color-surface-hover` outside the range, `color-accent-default` at 40 % inside, class `in`), the two-thumb rail, and marks SFC · TA · FL 100 · FL 195 in `mono-caption` `color-text-tertiary`. ← and → move the focused thumb.
 
 **Data.** The histogram counts the store's aircraft by level band; the range filters the list and the map together.
+
+**The altitude slider** (Traffic, owner 15/10): its histogram's bars take the colour the aircraft of their altitude wear on the map (`data-band` very-low to cruise, the dark palette always, the column being dark), at 85 % inside the chosen band and 30 % outside; the track stays the accent of the selection. The transition altitude is a dashed tertiary mark (`cl-altrange__ta`) labelled "TA" alone; marks that would touch their neighbour are dropped ("FL 300" went: at 347 px it overlapped "FL 200").

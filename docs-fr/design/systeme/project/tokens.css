@@ -68,6 +68,9 @@
   --color-map-light-selected: #2e7d32;
   --color-map-light-hovered: #333333;
   --color-map-light-trail-stale: #7a7a7a;
+  --color-map-light-ground: #f2efe9;
+  --color-map-light-text: #3a3a3a;
+  --color-map-light-text-dim: #5e5e5e;
   --color-scrim: #000000b3;
   --shadow-overlay: 0 4px 16px #00000099;
 }

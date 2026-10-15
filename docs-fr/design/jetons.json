@@ -92,7 +92,10 @@
         "taxiway": { "$value": "#9a9a9a", "$description": "Taxiway on a light base map." },
         "selected": { "$value": "#2e7d32", "$description": "Selection ring on a light base map (4.5:1 on the OSM ground)." },
         "hovered": { "$value": "#333333", "$description": "Hover ring on a light base map." },
-        "trail-stale": { "$value": "#7a7a7a", "$description": "Old or lost trail on a light base map." }
+        "trail-stale": { "$value": "#7a7a7a", "$description": "Old or lost trail on a light base map." },
+        "ground": { "$value": "#f2efe9", "$description": "Ground of a chip over a light base map (the altitude legend)." },
+        "text": { "$value": "#3a3a3a", "$description": "Text on that chip (10.5:1)." },
+        "text-dim": { "$value": "#5e5e5e", "$description": "Its label (5.7:1)." }
       }
     },
     "scrim": { "$value": "#000000b3", "$description": "Behind a full page (settings) over the map: black at 70 %." }
