@@ -162,7 +162,7 @@
                 <div class="cl-threadhead">
                     <div class="cl-threadhead__row">
                         <h2 class="cl-threadhead__title">Radio</h2>
-                        <span class="cl-exchange__when" x-text="$store.atc.threadPace"></span>
+                        <span class="cl-exchange__when cl-threadhead__pace" x-text="$store.atc.threadPace"></span>
                         <span class="cl-threadhead__end">
                             <button class="cl-btn cl-btn--icon" aria-label="Search the thread" aria-controls="thread-search"
                                     :aria-expanded="String($store.atc.threadSearchOpen)"
@@ -227,7 +227,7 @@
                             </span>
                         </template>
                     </div>
-                    <div class="cl-threadhead__row" x-show="!$store.atc.nothingOnAir && $store.atc.audioFrequencies.length > 1">
+                    <div class="cl-threadhead__row cl-threadhead__row--show" x-show="!$store.atc.nothingOnAir && $store.atc.audioFrequencies.length > 1">
                         <span class="cl-label">Show</span>
                         <div class="cl-seg">
                             <button class="cl-seg__item" :aria-pressed="String($store.atc.threadShow === 'all')" @click="$store.atc.setThreadShow('all')">All</button>
