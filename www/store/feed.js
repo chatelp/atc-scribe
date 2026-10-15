@@ -9,6 +9,17 @@
 // MAP_STYLES, wsClient, audioClient, mapManager) are defined, and a method
 // resolves them when it runs.
 (function () {
+    // How long a lost connection lasts before it rings and is logged.
+    const SERVER_LOST_NOTICE_MS = 10000;
+
+    // "43 s", "8 min 43 s", "1 h 12 min".
+    function lostForText(ms) {
+        const s = Math.round(ms / 1000);
+        if (s < 60) return `${s} s`;
+        if (s < 3600) return `${Math.floor(s / 60)} min ${s % 60} s`;
+        return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`;
+    }
+
     window.AtcStore = window.AtcStore || [];
     window.AtcStore.push(() => ({
         visibleAircraftOnMap: new Set(), // Track aircraft visible on map for UI indicators
@@ -19,6 +30,46 @@
         wsConnectionState: 'idle',
         lastUpdate: null,
         lastUpdateSeconds: 0, // For footer status
+
+        // A lost connection to the server (owner, 15/10): the bell's sound
+        // once the loss has lasted ten seconds, and on reconnection a line in
+        // the event log saying for how long, with the exchanges the server
+        // kept meanwhile put back into the thread. A blink rings nothing.
+        _serverLostAt: null,
+        _serverLostTimer: null,
+
+        markServerLost() {
+            if (!this.initialDataLoaded || this._serverLostAt) return;
+            this._serverLostAt = new Date();
+            this._serverLostTimer = setTimeout(() => {
+                this._serverLostTimer = null;
+                const events = window.Alpine && Alpine.store('events');
+                if (this.connected === false && events) events.ringServerLost();
+            }, SERVER_LOST_NOTICE_MS);
+        },
+
+        async serverBack() {
+            const lostAt = this._serverLostAt;
+            this._serverLostAt = null;
+            if (this._serverLostTimer) {
+                clearTimeout(this._serverLostTimer);
+                this._serverLostTimer = null;
+            }
+            if (!lostAt) return;
+            const backAt = new Date();
+            if (backAt - lostAt < SERVER_LOST_NOTICE_MS) return;
+            const filled = await this.fillBackTranscriptions(lostAt);
+            const events = window.Alpine && Alpine.store('events');
+            if (!events) return;
+            const meanwhile = filled === null
+                ? 'exchanges heard meanwhile may be missing from the thread.'
+                : filled === 0 ? 'nothing was heard meanwhile.'
+                : `${filled} exchange${filled === 1 ? '' : 's'} filled back into the thread.`;
+            events.add({
+                kind: 'server', silent: true,
+                text: `Server connection lost from ${this.clockText(lostAt)} to ${this.clockText(backAt)} (${lostForText(backAt - lostAt)}); ${meanwhile}`,
+            });
+        },
 
         // Initialize WebSocket for all aircraft data and alerts. (It sat at column
         // 0 in app.js, a stray indentation; moved with the feed, where it belongs.)
@@ -118,8 +169,7 @@
                 this.initialDataLoaded = true;
                 this.wsReconnectAttempt = 0;
                 this.wsNextRetryDelayMs = null;
-                // Reset the connection lost sound flag when connection is re-established
-                this.connectionLostSoundPlayed = false;
+                this.serverBack();
                 
                 // Request initial aircraft data via WebSocket (this will send filter update)
                 console.log('WebSocket connected, requesting initial aircraft data...');
@@ -135,10 +185,8 @@
                     console.log('Connection was previously established and is now lost');
                     this.connectionLostAt = new Date();
                     this.connected = false;
-                    
-                    // Play connection lost sound once when connection is lost
-                    this.playConnectionLostSound();
                 }
+                this.markServerLost();
                 
                 // Note: Reconnection is now handled by WebSocketClient internally
                 // No need to manually initiate reconnection here
@@ -150,6 +198,7 @@
                 if (status?.state === 'reconnecting' || status?.state === 'closed') {
                     if (this.connected !== false) this.connectionLostAt = new Date();
                     this.connected = false;
+                    this.markServerLost();
                 }
                 if (status?.state === 'connecting' && this.connected === false) {
                     // keep false while recovering to retain clear UX

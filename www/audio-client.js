@@ -482,40 +482,6 @@ class AudioClient {
     }
 
     /**
-     * Play the Airbus retard callout sound.
-     */
-    playRetardSound() {
-        if (!this.audioContext) {
-            this.initAudioContext();
-        }
-        if (!this.audioContext) {
-            console.error("AudioContext could not be initialized. Cannot play retard sound.");
-            return;
-        }
-
-        if (this.audioContext.state === 'suspended') {
-            this.audioContext.resume().then(() => {
-                this._playRetardSoundInternal();
-            }).catch(e => {
-                console.error("Error resuming AudioContext for retard sound:", e);
-            });
-        } else {
-            this._playRetardSoundInternal();
-        }
-    }
-
-    /**
-     * Internal helper for playing the static retard sound file.
-     */
-    _playRetardSoundInternal() {
-        const retardSound = new Audio('/sounds/airbus_retard.mp3');
-        retardSound.play()
-            .catch(error => {
-                console.error("Error playing airbus_retard.mp3:", error);
-            });
-    }
-
-    /**
      * Build a frequency stream URL and attach the client id.
      * @param {{stream_port?: number|string, stream_url?: string}} frequency
      * @returns {string|null}

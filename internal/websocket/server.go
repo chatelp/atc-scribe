@@ -2,7 +2,9 @@ package websocket
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -63,7 +65,28 @@ type Client struct {
 	mu        sync.Mutex
 	closed    bool
 	closeChan chan struct{}
+
+	// Who it is and why it left, for the log line written when it goes: a
+	// page hears a lost connection (owner, 15/10) and the server used to drop
+	// clients without a word.
+	remote string
+	agent  string
+	since  time.Time
+	reason string
 }
+
+// leave records the first reason the client goes; later ones are consequences.
+func (c *Client) leave(reason string) {
+	c.mu.Lock()
+	if c.reason == "" {
+		c.reason = reason
+	}
+	c.mu.Unlock()
+}
+
+// sendQueue is a client's queue of messages not yet written. A client whose
+// queue is full when a message comes is dropped, not the message.
+const sendQueue = 256
 
 // Server represents a WebSocket server
 type Server struct {
@@ -172,6 +195,7 @@ func (s *Server) Run() {
 				client.mu.Unlock()
 				// Then close the channel
 				close(client.send)
+				s.logLeft(client)
 			}
 			clientCount := len(s.clients)
 			s.mu.Unlock()
@@ -202,6 +226,7 @@ func (s *Server) Run() {
 							close(client.send)
 						}
 						client.mu.Unlock()
+						s.logLeft(client)
 					}
 				}
 				s.mu.Unlock()
@@ -231,9 +256,12 @@ func (s *Server) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	// Create client
 	client := &Client{
 		conn:      conn,
-		send:      make(chan *Message, 256),
+		send:      make(chan *Message, sendQueue),
 		server:    s,
 		closeChan: make(chan struct{}),
+		remote:    r.RemoteAddr,
+		agent:     r.UserAgent(),
+		since:     time.Now(),
 	}
 
 	// Register client
@@ -242,6 +270,21 @@ func (s *Server) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	// Start client goroutines
 	go client.readPump()
 	go client.writePump()
+}
+
+// logLeft writes why a client went, once, when the server lets it go.
+func (s *Server) logLeft(c *Client) {
+	c.mu.Lock()
+	reason := c.reason
+	c.mu.Unlock()
+	if reason == "" {
+		reason = "unknown"
+	}
+	s.logger.Info("WebSocket client left",
+		String("reason", reason),
+		String("after", time.Since(c.since).Round(time.Second).String()),
+		String("remote_addr", c.remote),
+		String("user_agent", c.agent))
 }
 
 // Broadcast sends a message to all connected clients
@@ -289,6 +332,7 @@ func (s *Server) broadcastImmediate(message *Message) {
 					close(client.send)
 				}
 				client.mu.Unlock()
+				s.logLeft(client)
 			}
 		}
 		s.mu.Unlock()
@@ -326,6 +370,17 @@ func (c *Client) readPump() {
 		// Read message
 		_, messageBytes, err := c.conn.ReadMessage()
 		if err != nil {
+			var ne net.Error
+			var ce *websocket.CloseError
+			switch {
+			case errors.As(err, &ce):
+				// 1001 going away, 1005 no status: a page reloaded or closed.
+				c.leave(fmt.Sprintf("the page closed it (%d)", ce.Code))
+			case errors.As(err, &ne) && ne.Timeout():
+				c.leave(fmt.Sprintf("no answer to pings for %s", pongWait))
+			default:
+				c.leave("reading failed: " + err.Error())
+			}
 			// 1005, no status: what a browser sends when the page is reloaded or closed.
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure,
 				websocket.CloseNormalClosure, websocket.CloseNoStatusReceived) {
@@ -402,11 +457,13 @@ func (c *Client) writePump() {
 			}
 
 			if err := c.conn.WriteMessage(websocket.TextMessage, data); err != nil {
+				c.leave(fmt.Sprintf("a write failed (deadline %s): %v", writeWait, err))
 				return
 			}
 
 		case <-ticker.C:
 			if err := c.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeWait)); err != nil {
+				c.leave(fmt.Sprintf("a ping could not be written (deadline %s): %v", writeWait, err))
 				return
 			}
 
@@ -445,7 +502,11 @@ func (c *Client) SendMessage(message *Message) bool {
 	case c.send <- message:
 		return true
 	default:
-		// Channel is full, drop message
+		// The queue is full: the client did not read fast enough, and the
+		// caller drops it.
+		if c.reason == "" {
+			c.reason = fmt.Sprintf("its queue was full (%d messages not yet written): it did not read fast enough", sendQueue)
+		}
 		return false
 	}
 }

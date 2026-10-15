@@ -492,6 +492,20 @@ sur la carte.
 
 ## État
 
+- 15/10 : **connexion au serveur perdue : un son neutre, une trace, le fil comblé** (le
+  propriétaire entendait « retard retard » par moment). C'était le son d'Airbus de l'amont, joué à
+  chaque coupure de la WebSocket, même d'une seconde, et qu'aucun réglage ne coupait ; une partie
+  venait des redémarrages de l'instance d'essai, le reste de coupures que le serveur ne
+  journalisait pas. Le serveur écrit désormais « WebSocket client left » avec la raison (page
+  fermée, pas de réponse aux pings en 60 s, écriture échouée, **file de 256 messages pleine** : le
+  serveur retire alors le client entier, pas le message, ce que son commentaire disait à tort), la
+  durée de connexion et le navigateur. La page : le son ne part que si la coupure atteint 10 s,
+  deux notes douces synthétisées (660 puis 495 Hz), réglables sous « Server connection » dans les
+  sons de la cloche ; à la reconnexion, une ligne ▲ dans le journal (« Server connection lost from
+  14:13Z to 14:22Z (8 min 43 s); 6 exchanges filled back into the thread. ») et les échanges gardés
+  par le serveur pendant la coupure remis dans le fil. Forme décidée par la session design
+  (7dec77e). Vérifié par une coupure simulée : 6 échanges retirés, 6 remis. Le son « retard » et son
+  fichier sont retirés.
 - 15/10 : **le voyant de transcription distingue un faux sidecar** (demande du propriétaire :
   même voyant vert avec le vrai modèle et le faux sidecar de l'instance d'essai). `/api/v1/status`
   publie ce que le sidecar déclare (`backend` : `mlx`, le nom d'un GPU, ou `fake`) et la famille du

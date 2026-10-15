@@ -27,7 +27,6 @@
         audioArchive: { available: false },
         clip: { id: null, state: 'idle', failed: {} },
         resumeListeningPending: false, // remembered listening waits for the page's first gesture
-        connectionLostSoundPlayed: false, // Track if the connection lost sound has been played
         userSetVolumes: {}, // Initialize as empty object
         lastSignificantAudioTime: {}, // Stores timestamp for each freqId
         secondsSinceLastAudio: {},  // Stores formatted string for display (e.g., "5s")
@@ -368,30 +367,6 @@
             };
             document.addEventListener('pointerdown', onFirstGesture, true);
             document.addEventListener('keydown', onFirstGesture, true);
-        },
-
-        // Play connection lost sound
-        playConnectionLostSound() {
-            if (this.connectionLostSoundPlayed) return;
-            
-            try {
-                // const audio = new Audio('/sounds/airbus_retard.mp3');
-                // audio.volume = 0.8; // Set volume to 80%
-                // audio.play().then(() => {
-                //     console.log('[Alpine Store] Connection lost sound played successfully');
-                //     this.connectionLostSoundPlayed = true;
-                // }).catch(err => {
-                //     console.error('[Alpine Store] Error playing connection lost sound:', err);
-                // });
-                if (audioClient) {
-                    audioClient.playRetardSound();
-                    this.connectionLostSoundPlayed = true; // Assume it plays successfully
-                } else {
-                    console.error('[Alpine Store] audioClient not available to play connection lost sound.');
-                }
-            } catch (err) {
-                console.error('[Alpine Store] Error initiating connection lost sound:', err);
-            }
         },
     }));
 })();

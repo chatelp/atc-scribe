@@ -396,6 +396,36 @@
 
 
 
+        // After a lost connection, the exchanges the server kept meanwhile go
+        // back into the thread, which reads originalTranscriptions (design,
+        // 15/10): how many, or null when the server could not be asked. From
+        // a minute before the loss: what was on its way when it broke.
+        async fillBackTranscriptions(since) {
+            const from = since.getTime() - 60000;
+            let added = 0;
+            try {
+                for (const freq of (this.audioFrequencies || [])) {
+                    const res = await fetch(`${API_BASE_URL}/transcriptions/frequency/${encodeURIComponent(freq.id)}?limit=200`);
+                    if (!res.ok) return null;
+                    const data = await res.json();
+                    const have = new Set((this.originalTranscriptions[freq.id] || []).map((t) => t.id));
+                    const missing = (data.transcriptions || [])
+                        .filter((t) => !have.has(t.id) && Date.parse(t.created_at) >= from)
+                        .map((t) => ({ ...t, timestamp: t.created_at, text: t.content, _historical: true }));
+                    if (!missing.length) continue;
+                    added += missing.length;
+                    for (const key of ['originalTranscriptions', 'frequencyTranscriptions']) {
+                        this[key][freq.id] = (this[key][freq.id] || []).concat(missing)
+                            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                            .slice(0, 99);
+                    }
+                }
+            } catch (e) {
+                return null;
+            }
+            return added;
+        },
+
         // Fetch transcriptions for a specific frequency
         async fetchTranscriptionsForFrequency(frequencyId) {
             try {

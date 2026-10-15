@@ -255,6 +255,8 @@
         switch (kind) {
         case 'emergency': return { mark: '■', cls: 'is-urgent' };
         case 'go_around': return { mark: '▲', cls: 'is-warn' };
+        // A service degraded for a while, not a failure going on (design, 15/10).
+        case 'server': return { mark: '▲', cls: 'is-warn' };
         case 'interest': return { mark: '●', cls: 'is-info' };
         default: return { mark: '', cls: '' };
         }
