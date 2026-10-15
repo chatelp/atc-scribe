@@ -523,4 +523,4 @@ Tranchés le 13/10, tous selon la proposition :
 4. J / K (et ↓ / ↑ quand la liste a le focus) au lieu de Tab pour passer d'un avion à l'autre.
 
 Reste ouvert, sans effet sur le dessin : 5. l'interpolation des avions gardée sous
-`prefers-reduced-motion` (proposé : gardée, c'est de l'information).
+`prefers-reduced-motion` (décidé par le propriétaire le 15/10 : gardée, c'est de l'information ; tout le reste s'arrête).
