@@ -492,6 +492,17 @@ sur la carte.
 
 ## État
 
+- 15/10 : **étiquettes de la carte allégées** (demande du propriétaire du 13/10, choisie le 15/10
+  sur deux planches de la session design ; fiche MapLabel, 597c142). Mesure de la session sur
+  environ 110 avions : au zoom par défaut, 62 % des étiquettes complètes en chevauchaient une
+  autre, 87 % à 67 NM. Trois paliers selon la largeur du ciel en NM au sol (33,7 NM au zoom par
+  défaut, recoupé ici) : jusqu'à 24 NM tout est complet ; de 24 à 67 NM l'indicatif seul, sauf
+  les avions qui comptent (entendus depuis 10 min, dans une séquence d'arrivée, suivis, squawk
+  d'urgence) ; au-delà, l'indicatif de ceux-là seulement ; le survol montre tout. Le dernier
+  message n'est plus une troisième ligne mais une bulle sous l'étiquette, dessinée dans un canevas
+  (barre info, texte de lecture, âge), pleine 2 min, à 55 % jusqu'à 10 min, qui suit le fondu du
+  moteur de mouvement. Écart à la fiche, soumis : la bulle est opaque, et l'étiquette à deux
+  lignes mordait de 7 px sur le glyphe ; avec une bulle, le bloc s'arrête 2 px au-dessus du glyphe.
 - 15/10 : **palette de la carte, choix C du propriétaire** (seulement les conflits ; jetons
   `color-map-*` et `color-map-light-*` de la session design, 34ecf70). Un module commun
   `www/map/core/map-palette.js` les lit, avec la variante des fonds clairs (IGN, OSM). Anneau de

@@ -481,7 +481,6 @@
                 typeText: '',
                 detailsText: '',
                 ageText: '',
-                voiceText: '',
             };
         }
 
@@ -532,7 +531,6 @@
             ageText: (aircraft.status === 'signal_lost' || ageSeconds === null || !Number.isFinite(ageSeconds) || ageSeconds < 5)
                 ? ''
                 : `-${Math.max(0, ageSeconds)}s`,
-            voiceText: getVoiceLabelLine(aircraft, store),
         };
     }
 
@@ -552,24 +550,128 @@
         return seconds < 60 ? `${Math.max(0, Math.round(seconds))} s ` : `${Math.floor(seconds / 60)} min `;
     }
 
-    // The last transmission matched to the aircraft, as a third line of its
-    // label (13/10, owner's request): the separate speech bubble of 12/10 sat
-    // over the label and hid it. Shown for ten minutes after it was heard, cut
-    // short, off when the "last transmission on the label" setting is.
-    const VOICE_LINE_WINDOW_MS = 10 * 60 * 1000;
-    const VOICE_LINE_MAX_CHARS = 40;
-    // One line of the 11 px label, at OpenLayers' default line height of 1.2.
+    // The last transmission matched to the aircraft, as a message tag hung
+    // under its label (MapLabel, owner 15/10): the third line of 13/10 widened
+    // the label to 40 mono characters and read as data. Full for two minutes,
+    // at 55 % to ten, gone at ten; off with the "last transmission on aircraft
+    // labels" setting.
+    const VOICE_FULL_MS = 2 * 60 * 1000;
+    const VOICE_WINDOW_MS = 10 * 60 * 1000;
+    const VOICE_MAX_CHARS = 34;
+    // One line of the 11 px label, at OpenLayers' default line height of 1.2,
+    // and the label's padding above and below.
     const LABEL_LINE_PX = 13;
+    const LABEL_PAD_Y = 2;
+    const LABEL_PAD_X = 6;
+    const TAG_GAP_PX = 3;
+    const TAG_HEIGHT_PX = 18;
 
-    function getVoiceLabelLine(aircraft, store) {
-        if (store?.settings?.voiceBubbles === false) return '';
+    function getVoiceTag(aircraft, store) {
+        if (store?.settings?.voiceBubbles === false) return null;
         const v = aircraft?.voice;
-        if (!v || !v.last_text || !v.last_heard) return '';
+        if (!v || !v.last_text || !v.last_heard) return null;
         const heard = Date.parse(v.last_heard);
-        if (!Number.isFinite(heard) || Date.now() - heard > VOICE_LINE_WINDOW_MS) return '';
+        const ageMs = Date.now() - heard;
+        if (!Number.isFinite(heard) || ageMs > VOICE_WINDOW_MS) return null;
         const t = String(v.last_text).replace(/\s+/g, ' ').trim();
-        if (!t) return '';
-        return '“' + (t.length > VOICE_LINE_MAX_CHARS ? t.slice(0, VOICE_LINE_MAX_CHARS - 1).trimEnd() + '…' : t) + '”';
+        if (!t) return null;
+        const seconds = Math.max(0, Math.round(ageMs / 1000));
+        return {
+            text: '“' + (t.length > VOICE_MAX_CHARS ? t.slice(0, VOICE_MAX_CHARS - 1).trimEnd() + '…' : t) + '”',
+            age: seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min`,
+            alpha: ageMs <= VOICE_FULL_MS ? 1 : 0.55,
+        };
+    }
+
+    // The tag drawn once into a canvas (a bar, the words, the age), an icon
+    // for OpenLayers, whose text style has no left bar nor two fonts.
+    const tagCanvasCache = new Map();
+    function tagCanvas(tag) {
+        const key = `${tag.text}|${tag.age}`;
+        let entry = tagCanvasCache.get(key);
+        if (entry) return entry;
+        if (tagCanvasCache.size > 400) tagCanvasCache.clear();
+        const P = window.MapPalette;
+        const ratio = Math.max(1, Math.round(window.devicePixelRatio || 1));
+        const textFont = `11px ${cssVar('--font-family-text', 'system-ui, sans-serif')}`;
+        const monoFont = `10px ${cssVar('--font-family-mono', 'ui-monospace, monospace')}`;
+        const measure = document.createElement('canvas').getContext('2d');
+        measure.font = textFont;
+        const textW = Math.ceil(measure.measureText(tag.text).width);
+        measure.font = monoFont;
+        const ageW = Math.ceil(measure.measureText(tag.age).width);
+        const bar = 2.5;
+        const width = Math.ceil(bar + 6 + textW + 8 + ageW + 6);
+        const canvas = document.createElement('canvas');
+        canvas.width = width * ratio;
+        canvas.height = TAG_HEIGHT_PX * ratio;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(ratio, ratio);
+        ctx.fillStyle = cssVar('--color-surface-raised', '#222222');
+        ctx.fillRect(0, 0, width, TAG_HEIGHT_PX);
+        ctx.fillStyle = cssVar('--color-status-info', '#6cb6ff');
+        ctx.fillRect(0, 0, bar, TAG_HEIGHT_PX);
+        ctx.textBaseline = 'middle';
+        ctx.font = textFont;
+        ctx.fillStyle = labelTextColor('primary');
+        ctx.fillText(tag.text, bar + 6, TAG_HEIGHT_PX / 2 + 0.5);
+        ctx.font = monoFont;
+        ctx.fillStyle = labelTextColor('tertiary');
+        ctx.textAlign = 'right';
+        ctx.fillText(tag.age, width - 6, TAG_HEIGHT_PX / 2 + 0.5);
+        entry = { canvas, width, ratio };
+        tagCanvasCache.set(key, entry);
+        return entry;
+    }
+
+    function cssVar(name, fallback) {
+        if (typeof document === 'undefined' || !document.documentElement) return fallback;
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+    }
+
+    // Zoom tiers (MapLabel, owner 15/10), by the width of the sky in nautical
+    // miles on the ground, not the zoom level: folding the column widens the
+    // sky. Measured on about 110 aircraft: at 34 NM, 62 % of full labels
+    // overlapped another; at 67 NM, 87 %; callsigns alone 47 to 87 % beyond.
+    const FULL_LABELS_UP_TO_NM = 24;
+    const CALLSIGNS_UP_TO_NM = 67;
+    const EMERGENCY_SQUAWKS = new Set(['7500', '7600', '7700']);
+
+    function skyWidthNm(map, resolution) {
+        if (!map || !Number.isFinite(resolution)) return 0;
+        const size = map.getSize ? map.getSize() : null;
+        const center = map.getView ? map.getView().getCenter() : null;
+        if (!size || !center) return 0;
+        const lat = window.ol.proj.toLonLat(center)[1];
+        return resolution * size[0] * Math.cos(lat * Math.PI / 180) / 1852;
+    }
+
+    // The aircraft that matter keep their label further out: heard in the
+    // last ten minutes, in an arrival sequence, chosen or followed, or
+    // squawking an emergency.
+    let sequenceHexes = null;
+    let sequenceHexesAt = 0;
+    function inArrivalSequence(hex, store) {
+        const now = Date.now();
+        if (!sequenceHexes || now - sequenceHexesAt > 1000) {
+            sequenceHexes = new Set();
+            for (const seqs of Object.values(store?.arrivals || {})) {
+                for (const seq of (Array.isArray(seqs) ? seqs : [])) {
+                    for (const item of (seq?.items || [])) if (item?.hex) sequenceHexes.add(item.hex);
+                }
+            }
+            sequenceHexesAt = now;
+        }
+        return sequenceHexes.has(hex);
+    }
+
+    function aircraftMatters(aircraft, properties, store) {
+        if (!aircraft) return false;
+        if (properties.selected) return true;
+        if (EMERGENCY_SQUAWKS.has(String(aircraft?.adsb?.squawk || ''))) return true;
+        const heard = Date.parse(aircraft?.voice?.last_heard || '');
+        if (Number.isFinite(heard) && Date.now() - heard <= VOICE_WINDOW_MS) return true;
+        return inArrivalSequence(aircraft.hex, store);
     }
 
     function createAircraftWebGLRenderer(map, options) {
@@ -609,12 +711,21 @@
             return `${selected}_${hovered}_${deemphasized}_${color}_${labelColor}_${iconSrc}_${iconSize}_${rotationRad.toFixed(3)}_${fade}`;
         }
 
-        function getVectorStyle(feature) {
+        function getVectorStyle(feature, resolution) {
             const properties = feature.getProperties();
             const aircraft = store?.aircraft?.[properties.hex] || null;
             const labelParts = (store?.settings?.showLabels === false)
-                ? { callsignText: '', typeText: '', detailsText: '', ageText: '', voiceText: '' }
+                ? { callsignText: '', typeText: '', detailsText: '', ageText: '' }
                 : getAircraftLabelParts(aircraft, store);
+            // Full label, callsign alone, or the glyph alone (zoom tiers);
+            // hovering shows the full label always.
+            const widthNm = skyWidthNm(map, resolution);
+            const labelMode = (properties.hovered || widthNm <= FULL_LABELS_UP_TO_NM)
+                ? 'full'
+                : aircraftMatters(aircraft, properties, store)
+                    ? (widthNm <= CALLSIGNS_UP_TO_NM ? 'full' : 'callsign')
+                    : (widthNm <= CALLSIGNS_UP_TO_NM ? 'callsign' : 'none');
+            const voiceTag = labelMode === 'full' && labelParts.callsignText ? getVoiceTag(aircraft, store) : null;
 
             // The label's text reads in the page's primary text colour, tertiary
             // once the signal is lost (design system, migration step 2): green is
@@ -656,8 +767,7 @@
             const textOpacity = baseTextOpacity * labelAgeFade * fade;
             const labelLineOne = `${labelParts.phaseText || ''}${labelParts.callsignText || ''}${labelParts.typeText || ''}`;
             const labelLineTwo = `${labelParts.detailsText || ''}`;
-            const labelLineThree = `${labelParts.voiceText || ''}`;
-            const longestLabelLineLength = Math.max(labelLineOne.length, labelLineTwo.length, labelLineThree.length);
+            const longestLabelLineLength = Math.max(labelLineOne.length, labelLineTwo.length);
             const estimatedLabelWidthPx = Math.max(72, Math.round(longestLabelLineLength * 6.4) + 12);
             const labelBorderColor = brightMap
                 ? hexToRgba('#111827', (deemphasized ? 0.7 : 0.85) * labelAgeFade)
@@ -718,42 +828,77 @@
                 styleCache.set(key, symbolStyles);
             }
 
-            const labelMainStyle = new window.ol.style.Style({
-                text: new window.ol.style.Text({
-                    text: labelParts.callsignText
-                        ? `${labelParts.phaseText || ''}${labelParts.callsignText}${labelParts.typeText}\n${labelParts.detailsText}`
-                            + (labelParts.voiceText ? `\n${labelParts.voiceText}` : '')
-                        : '',
-                    font: '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                    // A third line (the last transmission) grows the block by one
-                    // line: the block moves up by half of it, so its bottom stays
-                    // where the two-line label's was, clear of the icon.
-                    offsetY: -(iconSize / 2 + 8 + (labelParts.voiceText ? LABEL_LINE_PX / 2 : 0)),
-                    textAlign: 'left',
-                    fill: new window.ol.style.Fill({ color: hexToRgba(labelColor, textOpacity) }),
-                    backgroundFill: new window.ol.style.Fill({ color: labelBackgroundColor }),
-                    backgroundStroke: new window.ol.style.Stroke({ color: labelBorderColor, width: 1 }),
-                    padding: [2, 6, 2, 6],
-                }),
-            });
+            // The two-line label's centre sits above the glyph, its bottom
+            // a few pixels into the glyph's box, which its translucent ground
+            // lets through. The message tag is opaque: the block with it ends
+            // 2 px above the glyph's box, and the label moves up with it.
+            const labelCentreY = -(iconSize / 2 + 8);
+            const labelBottomY = labelCentreY + LABEL_LINE_PX + LABEL_PAD_Y;
+            const blockBottomY = Math.min(labelBottomY, -(iconSize / 2 + 2));
+            const tagTop = blockBottomY - TAG_HEIGHT_PX;
+            const lift = voiceTag ? labelBottomY - (tagTop - TAG_GAP_PX) : 0;
+            const labelChrome = {
+                textAlign: 'left',
+                backgroundFill: new window.ol.style.Fill({ color: labelBackgroundColor }),
+                backgroundStroke: new window.ol.style.Stroke({ color: labelBorderColor, width: 1 }),
+                padding: [LABEL_PAD_Y, LABEL_PAD_X, LABEL_PAD_Y, LABEL_PAD_X],
+            };
 
-            const phasePrefixStyle = labelParts.phaseText
+            const labelMainStyle = labelMode === 'none' || !labelParts.callsignText
+                ? null
+                : labelMode === 'callsign'
+                    // One line, just above the glyph: no phase, no age.
+                    ? new window.ol.style.Style({
+                        text: new window.ol.style.Text(Object.assign({
+                            text: labelParts.callsignText,
+                            font: '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                            offsetY: -(iconSize / 2 + 2 + (LABEL_LINE_PX / 2 + LABEL_PAD_Y)),
+                            fill: new window.ol.style.Fill({ color: hexToRgba(labelColor, textOpacity) }),
+                        }, labelChrome)),
+                    })
+                    : new window.ol.style.Style({
+                        text: new window.ol.style.Text(Object.assign({
+                            text: `${labelParts.phaseText || ''}${labelParts.callsignText}${labelParts.typeText}\n${labelParts.detailsText}`,
+                            font: '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                            offsetY: labelCentreY - lift,
+                            fill: new window.ol.style.Fill({ color: hexToRgba(labelColor, textOpacity) }),
+                        }, labelChrome)),
+                    });
+
+            const phasePrefixStyle = labelMode === 'full' && labelParts.phaseText && labelParts.callsignText
                 ? new window.ol.style.Style({
                     text: new window.ol.style.Text({
                         text: labelParts.phaseText,
                         font: '700 11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                        // Drawn over the first line, which a third line moves up by one.
-                        offsetY: -(iconSize / 2 + 14 + (labelParts.voiceText ? LABEL_LINE_PX : 0)),
+                        // Drawn over the first line.
+                        offsetY: -(iconSize / 2 + 14) - lift,
                         textAlign: 'left',
                         fill: new window.ol.style.Fill({ color: hexToRgba(labelParts.phaseColor || labelTextColor('tertiary'), textOpacity) }),
                     }),
                 })
                 : null;
 
+            // The message tag, 3 px under the label, left edges aligned; it
+            // fades with the label (the relocation fade of the motion engine).
+            let voiceTagStyle = null;
+            if (voiceTag) {
+                const t = tagCanvas(voiceTag);
+                voiceTagStyle = new window.ol.style.Style({
+                    image: new window.ol.style.Icon({
+                        img: t.canvas,
+                        scale: 1 / t.ratio,
+                        anchor: [LABEL_PAD_X * t.ratio, -tagTop * t.ratio],
+                        anchorXUnits: 'pixels',
+                        anchorYUnits: 'pixels',
+                        opacity: voiceTag.alpha * (deemphasized ? 0.5 : 1) * fade,
+                    }),
+                });
+            }
+
             const ageTextOffsetX = Math.max(36, estimatedLabelWidthPx - 2);
             const ageTextOffsetY = Math.max(3, Math.round(iconSize * 0.18));
 
-            const labelAgeStyle = labelParts.ageText
+            const labelAgeStyle = labelMode === 'full' && labelParts.ageText
                 ? new window.ol.style.Style({
                     text: new window.ol.style.Text({
                         text: labelParts.ageText,
@@ -766,8 +911,10 @@
                 })
                 : null;
 
-            const textStyles = [labelMainStyle];
+            const textStyles = [];
+            if (labelMainStyle) textStyles.push(labelMainStyle);
             if (phasePrefixStyle) textStyles.push(phasePrefixStyle);
+            if (voiceTagStyle) textStyles.push(voiceTagStyle);
 
             return labelAgeStyle
                 ? [...symbolStyles, ...textStyles, labelAgeStyle]
