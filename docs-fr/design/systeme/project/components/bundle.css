@@ -563,3 +563,14 @@
 /* above the map library's own layers, which count from 10000 */
 .cl-skip a { position: fixed; left: var(--space-2); top: -48px; z-index: 100000; padding: var(--space-1-5) var(--space-3); background: var(--color-surface-raised); color: var(--color-text-primary); border: var(--border-width-strong) solid var(--color-border-focus); border-radius: var(--radius-md); font-size: var(--font-size-small); text-decoration: none; }
 .cl-skip a:focus { top: var(--space-2); }
+
+/* ------------------------------------------------------------ Phone: the thread's head and an exchange's head */
+/* The tab bar says "Radio": the head keeps the tools and the channels; "Show" is in each frequency's menu
+   ("Only this frequency in the thread"). An exchange's time goes on its own line, so that the play button
+   ends the second one instead of wrapping alone (step 12, 375 px). */
+@media (max-width: 767px) {
+    .cl-threadhead__title, .cl-threadhead__pace, .cl-threadhead__row--show { display: none; }
+    .cl-exchange__when { flex-basis: 100%; }
+}
+.cl-phone .cl-threadhead__title, .cl-phone .cl-threadhead__pace, .cl-phone .cl-threadhead__row--show { display: none; }
+.cl-phone .cl-exchange__when { flex-basis: 100%; }
