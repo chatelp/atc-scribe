@@ -64,8 +64,16 @@ function altitudeFilter() {
         get loPct() { return (this.lo / this.last) * 100; },
         get hiPct() { return (this.hi / this.last) * 100; },
         get taPct() { return S.position(this.list, this.ta) * 100; },
-        get active() { return this.min > S.FLOOR || this.max < S.NO_CEILING; },
-        get band() { return S.bandLabel(this.min, this.max, this.ta); },
+        get active() { const st = this.$store.atc.settings; return st.minAltitude > S.FLOOR || st.maxAltitude < S.NO_CEILING; },
+        // The band as it filters: a "Show only" level reads as the story's
+        // toggle wrote it; a band set elsewhere is not always on a stop
+        // (FL 430 ± 500 ft, the stops going by 1 000 ft up there), and the
+        // handles sit on the nearest ones while the words say the band itself.
+        get band() {
+            const atc = this.$store.atc;
+            if (atc.onlyLevelOn) return atc._onlyLevel.label;
+            return S.bandLabel(atc.settings.minAltitude, atc.settings.maxAltitude, this.ta);
+        },
         get presets() { return S.presets(this.ta); },
         get peak() { return Math.max(1, ...this.counts); },
 
