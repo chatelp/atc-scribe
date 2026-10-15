@@ -62,13 +62,21 @@ function altitudeFilter() {
                 { at: 0, text: 'SFC' },
                 { at: this.taPct, text: 'TA' },
                 { at: S.position(this.list, 10000) * 100, text: 'FL 100' },
+                // FL 300 went: at 347 px it overlapped FL 200 (Slider, 15/10).
                 { at: S.position(this.list, 20000) * 100, text: 'FL 200' },
-                { at: S.position(this.list, 30000) * 100, text: 'FL 300' },
                 { at: 100, text: '∞' },
             ];
         },
 
         label(ft) { return S.label(ft, this.ta); },
+
+        // The colour band of a bar: the colour the aircraft at its height
+        // wear on the map (altitude-bands.js), the dark palette always, the
+        // column being dark.
+        binBand(i) {
+            const at = Math.min(this.last, Math.floor(((i + 0.5) / BINS) * this.last));
+            return window.AltitudeBands.bandOf(this.list[at], this.$store.atc.stationCruiseAltitudeFt);
+        },
 
         binInBand(i) {
             const centre = ((i + 0.5) / BINS) * this.last;

@@ -121,7 +121,7 @@ input:checked + .slider:before {
 .alt-track, .alt-track-band { position: absolute; top: 10px; height: 4px; border-radius: 2px; }
 .alt-track { left: 7px; right: 7px; background: var(--color-border-default); }
 .alt-track-band { background: var(--color-accent-default); }
-.alt-ta { position: absolute; top: 6px; width: 1px; height: 12px; background: var(--color-status-info); pointer-events: none; }
+.alt-ta { position: absolute; top: 6px; width: 0; height: 12px; pointer-events: none; }
 .alt-range { position: absolute; inset: 0; width: 100%; height: var(--size-target-desk, 24px); margin: 0; background: transparent; -webkit-appearance: none; appearance: none; pointer-events: none; }
 .alt-range:focus { outline: none; }
 .alt-range::-webkit-slider-runnable-track { background: transparent; height: var(--size-target-desk, 24px); }

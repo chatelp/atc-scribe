@@ -161,6 +161,7 @@ document.addEventListener('alpine:init', () => {
             showNavaids: JSON.parse(localStorage.getItem('showNavaids')) ?? true,
             showAllRunways: JSON.parse(localStorage.getItem('showAllRunways')) ?? true,
             showAirportLayout: JSON.parse(localStorage.getItem('showAirportLayout')) ?? true,
+            showAltitudeLegend: JSON.parse(localStorage.getItem('showAltitudeLegend')) ?? true,
             showAirspaceBoundaries: JSON.parse(localStorage.getItem('showAirspaceBoundaries')) ?? false,
             airspaceOpacity: (() => {
                 const value = parseFloat(localStorage.getItem('airspaceOpacity'));
@@ -250,6 +251,7 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('showNavaids', this.settings.showNavaids);
             localStorage.setItem('showAllRunways', this.settings.showAllRunways);
             localStorage.setItem('showAirportLayout', this.settings.showAirportLayout);
+            localStorage.setItem('showAltitudeLegend', this.settings.showAltitudeLegend);
             localStorage.setItem('showAirspaceBoundaries', this.settings.showAirspaceBoundaries);
             localStorage.setItem('airspaceOpacity', this.settings.airspaceOpacity);
             localStorage.setItem('ringsOpacity', this.settings.ringsOpacity);

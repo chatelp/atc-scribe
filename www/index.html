@@ -899,6 +899,33 @@
                              class="cl-root cl-banner absolute left-3 right-3 top-14" style="z-index: 10001;"
                              x-text="$store.atc.connectionBannerText"></div>
 
+                        <!-- AltitudeLegend (owner, 15/10): the aircraft's colours by altitude band,
+                             with how busy each band and its levels are; bottom left, the mirror of
+                             the layers corner, above the PAR frame while it shows. A picture. -->
+                        <div x-data="altitudeLegend()" x-show="$store.atc.mainView === 'map' && $store.atc.settings.showAltitudeLegend" x-cloak
+                             class="cl-root cl-altlegend" :class="bright ? 'is-light' : ''" aria-hidden="true"
+                             :style="'z-index: 10000;' + ($store.atc.storyFrameAirport && $store.atc.parFrameHeight ? ' bottom: ' + ($store.atc.parFrameHeight + 8) + 'px' : '')">
+                            <div class="cl-altlegend__head">
+                                <span class="cl-altlegend__title">Altitude</span>
+                                <span class="cl-altlegend__total" x-text="total + ' airborne'"></span>
+                            </div>
+                            <div class="cl-altlegend__bands">
+                                <template x-for="b in bands" :key="b.name">
+                                    <div class="cl-altlegend__band" :class="'cl-altlegend__band--' + b.name">
+                                        <div class="cl-altlegend__histo">
+                                            <template x-for="(n, i) in b.bars" :key="i">
+                                                <i :class="n ? '' : 'is-empty'" :style="n ? 'height:' + (n / peak * 100) + '%' : ''"></i>
+                                            </template>
+                                        </div>
+                                        <span class="cl-altlegend__count" x-text="b.count"></span>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="cl-altlegend__bounds">
+                                <template x-for="t in bounds" :key="t"><span x-text="t"></span></template>
+                            </div>
+                        </div>
+
                         <!-- MapControls (step 9, a-calques): the base map and the layers, behind the
                              layers button in the corner; saved in this browser as before. Above
                              the PAR frame while it shows; hidden with the PAR view. -->
@@ -938,6 +965,11 @@
                                                 <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="1" max="10" step="1" aria-label="Track length, minutes"
                                                        :value="$store.atc.settings.trailLength" @input="$store.atc.settings.trailLength = Number($event.target.value); $store.atc.applyFilters()">
                                             </div>
+                                        </div>
+                                        <div class="cl-menu__row">
+                                            <button class="cl-switch" role="switch" :class="$store.atc.settings.showAltitudeLegend ? 'is-on' : ''" :aria-checked="!!$store.atc.settings.showAltitudeLegend"
+                                                    aria-label="Altitude legend" @click="$store.atc.flipSetting('showAltitudeLegend', 'saveSettings')"></button>
+                                            <span class="cl-menu__label cursor-help" data-help-title="Altitude legend" data-help="Bottom left of the sky: which colour an aircraft wears from which altitude, and how many fly in each band and at which levels.">Altitude legend</span>
                                         </div>
                                     </div>
                                     <div class="cl-menu__sep"></div>
@@ -1146,15 +1178,15 @@
                             </div>
                             <!-- The traffic of the moment, along the slider. -->
                             <div class="cl-altrange__histo" aria-hidden="true" data-help-title="Traffic by altitude"
-                                 data-help="Each bar is the number of airborne aircraft at that height now, on the same scale as the slider under it; green bars are inside the band.">
+                                 data-help="Each bar is the number of airborne aircraft at that height now, on the same scale as the slider under it, in the colour those aircraft wear on the map; the bars inside the band are the bright ones.">
                                 <template x-for="(n, i) in counts" :key="i">
-                                    <i :class="binInBand(i) ? 'is-in' : ''" :style="'height:' + (n ? Math.max(12, n / peak * 100) : 0) + '%'"></i>
+                                    <i :class="binInBand(i) ? 'is-in' : ''" :data-band="binBand(i)" :style="'height:' + (n ? Math.max(12, n / peak * 100) : 0) + '%'"></i>
                                 </template>
                             </div>
                             <div class="alt-track-wrap">
                                 <div class="alt-track"></div>
                                 <div class="alt-track-band" :style="'left:calc(7px + (100% - 14px) * ' + loPct / 100 + ');right:calc(7px + (100% - 14px) * ' + (100 - hiPct) / 100 + ')'"></div>
-                                <div class="alt-ta" :style="'left:calc(7px + (100% - 14px) * ' + taPct / 100 + ')'"></div>
+                                <div class="alt-ta cl-altrange__ta" :style="'left:calc(7px + (100% - 14px) * ' + taPct / 100 + ')'"></div>
                                 <input type="range" class="alt-range" x-ref="lo" min="0" :max="last" step="1" :value="lo"
                                        aria-label="Altitude floor" :aria-valuetext="label(min)"
                                        @input="moveLo($event.target.value)" @change="save()">
@@ -1693,9 +1725,11 @@
     <!-- Sign-in overlay; does nothing when auth.enabled is false. -->
     <script defer src="login.js"></script>
     <script defer src="altitude/altitude-scale.js"></script>
+    <script defer src="altitude/altitude-bands.js"></script>
     <script defer src="timeline/flight-timeline.js"></script>
     <script defer src="story/then.js"></script>
     <script defer src="altitude/altitude-filter.js"></script>
+    <script defer src="altitude/altitude-legend.js"></script>
     <script defer src="events.js"></script>
     <script defer src="help-tips.js"></script>
     <script defer src="favicon-state.js"></script>

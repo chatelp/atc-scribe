@@ -492,6 +492,17 @@ sur la carte.
 
 ## État
 
+- 15/10 : **échelle des altitudes aux couleurs des avions** (demande du propriétaire, forme A
+  choisie sur une planche de la session design, 7e63e14 ; fiche AltitudeLegend, Slider mise à
+  jour). En bas à gauche du ciel, une légende des cinq bandes de couleur, chacune avec
+  l'histogramme de ses niveaux (hauteurs rapportées à la barre la plus haute de toute la légende),
+  son nombre d'avions et les seuils dessous (1 000 ft, 3 000 ft, FL 125, niveau de croisière de la
+  station) ; version claire sur IGN et OSM ; au-dessus du cadre PAR pendant un suivi (vérifié :
+  8 px) ; interrupteur « Altitude legend » dans le menu des calques. La réglette de Traffic prend
+  les mêmes couleurs, barre par barre ; son repère TA devient un pointillé tertiaire, « FL 300 »,
+  qui chevauchait « FL 200 », est retiré. Les bandes viennent d'un seul module
+  (`www/altitude/altitude-bands.js`, testé), que lisent aussi le moteur des avions, la légende et
+  la réglette : elles ne peuvent plus diverger.
 - 15/10 : **connexion au serveur perdue : un son neutre, une trace, le fil comblé** (le
   propriétaire entendait « retard retard » par moment). C'était le son d'Airbus de l'amont, joué à
   chaque coupure de la WebSocket, même d'une seconde, et qu'aucun réglage ne coupait ; une partie

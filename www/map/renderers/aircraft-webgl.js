@@ -327,6 +327,8 @@
     function getAltitudeColorBand(aircraft, store) {
         const altitude = Number(aircraft?.adsb?.alt_baro);
         if (!Number.isFinite(altitude)) return 'cruise';
+        // The bands the altitude legend and the Traffic slider draw (altitude-bands.js).
+        if (window.AltitudeBands) return window.AltitudeBands.bandOf(altitude, store?.stationCruiseAltitudeFt);
 
         const configuredCruise = Number(store?.stationCruiseAltitudeFt);
         const cruiseAltitudeFt = Number.isFinite(configuredCruise) && configuredCruise > 0
