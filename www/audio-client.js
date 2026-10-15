@@ -340,32 +340,15 @@ class AudioClient {
             
             const audioLevel = totalPoints > 0 ? (totalSum / totalPoints) / 255 : 0;
 
-            const isUnmuted = this.store.unmutedFrequencies.has(frequencyId);
-
             if (audioLevel >= this.significantAudioThreshold) {
                 this.lastSignificantAudioTime[frequencyId] = Date.now();
             } else if (!this.lastSignificantAudioTime[frequencyId]) {
                 this.lastSignificantAudioTime[frequencyId] = Date.now();
             }
 
-            const widthPercentage = Math.min(100, audioLevel * this.visualizerMultiplier);
-            
-            const barElement = document.getElementById(`vis-bar-${frequencyId}`);
-            if (barElement) {
-                const currentWidth = parseFloat(barElement.style.width) || 0;
-                const smoothingFactor = 0.3;
-                const newWidth = (currentWidth * smoothingFactor) + (widthPercentage * (1 - smoothingFactor));
-                
-                barElement.style.width = newWidth + '%';
-                barElement.style.backgroundColor = isUnmuted ? '#4CAF50' : '#888888';
-                
-                barElement.style.opacity = '1';
-            }
-
             // The thread's level meter (LevelMeter, migration step 6): five bars,
             // 2 to 14 px, from the same level; drawn here, at the meter's own pace,
-            // so the store is not touched thirty times a second. The bar of the
-            // radio strip above goes at step 7; this one stays.
+            // so the store is not touched thirty times a second.
             const meter = document.querySelector(`[data-level-for="${frequencyId}"]`);
             if (meter) {
                 const level = Math.min(1, audioLevel * this.visualizerMultiplier / 100);

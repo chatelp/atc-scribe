@@ -492,6 +492,21 @@ sur la carte.
 
 ## État
 
+- 15/10 : **étape 13 (nettoyage) livrée sur `migration`**. Mesuré par `tools/design/inventory.mjs`,
+  avant la migration → avant le nettoyage → après : utilisations de classes Tailwind 3 879 → 834
+  → 433 ; couleurs distinctes 215 → 122 → 82 ; valeurs en dur 284 → 241 → 177 ; `style.css`
+  311 → 161 lignes, **plus aucune couleur en dur** (toutes en jetons, transparences par
+  `color-mix`). Retirés : les règles mortes (famille `flight-strip`, filtres, visualiseur, barre
+  de défilement personnalisée, bande de tuiles, surlignage de transcription), le code des fenêtres
+  de transcription de l'ancienne barre radio (`toggleTranscriptionViewer`, `layoutTranscriptionViewers`,
+  `openTranscriptionAt`, la recherche par fréquence, les compteurs non lus) et la barre de niveau
+  des tuiles. Restylés sur le système, au contenu inchangé : l'onglet Track (mini-carte, positions
+  en `cl-table`, tendances en flèches), Nearby (curseur et tableau), la liste radio de Details (en
+  échanges du fil), les deux menus de la liste. Les 177 valeurs en dur restantes sont la palette
+  propre de la carte (aéroports, balises, héliports, espaces aériens, traces), celle de la PAR et
+  les dessins de la connexion : soumises à la session design (jetons de carte). Sonde de
+  contraste sur les quatorze écrans : 0 caractère sous le seuil sur onze, quelques caractères
+  sur trois (« 3° » de la PAR, « 10 NM » de la portée décorative de la connexion), signalés.
 - 15/10 : **étape 11 versée dans `local`** après trois recomptes design et le coup d'œil du
   propriétaire. Tab rendu au navigateur ; J/K (et ↓/↑ sur la carte, qui ne se déplace plus aux
   flèches) d'un avion à l'autre ; A, G et 0-9 sans Cmd/Ctrl/Alt ; rôles et tabulation pour ce qui

@@ -416,26 +416,15 @@ document.addEventListener('alpine:init', () => {
                     this.updateMapPerformanceStats();
                 }, 2000);
 
-                // Watch for hover changes and update map visual state
+                // A hovered aircraft (in the list or on the map) is drawn as such
+                // on the map, and the one hovered before is drawn back.
                 let previousHoveredHex = null;
                 Alpine.effect(() => {
                     const currentHoveredAircraft = Alpine.store('atc').hoveredAircraft;
-                    const previousStrip = previousHoveredHex
-                        ? document.querySelector(`tr[data-aircraft-hex="${previousHoveredHex}"] .flight-strip`)
-                        : null;
-                    if (previousStrip) {
-                        previousStrip.classList.remove('flight-card-map-hover');
-                    }
-
                     if (previousHoveredHex && (!currentHoveredAircraft || previousHoveredHex !== currentHoveredAircraft.hex)) {
                         if (this.mapManager) this.mapManager.updateVisualState(previousHoveredHex, true);
                     }
-
                     if (currentHoveredAircraft) {
-                        const currentStrip = document.querySelector(`tr[data-aircraft-hex="${currentHoveredAircraft.hex}"] .flight-strip`);
-                        if (currentStrip) {
-                            currentStrip.classList.add('flight-card-map-hover');
-                        }
                         if (this.mapManager) this.mapManager.updateVisualState(currentHoveredAircraft.hex, true);
                         previousHoveredHex = currentHoveredAircraft.hex;
                     } else {
@@ -1042,11 +1031,6 @@ document.addEventListener('alpine:init', () => {
             if (code) frame.show(code); else frame.hide();
         });
     }
-
-    // The open transcripts follow their tiles when the window changes or the
-    // strip of tiles scrolls.
-    window.addEventListener('resize', () => Alpine.store('atc').layoutTranscriptionViewers());
-    document.querySelector('.radio-strip')?.addEventListener('scroll', () => Alpine.store('atc').layoutTranscriptionViewers(), { passive: true });
 
     // On a phone, selecting an aircraft on the map opens its panel, which lives
     // in the list pane (audit 4.2).

@@ -275,6 +275,18 @@
             return { start, earlier: uniq.length, marks: uniq };
         },
 
+        // "↑", "↓" or "↔" from a vertical rate in ft/min (Nearby, step 13).
+        rateArrow(rate) {
+            return typeof rate !== 'number' ? '' : rate > 100 ? '↑' : rate < -100 ? '↓' : '↔';
+        },
+
+        // "↑", "↓" or "↔": a past or predicted position's trend, as text (the
+        // Track tab, step 13), from the same reading as before.
+        trackTrend(position, index, isFuture) {
+            const icon = this.aircraftDetailsGetAltitudeTrend(position, index, isFuture);
+            return icon === 'fas fa-arrow-up' ? '↑' : icon === 'fas fa-arrow-down' ? '↓' : '↔';
+        },
+
         // "13:12Z" or "13:12": a timeline's time without its seconds.
         storyClock(at) {
             return this.timelineTime(at).replace(/(\d{1,2}:\d{2}):\d{2}/, '$1');
