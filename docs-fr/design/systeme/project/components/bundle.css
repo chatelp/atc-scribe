@@ -581,3 +581,14 @@
     .cl-story__events button { min-height: var(--size-target-touch); }
     .cl-table button { min-height: var(--size-target-touch); min-width: var(--size-target-touch); }
 }
+
+/* ------------------------------------------------------------ Phone: the thread's head and an exchange's head */
+/* The tab bar says "Radio": the head keeps the tools and the channels; "Show" is in each frequency's menu
+   ("Only this frequency in the thread"). An exchange's time goes on its own line, so that the play button
+   ends the second one instead of wrapping alone (step 12, 375 px). */
+@media (max-width: 767px) {
+    .cl-threadhead__title, .cl-threadhead__pace, .cl-threadhead__row--show { display: none; }
+    .cl-exchange__when { flex-basis: 100%; }
+}
+.cl-phone .cl-threadhead__title, .cl-phone .cl-threadhead__pace, .cl-phone .cl-threadhead__row--show { display: none; }
+.cl-phone .cl-exchange__when { flex-basis: 100%; }
