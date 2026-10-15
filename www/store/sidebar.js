@@ -132,6 +132,11 @@
                     }
                 }
 
+                // The followed aircraft stays in the list whatever the filters, as
+                // on the map, even once its level or phase has moved on (design,
+                // 15/10): it does not vanish under the eyes of who chose it.
+                if (this.selectedAircraft && aircraft.hex === this.selectedAircraft.hex) return true;
+
                 // Filter by search term - includes callsign, type, category, manufacturer
                 if (searchLower) {
                     const callsign = (aircraft.flight || aircraft.hex).toLowerCase();
@@ -541,14 +546,17 @@
             for (const a of Object.values(this.aircraft || {})) if (a && !this.isSignalLostForSidebar(a)) total++;
             let text = `Showing ${shown} of ${Math.max(total, shown)}`;
             const A = window.AltitudeScale;
-            if (band && A && typeof A.bandLabel === 'function') text += ` · ${A.bandLabel(Number(s.minAltitude) || 0, Number(s.maxAltitude) || 60000)}`;
+            // The filters of a "Show only" row read as the row wrote them.
+            if (band && this.onlyLevelOn) text += ` · ${this._onlyLevel.label}`;
+            else if (band && A && typeof A.bandLabel === 'function') text += ` · ${A.bandLabel(Number(s.minAltitude) || 0, Number(s.maxAltitude) || 60000)}`;
             // Every filter at work is named: "Heard" kept on from an earlier
             // visit read as no filter at all (owner, 14/10: "Showing 8 of 70").
             if (s.voiceOnly) text += ' · heard on the radio only';
             if (s.showAirAircraft === false) text += ' · airborne hidden';
             if (s.showGroundAircraft === false) text += ' · ground hidden';
             const off = Object.values(f).filter((v) => v === false).length;
-            if (off) text += ` · ${off} ${off > 1 ? 'phases' : 'phase'} hidden`;
+            if (off && this.onlyPhaseOn) text += ` · ${this._onlyPhase.code} only`;
+            else if (off) text += ` · ${off} ${off > 1 ? 'phases' : 'phase'} hidden`;
             const term = (this.searchTerm || '').trim();
             if (term) text += ` · “${term}”`;
             return text;

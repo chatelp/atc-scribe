@@ -115,7 +115,15 @@ func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		if state == "" {
 			state = "unknown"
 		}
-		out["transcription"] = map[string]any{"status": state, "degraded": health.Degraded, "reachable": reached}
+		// What answers: "mlx" or a GPU's name from the real sidecar, "fake"
+		// from a test instance's stand-in, which the page must not show as a
+		// working transcription.
+		backend := strings.TrimSpace(health.Backend)
+		if len(backend) > 48 {
+			backend = ""
+		}
+		out["transcription"] = map[string]any{"status": state, "degraded": health.Degraded, "reachable": reached,
+			"backend": backend, "model": ModelFamily(health.ModelEN)}
 	} else {
 		out["transcription"] = nil
 	}

@@ -12,12 +12,8 @@
     window.AtcStore = window.AtcStore || [];
     window.AtcStore.push(() => ({
         transcriptions: [], // Array of transcription messages
-        transcriptionSearchTerm: '', // For searching transcriptions
         originalTranscriptions: {}, // Store original transcriptions before filtering
         frequencyTranscriptions: {}, // Stores transcriptions per frequency_id
-        transcriptionViewerVisible: {}, // Stores visibility state for each frequency's viewer
-        unreadTranscriptions: {}, // Unread count per frequency (only live WS messages while viewer is closed)
-        _readDividerId: {}, // ID of the first already-read message when viewer opens with unread
         
         // Handle transcription message
         handleTranscriptionMessage(data) {
@@ -48,98 +44,14 @@
                 this.originalTranscriptions[freqId].pop();
             }
             
-            // If there's an active search, check if the new transcription matches
-            if (this.transcriptionSearchTerm) {
-                const searchTerm = this.transcriptionSearchTerm.toLowerCase();
-                const shouldInclude =
-                    (data.text && data.text.toLowerCase().includes(searchTerm)) ||
-                    (data.content_processed && data.content_processed.toLowerCase().includes(searchTerm)) ||
-                    (data.callsign && data.callsign.toLowerCase().includes(searchTerm)) ||
-                    (data.speaker_type && data.speaker_type.toLowerCase().includes(searchTerm));
-                
-                // Only add to the visible list if it matches the search
-                if (shouldInclude) {
-                    this.frequencyTranscriptions[freqId].unshift(data);
-                }
-            } else {
-                // No search active, add normally
-                this.frequencyTranscriptions[freqId].unshift(data);
-            }
+            this.frequencyTranscriptions[freqId].unshift(data);
 
             // Limit stored visible transcriptions per frequency
             if (this.frequencyTranscriptions[freqId].length > 99) {
                 this.frequencyTranscriptions[freqId].pop();
             }
-
-            // Increment unread count only when viewer is closed
-            if (!this.transcriptionViewerVisible[freqId]) {
-                this.unreadTranscriptions[freqId] = (this.unreadTranscriptions[freqId] || 0) + 1;
-            }
         },
         
-        // Filter transcriptions based on search term
-        filterTranscriptions(frequencyId) {
-            if (!this.frequencyTranscriptions[frequencyId]) {
-                return;
-            }
-            
-            // If search term is empty, restore from original transcriptions
-            if (!this.transcriptionSearchTerm || this.transcriptionSearchTerm.trim() === '') {
-                if (this.originalTranscriptions[frequencyId]) {
-                    // Copy the original transcriptions to the visible array
-                    this.frequencyTranscriptions[frequencyId] = [...this.originalTranscriptions[frequencyId]];
-                } else {
-                    // Fallback to API if original transcriptions aren't available
-                    this.fetchTranscriptionsForFrequency(frequencyId);
-                }
-                return;
-            }
-            
-            const searchTerm = this.transcriptionSearchTerm.toLowerCase();
-            
-            // Use original transcriptions as the source for filtering
-            if (this.originalTranscriptions[frequencyId]) {
-                const originalData = [...this.originalTranscriptions[frequencyId]];
-                
-                // Create a filtered copy of the transcriptions
-                const filtered = originalData.filter(transcription => {
-                    // Search in the text content
-                    if (transcription.text && transcription.text.toLowerCase().includes(searchTerm)) {
-                        return true;
-                    }
-                    
-                    // Search in the processed content if available
-                    if (transcription.content_processed &&
-                        transcription.content_processed.toLowerCase().includes(searchTerm)) {
-                        return true;
-                    }
-                    
-                    // Search in the callsign if available
-                    if (transcription.callsign &&
-                        transcription.callsign.toLowerCase().includes(searchTerm)) {
-                        return true;
-                    }
-                    
-                    // Search in the speaker type if available
-                    if (transcription.speaker_type &&
-                        transcription.speaker_type.toLowerCase().includes(searchTerm)) {
-                        return true;
-                    }
-                    
-                    return false;
-                });
-                
-                // Replace the array with the filtered version
-                this.frequencyTranscriptions[frequencyId] = filtered;
-            } else {
-                // Fallback to API if original transcriptions aren't available
-                this.fetchTranscriptionsForFrequency(frequencyId).then(data => {
-                    // Store as original and then filter
-                    this.originalTranscriptions[frequencyId] = [...data];
-                    this.filterTranscriptions(frequencyId); // Call again now that we have original data
-                });
-            }
-        },
         
         // Handle transcription update messages (processed transcriptions)
         // A second (French) reading that came after the first (14/10): only
@@ -307,7 +219,7 @@
             if (!text) return '';
             const esc = str => str.replace(/[&<>"']/g, c =>
                 ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-            const term = ((searchTerm !== undefined ? searchTerm : this.transcriptionSearchTerm) || '').trim();
+            const term = (searchTerm || '').trim();
             const re = term ? new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi') : null;
             const plain = str => re
                 ? str.split(re).map((piece, i) => i % 2
@@ -480,100 +392,38 @@
             }
         },
         
-        getTranscriptionCount(frequencyId) {
-            return this.unreadTranscriptions[frequencyId] || 0;
-        },
 
-        toggleTranscriptionViewer(frequencyId) {
-            // Ensure the viewer state for this frequency is initialized
-            if (this.transcriptionViewerVisible[frequencyId] === undefined) {
-                this.transcriptionViewerVisible[frequencyId] = false;
-            }
-            
-            // Toggle the state
-            const newState = !this.transcriptionViewerVisible[frequencyId];
-            this.transcriptionViewerVisible[frequencyId] = newState;
 
-            // When opening: set read divider if there are unread messages, then clear count
-            if (newState) {
-                const unreadCount = this.unreadTranscriptions[frequencyId] || 0;
-                const txns = this.frequencyTranscriptions[frequencyId];
-                if (unreadCount > 0 && txns && txns.length > unreadCount) {
-                    this._readDividerId[frequencyId] = txns[unreadCount]?.id;
-                } else {
-                    delete this._readDividerId[frequencyId];
+
+
+        // After a lost connection, the exchanges the server kept meanwhile go
+        // back into the thread, which reads originalTranscriptions (design,
+        // 15/10): how many, or null when the server could not be asked. From
+        // a minute before the loss: what was on its way when it broke.
+        async fillBackTranscriptions(since) {
+            const from = since.getTime() - 60000;
+            let added = 0;
+            try {
+                for (const freq of (this.audioFrequencies || [])) {
+                    const res = await fetch(`${API_BASE_URL}/transcriptions/frequency/${encodeURIComponent(freq.id)}?limit=200`);
+                    if (!res.ok) return null;
+                    const data = await res.json();
+                    const have = new Set((this.originalTranscriptions[freq.id] || []).map((t) => t.id));
+                    const missing = (data.transcriptions || [])
+                        .filter((t) => !have.has(t.id) && Date.parse(t.created_at) >= from)
+                        .map((t) => ({ ...t, timestamp: t.created_at, text: t.content, _historical: true }));
+                    if (!missing.length) continue;
+                    added += missing.length;
+                    for (const key of ['originalTranscriptions', 'frequencyTranscriptions']) {
+                        this[key][freq.id] = (this[key][freq.id] || []).concat(missing)
+                            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                            .slice(0, 99);
+                    }
                 }
-                this.unreadTranscriptions[frequencyId] = 0;
+            } catch (e) {
+                return null;
             }
-
-            // When closing: clear the read divider
-            if (!newState) {
-                delete this._readDividerId[frequencyId];
-            }
-
-            // If closing the viewer, reset the search term
-            if (!newState && this.transcriptionSearchTerm) {
-                this.transcriptionSearchTerm = '';
-                // Reload the original transcriptions if needed
-                this.fetchTranscriptionsForFrequency(frequencyId);
-            }
-            
-            // Every open transcript is laid out again: side by side, since the
-            // tiles under them are narrower than a readable transcript.
-            this.layoutTranscriptionViewers();
-        },
-
-        // Opens a frequency's transcript at one transmission: from a speech
-        // bubble on the map. The row is found by its id once the transcript is
-        // shown; a transmission older than the hundred the transcript holds
-        // only opens the transcript.
-        openTranscriptionAt(frequencyId, id) {
-            const fid = String(frequencyId || '');
-            if (!fid || !this.audioFrequencies.some((f) => String(f.id) === fid)) return;
-            if (!this.transcriptionViewerVisible[fid]) this.toggleTranscriptionViewer(fid);
-            const find = (left) => {
-                const row = document.getElementById('tx-' + id);
-                if (row) {
-                    row.scrollIntoView({ block: 'center' });
-                    row.classList.add('tx-flash');
-                    setTimeout(() => row.classList.remove('tx-flash'), 1800);
-                } else if (left > 0) {
-                    setTimeout(() => find(left - 1), 150);
-                }
-            };
-            setTimeout(() => find(10), 60);
-        },
-
-        // The open transcripts, left to right in the order of their tiles, each
-        // 320 px wide and never over its neighbour: a transcript starts at its
-        // tile, or right after the previous transcript when that is further.
-        // The last ones are pushed back onto the screen if they would leave it
-        // (audit 4.1: tiles are 160 px, transcripts 320).
-        layoutTranscriptionViewers() {
-            const width = 320;
-            const gap = 8;
-            let nextLeft = 4;
-            const placed = [];
-            for (const freq of this.audioFrequencies) {
-                if (!this.transcriptionViewerVisible[freq.id]) continue;
-                const tile = document.querySelector(`[data-freq-id="${freq.id}"]`);
-                const viewer = document.querySelector(`[data-viewer-id="${freq.id}"]`);
-                if (!tile || !viewer) continue;
-                const rect = tile.getBoundingClientRect();
-                const left = Math.max(nextLeft, rect.left);
-                placed.push({ viewer, left, top: rect.top });
-                nextLeft = left + width + gap;
-            }
-            // Past the right edge: shift the row back, keeping the order.
-            const overflow = nextLeft - gap + 4 - window.innerWidth;
-            const shift = overflow > 0 ? overflow : 0;
-            for (const p of placed) {
-                p.viewer.style.left = `${Math.max(4, p.left - shift)}px`;
-                p.viewer.style.width = `${width}px`;
-                p.viewer.style.bottom = `${window.innerHeight - p.top + 8}px`;
-                p.viewer.style.transition = 'none';
-                p.viewer.style.transform = 'none';
-            }
+            return added;
         },
 
         // Fetch transcriptions for a specific frequency

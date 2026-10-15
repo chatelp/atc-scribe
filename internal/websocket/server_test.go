@@ -113,3 +113,21 @@ func TestQueuedMessagesReachAClient(t *testing.T) {
 		t.Fatalf("got %s (%v)", data, err)
 	}
 }
+
+func TestAClientDroppedForAFullQueueSaysWhy(t *testing.T) {
+	c := &Client{send: make(chan *Message, 1)}
+	m := &Message{Type: "aircraft_update"}
+	if !c.SendMessage(m) {
+		t.Fatal("the first message did not fit in the queue")
+	}
+	if c.SendMessage(m) {
+		t.Fatal("a full queue took one more message")
+	}
+	if !strings.Contains(c.reason, "queue was full") {
+		t.Fatalf("reason %q, want the full queue", c.reason)
+	}
+	c.leave("a write failed")
+	if !strings.Contains(c.reason, "queue was full") {
+		t.Fatalf("a later reason replaced the first: %q", c.reason)
+	}
+}

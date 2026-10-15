@@ -161,6 +161,7 @@ document.addEventListener('alpine:init', () => {
             showNavaids: JSON.parse(localStorage.getItem('showNavaids')) ?? true,
             showAllRunways: JSON.parse(localStorage.getItem('showAllRunways')) ?? true,
             showAirportLayout: JSON.parse(localStorage.getItem('showAirportLayout')) ?? true,
+            showAltitudeLegend: JSON.parse(localStorage.getItem('showAltitudeLegend')) ?? true,
             showAirspaceBoundaries: JSON.parse(localStorage.getItem('showAirspaceBoundaries')) ?? false,
             airspaceOpacity: (() => {
                 const value = parseFloat(localStorage.getItem('airspaceOpacity'));
@@ -250,6 +251,7 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('showNavaids', this.settings.showNavaids);
             localStorage.setItem('showAllRunways', this.settings.showAllRunways);
             localStorage.setItem('showAirportLayout', this.settings.showAirportLayout);
+            localStorage.setItem('showAltitudeLegend', this.settings.showAltitudeLegend);
             localStorage.setItem('showAirspaceBoundaries', this.settings.showAirspaceBoundaries);
             localStorage.setItem('airspaceOpacity', this.settings.airspaceOpacity);
             localStorage.setItem('ringsOpacity', this.settings.ringsOpacity);
@@ -416,26 +418,15 @@ document.addEventListener('alpine:init', () => {
                     this.updateMapPerformanceStats();
                 }, 2000);
 
-                // Watch for hover changes and update map visual state
+                // A hovered aircraft (in the list or on the map) is drawn as such
+                // on the map, and the one hovered before is drawn back.
                 let previousHoveredHex = null;
                 Alpine.effect(() => {
                     const currentHoveredAircraft = Alpine.store('atc').hoveredAircraft;
-                    const previousStrip = previousHoveredHex
-                        ? document.querySelector(`tr[data-aircraft-hex="${previousHoveredHex}"] .flight-strip`)
-                        : null;
-                    if (previousStrip) {
-                        previousStrip.classList.remove('flight-card-map-hover');
-                    }
-
                     if (previousHoveredHex && (!currentHoveredAircraft || previousHoveredHex !== currentHoveredAircraft.hex)) {
                         if (this.mapManager) this.mapManager.updateVisualState(previousHoveredHex, true);
                     }
-
                     if (currentHoveredAircraft) {
-                        const currentStrip = document.querySelector(`tr[data-aircraft-hex="${currentHoveredAircraft.hex}"] .flight-strip`);
-                        if (currentStrip) {
-                            currentStrip.classList.add('flight-card-map-hover');
-                        }
                         if (this.mapManager) this.mapManager.updateVisualState(currentHoveredAircraft.hex, true);
                         previousHoveredHex = currentHoveredAircraft.hex;
                     } else {
@@ -1043,16 +1034,14 @@ document.addEventListener('alpine:init', () => {
         });
     }
 
-    // The open transcripts follow their tiles when the window changes or the
-    // strip of tiles scrolls.
-    window.addEventListener('resize', () => Alpine.store('atc').layoutTranscriptionViewers());
-    document.querySelector('.radio-strip')?.addEventListener('scroll', () => Alpine.store('atc').layoutTranscriptionViewers(), { passive: true });
-
     // On a phone, selecting an aircraft on the map opens its panel, which lives
     // in the list pane (audit 4.2).
     Alpine.effect(() => {
         const store = Alpine.store('atc');
-        if (store.selectedAircraft && window.matchMedia('(max-width: 767px)').matches) store.mobilePane = 'list';
+        // On the phone a flight's story is in the column (PhoneShell): chosen
+        // from the thread or the sky, it opens in Traffic; from Traffic or
+        // Right now, it stays there and its back button returns there.
+        if (store.selectedAircraft && window.matchMedia('(max-width: 767px)').matches && !store.phoneColumn) store.showPane('traffic');
     });
 
     // Watch for aircraft selection changes to clear pending requests and trails

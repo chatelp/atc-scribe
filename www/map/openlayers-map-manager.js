@@ -21,12 +21,11 @@
     //
     // Runways, taxiways, aprons and terminals around the station, from
     // OpenStreetMap, written per station by tools/airport-layout/fetch.py. Drawn
-    // to read on a dark base map as well as a light one; colours to tune by eye.
+    // to read on a dark base map as well as a light one. Runways and taxiways
+    // take the map's tokens (map-palette.js); aprons and terminals stay faint
+    // neutral fills.
     const AIRPORT_LAYOUT_URL = '/data/airport-layout.geojson';
     const AIRPORT_LAYOUT_COLORS = {
-        runway: '#e4e4e4',
-        runwayLabel: '#ffffff',
-        taxiway: '#efe3a0',
         apron: 'rgba(190, 190, 190, 0.16)',
         terminal: 'rgba(170, 182, 214, 0.30)',
     };
@@ -68,35 +67,37 @@
         if (kind !== 'runway' && zoom < 9) return null;
         const type = feature.getGeometry().getType();
         const isArea = type === 'Polygon' || type === 'MultiPolygon';
+        const P = window.MapPalette;
+        const base = P.isBright() ? 'light' : 'dark';
 
         if (kind === 'runway') {
             const label = zoom >= 13 ? (feature.get('ref') || '') : '';
             const text = label ? new ol.style.Text({
                 text: label,
                 font: 'bold 11px sans-serif',
-                fill: new ol.style.Fill({ color: AIRPORT_LAYOUT_COLORS.runwayLabel }),
+                fill: new ol.style.Fill({ color: P.color('text-primary') }),
                 stroke: new ol.style.Stroke({ color: '#000000', width: 3 }),
                 overflow: true,
             }) : undefined;
             if (isArea) {
-                return cachedStyle(`runway-area|${label}`, () => new ol.style.Style({
-                    fill: new ol.style.Fill({ color: AIRPORT_LAYOUT_COLORS.runway }),
+                return cachedStyle(`runway-area|${base}|${label}`, () => new ol.style.Style({
+                    fill: new ol.style.Fill({ color: P.color('runway') }),
                     text,
                 }));
             }
             const widthMetres = parseFloat(feature.get('width')) || 45;
             const widthPx = Math.max(2, widthMetres / groundMetresPerPixel(feature, resolution));
-            return cachedStyle(`runway|${widthPx.toFixed(1)}|${label}`, () => new ol.style.Style({
-                stroke: new ol.style.Stroke({ color: AIRPORT_LAYOUT_COLORS.runway, width: widthPx, lineCap: 'butt' }),
+            return cachedStyle(`runway|${base}|${widthPx.toFixed(1)}|${label}`, () => new ol.style.Style({
+                stroke: new ol.style.Stroke({ color: P.color('runway'), width: widthPx, lineCap: 'butt' }),
                 text,
             }));
         }
 
         if (kind === 'taxiway') {
             if (zoom < 12) return null;
-            return cachedStyle(`taxiway|${isArea}`, () => new ol.style.Style(isArea
-                ? { fill: new ol.style.Fill({ color: 'rgba(239, 227, 160, 0.25)' }) }
-                : { stroke: new ol.style.Stroke({ color: AIRPORT_LAYOUT_COLORS.taxiway, width: 1 }) }));
+            return cachedStyle(`taxiway|${base}|${isArea}`, () => new ol.style.Style(isArea
+                ? { fill: new ol.style.Fill({ color: P.withAlpha(P.color('taxiway'), 0.25) }) }
+                : { stroke: new ol.style.Stroke({ color: P.color('taxiway'), width: 1 }) }));
         }
 
         const color = kind === 'terminal' ? AIRPORT_LAYOUT_COLORS.terminal : AIRPORT_LAYOUT_COLORS.apron;
@@ -489,16 +490,7 @@
         _navaidSvgMarkup(type, size = 18) {
             const s = size;
             const h = s / 2;
-            const colors = {
-                VOR: '#60A5FA',
-                'VOR-DME': '#60A5FA',
-                VORTAC: '#818CF8',
-                NDB: '#F59E0B',
-                'NDB-DME': '#F59E0B',
-                DME: '#A78BFA',
-                TACAN: '#818CF8',
-            };
-            const color = colors[type] || '#9CA3AF';
+            const color = this._navaidColor(type);
 
             const hex = (radius) => {
                 const points = [];
@@ -608,7 +600,7 @@
             return true;
         }
 
-        _getReferenceLabelStyle(text, color = '#9CA3AF') {
+        _getReferenceLabelStyle(text, color = window.MapPalette.color('text-tertiary')) {
             return new window.ol.style.Text({
                 text: text || '',
                 font: '10px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
@@ -652,7 +644,7 @@
                     ]),
                 });
                 line.setStyle(new window.ol.style.Style({
-                    stroke: new window.ol.style.Stroke({ color: '#FFFFFF', width: lineWeight }),
+                    stroke: new window.ol.style.Stroke({ color: window.MapPalette.color('runway'), width: lineWeight }),
                 }));
                 state.source.addFeature(line);
 
@@ -663,7 +655,7 @@
                         const label = new window.ol.Feature({
                             geometry: new window.ol.geom.Point(this._toMapCoordinate(end.latitude, end.longitude)),
                         });
-                        label.setStyle(new window.ol.style.Style({ text: this._getReferenceLabelStyle(endName, '#FFFFFF') }));
+                        label.setStyle(new window.ol.style.Style({ text: this._getReferenceLabelStyle(endName, window.MapPalette.color('text-primary')) }));
                         state.source.addFeature(label);
                     });
                 }
@@ -681,7 +673,7 @@
                             ),
                         });
                         lineExt.setStyle(new window.ol.style.Style({
-                            stroke: new window.ol.style.Stroke({ color: '#76C76C', width: 1.5, lineDash: [8, 12] }),
+                            stroke: new window.ol.style.Stroke({ color: window.MapPalette.color('centerline'), width: 1.5, lineDash: [8, 12] }),
                         }));
                         state.source.addFeature(lineExt);
                     });
@@ -699,10 +691,10 @@
             if (zoom < 8) return;
             const showLabels = zoom >= 12;
             const typeCfg = {
-                large_airport: { color: '#60A5FA', radius: 6, minZoom: 8 },
-                medium_airport: { color: '#34D399', radius: 5, minZoom: 9 },
-                small_airport: { color: '#A78BFA', radius: 4, minZoom: 10 },
-                seaplane_base: { color: '#2DD4BF', radius: 3, minZoom: 11 },
+                large_airport: { color: window.MapPalette.color('airport'), radius: 6, minZoom: 8 },
+                medium_airport: { color: window.MapPalette.color('airport'), radius: 5, minZoom: 9 },
+                small_airport: { color: window.MapPalette.color('airport-small'), radius: 4, minZoom: 10 },
+                seaplane_base: { color: window.MapPalette.color('airport-small'), radius: 3, minZoom: 11 },
             };
 
             this.airportsData.forEach((airport) => {
@@ -746,26 +738,24 @@
                 feature.setStyle(new window.ol.style.Style({
                     image: new window.ol.style.Circle({
                         radius: 4,
-                        fill: new window.ol.style.Fill({ color: '#FB923C' }),
-                        stroke: new window.ol.style.Stroke({ color: '#FB923C', width: 1.5 }),
+                        fill: new window.ol.style.Fill({ color: window.MapPalette.color('heliport') }),
+                        stroke: new window.ol.style.Stroke({ color: window.MapPalette.color('heliport'), width: 1.5 }),
                     }),
-                    text: showLabels ? this._getReferenceLabelStyle(heliport.ident || '', '#FB923C') : undefined,
+                    text: showLabels ? this._getReferenceLabelStyle(heliport.ident || '', window.MapPalette.color('heliport')) : undefined,
                 }));
                 state.source.addFeature(feature);
             });
         }
 
         _navaidColor(type) {
-            const map = {
-                VOR: '#60A5FA',
-                'VOR-DME': '#60A5FA',
-                VORTAC: '#818CF8',
-                NDB: '#F59E0B',
-                'NDB-DME': '#F59E0B',
-                DME: '#A78BFA',
-                TACAN: '#818CF8',
-            };
-            return map[type] || '#9CA3AF';
+            const P = window.MapPalette;
+            const role = {
+                VOR: 'navaid-vor', 'VOR-DME': 'navaid-vor',
+                VORTAC: 'navaid-vortac', TACAN: 'navaid-vortac',
+                NDB: 'navaid-ndb', 'NDB-DME': 'navaid-ndb',
+                DME: 'navaid-dme',
+            }[type];
+            return P.color(role || 'text-tertiary');
         }
 
         _renderNavaids() {
@@ -824,7 +814,7 @@
                     ]),
                 });
                 line.setStyle(new window.ol.style.Style({
-                    stroke: new window.ol.style.Stroke({ color: '#9CA3AF', width: weight }),
+                    stroke: new window.ol.style.Stroke({ color: window.MapPalette.color('text-tertiary'), width: weight }),
                 }));
                 state.source.addFeature(line);
 
@@ -833,14 +823,14 @@
                         const leLabel = new window.ol.Feature({
                             geometry: new window.ol.geom.Point(this._toMapCoordinate(runway.le_latitude, runway.le_longitude)),
                         });
-                        leLabel.setStyle(new window.ol.style.Style({ text: this._getReferenceLabelStyle(runway.le_ident, '#9CA3AF') }));
+                        leLabel.setStyle(new window.ol.style.Style({ text: this._getReferenceLabelStyle(runway.le_ident) }));
                         state.source.addFeature(leLabel);
                     }
                     if (runway.he_ident) {
                         const heLabel = new window.ol.Feature({
                             geometry: new window.ol.geom.Point(this._toMapCoordinate(runway.he_latitude, runway.he_longitude)),
                         });
-                        heLabel.setStyle(new window.ol.style.Style({ text: this._getReferenceLabelStyle(runway.he_ident, '#9CA3AF') }));
+                        heLabel.setStyle(new window.ol.style.Style({ text: this._getReferenceLabelStyle(runway.he_ident) }));
                         state.source.addFeature(heLabel);
                     }
                 }
@@ -866,7 +856,7 @@
                     geometry: new window.ol.geom.Circle(center, radiusMeters),
                 });
                 ring.setStyle(new window.ol.style.Style({
-                    stroke: new window.ol.style.Stroke({ color: 'rgba(115, 115, 115, 0.5)', width: 1 }),
+                    stroke: new window.ol.style.Stroke({ color: window.MapPalette.color('ring'), width: 1 }),
                 }));
                 this._rangeRingLayerState.source.addFeature(ring);
 
@@ -875,25 +865,23 @@
                     geometry: new window.ol.geom.Point([center[0], center[1] + labelOffsetMeters]),
                 });
                 labelPoint.setStyle(new window.ol.style.Style({
-                    text: this._getReferenceLabelStyle(`${radiusNm} NM`, 'rgba(115, 115, 115, 0.8)'),
+                    text: this._getReferenceLabelStyle(`${radiusNm} NM`, window.MapPalette.color('ring-label')),
                 }));
                 this._rangeRingLayerState.source.addFeature(labelPoint);
             });
         }
 
-        _getTrailColorForAircraft(aircraft) {
-            if (!aircraft) return '#4CAF50';
-            // The tertiary text colour, as its glyph and label (MapLabel, signal lost).
-            if (aircraft.status === 'signal_lost') {
-                if (!this._tertiaryText) {
-                    const v = getComputedStyle(document.documentElement).getPropertyValue('--color-text-tertiary').trim();
-                    this._tertiaryText = v || '#949494';
-                }
-                return this._tertiaryText;
+        // A trail is its aircraft's altitude colour at half strength, on the
+        // ground too; an old or lost one is grey, as the lost glyph; the
+        // followed flight's is the accent, dotted (palette C, 15/10).
+        _getTrailStyleForAircraft(aircraft, isSelected) {
+            const P = window.MapPalette;
+            if (aircraft && (aircraft.status === 'signal_lost' || aircraft.status === 'stale')) {
+                return { color: P.color('trail-stale'), lineDash: undefined };
             }
-            if (aircraft.status === 'stale') return '#FFC107';
-            if (aircraft.on_ground) return '#60A5FA';
-            return '#4CAF50';
+            if (isSelected) return { color: P.color('trail-followed'), lineDash: [4, 4] };
+            const altitude = window.MapAircraftWebGLRenderer?.altitudeColor?.(aircraft, this.store);
+            return { color: P.withAlpha(altitude || P.color('text-tertiary'), 0.5), lineDash: undefined };
         }
 
         _updateLiveTrailForAircraft(hex, aircraft) {
@@ -963,7 +951,7 @@
 
             feature.setStyle(new window.ol.style.Style({
                 stroke: new window.ol.style.Stroke({
-                    color: styleOptions?.color || '#4CAF50',
+                    color: styleOptions?.color || window.MapPalette.color('text-tertiary'),
                     width: Number.isFinite(styleOptions?.width) ? styleOptions.width : 2,
                     lineDash: Array.isArray(styleOptions?.lineDash) ? styleOptions.lineDash : undefined,
                 }),
@@ -986,9 +974,9 @@
             pointFeature.setStyle(new window.ol.style.Style({
                 image: new window.ol.style.Circle({
                     radius: Number.isFinite(styleOptions?.radius) ? styleOptions.radius : 3,
-                    fill: new window.ol.style.Fill({ color: styleOptions?.fillColor || '#888888' }),
+                    fill: new window.ol.style.Fill({ color: styleOptions?.fillColor || window.MapPalette.color('text-tertiary') }),
                     stroke: new window.ol.style.Stroke({
-                        color: styleOptions?.strokeColor || styleOptions?.fillColor || '#888888',
+                        color: styleOptions?.strokeColor || styleOptions?.fillColor || window.MapPalette.color('text-tertiary'),
                         width: Number.isFinite(styleOptions?.strokeWidth) ? styleOptions.strokeWidth : 1,
                     }),
                 }),
@@ -1009,7 +997,7 @@
                         offsetX: Number.isFinite(styleOptions?.labelOffsetX) ? styleOptions.labelOffsetX : 6,
                         offsetY: Number.isFinite(styleOptions?.labelOffsetY) ? styleOptions.labelOffsetY : 0,
                         textAlign: 'left',
-                        fill: new window.ol.style.Fill({ color: styleOptions?.labelColor || '#888888' }),
+                        fill: new window.ol.style.Fill({ color: styleOptions?.labelColor || window.MapPalette.color('text-tertiary') }),
                     }),
                 }));
                 features.push(labelFeature);
@@ -1047,42 +1035,6 @@
                 return null;
             }
             return this._aircraftRenderer.getLayer();
-        }
-
-        _getAircraftStyle(feature) {
-            const hex = feature && feature.get ? feature.get('hex') : null;
-            const aircraft = (hex && this.store && this.store.aircraft) ? this.store.aircraft[hex] : null;
-
-            const isSelected = !!(this.store && this.store.selectedAircraft && this.store.selectedAircraft.hex === hex);
-            const isHovered = !!(this.store && this.store.hoveredAircraft && this.store.hoveredAircraft.hex === hex);
-
-            let fillColor = '#4CAF50';
-            if (aircraft && aircraft.status === 'signal_lost') {
-                fillColor = '#F44336';
-            } else if (aircraft && aircraft.status === 'stale') {
-                fillColor = '#FFC107';
-            } else if (aircraft && aircraft.on_ground) {
-                fillColor = '#60A5FA';
-            }
-
-            if (isSelected) {
-                fillColor = '#FDE047';
-            } else if (isHovered) {
-                fillColor = '#86EFAC';
-            }
-
-            const radius = isSelected ? 7 : (isHovered ? 6 : 5);
-
-            return new window.ol.style.Style({
-                image: new window.ol.style.Circle({
-                    radius,
-                    fill: new window.ol.style.Fill({ color: fillColor }),
-                    stroke: new window.ol.style.Stroke({
-                        color: isSelected ? '#EAB308' : '#0B2F0B',
-                        width: isSelected ? 2 : 1,
-                    }),
-                }),
-            });
         }
 
         _setFeatureVisible(hex, aircraft, visible) {
@@ -1243,6 +1195,10 @@
         setMapStyle(styleId) {
             if (!this.engine || typeof this.engine.setBaseMapStyle !== 'function') return;
             this.engine.setBaseMapStyle(styleId);
+            // The rings and the airport layout have their own colours on a
+            // bright base (color-map-light-*): drawn again.
+            this._renderRangeRings();
+            this._referenceLayerState?.airportLayout?.layer?.changed();
             // Aircraft icon colors depend on map style (dark vs light), so force a full re-render
             if (this._aircraftRenderer) {
                 this.applyFiltersAndRefreshView();
@@ -1472,7 +1428,8 @@
                     return;
                 }
 
-                const color = this._getTrailColorForAircraft(aircraft);
+                const trailStyle = this._getTrailStyleForAircraft(aircraft, isSelected);
+                const estimate = window.MapPalette.color('estimate');
                 const features = [];
 
                 const trailPoints = (this.trails && Array.isArray(this.trails[hex]))
@@ -1492,9 +1449,9 @@
 
                 const currentTrailFeature = this._createTrailFeature(hex, trailPoints, {
                     trailType: 'current',
-                    color,
+                    color: trailStyle.color,
                     width: 2,
-                    lineDash: undefined,
+                    lineDash: trailStyle.lineDash,
                 });
                 if (currentTrailFeature) {
                     features.push(currentTrailFeature);
@@ -1507,7 +1464,7 @@
                         .map((position) => [position.lat, position.lon]);
                     const historyFeature = this._createTrailFeature(hex, historyPoints, {
                         trailType: 'history',
-                        color,
+                        color: trailStyle.color,
                         width: 2,
                         lineDash: [4, 4],
                     });
@@ -1545,10 +1502,10 @@
                             const metadataFeatures = this._createTrailMetadataFeature(hex, position.lat, position.lon, {
                                 trailType: 'history-metadata',
                                 radius: isEdgePoint ? 4 : 3,
-                                fillColor: '#888888',
-                                strokeColor: '#888888',
+                                fillColor: window.MapPalette.color('text-tertiary'),
+                                strokeColor: window.MapPalette.color('text-tertiary'),
                                 labelText,
-                                labelColor: '#888888',
+                                labelColor: window.MapPalette.color('text-tertiary'),
                                 labelOffsetX: 8,
                                 labelOffsetY: 0,
                             });
@@ -1562,9 +1519,9 @@
                         .map((position) => [position.lat, position.lon]);
                     const hindcastFeature = this._createTrailFeature(hex, hindcastPoints, {
                         trailType: 'hindcast',
-                        color: '#00BCD4',
-                        width: 2,
-                        lineDash: [4, 6],
+                        color: estimate,
+                        width: 1.5,
+                        lineDash: [2, 4],
                     });
                     if (hindcastFeature) {
                         features.push(hindcastFeature);
@@ -1575,9 +1532,9 @@
                         .map((position) => [position.lat, position.lon]);
                     const futureFeature = this._createTrailFeature(hex, futurePoints, {
                         trailType: 'future',
-                        color,
-                        width: 2,
-                        lineDash: [3, 7],
+                        color: estimate,
+                        width: 1.5,
+                        lineDash: [2, 4],
                     });
                     if (futureFeature) {
                         features.push(futureFeature);
@@ -1607,10 +1564,10 @@
                             const metadataFeatures = this._createTrailMetadataFeature(hex, position.lat, position.lon, {
                                 trailType: 'future-metadata',
                                 radius: isLast ? 4 : 3,
-                                fillColor: '#666666',
-                                strokeColor: '#666666',
+                                fillColor: window.MapPalette.color('text-disabled'),
+                                strokeColor: window.MapPalette.color('text-disabled'),
                                 labelText,
-                                labelColor: '#666666',
+                                labelColor: window.MapPalette.color('text-disabled'),
                                 labelOffsetX: 8,
                                 labelOffsetY: 0,
                             });
@@ -1731,14 +1688,16 @@
             this._ensureOverlayLayer();
             if (!this._overlaySource) return;
 
-            const phaseColor = phase === 'T/O' ? '#60A5FA' : (phase === 'APP' || phase === 'ARR' ? '#F59E0B' : '#4CAF50');
+            // The phase family's colour (phase-families.js), as the label's prefix.
+            const phaseColor = window.PhaseFamilies ? window.PhaseFamilies.colorOf(phase) : window.MapPalette.color('text-tertiary');
+            const P = window.MapPalette;
             const center = this._toMapCoordinate(lat, lon);
             const feature = new window.ol.Feature({
                 geometry: new window.ol.geom.Circle(center, 400),
             });
             feature.setStyle(new window.ol.style.Style({
                 stroke: new window.ol.style.Stroke({ color: phaseColor, width: 2 }),
-                fill: new window.ol.style.Fill({ color: 'rgba(76, 175, 80, 0.12)' }),
+                fill: new window.ol.style.Fill({ color: P.withAlpha(phaseColor, 0.12) }),
             }));
 
             this._overlaySource.addFeature(feature);
@@ -1755,7 +1714,7 @@
                 feature.setGeometry(new window.ol.geom.Circle(center, radius));
                 feature.setStyle(new window.ol.style.Style({
                     stroke: new window.ol.style.Stroke({ color: phaseColor, width: 2 }),
-                    fill: new window.ol.style.Fill({ color: `rgba(76, 175, 80, ${alpha.toFixed(3)})` }),
+                    fill: new window.ol.style.Fill({ color: P.withAlpha(phaseColor, alpha.toFixed(3)) }),
                 }));
 
                 if (progress < 1) {
@@ -1780,8 +1739,8 @@
             feature.setStyle(new window.ol.style.Style({
                 image: new window.ol.style.Circle({
                     radius: 7,
-                    fill: new window.ol.style.Fill({ color: 'rgba(76, 175, 80, 0.95)' }),
-                    stroke: new window.ol.style.Stroke({ color: '#FFFFFF', width: 2 }),
+                    fill: new window.ol.style.Fill({ color: window.MapPalette.color('selected') }),
+                    stroke: new window.ol.style.Stroke({ color: window.MapPalette.color('text-primary'), width: 2 }),
                 }),
             }));
 
@@ -1814,11 +1773,11 @@
             const feature = new window.ol.Feature({ geometry: circle });
             feature.setStyle(new window.ol.style.Style({
                 stroke: new window.ol.style.Stroke({
-                    color: '#EB8C00',
+                    color: window.MapPalette.color('proximity'),
                     width: 2,
                     lineDash: [5, 5],
                 }),
-                fill: new window.ol.style.Fill({ color: 'rgba(235, 140, 0, 0.08)' }),
+                fill: new window.ol.style.Fill({ color: window.MapPalette.withAlpha(window.MapPalette.color('proximity'), 0.06) }),
             }));
 
             this._proximityCircleFeature = feature;

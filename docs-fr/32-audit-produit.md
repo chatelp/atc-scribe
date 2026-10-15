@@ -492,6 +492,117 @@ sur la carte.
 
 ## État
 
+- 15/10 (soir) : **migration du design versée dans `local` et prête pour la production**
+  (efaaa7a) : étapes 12 et 13 et tout ce qui a suivi le même jour, relu conforme par la session
+  design. Le propriétaire a choisi de la regarder en production plutôt que sur l'instance d'essai
+  (l'iPhone y accède déjà, avec connexion, et le vrai modèle y tourne). Avant le versement : `go
+  vet`, tous les tests Go, les tests du sidecar et le filet de la page, verts. Binaire de
+  production reconstruit ; `runs/production.command` fige la page au lancement.
+- 15/10 : **un avion perdu pointait au nord**, à 90° de sa trajectoire sur l'axe est-ouest de
+  Roissy (vu par le propriétaire). Mesuré sur l'instance : sur dix avions perdus récents, sept
+  n'avaient plus ni `track` ni cap dans leur dernier relevé (le récepteur les fait expirer) ; le
+  rendu retombait alors sur 0° et écrasait le dernier cap à chaque mise à jour. Le glyphe garde
+  désormais l'orientation qu'il avait (vérifié par une perte simulée : 62° avant, 62° après).
+  Reste : une page ouverte après la perte n'a aucun cap à garder et dessine encore le nord ; le
+  remède est côté serveur (conserver le dernier cap valide quand un relevé n'en porte plus), sur
+  le chemin d'écriture des avions, à faire à part.
+- 15/10 : **« Show only » depuis un avion** (le propriétaire pensait au Shift+clic ; écarté :
+  invisible, sans équivalent au doigt, et il n'y a pas de sélection multiple). Sous la grille du
+  récit, une rangée « Show only » et deux bascules : « FL 290 ± 500 ft » (±500 ft, choix du
+  propriétaire) règle la réglette d'altitude, « CRZ » ne garde que ce code de phase exact ; elles
+  se cumulent, et un second clic remet le filtre d'avant (vérifié : « up to FL 100 » revient). La
+  note du ciel les nomme (« Showing 1 of 87 · FL 290 ± 500 ft · CRZ only ») et finit par un ✕ qui
+  efface tout ce qu'elle liste. L'avion suivi reste dans la liste quels que soient les filtres,
+  comme il restait déjà sur la carte. Forme de la session design (5530c9e).
+- 15/10 : **échelle des altitudes aux couleurs des avions** (demande du propriétaire, forme A
+  choisie sur une planche de la session design, 7e63e14 ; fiche AltitudeLegend, Slider mise à
+  jour). En bas à gauche du ciel, une légende des cinq bandes de couleur, chacune avec
+  l'histogramme de ses niveaux (hauteurs rapportées à la barre la plus haute de toute la légende),
+  son nombre d'avions et les seuils dessous (1 000 ft, 3 000 ft, FL 125, niveau de croisière de la
+  station) ; version claire sur IGN et OSM ; au-dessus du cadre PAR pendant un suivi (vérifié :
+  8 px) ; interrupteur « Altitude legend » dans le menu des calques. La réglette de Traffic prend
+  les mêmes couleurs, barre par barre ; son repère TA devient un pointillé tertiaire, « FL 300 »,
+  qui chevauchait « FL 200 », est retiré. Les bandes viennent d'un seul module
+  (`www/altitude/altitude-bands.js`, testé), que lisent aussi le moteur des avions, la légende et
+  la réglette : elles ne peuvent plus diverger.
+- 15/10 : **connexion au serveur perdue : un son neutre, une trace, le fil comblé** (le
+  propriétaire entendait « retard retard » par moment). C'était le son d'Airbus de l'amont, joué à
+  chaque coupure de la WebSocket, même d'une seconde, et qu'aucun réglage ne coupait ; une partie
+  venait des redémarrages de l'instance d'essai, le reste de coupures que le serveur ne
+  journalisait pas. Le serveur écrit désormais « WebSocket client left » avec la raison (page
+  fermée, pas de réponse aux pings en 60 s, écriture échouée, **file de 256 messages pleine** : le
+  serveur retire alors le client entier, pas le message, ce que son commentaire disait à tort), la
+  durée de connexion et le navigateur. La page : le son ne part que si la coupure atteint 10 s,
+  deux notes douces synthétisées (660 puis 495 Hz), réglables sous « Server connection » dans les
+  sons de la cloche ; à la reconnexion, une ligne ▲ dans le journal (« Server connection lost from
+  14:13Z to 14:22Z (8 min 43 s); 6 exchanges filled back into the thread. ») et les échanges gardés
+  par le serveur pendant la coupure remis dans le fil. Forme décidée par la session design
+  (7dec77e). Vérifié par une coupure simulée : 6 échanges retirés, 6 remis. Le son « retard » et son
+  fichier sont retirés.
+- 15/10 : **le voyant de transcription distingue un faux sidecar** (demande du propriétaire :
+  même voyant vert avec le vrai modèle et le faux sidecar de l'instance d'essai). `/api/v1/status`
+  publie ce que le sidecar déclare (`backend` : `mlx`, le nom d'un GPU, ou `fake`) et la famille du
+  modèle ; la page affiche « Simulated » en ambre quand c'est `fake`, avec une bulle qui dit que les
+  textes sont inventés et que les chiffres d'appariement n'ont pas de sens ; avec le vrai modèle,
+  la bulle nomme le modèle et ce qui le fait tourner. Vérifié sur l'instance d'essai redémarrée.
+- 15/10 : **étiquettes de la carte allégées** (demande du propriétaire du 13/10, choisie le 15/10
+  sur deux planches de la session design ; fiche MapLabel, 597c142). Mesure de la session sur
+  environ 110 avions : au zoom par défaut, 62 % des étiquettes complètes en chevauchaient une
+  autre, 87 % à 67 NM. Trois paliers selon la largeur du ciel en NM au sol (33,7 NM au zoom par
+  défaut, recoupé ici) : jusqu'à 24 NM tout est complet ; de 24 à 67 NM l'indicatif seul, sauf
+  les avions qui comptent (entendus depuis 10 min, dans une séquence d'arrivée, suivis, squawk
+  d'urgence) ; au-delà, l'indicatif de ceux-là seulement ; le survol montre tout. Le dernier
+  message n'est plus une troisième ligne mais une bulle sous l'étiquette, dessinée dans un canevas
+  (barre info, texte de lecture, âge), pleine 2 min, à 55 % jusqu'à 10 min, qui suit le fondu du
+  moteur de mouvement. Écart à la fiche, soumis : la bulle est opaque, et l'étiquette à deux
+  lignes mordait de 7 px sur le glyphe ; avec une bulle, le bloc s'arrête 2 px au-dessus du glyphe.
+  **Relu conforme, écart accepté.** Recompte de la session design, au même instant sur le même
+  ciel (part des boîtes chevauchées, « avant » estimé à 140 px par étiquette) : 24 NM 67 → 21 % ;
+  34 NM (défaut) 67 → 37 % ; 48 NM 68 → 55 % ; 67 NM 81 → 20 % ; 135 NM 93 → 45 % ; 270 NM
+  97 → 58 %. Avions sous une étiquette à 67 NM : 28 → 5. Il reste des chevauchements entre 34 et
+  48 NM autour de l'approche de Roissy, où les avions qui comptent sont serrés : laissé tel quel
+  pour une soirée, choix du propriétaire.
+- 15/10 : **palette de la carte, choix C du propriétaire** (seulement les conflits ; jetons
+  `color-map-*` et `color-map-light-*` de la session design, 34ecf70). Un module commun
+  `www/map/core/map-palette.js` les lit, avec la variante des fonds clairs (IGN, OSM). Anneau de
+  l'avion choisi en accent (2 px), survol en texte primaire (1,2 px) ; traces à la couleur
+  d'altitude de l'avion à 50 %, au sol aussi ; vol suivi en accent pointillé ; estimations (futur,
+  rétro-prévision) en accent pointillé fin ; trace ancienne ou perdue en gris ; taxiways et
+  anneaux gris ; balises, pistes et grands aéroports sur leurs jetons ; l'onde de décollage ou
+  d'atterrissage prend la couleur de la famille de phase. Le jaune #FDE047 de l'avion choisi
+  était dans une fonction morte (`_getAircraftStyle`, retirée) : le vrai halo était blanc. Les sept
+  restes, tranchés par la session design le même jour (eedecb2, mesurés en ΔE76) : axes de piste
+  en `centerline` gris (le vert était à ΔE 1,2 de l'accent) ; aérodromes moyens en `airport`,
+  petits et hydrobases en `airport-small` ; héliports en `heliport` violet (l'orange était à
+  ΔE 3,3 de la phase départ) ; DME seuls en `navaid-dme` ; cercle de proximité en `proximity`,
+  l'accent du vol suivi ; jeton `airspace` retiré, les espaces aériens étant des tuiles openAIP ;
+  neutres gardés. Dans le code de la carte, il ne reste en dur que ces neutres. Rendu sur fond
+  clair (IGN, OSM) non mesuré : à regarder pendant la soirée du propriétaire.
+- 15/10 : **relecture design de l'étape 13**. Le « 3° » de la PAR passe en texte tertiaire
+  (#949494, environ 6,8:1 ; il était à 2,7:1) ; le « 10 NM » de la portée de la connexion reste,
+  décoratif et `aria-hidden` (WCAG 1.4.3, noté dans la fiche SignIn). La légende de la mini-carte
+  disait « Past » en rouge d'urgence et « Future » en jaune des avions très bas, alors que la trace
+  était grise : la mini-carte et sa légende prennent les mêmes jetons (position en accent, ou en
+  texte secondaire si le signal est perdu ; trace reçue en tertiaire pointillé ; estimations en
+  accent pointillé). Les positions estimées avant le premier contact, en cyan et absentes de la
+  légende, rejoignent les estimations, d'où « Estimated » plutôt que « Future ». La colonne des
+  secondes du tableau est retirée, l'heure suffit. La palette de la carte attend le choix du
+  propriétaire.
+- 15/10 : **étape 13 (nettoyage) livrée sur `migration`**. Mesuré par `tools/design/inventory.mjs`,
+  avant la migration → avant le nettoyage → après : utilisations de classes Tailwind 3 879 → 834
+  → 433 ; couleurs distinctes 215 → 122 → 82 ; valeurs en dur 284 → 241 → 177 ; `style.css`
+  311 → 161 lignes, **plus aucune couleur en dur** (toutes en jetons, transparences par
+  `color-mix`). Retirés : les règles mortes (famille `flight-strip`, filtres, visualiseur, barre
+  de défilement personnalisée, bande de tuiles, surlignage de transcription), le code des fenêtres
+  de transcription de l'ancienne barre radio (`toggleTranscriptionViewer`, `layoutTranscriptionViewers`,
+  `openTranscriptionAt`, la recherche par fréquence, les compteurs non lus) et la barre de niveau
+  des tuiles. Restylés sur le système, au contenu inchangé : l'onglet Track (mini-carte, positions
+  en `cl-table`, tendances en flèches), Nearby (curseur et tableau), la liste radio de Details (en
+  échanges du fil), les deux menus de la liste. Les 177 valeurs en dur restantes sont la palette
+  propre de la carte (aéroports, balises, héliports, espaces aériens, traces), celle de la PAR et
+  les dessins de la connexion : soumises à la session design (jetons de carte). Sonde de
+  contraste sur les quatorze écrans : 0 caractère sous le seuil sur onze, quelques caractères
+  sur trois (« 3° » de la PAR, « 10 NM » de la portée décorative de la connexion), signalés.
 - 15/10 : **étape 11 versée dans `local`** après trois recomptes design et le coup d'œil du
   propriétaire. Tab rendu au navigateur ; J/K (et ↓/↑ sur la carte, qui ne se déplace plus aux
   flèches) d'un avion à l'autre ; A, G et 0-9 sans Cmd/Ctrl/Alt ; rôles et tabulation pour ce qui

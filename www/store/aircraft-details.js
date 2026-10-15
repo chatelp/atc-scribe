@@ -759,44 +759,14 @@
         },
 
         // Scroll to the highlighted row in the Tracks table
+        // The row of one received position in the Track tab, brought into view
+        // (a phase's point in the Details tab leads there). Each row carries its
+        // position's id; the one wanted may be folded among unchanged ones.
         scrollToHighlightedRow(adsbId) {
             if (!adsbId) return;
-            
-            // Wait a bit more for Alpine.js to render the highlighted row
             setTimeout(() => {
-                // Find the history data and locate the index of the matching ADSB ID
-                const historyData = this.aircraftDetailsHistoryData;
-                if (!historyData || historyData.length === 0) return;
-                
-                let targetIndex = -1;
-                for (let i = 0; i < historyData.length; i++) {
-                    if (historyData[i].id && historyData[i].id == adsbId) {
-                        targetIndex = i;
-                        break;
-                    }
-                }
-                
-                if (targetIndex === -1) return;
-                
-                // Find the tracks view container and scroll to the appropriate position
-                const tracksContainer = document.querySelector('#story-track .overflow-x-auto');
-                if (!tracksContainer) return;
-                
-                // Calculate approximate row height and scroll position
-                // Account for header rows (Future Predictions header + Historical Positions header)
-                const futureDataLength = this.aircraftDetailsFutureData ? this.aircraftDetailsFutureData.length : 0;
-                const headerRows = (futureDataLength > 0 ? 1 : 0) + 1; // Future header (if exists) + Historical header
-                const totalRowsBeforeTarget = futureDataLength + headerRows + targetIndex;
-                
-                // Estimate row height (approximately 32px per row)
-                const estimatedRowHeight = 32;
-                const scrollPosition = totalRowsBeforeTarget * estimatedRowHeight;
-                
-                // Scroll to the calculated position
-                tracksContainer.scrollTo({
-                    top: scrollPosition,
-                    behavior: window.smoothScroll()
-                });
+                const row = document.querySelector(`#story-track tr[data-adsb-id="${adsbId}"]`);
+                if (row) row.scrollIntoView({ block: 'center', behavior: window.smoothScroll() });
             }, 300);
         },
 

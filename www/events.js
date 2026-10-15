@@ -51,13 +51,16 @@
         interest: { label: 'Aircraft of interest', icon: 'fa-star', color: 'text-violet-300' },
         station: { label: 'Station channels', icon: 'fa-tower-broadcast', color: 'text-emerald-300' },
         stream: { label: 'Audio stream', icon: 'fa-plug-circle-exclamation', color: 'text-orange-300' },
+        server: { label: 'Server connection', icon: 'fa-plug-circle-xmark', color: 'text-amber-300' },
     };
-    const DEFAULT_SOUNDS = { emergency: true };
+    // A lost server rings by default (owner, 15/10): its sound replaced
+    // upstream's "retard" callout, which no setting could turn off.
+    const DEFAULT_SOUNDS = { emergency: true, server: true };
 
     function loadSounds() {
         try {
             const kept = JSON.parse(localStorage.getItem('eventSounds') || 'null');
-            if (kept && typeof kept === 'object') return { ...kept };
+            if (kept && typeof kept === 'object') return { ...DEFAULT_SOUNDS, ...kept };
         } catch (e) { /* none kept */ }
         return { ...DEFAULT_SOUNDS };
     }
@@ -163,7 +166,9 @@
                 this._timer = setInterval(() => this.scan(), SCAN_MS);
             },
 
-            add({ kind, text, hex = null, key = null }) {
+            // silent: logged without its sound (the lost server rings when the
+            // loss reaches ten seconds, never when it comes back).
+            add({ kind, text, hex = null, key = null, silent = false }) {
                 if (key) {
                     if (this._seen.has(key)) return;
                     this._seen.add(key);
@@ -175,7 +180,7 @@
                     this.unread++;
                     if (kind === 'emergency') this.unreadUrgent++;
                 }
-                if (this.sounds[kind]) this.ring();
+                if (this.sounds[kind] && !silent) this.ring();
             },
 
             // The events of the last few minutes, newest first: what a "right
@@ -183,6 +188,32 @@
             recent(minutes = 30) {
                 const since = Date.now() - minutes * 60000;
                 return this.list.filter((e) => e.at.getTime() >= since);
+            },
+
+            // Two soft notes falling a fourth, 660 then 495 Hz, 140 ms each:
+            // something stopped, not an alarm, and unlike the emergencies'
+            // ding-dong (design, 15/10). Synthesised, no file.
+            ringServerLost() {
+                if (!this.sounds.server) return;
+                try {
+                    const client = typeof audioClient !== 'undefined' ? audioClient : null;
+                    const ctx = (client && client.initAudioContext && client.initAudioContext())
+                        || new (window.AudioContext || window.webkitAudioContext)();
+                    if (ctx.state === 'suspended') ctx.resume().catch(() => { /* no click on the page yet */ });
+                    const t0 = ctx.currentTime + 0.02;
+                    [[660, 0], [495, 0.16]].forEach(([freq, at]) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0, t0 + at);
+                        gain.gain.linearRampToValueAtTime(0.25, t0 + at + 0.015);
+                        gain.gain.exponentialRampToValueAtTime(0.001, t0 + at + 0.14);
+                        osc.connect(gain).connect(ctx.destination);
+                        osc.start(t0 + at);
+                        osc.stop(t0 + at + 0.15);
+                    });
+                } catch (e) { /* no sound */ }
             },
 
             ring() {
@@ -213,6 +244,7 @@
                 { key: 'runway', label: 'Runway changes', kinds: ['runway'] },
                 { key: 'interest', label: 'Aircraft of interest', kinds: ['interest'] },
                 { key: 'station', label: 'Station and audio', kinds: ['station', 'stream'] },
+                { key: 'server', label: 'Server connection', kinds: ['server'] },
             ],
 
             soundGroupOn(group) {
