@@ -84,6 +84,14 @@
         <!-- The top bar (design system, TopBar; migration step 3): the sign and the
              name, what the station has on air, the chain's lights, the time, the
              tools. cl-root scopes the system's styles to this bar for now. -->
+        <!-- Skip links (migration step 11): the thread holds up to 200 exchanges,
+             each with its own button; without them the map and the column were
+             hundreds of Tab presses away. Hidden until focused. -->
+        <nav class="cl-root cl-skip" aria-label="Skip">
+            <a href="#map" @click.prevent="document.getElementById('map').focus()">Skip to the map</a>
+            <a href="#region-column" @click.prevent="document.getElementById('region-column').focus()">Skip to the column</a>
+            <a href="#region-thread" @click.prevent="document.getElementById('region-thread').focus()">Skip to the radio thread</a>
+        </nav>
         <header class="cl-root cl-topbar" aria-label="Status bar">
             <span class="cl-topbar__brand cursor-help"
                   data-help-title="Clairance"
@@ -149,7 +157,7 @@
                  until step 7 to be compared. Wide screens only; the phone keeps
                  its panes until step 12. Folded (layout B), it takes the width the
                  column gave up. -->
-            <section class="cl-root cl-app__thread hidden md:flex" aria-label="Radio"
+            <section id="region-thread" tabindex="-1" class="cl-root cl-app__thread hidden md:flex" aria-label="Radio"
                      :style="$store.atc.columnFolded && !$store.atc.selectedAircraft ? 'flex-basis: 640px' : ''">
                 <div class="cl-threadhead">
                     <div class="cl-threadhead__row">
@@ -211,7 +219,7 @@
                                     </div>
                                     <div class="cl-menu__sep"></div>
                                     <label class="cl-check" :class="$store.atc.threadShow === freq.id ? 'is-on' : ''"
-                                           @click.prevent="$store.atc.setThreadShow($store.atc.threadShow === freq.id ? 'all' : freq.id)">
+                                           @click.prevent="$store.atc.setThreadShow($store.atc.threadShow === freq.id ? 'all' : freq.id)" role="checkbox" tabindex="0" :aria-checked="String($store.atc.threadShow === freq.id)">
                                         <span class="cl-check__box"></span>Only this frequency in the thread
                                     </label>
                                     <span class="cl-plain" x-text="$store.atc.channelNote(freq)"></span>
@@ -820,7 +828,7 @@
                             <div class="cl-menu__group">
                                 <span class="cl-label">Ring a bell for</span>
                                 <template x-for="g in $store.events.soundGroups" :key="g.key">
-                                    <label class="cl-check" :class="$store.events.soundGroupOn(g) ? 'is-on' : ''" @click.prevent="$store.events.toggleSoundGroup(g)">
+                                    <label class="cl-check" :class="$store.events.soundGroupOn(g) ? 'is-on' : ''" @click.prevent="$store.events.toggleSoundGroup(g)" role="checkbox" tabindex="0" :aria-checked="String($store.events.soundGroupOn(g))">
                                         <span class="cl-check__box"></span><span x-text="g.label"></span>
                                     </label>
                                 </template>
@@ -833,7 +841,7 @@
                         </p>
                         <ul class="cl-events" x-show="$store.events.list.length">
                             <template x-for="ev in $store.events.list" :key="ev.id">
-                                <li :class="ev.hex ? 'is-clickable' : ''" @click="$store.events.select(ev)" :title="ev.hex ? 'Show this aircraft' : ''">
+                                <li :class="ev.hex ? 'is-clickable' : ''" :role="ev.hex ? 'button' : null" :tabindex="ev.hex ? 0 : null" @click="$store.events.select(ev)" :title="ev.hex ? 'Show this aircraft' : ''">
                                     <time x-text="$store.events.time(ev)"></time>
                                     <span><span x-show="$store.events.markOf(ev).mark" :class="$store.events.markOf(ev).cls" x-text="$store.events.markOf(ev).mark + ' '"></span><span x-text="ev.text"></span></span>
                                 </li>
@@ -843,7 +851,7 @@
 
                     <!-- Map Container -->
                     <div class="flex-1 relative z-10">
-                        <div id="map" class="h-full w-full bg-black"></div>
+                        <div id="map" class="h-full w-full bg-black" tabindex="0" aria-label="Map: J and K, or the arrows, go from one aircraft to the next"></div>
                         <!-- The sky's top row (step 9; a-calques, a-trafic, b-replie): what the sky
                              shows, the map or the PAR of a followed airport; what the map shows
                              (followed flight, filters); the folded column at its end. -->
@@ -986,13 +994,13 @@
                    :class="[($store.atc.columnFolded && !$store.atc.selectedAircraft)
                               ? ($store.atc.mobilePane === 'list' ? 'flex md:hidden' : 'hidden')
                               : ($store.atc.mobilePane === 'list' ? 'flex' : 'hidden md:flex')]"
-                   aria-label="Context">
+                   id="region-column" tabindex="-1" aria-label="Context">
                 <div x-show="!$store.atc.selectedAircraft" class="flex-1 min-h-0 flex flex-col">
                     <div class="cl-tabs cl-tabs--column" role="tablist">
                         <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.columnTab === 'now'" @click="$store.atc.columnTab = 'now'"
                                 data-help-title="Right now" data-help="What the sky is doing now: the runway each airport uses, who lands next, what happened in the last half hour, the weather.">Right now</button>
                         <button class="cl-tabs__tab" role="tab" :aria-selected="$store.atc.columnTab === 'traffic'" @click="$store.atc.columnTab = 'traffic'"
-                                data-help-title="Traffic" data-help="Every aircraft the receiver hears, with the filters; the map shows the same selection.">Traffic <span class="cl-tabs__count" x-text="$store.atc.activeAircraftCount"></span></button>
+                                data-help-title="Traffic" data-help="Every aircraft the receiver hears, with the filters; the map shows the same selection. J and K, or the arrows on the map, go from one aircraft to the next.">Traffic <span class="cl-tabs__count" x-text="$store.atc.activeAircraftCount"></span></button>
                         <!-- Fold the column: the map takes its width, Right now becomes a card over it (layout B). -->
                         <span class="cl-tabs__end hidden md:flex">
                             <button class="cl-btn cl-btn--icon cl-mono" aria-label="Fold the column" @click="$store.atc.setColumnFolded(true)"
@@ -1027,7 +1035,7 @@
                                     </tr></thead>
                                     <tbody>
                                         <template x-for="r in t.rows" :key="r.hex">
-                                            <tr class="cursor-pointer" @click="$store.atc.selectAircraftByHex(r.hex)" :title="'Show ' + r.callsign">
+                                            <tr class="cursor-pointer" @click="$store.atc.selectAircraftByHex(r.hex)" :title="'Show ' + r.callsign" role="button" tabindex="0">
                                                 <td class="is-dim" x-text="r.rank"></td>
                                                 <td><b x-text="r.callsign"></b> <span class="is-dim" x-text="r.type"></span></td>
                                                 <td class="is-num" x-text="r.toThreshold"></td>
@@ -1049,7 +1057,7 @@
                             </template>
                             <ul class="cl-events" x-show="$store.atc.nowEvents.length > 0">
                                 <template x-for="ev in $store.atc.nowEvents" :key="ev.id">
-                                    <li :class="ev.hex ? 'is-clickable' : ''" @click="$store.events.select(ev)" :title="ev.hex ? 'Show this aircraft' : ''">
+                                    <li :class="ev.hex ? 'is-clickable' : ''" :role="ev.hex ? 'button' : null" :tabindex="ev.hex ? 0 : null" @click="$store.events.select(ev)" :title="ev.hex ? 'Show this aircraft' : ''">
                                         <time x-text="$store.atc.clockText(ev.at)"></time>
                                         <span><span x-show="ev.mark.mark" :class="ev.mark.cls" x-text="ev.mark.mark + ' '"></span><span x-text="ev.text"></span></span>
                                     </li>
@@ -1118,9 +1126,7 @@
                         <div class="relative">
                             <input type="search" class="cl-input" style="width: 100%;" placeholder="Callsign, registration, type" aria-label="Find an aircraft"
                                    x-model="$store.atc.searchTerm"
-                                   @input.debounce.300ms="$store.atc.applyFilters()"
-                                   @keydown.tab.prevent="$store.atc.cycleToNextAircraft()"
-                                   @keydown.shift.tab.prevent="$store.atc.cycleToPreviousAircraft()">
+                                   @input.debounce.300ms="$store.atc.applyFilters()">
                         </div>
 
                         <!-- Altitude band (www/altitude/): floor and ceiling on one slider,
@@ -1241,7 +1247,9 @@
                             <div class="cl-strip aircraft-row" :class="$store.atc.stripClasses(aircraft)" :data-aircraft-hex="aircraft.hex"
                                  @click="$store.atc.selectedAircraft = aircraft; if ($store.atc.mapManager) { $store.atc.mapManager.updateVisualState(aircraft.hex, true); $store.atc.mapManager.centerOnAircraft(aircraft); }"
                                  @mouseover="$store.atc.hoveredAircraft = aircraft; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
-                                 @mouseout="$store.atc.hoveredAircraft = null; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);">
+                                 @mouseout="$store.atc.hoveredAircraft = null; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
+                                 @focus="$store.atc.hoveredAircraft = aircraft; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);"
+                                 @blur="$store.atc.hoveredAircraft = null; if ($store.atc.mapManager) $store.atc.mapManager.updateVisualState(aircraft.hex, true);" role="button" tabindex="0">
                                 <span class="cl-phase" :class="$store.atc.phaseClasses(aircraft)" x-text="$store.atc.getCurrentPhase(aircraft) || 'NEW'"
                                       data-help-title="Flight phase" :data-help="$store.atc.phaseHelp($store.atc.getCurrentPhase(aircraft) || 'NEW')"></span>
                                 <div class="cl-strip__col" style="flex: 1;">
@@ -1282,7 +1290,7 @@
                     <div class="flex-1 min-h-0 flex flex-col" :aria-label="$store.atc.storyHead ? $store.atc.storyHead.callsign : ''">
                         <div class="cl-tabs cl-tabs--column">
                             <button class="cl-btn cl-btn--icon cl-mono" :aria-label="$store.atc.storyBackLabel" @click="$store.atc.stopFollowing()">‹</button>
-                            <button class="cl-plain" @click="$store.atc.stopFollowing()" x-text="$store.atc.storyBackLabel"></button>
+                            <button class="cl-plain" tabindex="-1" @click="$store.atc.stopFollowing()" x-text="$store.atc.storyBackLabel"></button>
                         </div>
                         <template x-if="$store.atc.storyHead">
                             <div class="cl-story__head">
@@ -1632,7 +1640,7 @@
                                              'border-gray-500': !t.speaker_type
                                          }">
                                         <div class="flex items-center gap-2 mb-0.5">
-                                            <button x-show="$store.atc.audioArchive.available && t.id"
+                                            <button :aria-label="$store.atc.clipHelp(t.id)" x-show="$store.atc.audioArchive.available && t.id"
                                                     class="w-4 text-center hover:text-highlight"
                                                     :class="$store.atc.clip.id === t.id ? 'text-highlight' : ($store.atc.clip.failed[t.id] ? 'text-text/30' : 'text-text/60')"
                                                     @click.stop="$store.atc.playClip(t.id)"
@@ -1728,7 +1736,7 @@
                                         </template>
                                         <template x-for="aircraft in $store.atc.proximityAircraft" :key="aircraft.hex">
                                             <tr @click="$store.atc.selectedAircraft = aircraft; $store.atc.showProximityView = false; $store.atc.clearProximityView()"
-                                                class="hover:bg-hover/50 transition-colors cursor-pointer">
+                                                class="hover:bg-hover/50 transition-colors cursor-pointer" role="button" tabindex="0">
                                                 <td class="p-1.5 text-left border-b border-border" x-text="aircraft.flight || aircraft.hex"></td>
                                                 <td class="p-1.5 text-right border-b border-border">
                                                     <div class="flex items-center justify-end">
@@ -1867,7 +1875,7 @@
                                                 <i class="fas fa-search absolute right-2 top-1/2 transform -translate-y-1/2 text-text/50 text-xs"></i>
                                             </div>
                                         </div>
-                                        <button @click="$store.atc.transcriptionViewerVisible[freq.id] = false" class="text-text/70 hover:text-text ml-2">
+                                        <button aria-label="Close" @click="$store.atc.transcriptionViewerVisible[freq.id] = false" class="text-text/70 hover:text-text ml-2">
                                             <i class="fas fa-times"></i>
                                         </button>
                                     </div>
@@ -1904,7 +1912,7 @@
                                                 <!-- Who speaks, and the aircraft the transmission was matched to:
                                                      on every matched line, the controller's too (audit 3.1). -->
                                                 <div class="text-text/60 text-[11px] mb-0.5 flex items-center gap-1.5 flex-wrap">
-                                                    <button x-show="$store.atc.audioArchive.available && transcription.id"
+                                                    <button :aria-label="$store.atc.clipHelp(transcription.id)" x-show="$store.atc.audioArchive.available && transcription.id"
                                                             class="w-4 text-center hover:text-highlight"
                                                             :class="$store.atc.clip.id === transcription.id ? 'text-highlight' : ($store.atc.clip.failed[transcription.id] ? 'text-text/30' : 'text-text/60')"
                                                             @click.stop="$store.atc.playClip(transcription.id)"
