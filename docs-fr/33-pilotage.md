@@ -119,18 +119,11 @@ l'interface, elle, reste sur le Mac.
    `~/.config/clairance`, documents. Reste à faire par le propriétaire, quand toutes les sessions
    seront fermées : déplacer le dossier local `~/Dev/Aero/atc-scribe` (commande fournie le 13/10)
    et, s'il le souhaite, renommer le dépôt privé `atc-scribe-communaute` et les sessions.
-2. **Le système de design** — tout est livré (`docs-fr/design/`, branche `design` : principes,
-   système, jetons, maquettes, plan de migration ≈ 13 j). Six choix à trancher avant la
-   migration : (1) monospace pour les phrases ou police du système (principe 8 ; le monospace
-   est 1,26 fois plus large à taille égale) ; (2) cinq familles de phase à la place des dix
-   couleurs ; (3) une rampe de clarté sans teinte pour l'altitude des avions ; (4) J / K au lieu
-   de Tab pour passer d'un avion à l'autre ; (5) l'interpolation des avions gardée sous
-   `prefers-reduced-motion` ; (6) ~~la validation des esquisses~~ **faite le 13/10 (D77)** ;
-   ~~les écrans finaux~~ **validés le 13/10 (D78)** sur le système de composants
-   (https://claude.ai/artifact/Ut6hWDRRUcWC58HHz6UP2K). **Reste le départ de la migration**,
-   sur le plan `04-migration.md` que la session design réécrit (étapes, critères
-   d'acceptation) : première étape, les jetons dans `tailwind.config.js` et `style.css` à
-   comportement identique.
+2. ~~**Le système de design**~~ — **tous ses choix tranchés** : (1) police, (2) cinq familles de
+   phase, (3) rampe d'altitude (palette F, 13/10), (4) J / K au lieu de Tab (13/10), (5)
+   l'interpolation des avions gardée sous « Réduire les animations » (**15/10**), (6) esquisses
+   (D77) et écrans finaux (D78). La migration elle-même est suivie dans le tableau des chantiers
+   (étapes 0 à 11 versées, 12 en attente de la soirée sur l'iPhone, 13 à faire).
 3. ~~Le premier pas communautaire~~ — **tranché le 13/10** avec la session communauté : pas
    d'avocat ni de démarche auprès d'une autorité ; le premier pas est l'outil strictement local
    installable ailleurs (P0), puis un corpus simulé avec consentement (voie A seule) ; les
