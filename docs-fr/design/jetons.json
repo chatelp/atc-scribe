@@ -65,6 +65,31 @@
         "cruise": { "$value": "#6e7b8f", "$description": "Cruise: slate, the quietest." }
       }
     },
+    "map": {
+      "$description": "The map's own layers, palette C chosen by the owner on 15/10: the hues of the map are kept (aerodromes and VOR blue, VORTAC indigo, NDB and airspace amber, heliports violet) and only what clashed with a colour that means something is changed: the selection and the followed track take the accent instead of a yellow that read as a very low aircraft, taxiways and range rings go grey, an aircraft's trail takes its altitude colour, estimates (future, hindcast) are the accent dotted. Colours the map draws on its own, read from these tokens.",
+      "airport": { "$value": "#60a5fa", "$description": "Airport symbol and code." },
+      "heliport": { "$value": "#a78bfa", "$description": "Heliport symbol and code." },
+      "navaid-vor": { "$value": "#60a5fa", "$description": "VOR and VOR-DME." },
+      "navaid-vortac": { "$value": "#818cf8", "$description": "VORTAC." },
+      "navaid-ndb": { "$value": "#f59e0b", "$description": "NDB." },
+      "airspace": { "$value": "#f59e0b", "$description": "Airspace outline, dashed, at 55 %; its fill at 6 %." },
+      "runway": { "$value": "#e4e4e4", "$description": "Runway in the airport layout." },
+      "taxiway": { "$value": "#5c5c5c", "$description": "Taxiway: grey, was pale yellow (#efe3a0), dE76 6.6 from a very low aircraft at worst." },
+      "ring": { "$value": "#3d3d3d", "$description": "Range rings: grey, were the accent." },
+      "ring-label": { "$value": "#949494", "$description": "Range ring labels (\"10 NM\"): the tertiary text." },
+      "selected": { "$value": "#66c56a", "$description": "Ring of the selected aircraft, 2 px: the accent, was #FDE047." },
+      "hovered": { "$value": "#e0e0e0", "$description": "Ring of the hovered aircraft, 1.2 px: primary text, was #86EFAC." },
+      "trail-followed": { "$value": "#66c56a", "$description": "Track of the followed aircraft, dashed. Other aircraft's trails take their altitude colour at 50 %." },
+      "estimate": { "$value": "#66c56a", "$description": "Estimated positions, dotted: the future and the hindcast (were #FFC107 and #00BCD4)." },
+      "trail-stale": { "$value": "#949494", "$description": "Trail of an aircraft whose position is getting old or lost: tertiary, as the lost glyph." },
+      "light": {
+        "ring": { "$value": "#b5b5b5", "$description": "Range rings on a light base map (IGN, OSM)." },
+        "taxiway": { "$value": "#9a9a9a", "$description": "Taxiway on a light base map." },
+        "selected": { "$value": "#2e7d32", "$description": "Selection ring on a light base map (4.5:1 on the OSM ground)." },
+        "hovered": { "$value": "#333333", "$description": "Hover ring on a light base map." },
+        "trail-stale": { "$value": "#7a7a7a", "$description": "Old or lost trail on a light base map." }
+      }
+    },
     "scrim": { "$value": "#000000b3", "$description": "Behind a full page (settings) over the map: black at 70 %." }
   },
   "font": {
