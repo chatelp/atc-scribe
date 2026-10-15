@@ -529,7 +529,7 @@ Reste ouvert, sans effet sur le dessin : 5. l'interpolation des avions gardée s
 
 Choisie par le propriétaire sur une même scène dessinée trois fois (aujourd'hui, fond gris, seulement
 les conflits) : **seulement les conflits**. La carte garde ses teintes (aérodromes et VOR en bleu,
-VORTAC indigo, NDB et espaces aériens en ambre, héliports en violet) ; ce qui se confondait avec une
+VORTAC indigo, NDB en ambre, petits aérodromes, héliports et DME en violet) ; ce qui se confondait avec une
 couleur de sens change :
 
 | Rôle | Avant | Après | Pourquoi |
@@ -541,6 +541,15 @@ couleur de sens change :
 | Traces | toutes vertes | la couleur d'altitude de l'avion à 50 % ; le vol suivi en `color-map-trail-followed` pointillé | la trace se rattache à son avion |
 | Positions estimées (futur, rétro-prévision) | `#FFC107`, `#00BCD4` | `color-map-estimate`, pointillé | une estimation, une seule couleur |
 | Trace ancienne ou perdue | `#FFC107` | `color-map-trail-stale` (tertiaire) | comme le glyphe perdu |
+| Prolongements d'axe de piste | `#76C76C` pointillé | `color-map-centerline` (#555555) | ΔE 1,2 du vert d'accent ; ils traversent toute la carte |
+| Aérodromes moyens | `#34D399` | `color-map-airport` (le bleu des grands ; la taille les distingue) | ΔE 2,2 de la phase « sol » au pire, et un vert |
+| Hydrobases | `#2DD4BF` | `color-map-airport-small` (violet, avec les petits aérodromes) | ΔE 3,4 d'un avion bas au pire |
+| Héliports | `#FB923C` | `color-map-heliport` (violet) | ΔE 3,3 de la phase « départ » |
+| Cercle de proximité (Nearby) | `#EB8C00` | `color-map-proximity` (accent, pointillé) | ΔE 0,9 de la phase « départ » ; il appartient au vol suivi |
+
+Les espaces aériens sont des tuiles d'image openAIP : leurs couleurs ne sont pas les nôtres, seule
+leur opacité se règle (le menu des calques). Les neutres restent (liseré noir des numéros de piste,
+fond des libellés, aprons et terminaux en gris pâles).
 
 Les jetons `color-map-*` (et `color-map-light-*` sur les fonds IGN et OSM) sont dans `jetons.json` ;
 la carte les lit comme elle lit déjà `labelTextColor`. Les anneaux restent volontairement discrets
