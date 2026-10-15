@@ -53,7 +53,13 @@ def get(url: str, timeout: float = 10.0):
 
 
 def pid_of(pattern: str) -> str:
+    # Never this logger itself: its own command line carries the patterns it
+    # is given (--stop "..."), and on 14/10 a restart with the same pattern
+    # stopped it along with the instance, silently, for the whole night.
+    me = str(os.getpid())
     out = subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True).stdout.split()
+    out = [pid for pid in out if pid != me and "night-log" not in
+           subprocess.run(["ps", "-o", "command=", "-p", pid], capture_output=True, text=True).stdout]
     return out[0] if out else ""
 
 
