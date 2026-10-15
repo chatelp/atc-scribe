@@ -492,6 +492,79 @@ sur la carte.
 
 ## État
 
+- 15/10 (matin) : **nuit de mesure du 14 au 15/10** (instance d'essai, vrai modèle, D81 et modèles
+  gardés en mémoire, 20 h 56 → 9 h). Première lecture, 3 850 transmissions : **1,0 s en médiane,
+  2,4 s au 90ᵉ centile**, stable d'heure en heure, pic du matin compris (7 h : 464 transmissions,
+  1,0 s, 1,8 s au 90ᵉ). Lecture française, 2 136 : 1,7 s après l'anglaise en médiane, 4,0 s au
+  90ᵉ ; 2 030 d'entre elles ont servi à la reconnaissance. Part reconnue 21 h – 9 h : **34,5 %**,
+  contre 27,4 et 25,1 % les nuits du 2-3 et du 3-4/10 sur les mêmes fréquences ; écart non
+  attribuable à une cause unique (règles, détecteur, D81 et trafic ont changé entre-temps), et la
+  précision n'est pas mesurée. ADS-B : 14 coupures d'une à deux minutes (« i/o timeout » vers la
+  station), rétablies seules. Disque : +1,5 Go d'archive audio, +0,3 Go de base, 82 Go libres.
+  Mémoire du sidecar : 14 → 17 Go en douze heures (trois modèles), à surveiller. **Le relevé toutes
+  les 5 minutes, lui, n'a tourné que dix minutes** : le redémarrage de 20 h 56 l'a arrêté (motif
+  `pgrep` trop large) ; corrigé dans l'outil (ce59219) ; files d'attente et mémoire heure par
+  heure ne sont donc pas connues pour cette nuit.
+- 14/10 (soir) : **étape 10 versée dans `local`** après relecture design et coup d'œil du
+  propriétaire. L'écran plein « Connection Lost » devient un `cl-banner` en haut du ciel, vérifié
+  en coupant le serveur sous une page ouverte (« Connection to the server lost since 18:31Z:
+  reconnecting (attempt 4), next in 9 s. The map shows the last positions. ») ; le fil vide dit
+  pourquoi (récepteur prêté ou éteint depuis quand, aucune fréquence, rien de transcrit encore) et
+  son en-tête n'offre plus de canal quand rien n'est à l'antenne ; l'avis de reprise prend la forme
+  du système. Le même soir, hors migration : **D81** (la première lecture d'abord, la seconde
+  ensuite) et le correctif du sidecar qui garde les deux modèles en mémoire (mesure du labo :
+  4,58 → 0,90 s pour la lecture anglaise, 4,66 → 0,99 s pour la française) ; la mesure en direct
+  suit.
+- 14/10 (soir) : **étape 9 versée dans `local`** après le coup d'œil du propriétaire (« ok
+  validé sauf la roue crantée qui ressemble à un soleil » : remplacée par une roue dentée). Ses
+  décisions du soir : la vue PAR **s'adapte à la hauteur de l'écran** (bande d'élévation de 80 à
+  230 px selon la place que laissent têtes et tableaux ; une piste sur un grand écran garde la
+  pleine hauteur, deux sur 900 px tiennent sans défiler) ; la latence de transcription transmise au
+  labo, qui l'a décomposée : de la requête au texte 7,8 s en médiane, 31,7 s au 90ᵉ centile ; calcul
+  seul 3,1 s (0,40 s par seconde d'audio) ; **le retard vient de la file à un seul fil** (attente
+  médiane 0,5 s, 26,5 s au 90ᵉ centile, quand les deux fréquences parlent ensemble ; la seconde
+  lecture française passe devant la première lecture de l'autre fréquence).
+- 14/10 (nuit) : **étapes 9b, 9d et 9e livrées sur `migration`, relues conformes pour 9b et 9d**
+  (9e en relecture ; 9c, les réglages, en cours). 9b : les phrases d'événements alignées sur la fiche
+  EventList, écrites en un seul endroit (`events.js`) pour la colonne et la cloche (« 7700 EZY306H,
+  emergency squawk, FL 390, 36 NM north. »), les fiches au nom court. 9d : la connexion et le
+  premier lancement sur le ciel (`SignIn` variante ciel), la console de la station lue sur
+  `/api/v1/vitals` (route publique, cache 10 s, déjà côté serveur) ; `login.js` perd sa palette ;
+  au téléphone une colonne dans le flux (règle du système corrigée, acceptée par la relecture) ;
+  aperçu `?signin=1` / `?signin=setup` sur une instance de cette machine. 9e : la vue PAR sur le
+  système (ParHead, ParFrame, ArrivalSequence), la piste hors service repliée par défaut.
+- 14/10 (soir) : **étape 9b livrée sur `migration`**. Les fiches d'aérodrome, d'héliport et de
+  balise deviennent des `cl-card` (tête : indicatif en mono, nom, × ; `KeyValues` ; fréquences en
+  `cl-table`, MHz à trois décimales), fermées par ×, Échap ou un clic à côté ; les valeurs venues
+  de la base sont échappées ; les règles `ref-popup` de `style.css` (couleurs en dur) sont
+  retirées. Le journal devient un `cl-menu` sous la cloche (a-journal) : « Sounds » et « Clear »
+  dans sa tête, « Ring a bell for » en cinq cases (la station et ses flux sous une), les lignes
+  marquées comme dans Right now (■ ▲ ●), à l'horloge de la page (UTC par défaut ; il affichait
+  l'heure locale avec les secondes). Au passage, la trace d'un avion perdu passe au gris tertiaire
+  du système (relecture design).
+- 14/10 (soir) : **trois retours du propriétaire pendant 9a.** (1) **Perte de signal** : un
+  avion trop bas avant l'atterrissage restait figé à côté de sa trace. Cause mesurée : pendant la
+  minute qui précède « signal lost », le serveur envoie des positions prédites en ligne droite et
+  le moteur extrapole ; l'avion déclaré perdu n'est plus animé là où la prédiction l'avait mené.
+  Désormais un avion silencieux revient en glissant (1,2 s) à sa dernière position observée et y
+  attend, sans estimation : sous 5 000 ft après 12 s sans position, plus haut une fois déclaré
+  perdu. Le banc de rejeu a tranché le seuil : un arrêt à 12 s partout dégradait le trou de 30 s
+  en croisière (erreur moyenne 97 → 414 m, images lentes 1,36 → 2,30 %) ; avec la règle « bas
+  seulement », les métriques du banc sont inchangées. Une fois perdu, le symbole est gris (texte
+  tertiaire) au lieu de la rampe d'altitude, l'étiquette dit « lost 3 min · last 1620ft » ; il
+  reste sur la carte le temps du réglage « last seen » (10 min), comme avant. (2) **L'indicatif
+  reconnu dans le fil** passe en vert d'accent (règle du système, `.cl-exchange__text b`,
+  contraste 8,1:1) ; les valeurs reconnues ne se marquent pas dans le texte, les puces les disent.
+  (3) Relecture de 9a : conforme ; la carte repliée se suspend sous la rangée (système). Ajouté à
+  l'étape 9 par la relecture : la vue PAR elle-même (tête, tableaux, piste hors service repliée),
+  prévue en 9e.
+- 14/10 (soir) : **étape 9a livrée sur `migration`** : la rangée du haut du ciel (`cl-sky__top` :
+  la bascule Map / PAR · LFPG… en `SegmentedControl`, les notes de carte, la colonne repliée à son
+  bout), le bouton des calques dans le coin (`cl-sky__corner`) et son menu `cl-menu--map` (fond de
+  carte en `SegmentedControl`, Aircraft, Layers avec interrupteurs et opacités ; mêmes réglages,
+  même enregistrement dans le navigateur, domaine `store/sky.js`). L'ancien bouton « Radar / PAR »
+  en haut à droite et le panneau « Map Controls » sont retirés. Les notes se raccourcissent avec
+  des points de suspension plutôt que de pousser la carte repliée hors de l'écran.
 - 14/10 : **étape 8 versée dans `local`** (b0c4e23) après le coup d'œil du propriétaire (« ok pour
   l'étape 8 »). Dernier détail de la relecture : le voyant d'antenne dit les jours au-delà de 48 h
   (« 5 days ago » au lieu de « 126 h 27 ago »).

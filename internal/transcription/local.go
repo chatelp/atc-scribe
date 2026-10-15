@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
@@ -217,6 +218,10 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 	// cannot serve, since under a queue it sees a transmission long after it ended.
 	req.Header.Set("X-Created-At", at.UTC().Format(time.RFC3339))
 	req.Header.Set("X-Segment-At", at.UTC().Format("2006-01-02T15:04:05.000Z"))
+	// The first reading now, a second one later (14/10): the sidecar answers
+	// as soon as the English text is ready and keeps the French reading for
+	// GET /second/{id}, in a lane that never delays another first reading.
+	req.Header.Set("X-Second", "later")
 
 	// From the request to the decoded answer: what one transmission costs,
 	// waiting behind others in the sidecar's queue included.
@@ -248,6 +253,8 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 		// French gate opened. Empty the rest of the time, which is most of it.
 		SecondText     string `json:"second_text"`
 		SecondLanguage string `json:"second_language"`
+		// Set when a second reading may follow, asked for later.
+		SecondPending string `json:"second_pending"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		p.logger.Error("Failed to decode sidecar response", Error(err))
@@ -281,8 +288,13 @@ func (p *LocalProcessor) send(pcm []byte, rate int, at time.Time) {
 			String("text", out.SecondText))
 	}
 
-	if err := p.sink.emit(out.Text, at, out.Language, out.SecondText); err != nil {
+	id, err := p.sink.emit(out.Text, at, out.Language, out.SecondText)
+	if err != nil {
 		p.logger.Error("Failed to store transcription", Error(err))
+		return
+	}
+	if out.SecondPending != "" {
+		go p.awaitSecond(id, out.SecondPending, time.Now())
 	}
 }
 
@@ -431,4 +443,57 @@ func rms(frame []byte) float64 {
 		sum += v * v
 	}
 	return math.Sqrt(sum / float64(n))
+}
+
+// secondWaitTotal bounds how long a second reading is waited for: past it the
+// sidecar has forgotten it, or the queue is so long it no longer matters.
+const secondWaitTotal = 10 * time.Minute
+
+// awaitSecond fetches a second reading asked for later, long-polling the
+// sidecar a minute at a time, and stores it when it says something.
+func (p *LocalProcessor) awaitSecond(id int64, key string, firstAt time.Time) {
+	deadline := time.Now().Add(secondWaitTotal)
+	client := &http.Client{Timeout: 75 * time.Second}
+	for time.Now().Before(deadline) && p.ctx.Err() == nil {
+		req, err := http.NewRequestWithContext(p.ctx, "GET",
+			p.config.Local.ServerURL+"/second/"+url.PathEscape(key)+"?wait=60", nil)
+		if err != nil {
+			return
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			if p.ctx.Err() == nil {
+				p.logger.Warn("Second reading not fetched", Error(err))
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			return
+		}
+		var out struct {
+			Status         string `json:"status"`
+			SecondText     string `json:"second_text"`
+			SecondLanguage string `json:"second_language"`
+		}
+		decodeErr := json.NewDecoder(resp.Body).Decode(&out)
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			return // the sidecar restarted, or forgot it
+		}
+		if decodeErr != nil || out.Status == "pending" {
+			continue
+		}
+		if out.SecondText == "" {
+			return // the French gate stayed shut
+		}
+		// "after": how long the exchange was shown without its French
+		// reading, what the listener sees of D81.
+		again := p.sink.second(id, out.SecondText)
+		p.logger.Info("Second opinion",
+			logger.Int64("id", id),
+			String("after", fmt.Sprintf("%.1fs", time.Since(firstAt).Seconds())),
+			logger.Bool("rematch", again),
+			String("language", out.SecondLanguage),
+			String("text", out.SecondText))
+		return
+	}
 }

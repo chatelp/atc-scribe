@@ -75,6 +75,18 @@ opinions the detector opened (`second_opinion_by_detector`) and its failures
 (`detector_failed`). All model work runs on one thread: MLX ties lazily created
 arrays to the thread that created them.
 
+That thread has two lanes (`lanes.py`, 14/10): the first reading of a transmission
+runs before any detector pass or second reading still waiting, so the French
+reading of one frequency no longer delays the English reading of another (the
+wait had reached 26.5 s at the 90th percentile when both spoke at once). With the
+header `X-Second: later` the answer comes as soon as the first reading is done,
+with `second_pending` set when a second reading may follow; `GET /second/{id}?wait=60`
+waits for it and answers `{"status": "done", "second_text": ...}` (empty when the
+gate stayed shut), `{"status": "pending"}`, or 404 for an id it does not know.
+Without the header the answer waits for both readings, as before. `/health`
+reports the queue by lane (`queue`) and the readings not yet fetched
+(`second_pending`).
+
 `--fr-no-fallback` reads French once, at temperature 0, instead of mlx_whisper's
 fallback of up to six decodes at rising temperature. The fallback fires on the
 French model's loops: on two benches it made the mean French read 3.8 and 2.7 s,

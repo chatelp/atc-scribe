@@ -1,6 +1,7 @@
-// serverSettings(), the x-data of the settings page's Server and Account
-// sections. Moved from app.js as it was (docs-fr/32, palier 5.1): a global
-// function, which index.html calls by name.
+// serverSettings(), the x-data of the settings page. Moved from app.js as it
+// was (docs-fr/32, palier 5.1): a global function, which index.html calls by
+// name. Since migration step 9 it also carries the page's own state: the
+// section in view, the folded parts, the light in its head.
 // ---------------------------------------------------------------- server panel
 //
 // The Server section of the settings panel. Everything else in that panel is a
@@ -8,8 +9,9 @@
 // and the two were worth separating -- one follows you between machines, the
 // other decides when data is deleted.
 //
-// Only two settings are writable while the server runs: the log level and the
-// database retention. The rest is reported and not editable, because changing it
+// Writable while the server runs: the log level, the database retention, the
+// airports followed, the callsign matching rules and the station's console on
+// the sign-in page. The rest is reported and not editable, because changing it
 // means reopening the log file or the audio pipeline. A panel that silently
 // fails to apply half of what it shows is worse than one that says which half.
 // The three matching presets (D73, 12/10), measured on the 03 and 04/10
@@ -29,9 +31,76 @@ const MATCHING_PRESETS = (() => {
     };
 })();
 
+// The presets as the page offers them: name, label, and the bubble that says
+// what each measured.
+const MATCHING_PRESET_CHOICES = [
+    ['measured', 'Measured', 'The rules in force since 26/09, each measured against shuffled skies: letters in flight numbers, the airline heard roughly, three digits at least, the last letters and the last two digits of an aircraft just heard, the frequency\'s sector. Measured on 03 and 04/10: 2 557 and 1 699 matches, 95 % right. The default.'],
+    ['cautious', 'Cautious', 'Measured, plus the exact flight number required (score 0.9): a number heard in part, or an abbreviation alone, no longer names an aircraft. Measured on 03 and 04/10: 97 % right, for 27 % fewer matches. For when a wrong aircraft costs more than a missing one.'],
+    ['experimental', 'Experimental', 'Measured, plus the two rules the shuffled sky cannot judge: an airline named alone when one aircraft of it was just heard, and the first digits after the airline\'s name. Measured on 03 and 04/10: 25 % more matches, 95 % right by the shuffle -- but two aircraft of one airline on the frequency can be confused, which only an ear can tell. To try, and judge.'],
+];
+
 function serverSettings() {
     return {
         presets: MATCHING_PRESETS,
+        presetChoices: MATCHING_PRESET_CHOICES,
+
+        // The page's navigation: the section in view is lit, a click scrolls
+        // to it. Read from the scroll rather than an IntersectionObserver: the
+        // last sections are short and never reach the top, so "in view" is
+        // also "scrolled to the bottom".
+        sections: [['listening', 'Listening'], ['matching', 'Callsign matching'], ['display', 'Display'], ['account', 'Account'], ['system', 'System']],
+        current: 'listening',
+        rulesOpen: false,
+        reportsOpen: false,
+        debugOpen: false,
+
+        spy() {
+            const box = this.$refs.scroller;
+            if (!box) return;
+            if (box.scrollTop + box.clientHeight >= box.scrollHeight - 2) {
+                this.current = this.sections[this.sections.length - 1][0];
+                return;
+            }
+            const top = box.getBoundingClientRect().top;
+            let current = this.sections[0][0];
+            for (const [id] of this.sections) {
+                const el = document.getElementById('set-' + id);
+                if (el && el.getBoundingClientRect().top - top <= 32) current = id;
+            }
+            this.current = current;
+        },
+
+        goTo(id) {
+            const el = document.getElementById('set-' + id);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            this.current = id;
+        },
+
+        // The light in the page's head: what the last load or save did.
+        statusLight() {
+            if (this.error) return { level: 'cl-light--bad', text: this.error };
+            if (this.busy) return { level: 'cl-light--switching', text: this.loading ? 'Loading…' : 'Saving…' };
+            if (this.note) return { level: this.noteBad ? 'cl-light--bad' : 'cl-light--ok', text: this.note.replace(/\.$/, '') };
+            if (this.state) return { level: 'cl-light--ok', text: 'Saved' };
+            return { level: '', text: '' };
+        },
+
+        // The channels the station plays, as one sentence: name and frequency.
+        onAir() {
+            const atc = Alpine.store('atc');
+            const list = (atc && atc.audioFrequencies) || [];
+            if (!list.length) return 'No frequency connected.';
+            return list.map((f) => {
+                const mhz = Number(f.frequency_mhz) > 0 ? ' ' + Number(f.frequency_mhz).toFixed(3) : '';
+                return atc.freqShortName(f) + mhz;
+            }).join(' · ');
+        },
+
+        // A rule switch: flip it, then save as its checkbox did.
+        flipRule(key) {
+            this.draft.matching[key] = !this.draft.matching[key];
+            this.save();
+        },
 
         // The preset the rules match, or null when they match none.
         activePreset() {
@@ -51,15 +120,17 @@ function serverSettings() {
         },
 
         state: null,
-        draft: { log_level: 'info', db_retention_gb: 20, reference_airport: '', also_airports: [], matching: null },
+        draft: { log_level: 'info', db_retention_gb: 20, reference_airport: '', also_airports: [], matching: null, vitals: true },
         newAccount: null, // { username, password } while the first account is being typed
         busy: false,
+        loading: false,
         error: '',
         note: '',
         noteBad: false,
 
         async load() {
             this.busy = true;
+            this.loading = true;
             this.error = '';
             try {
                 const r = await fetch('/api/v1/server', { credentials: 'same-origin' });
@@ -73,11 +144,13 @@ function serverSettings() {
                     also_airports: (this.state.settings.also_airports || []).slice(),
                     // A deep copy: the sector sizes are edited in place by the inputs.
                     matching: this.state.settings.matching ? JSON.parse(JSON.stringify(this.state.settings.matching)) : null,
+                    vitals: this.vitalsOn(this.state.settings),
                 };
             } catch (e) {
                 this.error = 'Server state unreachable: ' + e.message;
             } finally {
                 this.busy = false;
+                this.loading = false;
             }
         },
 
@@ -123,6 +196,7 @@ function serverSettings() {
                         // The reference airport cannot also be a further one.
                         also_airports: this.draft.also_airports.filter(c => c !== this.draft.reference_airport),
                         matching: this.draft.matching,
+                        vitals: { enabled: !!this.draft.vitals },
                     }),
                 });
                 if (r.status === 401) { this.flash('Sign in to change server settings.', true); return; }
@@ -133,6 +207,7 @@ function serverSettings() {
                     this.draft.reference_airport = this.state.settings.reference_airport;
                     this.draft.also_airports = (this.state.settings.also_airports || []).slice();
                     if (this.state.settings.matching) this.draft.matching = JSON.parse(JSON.stringify(this.state.settings.matching));
+                    this.draft.vitals = this.vitalsOn(this.state.settings);
                     return;
                 }
                 const followed = s => [s.reference_airport].concat(s.also_airports || []).join('+');
@@ -156,6 +231,12 @@ function serverSettings() {
             } finally {
                 this.busy = false;
             }
+        },
+
+        // The sign-in page's station console: absent from a settings file
+        // saved before it existed, which means on (config.DefaultVitals).
+        vitalsOn(settings) {
+            return !settings.vitals || settings.vitals.enabled !== false;
         },
 
         accessLabel() {
@@ -232,7 +313,9 @@ function serverSettings() {
             if (ref.airport && !list.some(c => c.code === ref.airport)) {
                 list.unshift({ code: ref.airport, name: ref.name || '', distance_nm: ref.distance_nm || 0 });
             }
-            return list;
+            // The short name, as everywhere else ("Paris-Orly", not "Paris-Orly Airport").
+            const R = window.RightNow;
+            return list.map((c) => (R ? Object.assign({}, c, { name: R.shortName({ name: c.name, code: c.code }) }) : c));
         },
 
         // Airports followed besides the reference one (Q40): each aircraft is

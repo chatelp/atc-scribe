@@ -134,7 +134,7 @@
             </button>
             <button class="cl-btn cl-btn--icon" aria-label="Settings" data-help-title="Settings"
                     data-help="Listening, callsign matching, display, account, system." @click="$store.atc.settingsOpen = true">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M6.43 2.83 L6.50 1.16 L9.50 1.16 L9.57 2.83 L10.55 3.24 L11.77 2.10 L13.90 4.23 L12.76 5.45 L13.17 6.43 L14.84 6.50 L14.84 9.50 L13.17 9.57 L12.76 10.55 L13.90 11.77 L11.77 13.90 L10.55 12.76 L9.57 13.17 L9.50 14.84 L6.50 14.84 L6.43 13.17 L5.45 12.76 L4.23 13.90 L2.10 11.77 L3.24 10.55 L2.83 9.57 L1.16 9.50 L1.16 6.50 L2.83 6.43 L3.24 5.45 L2.10 4.23 L4.23 2.10 L5.45 3.24Z"/><circle cx="8" cy="8" r="2.1"/></svg>
             </button>
         </header>
         <!-- Header Removed-->
@@ -162,7 +162,7 @@
                                     data-help-title="Search" data-help="Find exchanges by their words, a callsign, a speaker or an instruction.">
                                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>
                             </button>
-                            <button class="cl-btn" x-show="$store.atc.audioFrequencies.length" @click="$store.atc.toggleAllListening()"
+                            <button class="cl-btn" x-show="!$store.atc.nothingOnAir" @click="$store.atc.toggleAllListening()"
                                     x-text="$store.atc.anyUnmuted ? 'Mute all' : 'Listen to all'"
                                     data-help-title="Listening" data-help="Play or mute every frequency in this browser. The station chooses what is on air; this only chooses what you hear."></button>
                         </span>
@@ -173,7 +173,7 @@
                                @keydown.escape="$store.atc.threadSearch = ''; $store.atc.threadSearchOpen = false">
                     </div>
                     <!-- ChannelButton (split) per frequency, and its ChannelMenu. -->
-                    <div class="cl-threadhead__row cl-threadhead__row--channels" x-show="$store.atc.audioFrequencies.length">
+                    <div class="cl-threadhead__row cl-threadhead__row--channels" x-show="!$store.atc.nothingOnAir">
                         <template x-for="freq in $store.atc.audioFrequencies" :key="freq.id">
                             <span class="cl-channel cl-channel--split relative"
                                   :class="{ 'is-on': $store.atc.isUnmuted(freq.id), 'is-menu-open': $store.atc.threadMenuFor === freq.id,
@@ -219,7 +219,7 @@
                             </span>
                         </template>
                     </div>
-                    <div class="cl-threadhead__row" x-show="$store.atc.audioFrequencies.length > 1">
+                    <div class="cl-threadhead__row" x-show="!$store.atc.nothingOnAir && $store.atc.audioFrequencies.length > 1">
                         <span class="cl-label">Show</span>
                         <div class="cl-seg">
                             <button class="cl-seg__item" :aria-pressed="String($store.atc.threadShow === 'all')" @click="$store.atc.setThreadShow('all')">All</button>
@@ -234,7 +234,7 @@
                 <div class="cl-app__bottom relative" x-data="threadView()">
                     <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" x-ref="scroller" @scroll.passive="onScroll()">
                         <template x-if="$store.atc.threadExchanges.length === 0">
-                            <p class="cl-plain px-4 py-3" x-text="$store.atc.threadSearch ? 'No exchange matches this search.' : ($store.atc.audioFrequencies.length ? 'No exchange yet: they appear here as the frequencies are transcribed.' : 'No frequency: the station has nothing on air.')"></p>
+                            <div class="cl-empty"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 6.5a5.5 5.5 0 0 1 10 0M5 8.5a3 3 0 0 1 6 0"/><circle cx="8" cy="11" r="1.2"/></svg><span x-text="$store.atc.threadEmptyText"></span></div>
                         </template>
                         <!-- Exchange: who spoke to whom, what was said, what it means. -->
                         <template x-for="t in $store.atc.threadExchanges" :key="t.id || (t.frequency_id + '-' + t.timestamp)">
@@ -330,711 +330,538 @@
             <div class="flex-col flex-1 relative min-w-0" :class="$store.atc.mobilePane === 'map' ? 'flex' : 'hidden md:flex'">
                 <!-- Main Content -->
                 <main class="flex flex-1 overflow-hidden relative">
-                    <!-- Settings Panel -->
-                    <!-- Settings: a page of its own (audit 2.1, 10/10). It replaced a 320 px side
-                         panel where the settings that matter came last, 1 300 px down, under five
-                         upstream sections with no use here. The controls are the same, moved: their
-                         bindings are unchanged. The station override by the browser's GPS is gone:
-                         the station does not move. -->
+                    <!-- Settings: a page of its own (audit 2.1, 10/10), SettingsPage since
+                         migration step 9 (docs-fr/design/ecrans/reglages.html). The controls
+                         are the same, restyled: their bindings and save() are unchanged.
+                         Above the sky's overlays (10001-10002); on a phone the nav becomes a
+                         row over the body. -->
                     <div x-show="$store.atc.settingsOpen" x-cloak
                          @keydown.escape.window="$store.atc.settingsOpen = false"
                          x-data="serverSettings()" x-init="load()"
-                         class="fixed inset-x-0 top-0 bottom-20 md:bottom-0 z-[70] bg-panel flex">
-                        <nav class="hidden md:flex flex-col gap-1 w-48 shrink-0 border-r border-border p-4 text-sm">
-                            <div class="text-highlight font-semibold mb-2">Settings</div>
-                            <a href="#set-listening" @click.prevent="document.getElementById('set-listening').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">Listening</a>
-                            <a href="#set-matching" @click.prevent="document.getElementById('set-matching').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">Callsign matching</a>
-                            <a href="#set-display" @click.prevent="document.getElementById('set-display').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">Display</a>
-                            <a href="#set-account" @click.prevent="document.getElementById('set-account').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">Account</a>
-                            <a href="#set-system" @click.prevent="document.getElementById('set-system').scrollIntoView({behavior: 'smooth'})" class="px-2 py-1 rounded hover:bg-hover">System</a>
-                        </nav>
-                        <div class="flex-1 overflow-y-auto">
-                            <div class="max-w-2xl mx-auto px-4 py-5 grid gap-8">
-                                <div class="flex items-center justify-between gap-3 sticky top-0 bg-panel py-2 z-10">
-                                    <h1 class="text-lg font-semibold">Settings</h1>
-                                    <div class="flex items-center gap-3">
-                                        <template x-if="note"><span class="text-xs" :class="noteBad ? 'text-red-400' : 'text-green-400'" x-text="note"></span></template>
-                                        <button @click="load()" :disabled="busy" title="Reload from the server" class="text-sm opacity-60 hover:opacity-100 disabled:opacity-30"><i class="fas fa-rotate" :class="{ 'fa-spin': busy }"></i></button>
-                                        <button @click="$store.atc.settingsOpen = false" title="Close (Esc)" class="text-lg opacity-70 hover:opacity-100"><i class="fas fa-xmark"></i></button>
+                         role="dialog" aria-label="Settings"
+                         class="cl-root cl-page fixed inset-x-0 top-0 bottom-20 md:bottom-0" style="z-index: 10010;">
+                        <div class="cl-page__inner max-md:grid-cols-1 max-md:grid-rows-[auto_minmax(0,1fr)] max-md:border-x-0">
+                            <nav class="cl-page__nav max-md:flex-row max-md:overflow-x-auto max-md:border-r-0 max-md:border-b max-md:border-border-default max-md:px-3 max-md:py-2" aria-label="Sections">
+                                <template x-for="s in sections" :key="s[0]">
+                                    <a :href="'#set-' + s[0]" :aria-current="String(current === s[0])" @click.prevent="goTo(s[0])" class="whitespace-nowrap" x-text="s[1]"></a>
+                                </template>
+                            </nav>
+                            <div class="cl-page__body min-h-0">
+                                <div class="cl-page__head flex-wrap max-md:px-4 max-md:py-3">
+                                    <h1 class="cl-page__title">Settings</h1>
+                                    <span class="cl-light whitespace-normal" :class="statusLight().level" x-show="statusLight().text" x-text="statusLight().text"></span>
+                                    <span class="cl-row" style="margin-left: auto;">
+                                        <button class="cl-btn" @click="load()" :disabled="busy">Reload from the server</button>
+                                        <button class="cl-btn cl-btn--icon" aria-label="Close" title="Close (Esc)" @click="$store.atc.settingsOpen = false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg></button>
+                                    </span>
+                                </div>
+                                <div class="flex-1 min-h-0 overflow-y-auto" x-ref="scroller" @scroll.passive="spy()">
+
+                        <section id="set-listening" class="cl-page__section max-md:px-4">
+                            <h3>Listening</h3>
+                            <div class="cl-field cl-field--text">
+                                <span class="cl-field__label">On air</span>
+                                <span class="cl-plain" x-text="onAir()"></span>
+                                <span class="cl-field__help">Chosen at the station; this page plays what it receives.</span>
+                            </div>
+                            <!-- The airport phases are judged against. Upstream measured them from
+                                 the receiver; this lets a receiver that does not sit on the airport
+                                 worth watching say which one it is. -->
+                            <template x-if="state && state.reference">
+                                <div class="contents">
+                                    <div class="cl-field max-md:grid-cols-1">
+                                        <span class="cl-field__label cursor-help" data-help-title="Reference airport"
+                                              data-help="Approach, departure, takeoff, landing, runway in use and weather are judged against this airport. Distances and range rings stay on the receiver.">Reference airport</span>
+                                        <select class="cl-select min-w-0 max-w-full" aria-label="Reference airport"
+                                                x-model="draft.reference_airport" @change="save()" :disabled="busy">
+                                            <template x-for="c in airportChoices()" :key="c.code">
+                                                <option :value="c.code" :selected="c.code === draft.reference_airport"
+                                                        x-text="c.code + ' · ' + c.name + ' · ' + c.distance_nm + ' NM'"></option>
+                                            </template>
+                                        </select>
+                                        <span class="cl-field__help">Phases (taxi, take-off, approach) are judged against it.</span>
+                                    </div>
+                                    <!-- Further airports: Orly and De Gaulle are 13 NM apart and both
+                                         worth watching (docs-fr/05-decisions.md, Q40). -->
+                                    <!-- Stacked: the airports in range are twenty or more, and beside
+                                         the label they squeezed it to a word per line. -->
+                                    <div class="cl-field grid-cols-1">
+                                        <span class="cl-field__label cursor-help" data-help-title="Also follow"
+                                              data-help="Each aircraft is judged against the airport whose runway axis it flies, else the nearest; its phase then shows that airport. Weather stays the reference airport's. Three at most.">Also follow</span>
+                                        <span class="cl-row gap-x-4">
+                                            <template x-for="c in alsoChoices()" :key="'also-' + c.code">
+                                                <label class="cl-check" :class="alsoFollowed(c.code) ? 'is-on' : ''"
+                                                       role="checkbox" tabindex="0" :aria-checked="String(alsoFollowed(c.code))"
+                                                       :data-help-title="c.code" :data-help="c.name + ' · ' + c.distance_nm + ' NM from the receiver'"
+                                                       @click.prevent="if (!busy) toggleAlso(c.code)" @keydown.space.prevent="if (!busy) toggleAlso(c.code)">
+                                                    <span class="cl-check__box"></span><span x-text="c.code"></span>
+                                                </label>
+                                            </template>
+                                        </span>
+                                        <span class="cl-field__help">Up to three: each gets a PAR and an arrival sequence.</span>
                                     </div>
                                 </div>
-                                <template x-if="error"><div class="text-sm text-red-400" x-text="error"></div></template>
-                        <section id="set-listening" class="scroll-mt-4">
-                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">Listening</h2>
-                            <div class="grid gap-4">
-                            <div>
-                                <span class="text-sm">On air</span>
-                                <div class="text-xs opacity-70 mt-1" x-show="!$store.atc.audioFrequencies.length">No frequency connected.</div>
-                                <ul class="text-xs mt-1 grid gap-0.5">
-                                    <template x-for="f in $store.atc.audioFrequencies" :key="f.id">
-                                        <li x-text="f.name"></li>
-                                    </template>
-                                </ul>
-                                <div class="text-xs opacity-60 mt-1">Chosen at the station; Clairance follows it.</div>
-                            </div>
-                            <template x-if="state">
-                                <div class="grid gap-4">
-                                        <!-- The airport phases are judged against. Upstream measured them
-                                             from the receiver; this lets a receiver that does not sit on the
-                                             airport worth watching say which one it is. -->
-                                        <template x-if="state.reference">
-                                            <!-- Label above, select full width: airport names are long and the
-                                                 panel is narrow; side by side they overflowed it and clipped
-                                                 every other control in the section. -->
-                                            <div class="grid gap-1 min-w-0">
-                                                <span class="text-sm">Reference airport</span>
-                                                <div class="min-w-0">
-                                                    <select x-model="draft.reference_airport" @change="save()" :disabled="busy"
-                                                            class="w-full min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                        <template x-for="c in airportChoices()" :key="c.code">
-                                                            <option :value="c.code" :selected="c.code === draft.reference_airport"
-                                                                    x-text="c.code + ' · ' + c.name + ' · ' + c.distance_nm + ' NM'"></option>
-                                                        </template>
-                                                    </select>
-                                                </div>
-                                                <div class="text-xs opacity-60 leading-snug">
-                                                    Approach, departure, takeoff, landing, runway in use and weather are
-                                                    judged against this airport. Distances and range rings stay on the receiver.
-                                                </div>
-                                                <!-- Further airports: Orly and De Gaulle are 13 NM apart and both
-                                                     worth watching (docs-fr/05-decisions.md, Q40). -->
-                                                <span class="text-sm mt-2">Also follow</span>
-                                                <div class="grid gap-0.5 max-h-40 overflow-y-auto min-w-0">
-                                                    <template x-for="c in alsoChoices()" :key="'also-' + c.code">
-                                                        <label class="flex items-center gap-2 text-sm min-w-0 cursor-pointer">
-                                                            <input type="checkbox" :checked="alsoFollowed(c.code)" :disabled="busy"
-                                                                   @change="toggleAlso(c.code)">
-                                                            <span class="truncate" x-text="c.code + ' · ' + c.name + ' · ' + c.distance_nm + ' NM'"></span>
-                                                        </label>
-                                                    </template>
-                                                </div>
-                                                <div class="text-xs opacity-60 leading-snug">
-                                                    Each aircraft is judged against the airport whose runway axis it flies,
-                                                    else the nearest; its phase then shows that airport. Weather stays the
-                                                    reference airport's. Three at most.
-                                                </div>
-                                            </div>
-                                        </template>
-
-                                </div>
                             </template>
-                            </div>
                         </section>
-                        <section id="set-matching" class="scroll-mt-4">
-                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">Callsign matching</h2>
-                            <div class="grid gap-4">
-                            <template x-if="state">
-                                <div class="grid gap-4">
-                                        <!-- How a transmission is tied to an aircraft. Each rule was measured
-                                             against a shuffled sky before being offered here (docs-fr/05-decisions.md,
-                                             Q30 and Q46); a change applies to the next transmission. -->
-                                        <template x-if="draft.matching">
-                                            <div class="grid gap-1.5 min-w-0">
-                                                <span class="text-sm">Callsign matching</span>
-                                                <!-- Three presets (D73), measured on 03 and 04/10; the boxes below stay
-                                                     free to change, and "custom" says when they match no preset. -->
-                                                <div class="flex flex-wrap items-center gap-1.5 text-xs mb-1">
-                                                    <template x-for="p in [['measured', 'Measured', 'The rules in force since 26/09, each measured against shuffled skies: letters in flight numbers, the airline heard roughly, three digits at least, the last letters and the last two digits of an aircraft just heard, the frequency\'s sector. Measured on 03 and 04/10: 2 557 and 1 699 matches, 95 % right. The default.'], ['cautious', 'Cautious', 'Measured, plus the exact flight number required (score 0.9): a number heard in part, or an abbreviation alone, no longer names an aircraft. Measured on 03 and 04/10: 97 % right, for 27 % fewer matches. For when a wrong aircraft costs more than a missing one.'], ['experimental', 'Experimental', 'Measured, plus the two rules the shuffled sky cannot judge: an airline named alone when one aircraft of it was just heard, and the first digits after the airline\'s name. Measured on 03 and 04/10: 25 % more matches, 95 % right by the shuffle -- but two aircraft of one airline on the frequency can be confused, which only an ear can tell. To try, and judge.']]" :key="p[0]">
-                                                        <button class="px-2 py-1 rounded border cursor-pointer"
-                                                                :class="activePreset() === p[0] ? 'border-highlight/60 bg-highlight/15 text-highlight' : 'border-border text-text/70 hover:text-text'"
-                                                                :disabled="busy" @click="applyPreset(p[0])" data-help-title="Preset" :data-help="p[2]" x-text="p[1]"></button>
-                                                    </template>
-                                                    <span class="text-text/50" x-show="!activePreset()" data-help-title="Custom" data-help="The boxes below match none of the three presets: your own mix of rules.">custom</span>
-                                                </div>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.letters" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">Letters in flight numbers</span>: "seven uniform echo" read as 7UE.
-                                                        59% of callsigns have letters. Measured +27% matched aircraft, precision 73% to 76%.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.approx_operators" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">Airline heard roughly</span>: "welling" taken for Vueling,
-                                                        among the airlines in the sky only. Few matches on its own; rescues half-heard ones.</span>
-                                                </label>
-                                                <div class="flex items-center justify-between gap-2.5">
-                                                    <span class="text-xs">Shortest flight number</span>
-                                                    <select x-model.number="draft.matching.min_digits" @change="save()" :disabled="busy"
-                                                            class="bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                        <option value="2">2 digits</option>
-                                                        <option value="3">3 digits</option>
-                                                        <option value="4">4 digits</option>
-                                                    </select>
-                                                </div>
-                                                <div class="text-xs opacity-60 leading-snug">
-                                                    With 2 digits, chance matches about as often as the truth (measured); 3 is the default.
-                                                </div>
-                                                <div class="text-xs opacity-60 leading-snug">
-                                                    An aircraft heard on the frequency in the last two minutes, named again in short:
-                                                </div>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.context_letters" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">By its last letters</span>: "sierra bravo" for AFR23SB. Measured +8, no chance matches.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.context_digits" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">By its last two digits</span>: "five four" for LBT554, when no other aircraft just heard ends so. Measured +13.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.context_names" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">By its airline alone</span>, when it is the only one of that airline just heard. Measured +68,
-                                                        but ADS-B cannot tell whether the right aircraft was named: to be checked by ear first.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.sectors" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">Only aircraft in the frequency's sector</span>, for frequencies that name
-                                                        their airport and kind. Measured on the Roissy approach: chance matches halved, more true ones.</span>
-                                                </label>
-                                                <template x-if="draft.matching.sectors && draft.matching.sector">
-                                                    <div class="grid gap-1 pl-5">
-                                                        <template x-for="kind in ['approach', 'departure', 'tower', 'ground']" :key="kind">
-                                                            <div class="flex items-center justify-between gap-2 text-xs">
-                                                                <span class="capitalize" x-text="kind"></span>
-                                                                <span class="flex items-center gap-1">
-                                                                    <input type="number" min="1" max="250" x-model.number="draft.matching.sector[kind].radius_nm" @change="save()" :disabled="busy"
-                                                                           class="w-14 bg-background border border-border rounded px-1 py-0.5 text-right">
-                                                                    <span class="opacity-60">NM, below</span>
-                                                                    <input type="number" min="500" max="60000" step="500" x-model.number="draft.matching.sector[kind].max_alt_ft" @change="save()" :disabled="busy"
-                                                                           class="w-20 bg-background border border-border rounded px-1 py-0.5 text-right">
-                                                                    <span class="opacity-60">ft</span>
-                                                                </span>
-                                                            </div>
-                                                        </template>
+
+                        <section id="set-matching" class="cl-page__section max-md:px-4">
+                            <h3>Callsign matching</h3>
+                            <!-- How a transmission is tied to an aircraft. Each rule was measured
+                                 against a shuffled sky before being offered here (docs-fr/05-decisions.md,
+                                 Q30 and Q46); a change applies to the next transmission. -->
+                            <template x-if="state && draft.matching">
+                                <div class="contents">
+                                    <!-- Three presets (D73), measured on 03 and 04/10; the rules below stay
+                                         free to change, and "custom" says when they match no preset. -->
+                                    <div class="cl-field max-md:grid-cols-1">
+                                        <span class="cl-field__label">Rules</span>
+                                        <span class="cl-row justify-end max-md:justify-start">
+                                            <span class="cl-age cursor-help" x-show="!activePreset()" data-help-title="Custom"
+                                                  data-help="The rules below match none of the three presets: your own mix.">custom</span>
+                                            <div class="cl-seg" role="group" aria-label="Rules preset">
+                                                <template x-for="p in presetChoices" :key="p[0]">
+                                                    <button class="cl-seg__item" :aria-pressed="String(activePreset() === p[0])" :disabled="busy"
+                                                            @click="applyPreset(p[0])" data-help-title="Preset" :data-help="p[2]" x-text="p[1]"></button>
+                                                </template>
+                                            </div>
+                                        </span>
+                                        <span class="cl-field__help">How a transmission is tied to an aircraft. The eleven rules behind each preset stay below, folded.</span>
+                                    </div>
+                                    <button class="cl-disclosure" :aria-expanded="String(rulesOpen)" @click="rulesOpen = !rulesOpen">The eleven rules</button>
+                                    <div x-show="rulesOpen" class="flex flex-col gap-3">
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">Letters in flight numbers</span>
+                                            <button class="cl-switch" role="switch" aria-label="Letters in flight numbers" :disabled="busy"
+                                                    :class="draft.matching.letters ? 'is-on' : ''" :aria-checked="String(!!draft.matching.letters)" @click="flipRule('letters')"></button>
+                                            <span class="cl-field__help">"seven uniform echo" read as 7UE. 59% of callsigns have letters. Measured +27% matched aircraft, precision 73% to 76%.</span>
+                                        </div>
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">Airline heard roughly</span>
+                                            <button class="cl-switch" role="switch" aria-label="Airline heard roughly" :disabled="busy"
+                                                    :class="draft.matching.approx_operators ? 'is-on' : ''" :aria-checked="String(!!draft.matching.approx_operators)" @click="flipRule('approx_operators')"></button>
+                                            <span class="cl-field__help">"welling" taken for Vueling, among the airlines in the sky only. Few matches on its own; rescues half-heard ones.</span>
+                                        </div>
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">Shortest flight number</span>
+                                            <select class="cl-select" aria-label="Shortest flight number" x-model.number="draft.matching.min_digits" @change="save()" :disabled="busy">
+                                                <option value="2">2 digits</option>
+                                                <option value="3">3 digits</option>
+                                                <option value="4">4 digits</option>
+                                            </select>
+                                            <span class="cl-field__help">With 2 digits, chance matches about as often as the truth (measured); 3 is the default.</span>
+                                        </div>
+                                        <p class="cl-plain m-0">An aircraft heard on the frequency in the last two minutes, named again in short:</p>
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">By its last letters</span>
+                                            <button class="cl-switch" role="switch" aria-label="By its last letters" :disabled="busy"
+                                                    :class="draft.matching.context_letters ? 'is-on' : ''" :aria-checked="String(!!draft.matching.context_letters)" @click="flipRule('context_letters')"></button>
+                                            <span class="cl-field__help">"sierra bravo" for AFR23SB. Measured +8, no chance matches.</span>
+                                        </div>
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">By its last two digits</span>
+                                            <button class="cl-switch" role="switch" aria-label="By its last two digits" :disabled="busy"
+                                                    :class="draft.matching.context_digits ? 'is-on' : ''" :aria-checked="String(!!draft.matching.context_digits)" @click="flipRule('context_digits')"></button>
+                                            <span class="cl-field__help">"five four" for LBT554, when no other aircraft just heard ends so. Measured +13.</span>
+                                        </div>
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">By its airline alone</span>
+                                            <button class="cl-switch" role="switch" aria-label="By its airline alone" :disabled="busy"
+                                                    :class="draft.matching.context_names ? 'is-on' : ''" :aria-checked="String(!!draft.matching.context_names)" @click="flipRule('context_names')"></button>
+                                            <span class="cl-field__help">When it is the only one of that airline just heard. Measured +68, but ADS-B cannot tell whether the right aircraft was named: to be checked by ear first.</span>
+                                        </div>
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">Only aircraft in the frequency's sector</span>
+                                            <button class="cl-switch" role="switch" aria-label="Only aircraft in the frequency's sector" :disabled="busy"
+                                                    :class="draft.matching.sectors ? 'is-on' : ''" :aria-checked="String(!!draft.matching.sectors)" @click="flipRule('sectors')"></button>
+                                            <span class="cl-field__help">For frequencies that name their airport and kind. Measured on the Roissy approach: chance matches halved, more true ones.</span>
+                                        </div>
+                                        <template x-if="draft.matching.sectors && draft.matching.sector">
+                                            <div class="flex flex-col gap-2 pl-4 border-l border-border-subtle">
+                                                <template x-for="kind in ['approach', 'departure', 'tower', 'ground']" :key="kind">
+                                                    <div class="cl-field">
+                                                        <span class="cl-field__label capitalize" x-text="kind"></span>
+                                                        <span class="cl-row">
+                                                            <input type="number" min="1" max="250" class="cl-input w-16 text-right" :aria-label="kind + ' sector radius, NM'"
+                                                                   x-model.number="draft.matching.sector[kind].radius_nm" @change="save()" :disabled="busy">
+                                                            <span class="cl-age">NM, below</span>
+                                                            <input type="number" min="500" max="60000" step="500" class="cl-input w-20 text-right" :aria-label="kind + ' sector ceiling, ft'"
+                                                                   x-model.number="draft.matching.sector[kind].max_alt_ft" @change="save()" :disabled="busy">
+                                                            <span class="cl-age">ft</span>
+                                                        </span>
                                                     </div>
                                                 </template>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" :checked="(draft.matching.min_score || 0) >= 0.9" @change="draft.matching.min_score = $event.target.checked ? 0.9 : 0; save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">Exact flight number required</span> (score 0.9): a number heard in part, or an abbreviation
-                                                    alone, no longer names an aircraft. Measured on 03 and 04/10: 95 % to 97 % right, 27 % fewer matches.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.prefix_digits" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">First two digits, airline named</span>: "Air France Five One" for AFR511,
-                                                        right after the airline's name, when no other aircraft of the airline starts so. Measured +1 to 2%, with nearly as much chance on one day: off by default.</span>
-                                                </label>
-                                                <label class="flex items-start gap-2 text-xs leading-snug cursor-pointer">
-                                                    <input type="checkbox" x-model="draft.matching.one_digit_off" @change="save()" :disabled="busy" class="mt-0.5">
-                                                    <span><span class="text-highlight">Accept one digit off</span>: measured 81% noise. For experiments only.</span>
-                                                </label>
                                             </div>
                                         </template>
-
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">Exact flight number required</span>
+                                            <button class="cl-switch" role="switch" aria-label="Exact flight number required" :disabled="busy"
+                                                    :class="(draft.matching.min_score || 0) >= 0.9 ? 'is-on' : ''" :aria-checked="String((draft.matching.min_score || 0) >= 0.9)"
+                                                    @click="draft.matching.min_score = (draft.matching.min_score || 0) >= 0.9 ? 0 : 0.9; save()"></button>
+                                            <span class="cl-field__help">Score 0.9: a number heard in part, or an abbreviation alone, no longer names an aircraft. Measured on 03 and 04/10: 95 % to 97 % right, 27 % fewer matches.</span>
+                                        </div>
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">First two digits, airline named</span>
+                                            <button class="cl-switch" role="switch" aria-label="First two digits, airline named" :disabled="busy"
+                                                    :class="draft.matching.prefix_digits ? 'is-on' : ''" :aria-checked="String(!!draft.matching.prefix_digits)" @click="flipRule('prefix_digits')"></button>
+                                            <span class="cl-field__help">"Air France Five One" for AFR511, right after the airline's name, when no other aircraft of the airline starts so. Measured +1 to 2%, with nearly as much chance on one day: off by default.</span>
+                                        </div>
+                                        <div class="cl-field">
+                                            <span class="cl-field__label">Accept one digit off</span>
+                                            <button class="cl-switch" role="switch" aria-label="Accept one digit off" :disabled="busy"
+                                                    :class="draft.matching.one_digit_off ? 'is-on' : ''" :aria-checked="String(!!draft.matching.one_digit_off)" @click="flipRule('one_digit_off')"></button>
+                                            <span class="cl-field__help">Measured 81% noise. For experiments only.</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </template>
-                            </div>
                         </section>
-                        <section id="set-display" class="scroll-mt-4">
-                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">Display <small class="text-xs font-normal opacity-60">this browser</small></h2>
-                            <div class="flex items-center justify-between gap-2.5 min-h-[30px]"
-                                 data-help-title="Clock" data-help="Aviation runs on UTC: clearances, weather and logs use it. Choose which time the interface shows; the top bar shows both, the chosen one first.">
-                                <span class="text-sm">Times shown in</span>
-                                <div class="flex gap-1.5 text-xs">
-                                    <button class="px-2 py-1 rounded border" :class="!$store.atc.showLocalDates ? 'bg-highlight/15 border-highlight/60 text-highlight' : 'border-border text-text/70 hover:text-text'"
-                                            @click="$store.atc.showLocalDates = false">UTC</button>
-                                    <button class="px-2 py-1 rounded border" :class="$store.atc.showLocalDates ? 'bg-highlight/15 border-highlight/60 text-highlight' : 'border-border text-text/70 hover:text-text'"
-                                            @click="$store.atc.showLocalDates = true">Local</button>
-                                </div>
-                            </div>
-                            <div class="grid gap-4">
-                                <div class="grid gap-3">
-                                    <div class="flex items-center justify-between gap-2.5"
-                                         data-help-title="Last transmission on the label" data-help="Under the callsign of each aircraft the radio has named in the last ten minutes, its last transmission, cut short. Click the aircraft to read it in full in its details.">
-                                        <span class="text-sm">Last transmission on the label</span>
-                                        <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.voiceBubbles" @change="$store.atc.toggleVoiceBubbles()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Smoothing Between Updates</span>
-                                        <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.aircraftAnimation.enabled" @change="$store.atc.toggleAnimation()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
 
-                                    <div class="flex items-center justify-between gap-2.5" x-show="$store.atc.settings.aircraftAnimation.enabled">
-                                        <span class="text-sm">Target FPS</span>
-                                        <div class="flex items-center flex-1 min-w-0">
-                                            <input type="range"
-                                                   x-model.number="$store.atc.settings.aircraftAnimation.interpolationFps"
-                                                   min="10"
-                                                   max="60"
-                                                   step="5"
-                                                   @input="$store.atc.saveSettings()"
-                                                   class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
-                                            <span class="w-9 text-right text-sm" x-text="$store.atc.settings.aircraftAnimation.interpolationFps"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                                 <div class="grid gap-2.5">
-                                           
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Tracks Limit</span>
-                                        <div class="flex items-center flex-1 min-w-0">
-                                            <input type="range"
-                                                   x-model.number="$store.atc.settings.tracksLimit"
-                                                   min="100"
-                                                   max="3600"
-                                                   step="100"
-                                                   @input="$store.atc.saveSettings()"
-                                                   class="flex-1 min-w-0 h-1 bg-background rounded mx-2">
-                                            <span class="w-12 text-right text-sm" x-text="$store.atc.settings.tracksLimit"></span>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-center justify-between gap-2.5">
-                                        <span class="text-sm">Hide Remote Ground Aircraft</span>
-                                        <label class="switch">
-                                            <input type="checkbox" x-model="$store.atc.settings.excludeOtherAirportsGrounded" @change="$store.atc.requestNewAircraftData()">
-                                            <span class="slider"></span>
-                                        </label>
-                                    </div>
-                                    </div>
-                            <div class="text-xs opacity-70">Base map and layers: <span class="text-highlight">Map Controls</span>, at the bottom right of the map.</div>
+                        <section id="set-display" class="cl-page__section max-md:px-4">
+                            <h3>Display <span class="cl-age">this browser</span></h3>
+                            <div class="cl-field">
+                                <span class="cl-field__label cursor-help" data-help-title="Last transmission on the label"
+                                      data-help="Under the callsign of each aircraft the radio has named in the last ten minutes, its last transmission, cut short. Click the aircraft to read it in full in its story.">Last transmission on aircraft labels</span>
+                                <button class="cl-switch" role="switch" aria-label="Last transmission on aircraft labels"
+                                        :class="$store.atc.settings.voiceBubbles ? 'is-on' : ''" :aria-checked="String(!!$store.atc.settings.voiceBubbles)"
+                                        @click="$store.atc.flipSetting('voiceBubbles', 'toggleVoiceBubbles')"></button>
+                                <span class="cl-field__help">A third line under the label, in quotes, for ten minutes after it was heard.</span>
                             </div>
+                            <div class="cl-field">
+                                <span class="cl-field__label cursor-help" data-help-title="Smooth movement"
+                                      data-help="The receiver reports each aircraft about every two seconds; between two reports the map moves it along its course instead of letting it jump.">Smooth movement between updates</span>
+                                <button class="cl-switch" role="switch" aria-label="Smooth movement between updates"
+                                        :class="$store.atc.settings.aircraftAnimation.enabled ? 'is-on' : ''" :aria-checked="String(!!$store.atc.settings.aircraftAnimation.enabled)"
+                                        @click="$store.atc.settings.aircraftAnimation.enabled = !$store.atc.settings.aircraftAnimation.enabled; $store.atc.toggleAnimation()"></button>
+                            </div>
+                            <div class="cl-field" x-show="$store.atc.settings.aircraftAnimation.enabled">
+                                <span class="cl-field__label cursor-help" data-help-title="Frames per second"
+                                      data-help="How often the smoothed map is redrawn. Higher is smoother and costs more of this computer's power.">Frames per second</span>
+                                <span class="cl-row" style="width: 240px; max-width: 50vw;">
+                                    <div class="cl-slider" style="flex: 1;">
+                                        <span class="cl-slider__rail"></span>
+                                        <span class="cl-slider__fill" :style="'left:0;width:' + Math.round(($store.atc.settings.aircraftAnimation.interpolationFps - 10) / 50 * 100) + '%'"></span>
+                                        <span class="cl-slider__thumb" :style="'left:' + Math.round(($store.atc.settings.aircraftAnimation.interpolationFps - 10) / 50 * 100) + '%'"></span>
+                                        <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="10" max="60" step="5" aria-label="Frames per second"
+                                               :value="$store.atc.settings.aircraftAnimation.interpolationFps"
+                                               @input="$store.atc.settings.aircraftAnimation.interpolationFps = Number($event.target.value); $store.atc.saveSettings()">
+                                    </div>
+                                    <span class="cl-age w-6 text-right" x-text="$store.atc.settings.aircraftAnimation.interpolationFps"></span>
+                                </span>
+                            </div>
+                            <div class="cl-field">
+                                <span class="cl-field__label cursor-help" data-help-title="Track points"
+                                      data-help="How many recorded positions are loaded when an aircraft is opened, for its track and its history. More reaches further back and loads slower.">Track points kept per aircraft</span>
+                                <span class="cl-row" style="width: 240px; max-width: 50vw;">
+                                    <div class="cl-slider" style="flex: 1;">
+                                        <span class="cl-slider__rail"></span>
+                                        <span class="cl-slider__fill" :style="'left:0;width:' + Math.round(($store.atc.settings.tracksLimit - 100) / 3500 * 100) + '%'"></span>
+                                        <span class="cl-slider__thumb" :style="'left:' + Math.round(($store.atc.settings.tracksLimit - 100) / 3500 * 100) + '%'"></span>
+                                        <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="100" max="3600" step="100" aria-label="Track points kept per aircraft"
+                                               :value="$store.atc.settings.tracksLimit"
+                                               @input="$store.atc.settings.tracksLimit = Number($event.target.value); $store.atc.saveSettings()">
+                                    </div>
+                                    <span class="cl-age w-9 text-right" x-text="$store.atc.settings.tracksLimit"></span>
+                                </span>
+                            </div>
+                            <div class="cl-field">
+                                <span class="cl-field__label cursor-help" data-help-title="Ground aircraft"
+                                      data-help="Aircraft parked or taxiing at airports other than the ones followed: many, and rarely on the radio heard here.">Hide ground aircraft at other airports</span>
+                                <button class="cl-switch" role="switch" aria-label="Hide ground aircraft at other airports"
+                                        :class="$store.atc.settings.excludeOtherAirportsGrounded ? 'is-on' : ''" :aria-checked="String(!!$store.atc.settings.excludeOtherAirportsGrounded)"
+                                        @click="$store.atc.flipSetting('excludeOtherAirportsGrounded', 'requestNewAircraftData')"></button>
+                            </div>
+                            <div class="cl-field">
+                                <span class="cl-field__label cursor-help" data-help-title="Clock"
+                                      data-help="Aviation runs on UTC: clearances, weather and logs use it. Choose which time the interface shows; the top bar shows both, the chosen one first.">Times in</span>
+                                <div class="cl-seg" role="group" aria-label="Times in">
+                                    <button class="cl-seg__item" :aria-pressed="String(!$store.atc.showLocalDates)" @click="$store.atc.showLocalDates = false">UTC</button>
+                                    <button class="cl-seg__item" :aria-pressed="String(!!$store.atc.showLocalDates)" @click="$store.atc.showLocalDates = true">Local</button>
+                                </div>
+                                <span class="cl-field__help">The clock in green in the top bar dates everything on screen.</span>
+                            </div>
+                            <p class="cl-plain m-0">Base map and layers: the layers button, at the bottom right of the map.</p>
                         </section>
-                        <section id="set-account" class="scroll-mt-4">
-                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">Account</h2>
-                            <div class="grid gap-4">
+
+                        <section id="set-account" class="cl-page__section max-md:px-4">
+                            <h3>Account</h3>
                             <!-- Who is signed in, and the way out: there was none. First in the
-                                 panel, not with Access at its bottom, so that it is found. Shown
-                                 only when sign-in is required. -->
+                                 section, so that it is found. Shown only when sign-in is required. -->
                             <div x-data="{ user: null, busy: false }"
                                  x-init="fetch('/api/v1/auth/status', { credentials: 'same-origin' })
                                      .then(r => r.ok ? r.json() : null)
                                      .then(s => { if (s && s.enabled && s.authenticated && s.user) user = s.user; })
                                      .catch(() => {})"
-                                 x-show="user"
-                                 class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                                <span class="opacity-80">Signed in as <span class="text-highlight" x-text="user"></span></span>
-                                <button :disabled="busy"
+                                 x-show="user" class="cl-field">
+                                <span class="cl-field__label">Signed in as <b class="cl-mono" x-text="user"></b></span>
+                                <button class="cl-btn" :disabled="busy"
                                         @click="busy = true; fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' })
-                                            .finally(() => location.reload())"
-                                        class="shrink-0 px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
-                                    <i class="fas fa-right-from-bracket mr-1"></i>Sign out
-                                </button>
+                                            .finally(() => location.reload())">Sign out</button>
                             </div>
                             <template x-if="state">
-                                <div class="grid gap-4">
-                                        <!-- Access: the first-run question, answerable again. Stacked rather
-                                             than side by side, for the same narrow panel. Switching reloads the
-                                             page, since what this browser may see changes with it. -->
-                                        <template x-if="state.access">
-                                            <div class="grid gap-1 min-w-0">
-                                                <span class="text-sm">Access</span>
-                                                <span class="text-xs" x-text="accessLabel()"></span>
-                                                <button x-show="state.access.mode === 'account'" @click="switchAccess('local')"
-                                                        :disabled="busy || !state.access.local_allowed"
-                                                        class="justify-self-start text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40 disabled:cursor-not-allowed">
-                                                    Switch to this machine only
-                                                </button>
-                                                <button x-show="state.access.mode !== 'account' && !newAccount" @click="switchAccess('account')"
-                                                        :disabled="busy"
-                                                        class="justify-self-start text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
-                                                    Require sign-in
-                                                </button>
-                                                <template x-if="newAccount">
-                                                    <div class="grid gap-1.5 min-w-0">
-                                                        <input x-model="newAccount.username" placeholder="User name"
-                                                               autocomplete="username" autocapitalize="none"
-                                                               class="min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                        <input x-model="newAccount.password" type="password"
-                                                               placeholder="Password, 10 characters or more" autocomplete="new-password"
-                                                               class="min-w-0 bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                        <div class="flex gap-2">
-                                                            <button @click="createAccount()" :disabled="busy"
-                                                                    class="text-xs px-2 py-0.5 rounded border border-border hover:bg-hover disabled:opacity-40">
-                                                                Create and require sign-in
-                                                            </button>
-                                                            <button @click="newAccount = null" class="text-xs px-2 py-0.5 opacity-60 hover:opacity-100">
-                                                                Cancel
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </template>
-                                                <div class="text-xs opacity-60 leading-snug" x-text="accessNote()"></div>
+                                <div class="contents">
+                                    <!-- Access: the first-run question, answerable again. Switching
+                                         reloads the page, since what this browser may see changes with
+                                         it; the network without an account yet asks for one first. -->
+                                    <template x-if="state.access">
+                                        <div class="contents">
+                                            <div class="cl-field max-md:grid-cols-1">
+                                                <span class="cl-field__label cursor-help" data-help-title="Access" :data-help="accessLabel()">Who may open Clairance</span>
+                                                <span class="cl-row justify-end max-md:justify-start" role="radiogroup" aria-label="Who may open Clairance">
+                                                    <label class="cl-check cl-check--radio" role="radio" tabindex="0"
+                                                           :class="state.access.mode === 'local' ? 'is-on' : ''" :aria-checked="String(state.access.mode === 'local')"
+                                                           :aria-disabled="String(busy || (state.access.mode === 'account' && !state.access.local_allowed))"
+                                                           @click.prevent="if (!busy && state.access.mode === 'account' && state.access.local_allowed) switchAccess('local')"
+                                                           @keydown.space.prevent="if (!busy && state.access.mode === 'account' && state.access.local_allowed) switchAccess('local')">
+                                                        <span class="cl-check__box"></span>This machine
+                                                    </label>
+                                                    <label class="cl-check cl-check--radio" role="radio" tabindex="0"
+                                                           :class="state.access.mode === 'account' || newAccount ? 'is-on' : ''" :aria-checked="String(state.access.mode === 'account' || !!newAccount)"
+                                                           @click.prevent="if (!busy && state.access.mode !== 'account' && !newAccount) switchAccess('account')"
+                                                           @keydown.space.prevent="if (!busy && state.access.mode !== 'account' && !newAccount) switchAccess('account')">
+                                                        <span class="cl-check__box"></span>The network, with a password
+                                                    </label>
+                                                </span>
+                                                <span class="cl-field__help">The same choice as at the first start. <span x-text="accessNote()"></span></span>
                                             </div>
-                                        </template>
-
-                                </div>
-                            </template>
-                            </div>
-                        </section>
-                        <section id="set-system" class="scroll-mt-4">
-                            <h2 class="text-highlight text-base font-semibold border-b border-border pb-1.5 mb-4">System</h2>
-                            <div class="grid gap-4">
-                            <template x-if="state">
-                                <div class="grid gap-4">
-                                        <!-- Editable: the only two things that change without a restart. -->
-                                        <div class="flex items-center justify-between gap-2.5">
-                                            <span class="text-sm">Log level</span>
-                                            <select x-model="draft.log_level" @change="save()"
-                                                    class="bg-background border border-border rounded px-2 py-0.5 text-sm">
-                                                <option value="debug">debug</option>
-                                                <option value="info">info</option>
-                                                <option value="warn">warn</option>
-                                                <option value="error">error</option>
-                                            </select>
-                                        </div>
-                            
-                                        <div class="flex items-center justify-between gap-2.5">
-                                            <!-- A size, not a number of days (28/09): the oldest days go
-                                                 past it, today's never. -->
-                                            <span class="text-sm">Keep databases up to</span>
-                                            <div class="flex items-center gap-2">
-                                                <input type="number" min="1" max="1000" step="1"
-                                                       x-model.number="draft.db_retention_gb" @change="save()"
-                                                       class="w-16 bg-background border border-border rounded px-2 py-0.5 text-sm text-right">
-                                                <span class="text-xs opacity-60">GB</span>
-                                            </div>
-                                        </div>
-                            
-                                        <!-- Reported, not editable: changing any of these means reopening
-                                             something, and a panel that silently fails to apply what it
-                                             shows is worse than one that says which half it can. -->
-                                        <div class="border-t border-border pt-2 mt-1 grid gap-1.5 text-xs">
-                                            <div class="flex justify-between gap-2">
-                                                <span class="opacity-60">Database</span>
-                                                <span class="text-right" :class="state.storage.rotates ? '' : 'text-red-400'"
-                                                      x-text="fmtBytes(state.storage.active_db_bytes) + (state.storage.rotates ? ' · rotates daily' : ' · NEVER ROTATES')"></span>
-                                            </div>
-                                            <div class="flex justify-between gap-2" x-show="state.storage.growth_bytes_per_hour > 0">
-                                                <span class="opacity-60">Growing</span>
-                                                <span x-text="fmtBytes(state.storage.growth_bytes_per_hour) + '/h'"></span>
-                                            </div>
-                                            <div class="flex justify-between gap-2" x-show="state.storage.days_until_full > 0">
-                                                <span class="opacity-60">Disk full in</span>
-                                                <span :class="state.storage.days_until_full < 7 ? 'text-red-400' : ''"
-                                                      x-text="state.storage.days_until_full.toFixed(1) + ' days'"></span>
-                                            </div>
-                                            <div class="flex justify-between gap-2">
-                                                <span class="opacity-60">Disk free</span>
-                                                <span x-text="fmtBytes(state.storage.disk_free_bytes)"></span>
-                                            </div>
-                                            <div class="flex justify-between gap-2">
-                                                <span class="opacity-60">Log</span>
-                                                <span class="text-right" :class="state.logging.bounded ? '' : 'text-yellow-400'"
-                                                      x-text="state.logging.bounded
-                                                              ? (state.logging.max_size_mb + ' MB × ' + state.logging.max_files + ' files')
-                                                              : 'stdout only · UNBOUNDED'"></span>
-                                            </div>
-                                            <template x-if="state.transcription">
-                                                <div class="flex justify-between gap-2">
-                                                    <span class="opacity-60">Transcription</span>
-                                                    <span class="text-right" :class="state.transcription.status === 'ok' ? '' : 'text-red-400'"
-                                                          x-text="state.transcription.status + (state.transcription.second_opinion ? ' · second opinion' : '')"></span>
+                                            <template x-if="newAccount">
+                                                <div class="flex flex-col gap-2 max-w-sm">
+                                                    <input class="cl-input" x-model="newAccount.username" placeholder="User name" aria-label="User name"
+                                                           autocomplete="username" autocapitalize="none">
+                                                    <input class="cl-input" x-model="newAccount.password" type="password" aria-label="Password"
+                                                           placeholder="Password, 10 characters or more" autocomplete="new-password">
+                                                    <span class="cl-row">
+                                                        <button class="cl-btn cl-btn--primary" @click="createAccount()" :disabled="busy">Create and require sign-in</button>
+                                                        <button class="cl-btn cl-btn--quiet" @click="newAccount = null">Cancel</button>
+                                                    </span>
                                                 </div>
                                             </template>
-                                            <template x-if="state.transcription && state.transcription.detail">
-                                                <div class="text-red-400 leading-snug" x-text="state.transcription.detail"></div>
-                                            </template>
-                                            <div class="flex justify-between gap-2">
-                                                <span class="opacity-60">Uptime</span>
-                                                <span x-text="fmtUptime(state.uptime_seconds)"></span>
-                                            </div>
                                         </div>
+                                    </template>
+                                    <!-- The sign-in page's console (StationVitals): figures anyone who
+                                         reaches the page sees, hence a switch of the server's own. -->
+                                    <div class="cl-field">
+                                        <span class="cl-field__label">Station console on the sign-in page</span>
+                                        <button class="cl-switch" role="switch" aria-label="Station console on the sign-in page" :disabled="busy"
+                                                :class="draft.vitals ? 'is-on' : ''" :aria-checked="String(!!draft.vitals)"
+                                                @click="draft.vitals = !draft.vitals; save()"></button>
+                                        <span class="cl-field__help">Shows live, aggregated figures of this station (aircraft, channels, transmissions, uptime) on the sign-in page, without any position, callsign or frequency name.</span>
+                                    </div>
                                 </div>
                             </template>
-                                <div class="grid gap-2.5 text-xs">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-sm">Mode</span>
-                                        <span class="font-mono text-text/80" x-text="$store.atc.adsbSourceInfo?.source_type || '—'"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-sm">Status</span>
-                                        <span class="font-mono"
-                                              :class="$store.atc.adsbSourceInfo?.status === 'ok' ? 'text-highlight' : 'text-danger'"
-                                              x-text="$store.atc.adsbSourceInfo?.status || 'unknown'"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-sm">Aircraft Feed</span>
-                                        <span class="font-mono"
-                                              :class="$store.atc.adsbSourceInfo?.aircraft?.available ? 'text-highlight' : 'text-text/60'"
-                                              x-text="$store.atc.adsbSourceInfo?.aircraft?.available ? 'available' : 'unavailable'"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-sm">Receiver</span>
-                                        <span class="font-mono"
-                                              :class="$store.atc.adsbSourceInfo?.receiver?.available ? 'text-highlight' : 'text-text/60'"
-                                              x-text="$store.atc.adsbSourceInfo?.receiver?.available ? 'available' : 'n/a'"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-sm">Stats</span>
-                                        <span class="font-mono"
-                                              :class="$store.atc.adsbSourceInfo?.stats?.available ? 'text-highlight' : 'text-text/60'"
-                                              x-text="$store.atc.adsbSourceInfo?.stats?.available ? 'available' : 'n/a'"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-sm">Updated</span>
-                                        <span class="font-mono text-text/80" x-text="$store.atc.adsbSourceInfo?.updated_at ? new Date($store.atc.adsbSourceInfo.updated_at).toLocaleTimeString() : '—'"></span>
-                                    </div>
+                        </section>
 
+                        <section id="set-system" class="cl-page__section max-md:px-4">
+                            <h3>System</h3>
+                            <template x-if="state">
+                                <div class="contents">
+                                    <!-- Editable: the only two things here that change without a restart. -->
+                                    <div class="cl-field">
+                                        <span class="cl-field__label cursor-help" data-help-title="Log level"
+                                              data-help="How much the server writes to its log: debug is everything, error only what went wrong. info is the usual.">Log level</span>
+                                        <select class="cl-select" aria-label="Log level" x-model="draft.log_level" @change="save()">
+                                            <option value="debug">debug</option>
+                                            <option value="info">info</option>
+                                            <option value="warn">warn</option>
+                                            <option value="error">error</option>
+                                        </select>
+                                    </div>
+                                    <!-- A size, not a number of days (28/09): the oldest days go past
+                                         it, today's never. -->
+                                    <div class="cl-field">
+                                        <span class="cl-field__label cursor-help" data-help-title="Databases kept"
+                                              data-help="A size, not a number of days: the oldest days are deleted past it, today's never. Lowering it asks first.">Keep databases up to</span>
+                                        <span class="cl-row">
+                                            <input type="number" min="1" max="1000" step="1" class="cl-input text-right" style="width: 72px;" aria-label="Gigabytes"
+                                                   x-model.number="draft.db_retention_gb" @change="save()">
+                                            <span class="cl-age">GB</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </template>
+                            <!-- Reported, not editable: changing any of these means reopening
+                                 something, and a page that silently fails to apply what it shows
+                                 is worse than one that says which half it can. -->
+                            <button class="cl-disclosure" :aria-expanded="String(reportsOpen)" @click="reportsOpen = !reportsOpen">Reports: database, ADS-B source, receiver, decoder</button>
+                            <div x-show="reportsOpen" class="flex flex-col gap-3">
+                                <template x-if="state">
+                                    <dl class="cl-kv">
+                                        <dt>Database</dt>
+                                        <dd><span x-text="fmtBytes(state.storage.active_db_bytes) + (state.storage.rotates ? ' · rotates daily' : ' · ')"></span><span x-show="!state.storage.rotates" class="cl-warn">▲ never rotates</span></dd>
+                                        <div class="contents" x-show="state.storage.growth_bytes_per_hour > 0">
+                                            <dt>Growing</dt><dd x-text="fmtBytes(state.storage.growth_bytes_per_hour) + '/h'"></dd>
+                                        </div>
+                                        <div class="contents" x-show="state.storage.days_until_full > 0">
+                                            <dt>Disk full in</dt>
+                                            <dd><span :class="state.storage.days_until_full < 7 ? 'cl-urgent' : ''"
+                                                      x-text="(state.storage.days_until_full < 7 ? '■ ' : '') + state.storage.days_until_full.toFixed(1) + ' days'"></span></dd>
+                                        </div>
+                                        <dt>Disk free</dt><dd x-text="fmtBytes(state.storage.disk_free_bytes)"></dd>
+                                        <dt>Log</dt>
+                                        <dd><span x-show="state.logging.bounded" x-text="state.logging.max_size_mb + ' MB × ' + state.logging.max_files + ' files'"></span><span x-show="!state.logging.bounded">stdout only · </span><span x-show="!state.logging.bounded" class="cl-warn">▲ no size limit</span></dd>
+                                        <template x-if="state.transcription">
+                                            <div class="contents">
+                                                <dt>Transcription</dt>
+                                                <dd><span :class="state.transcription.status === 'ok' ? '' : 'cl-urgent'"
+                                                          x-text="(state.transcription.status === 'ok' ? '' : '■ ') + state.transcription.status"></span><span x-show="state.transcription.second_opinion"> · second opinion</span></dd>
+                                            </div>
+                                        </template>
+                                        <template x-if="state.transcription && state.transcription.detail">
+                                            <dd class="col-span-2 whitespace-normal"><span class="cl-urgent" x-text="'■ ' + state.transcription.detail"></span></dd>
+                                        </template>
+                                        <dt>Uptime</dt><dd x-text="fmtUptime(state.uptime_seconds)"></dd>
+                                    </dl>
+                                </template>
+                                <span class="cl-label">ADS-B source</span>
+                                <dl class="cl-kv">
+                                    <dt>Mode</dt><dd x-text="$store.atc.adsbSourceInfo?.source_type || '—'"></dd>
+                                    <dt>Status</dt>
+                                    <dd><span :class="$store.atc.adsbSourceInfo?.status === 'ok' ? '' : 'cl-urgent'"
+                                              x-text="($store.atc.adsbSourceInfo?.status === 'ok' ? '' : '■ ') + ($store.atc.adsbSourceInfo?.status || 'unknown')"></span></dd>
+                                    <dt>Aircraft feed</dt>
+                                    <dd :class="$store.atc.adsbSourceInfo?.aircraft?.available ? '' : 'is-none'"
+                                        x-text="$store.atc.adsbSourceInfo?.aircraft?.available ? 'available' : 'unavailable'"></dd>
+                                    <dt>Receiver</dt>
+                                    <dd :class="$store.atc.adsbSourceInfo?.receiver?.available ? '' : 'is-none'"
+                                        x-text="$store.atc.adsbSourceInfo?.receiver?.available ? 'available' : 'n/a'"></dd>
+                                    <dt>Stats</dt>
+                                    <dd :class="$store.atc.adsbSourceInfo?.stats?.available ? '' : 'is-none'"
+                                        x-text="$store.atc.adsbSourceInfo?.stats?.available ? 'available' : 'n/a'"></dd>
+                                    <dt>Updated</dt>
+                                    <dd x-text="$store.atc.adsbSourceInfo?.updated_at ? new Date($store.atc.adsbSourceInfo.updated_at).toLocaleTimeString() : '—'"></dd>
                                     <template x-if="$store.atc.adsbSourceInfo?.aircraft?.last_error">
-                                        <div class="text-danger break-all" x-text="$store.atc.adsbSourceInfo.aircraft.last_error"></div>
+                                        <dd class="col-span-2 break-all"><span class="cl-urgent" x-text="'■ ' + $store.atc.adsbSourceInfo.aircraft.last_error"></span></dd>
                                     </template>
-
-                                    <div x-show="$store.atc.adsbSourceInfo?.receiver?.available" class="bg-background/30 border border-border/40 rounded p-2 space-y-1">
-                                        <div class="text-text/70">Receiver</div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Version</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbReceiverSummary()?.version || '—'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Refresh</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbReceiverSummary()?.refreshMs !== null ? ($store.atc.getAdsbReceiverSummary()?.refreshMs + ' ms') : '—'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>History</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbReceiverSummary()?.historySeconds !== null ? ($store.atc.getAdsbReceiverSummary()?.historySeconds + ' s') : '—'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Features</span>
-                                            <span class="text-text/80 font-mono" x-text="[
-                                                $store.atc.getAdsbReceiverSummary()?.readsb ? 'readsb' : null,
-                                                $store.atc.getAdsbReceiverSummary()?.zstd ? 'zstd' : null,
-                                                $store.atc.getAdsbReceiverSummary()?.binCraft ? 'binCraft' : null
-                                            ].filter(Boolean).join(' · ') || '—'"></span>
-                                        </div>
-                                    </div>
-
-                                    <div x-show="$store.atc.adsbSourceInfo?.stats?.available" class="bg-background/30 border border-border/40 rounded p-2 space-y-1">
-                                        <div class="text-text/70">Decoder Stats</div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Aircraft (pos/no-pos)</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.aircraftWithPos !== null ? (($store.atc.getAdsbStatsSummary()?.aircraftWithPos || 0) + ' / ' + ($store.atc.getAdsbStatsSummary()?.aircraftWithoutPos || 0)) : '—'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Messages / min</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.messagesPerMin ?? '—'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Positions / min</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.positionsPerMin ?? '—'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Tracks</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.tracksAll ?? '—'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Signal / Noise</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.signalDb !== null ? ($store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.signalDb, 1) + ' / ' + $store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.noiseDb, 1) + ' dBFS') : '—'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>SNR</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.snrDb !== null ? ($store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.snrDb, 1) + ' dB') : '—'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Gain / PPM</span>
-                                            <span class="text-text/80 font-mono" x-text="$store.atc.getAdsbStatsSummary()?.gainDb !== null ? ($store.atc.getAdsbStatsSummary()?.gainDb.toFixed(1) + ' dB · ' + $store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.estimatedPpm, 1) + ' ppm') : '—'"></span>
-                                        </div>
-                                    </div>
+                                </dl>
+                                <div x-show="$store.atc.adsbSourceInfo?.receiver?.available" class="flex flex-col gap-3">
+                                    <span class="cl-label">Receiver</span>
+                                    <dl class="cl-kv">
+                                        <dt>Version</dt><dd x-text="$store.atc.getAdsbReceiverSummary()?.version || '—'"></dd>
+                                        <dt>Refresh</dt><dd x-text="$store.atc.getAdsbReceiverSummary()?.refreshMs !== null ? ($store.atc.getAdsbReceiverSummary()?.refreshMs + ' ms') : '—'"></dd>
+                                        <dt>History</dt><dd x-text="$store.atc.getAdsbReceiverSummary()?.historySeconds !== null ? ($store.atc.getAdsbReceiverSummary()?.historySeconds + ' s') : '—'"></dd>
+                                        <dt>Features</dt>
+                                        <dd x-text="[
+                                            $store.atc.getAdsbReceiverSummary()?.readsb ? 'readsb' : null,
+                                            $store.atc.getAdsbReceiverSummary()?.zstd ? 'zstd' : null,
+                                            $store.atc.getAdsbReceiverSummary()?.binCraft ? 'binCraft' : null
+                                        ].filter(Boolean).join(' · ') || '—'"></dd>
+                                    </dl>
                                 </div>
-                            <details class="text-sm">
-                                <summary class="cursor-pointer opacity-80">Performance and debug</summary>
-                                <div class="mt-3 grid gap-2.5">
-                                <div class="grid gap-2.5">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-sm whitespace-nowrap">WebSocket</span>
-                                        <button @click="$store.atc.toggleWebSocketUpdates()"
-                                                title="Toggle WebSocket updates"
-                                                :class="{
-                                                    'bg-green-500/20 border-green-500/50 text-green-400': !$store.atc.wsUpdatesPaused,
-                                                    'bg-red-500/20 border-red-500/50 text-red-400': $store.atc.wsUpdatesPaused
-                                                }"
-                                                class="px-2.5 py-1 rounded border text-[11px] font-medium transition-all duration-200 flex items-center gap-1.5 cursor-pointer">
-                                            <i :class="$store.atc.wsUpdatesPaused ? 'fas fa-play' : 'fas fa-pause'" class="text-[9px]"></i>
-                                            <span x-text="$store.atc.wsUpdatesPaused ? 'Resume' : 'Pause'"></span>
-                                        </button>
-                                    </div>
-
-                                    <div x-show="$store.atc.mapPerformanceStats" class="text-xs text-text/70 bg-background/30 border border-border/40 rounded p-2 space-y-1">
-                                        <div class="flex items-center justify-between">
-                                            <span x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? 'Render FPS' : 'Update Rate (/s)'"></span>
-                                            <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.animationFps"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Render Frame (ms)</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? $store.atc.mapPerformanceStats?.animationFrameMs : '-'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Render Targets / Frame</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? (($store.atc.mapPerformanceStats?.animationAnimatedThisFrame ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.animationVisibleTargets ?? 0)) : '-'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Render Marker Updates /s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? $store.atc.mapPerformanceStats?.animationMarkerUpdatesPerSec : '-'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Map Refresh /s</span>
-                                            <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.refreshPerSec"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Map Refresh Avg (ms)</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.avgRefreshMs"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Map Marker Ops /s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.markerOpsPerSec"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Map Visibility Passes /s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.fullVisibilityPassesPerSec"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Merge Correct /s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.animationCorrectedPerSec"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Predicted /s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.animationPredictedPerSec"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Dropped Frames</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.animationDroppedFrames"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Render Quality</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.animationQuality"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>WebSocket Total /s</span>
-                                            <span class="text-highlight" x-text="$store.atc.mapPerformanceStats?.wsRates?.total ?? 0"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>WS aircraft_update /s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.wsRates?.aircraft_update ?? 0"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>WS predicted /s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.wsRates?.aircraft_predicted_state ?? 0"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>WS add/remove /s</span>
-                                            <span x-text="($store.atc.mapPerformanceStats?.wsRates?.aircraft_added ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.wsRates?.aircraft_removed ?? 0)"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>WS phase/transcription /s</span>
-                                            <span x-text="($store.atc.mapPerformanceStats?.wsRates?.phase_change ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.wsRates?.transcription ?? 0)"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>WS Parse Errors /s</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.wsRates?.parse_errors ?? 0"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Tile Cache Controlled</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.tileCache?.controlled ? 'yes' : 'no'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Tile Cache Hit Rate</span>
-                                            <span x-text="($store.atc.mapPerformanceStats?.tileCache?.hitRatePct ?? 0) + '%'"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Tile Cache Hits / Misses</span>
-                                            <span x-text="($store.atc.mapPerformanceStats?.tileCache?.hits ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.tileCache?.misses ?? 0)"></span>
-                                        </div>
-                                        <div class="flex items-center justify-between">
-                                            <span>Heap (MB)</span>
-                                            <span x-text="$store.atc.mapPerformanceStats?.heapUsedMB !== null ? ($store.atc.mapPerformanceStats.heapUsedMB + ' / ' + $store.atc.mapPerformanceStats.heapLimitMB + ' (' + $store.atc.mapPerformanceStats.heapUsagePct + '%) • Δ ' + (($store.atc.mapPerformanceStats.heapDeltaMB === null || $store.atc.mapPerformanceStats.heapDeltaMB === undefined) ? '-' : (($store.atc.mapPerformanceStats.heapDeltaMB > 0 ? '+' : '') + $store.atc.mapPerformanceStats.heapDeltaMB)) + ' MB') : '-'"></span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Removed Map Updates and Data Only Mode debug toggles -->
+                                <div x-show="$store.atc.adsbSourceInfo?.stats?.available" class="flex flex-col gap-3">
+                                    <span class="cl-label">Decoder</span>
+                                    <dl class="cl-kv">
+                                        <dt>Aircraft (pos/no-pos)</dt><dd x-text="$store.atc.getAdsbStatsSummary()?.aircraftWithPos !== null ? (($store.atc.getAdsbStatsSummary()?.aircraftWithPos || 0) + ' / ' + ($store.atc.getAdsbStatsSummary()?.aircraftWithoutPos || 0)) : '—'"></dd>
+                                        <dt>Messages / min</dt><dd x-text="$store.atc.getAdsbStatsSummary()?.messagesPerMin ?? '—'"></dd>
+                                        <dt>Positions / min</dt><dd x-text="$store.atc.getAdsbStatsSummary()?.positionsPerMin ?? '—'"></dd>
+                                        <dt>Tracks</dt><dd x-text="$store.atc.getAdsbStatsSummary()?.tracksAll ?? '—'"></dd>
+                                        <dt>Signal / noise</dt><dd x-text="$store.atc.getAdsbStatsSummary()?.signalDb !== null ? ($store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.signalDb, 1) + ' / ' + $store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.noiseDb, 1) + ' dBFS') : '—'"></dd>
+                                        <dt>SNR</dt><dd x-text="$store.atc.getAdsbStatsSummary()?.snrDb !== null ? ($store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.snrDb, 1) + ' dB') : '—'"></dd>
+                                        <dt>Gain / PPM</dt><dd x-text="$store.atc.getAdsbStatsSummary()?.gainDb !== null ? ($store.atc.getAdsbStatsSummary()?.gainDb.toFixed(1) + ' dB · ' + $store.atc.formatSignedNumber($store.atc.getAdsbStatsSummary()?.estimatedPpm, 1) + ' ppm') : '—'"></dd>
+                                    </dl>
                                 </div>
+                            </div>
+                            <button class="cl-disclosure" :aria-expanded="String(debugOpen)" @click="debugOpen = !debugOpen">Performance and debug</button>
+                            <div x-show="debugOpen" class="flex flex-col gap-3">
+                                <div class="cl-field">
+                                    <span class="cl-field__label">Live updates</span>
+                                    <button class="cl-btn" @click="$store.atc.toggleWebSocketUpdates()" :aria-pressed="String(!!$store.atc.wsUpdatesPaused)"
+                                            x-text="$store.atc.wsUpdatesPaused ? 'Resume' : 'Pause'"></button>
+                                    <span class="cl-field__help">Freezes the map and the lists to look at a moment; the radio keeps playing.</span>
                                 </div>
-                            </details>
+                                <dl class="cl-kv" x-show="$store.atc.mapPerformanceStats">
+                                    <dt x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? 'Render FPS' : 'Update rate (/s)'"></dt><dd x-text="$store.atc.mapPerformanceStats?.animationFps"></dd>
+                                    <dt>Render frame (ms)</dt><dd x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? $store.atc.mapPerformanceStats?.animationFrameMs : '-'"></dd>
+                                    <dt>Render targets / frame</dt><dd x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? (($store.atc.mapPerformanceStats?.animationAnimatedThisFrame ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.animationVisibleTargets ?? 0)) : '-'"></dd>
+                                    <dt>Render marker updates /s</dt><dd x-text="$store.atc.mapPerformanceStats?.smoothingEnabled ? $store.atc.mapPerformanceStats?.animationMarkerUpdatesPerSec : '-'"></dd>
+                                    <dt>Map refresh /s</dt><dd x-text="$store.atc.mapPerformanceStats?.refreshPerSec"></dd>
+                                    <dt>Map refresh avg (ms)</dt><dd x-text="$store.atc.mapPerformanceStats?.avgRefreshMs"></dd>
+                                    <dt>Map marker ops /s</dt><dd x-text="$store.atc.mapPerformanceStats?.markerOpsPerSec"></dd>
+                                    <dt>Map visibility passes /s</dt><dd x-text="$store.atc.mapPerformanceStats?.fullVisibilityPassesPerSec"></dd>
+                                    <dt>Merge correct /s</dt><dd x-text="$store.atc.mapPerformanceStats?.animationCorrectedPerSec"></dd>
+                                    <dt>Predicted /s</dt><dd x-text="$store.atc.mapPerformanceStats?.animationPredictedPerSec"></dd>
+                                    <dt>Dropped frames</dt><dd x-text="$store.atc.mapPerformanceStats?.animationDroppedFrames"></dd>
+                                    <dt>Render quality</dt><dd x-text="$store.atc.mapPerformanceStats?.animationQuality"></dd>
+                                    <dt>WebSocket total /s</dt><dd x-text="$store.atc.mapPerformanceStats?.wsRates?.total ?? 0"></dd>
+                                    <dt>WS aircraft_update /s</dt><dd x-text="$store.atc.mapPerformanceStats?.wsRates?.aircraft_update ?? 0"></dd>
+                                    <dt>WS predicted /s</dt><dd x-text="$store.atc.mapPerformanceStats?.wsRates?.aircraft_predicted_state ?? 0"></dd>
+                                    <dt>WS add/remove /s</dt><dd x-text="($store.atc.mapPerformanceStats?.wsRates?.aircraft_added ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.wsRates?.aircraft_removed ?? 0)"></dd>
+                                    <dt>WS phase/transcription /s</dt><dd x-text="($store.atc.mapPerformanceStats?.wsRates?.phase_change ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.wsRates?.transcription ?? 0)"></dd>
+                                    <dt>WS parse errors /s</dt><dd x-text="$store.atc.mapPerformanceStats?.wsRates?.parse_errors ?? 0"></dd>
+                                    <dt>Tile cache controlled</dt><dd x-text="$store.atc.mapPerformanceStats?.tileCache?.controlled ? 'yes' : 'no'"></dd>
+                                    <dt>Tile cache hit rate</dt><dd x-text="($store.atc.mapPerformanceStats?.tileCache?.hitRatePct ?? 0) + '%'"></dd>
+                                    <dt>Tile cache hits / misses</dt><dd x-text="($store.atc.mapPerformanceStats?.tileCache?.hits ?? 0) + ' / ' + ($store.atc.mapPerformanceStats?.tileCache?.misses ?? 0)"></dd>
+                                    <dt>Heap (MB)</dt><dd x-text="$store.atc.mapPerformanceStats?.heapUsedMB !== null ? ($store.atc.mapPerformanceStats.heapUsedMB + ' / ' + $store.atc.mapPerformanceStats.heapLimitMB + ' (' + $store.atc.mapPerformanceStats.heapUsagePct + '%) • Δ ' + (($store.atc.mapPerformanceStats.heapDeltaMB === null || $store.atc.mapPerformanceStats.heapDeltaMB === undefined) ? '-' : (($store.atc.mapPerformanceStats.heapDeltaMB > 0 ? '+' : '') + $store.atc.mapPerformanceStats.heapDeltaMB)) + ' MB') : '-'"></dd>
+                                </dl>
                             </div>
                         </section>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- The settings and the event log open from the top bar (step 3);
-                         the log's panel still hangs here, at the top left of the sky,
-                         until the windows step. -->
-                    <div x-show="$store.events.open" x-cloak @keydown.escape.window="$store.events.open = false"
-                         class="absolute left-2 top-12 w-[24rem] max-w-[calc(100%-1rem)] max-h-[60vh] z-50 flex flex-col bg-panel border border-border rounded-lg shadow-[0_5px_15px_rgba(0,0,0,0.5)] text-text text-xs">
-                        <div class="flex items-center gap-2 px-3 py-2 border-b border-border">
-                            <span class="font-medium text-sm">Event log</span>
-                            <span class="text-text/50" x-text="$store.events.list.length ? $store.events.list.length + ' events' : ''"></span>
-                            <span class="flex-1"></span>
-                            <button class="text-text/60 hover:text-text" title="Choose which events ring" @click="$store.events.soundsOpen = !$store.events.soundsOpen">
-                                <i class="fas fa-volume-high"></i>
-                            </button>
-                            <button class="text-text/60 hover:text-text" title="Clear the log" @click="$store.events.clear()" x-show="$store.events.list.length">
-                                <i class="fas fa-trash-can"></i>
-                            </button>
-                            <button class="text-text/60 hover:text-text" title="Close" @click="$store.events.open = false">
-                                <i class="fas fa-times"></i>
-                            </button>
+                    <!-- The event log (EventList, migration step 9b, a-journal): a cl-menu
+                         under the bell; a click on a line with an aircraft follows it. -->
+                    <div x-show="$store.events.open" x-cloak role="dialog" aria-label="Event log"
+                         class="cl-root cl-menu cl-menu--wide fixed right-3 top-[52px] max-h-[70vh] overflow-y-auto"
+                         style="z-index: 10002; width: 360px; max-width: calc(100vw - 1.5rem);"
+                         @keydown.escape.window="$store.events.open = false"
+                         @click.outside="if (!$event.target.closest('[aria-label=&quot;Event log&quot;]')) $store.events.open = false">
+                        <div class="cl-menu__head">
+                            <span class="cl-menu__title">Event log</span>
+                            <span class="cl-age" x-text="$store.events.list.length ? $store.events.list.length + ($store.events.list.length > 1 ? ' events' : ' event') : ''"></span>
+                            <span class="cl-row ml-auto">
+                                <button class="cl-btn" :class="$store.events.soundsOpen ? 'is-on' : ''" :aria-expanded="$store.events.soundsOpen"
+                                        @click="$store.events.soundsOpen = !$store.events.soundsOpen"
+                                        data-help-title="Sounds" data-help="Which events ring a bell in this browser. Emergencies ring by default.">Sounds</button>
+                                <button class="cl-btn cl-btn--quiet" x-show="$store.events.list.length" @click="$store.events.clear()"
+                                        data-help-title="Clear" data-help="Empty the log in this browser. The events themselves are not lost: they come again if they happen again.">Clear</button>
+                            </span>
                         </div>
-                        <div x-show="$store.events.soundsOpen" class="border-b border-border">
-                            <div class="px-3 py-2 grid grid-cols-2 gap-1">
-                                <div class="col-span-2 text-text/50 mb-1">Ring a bell for:</div>
-                                <template x-for="(k, kind) in $store.events.kinds" :key="kind">
-                                    <label class="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" :checked="!!$store.events.sounds[kind]" @change="$store.events.toggleSound(kind)">
-                                        <i class="fas w-4 text-center" :class="[k.icon, k.color]"></i>
-                                        <span x-text="k.label"></span>
+                        <template x-if="$store.events.soundsOpen">
+                            <div class="cl-menu__group">
+                                <span class="cl-label">Ring a bell for</span>
+                                <template x-for="g in $store.events.soundGroups" :key="g.key">
+                                    <label class="cl-check" :class="$store.events.soundGroupOn(g) ? 'is-on' : ''" @click.prevent="$store.events.toggleSoundGroup(g)">
+                                        <span class="cl-check__box"></span><span x-text="g.label"></span>
                                     </label>
                                 </template>
                             </div>
-                        </div>
-                        <div class="overflow-y-auto">
-                            <div x-show="!$store.events.list.length" class="px-3 py-4 text-text/50">
-                                Nothing yet. Emergencies, go-arounds, runway changes, aircraft of interest
-                                and changes of the station's channels will show here.
-                            </div>
+                        </template>
+                        <template x-if="$store.events.soundsOpen"><div class="cl-menu__sep"></div></template>
+                        <p x-show="!$store.events.list.length" class="cl-plain">
+                            Nothing yet. Emergencies, go-arounds, runway changes, aircraft of interest
+                            and changes of the station's channels will show here.
+                        </p>
+                        <ul class="cl-events" x-show="$store.events.list.length">
                             <template x-for="ev in $store.events.list" :key="ev.id">
-                                <div class="flex items-start gap-2 px-3 py-1.5 border-b border-border/40"
-                                     :class="ev.hex ? 'cursor-pointer hover:bg-hover' : ''"
-                                     :title="ev.hex ? 'Show this aircraft' : ''"
-                                     @click="$store.events.select(ev)">
-                                    <span class="text-text/50 tabular-nums shrink-0" x-text="$store.events.time(ev)"></span>
-                                    <i class="fas w-4 text-center mt-0.5 shrink-0" :class="[$store.events.kinds[ev.kind].icon, $store.events.kinds[ev.kind].color]"></i>
-                                    <span x-text="ev.text"></span>
-                                </div>
+                                <li :class="ev.hex ? 'is-clickable' : ''" @click="$store.events.select(ev)" :title="ev.hex ? 'Show this aircraft' : ''">
+                                    <time x-text="$store.events.time(ev)"></time>
+                                    <span><span x-show="$store.events.markOf(ev).mark" :class="$store.events.markOf(ev).cls" x-text="$store.events.markOf(ev).mark + ' '"></span><span x-text="ev.text"></span></span>
+                                </li>
                             </template>
-                        </div>
+                        </ul>
                     </div>
-                    
+
                     <!-- Map Container -->
                     <div class="flex-1 relative z-10">
                         <div id="map" class="h-full w-full bg-black"></div>
-                        <!-- What the map shows while a filter narrows it (step 4). -->
-                        <!-- Clear of the Map/PAR switch in the top right corner until step 9 joins them. -->
-                        <div x-show="$store.atc.filterSummary || $store.atc.selectedAircraft" x-cloak class="cl-root absolute left-2 top-2 z-20 pointer-events-none flex flex-col items-start gap-1" style="max-width: calc(100% - 16rem)">
-                            <template x-if="$store.atc.storySkyNote">
-                                <div class="cl-sky__note whitespace-nowrap"><b x-text="$store.atc.storySkyNote.callsign"></b><span x-text="$store.atc.storySkyNote.since"></span></div>
+                        <!-- The sky's top row (step 9; a-calques, a-trafic, b-replie): what the sky
+                             shows, the map or the PAR of a followed airport; what the map shows
+                             (followed flight, filters); the folded column at its end. -->
+                        <div class="cl-root cl-sky__top pointer-events-none" style="z-index: 10001; background: transparent">
+                            <div class="cl-seg pointer-events-auto" role="group" aria-label="What the sky shows">
+                                <button class="cl-seg__item" :aria-pressed="$store.atc.mainView === 'map'" @click="$store.atc.setMainView('map')"
+                                        data-help-title="Map" data-help="The radar map: every aircraft the receiver hears, from above.">Map</button>
+                                <template x-for="apt in $store.atc.followedAirports" :key="apt.code">
+                                    <button class="cl-seg__item" :aria-pressed="$store.atc.mainView === 'par' && $store.atc.parAirport === apt.code"
+                                            @click="$store.atc.setMainView('par', apt.code)" x-text="'PAR · ' + apt.code"
+                                            data-help-title="PAR" :data-help="'The approaches to ' + (apt.name || apt.code) + ' in profile, runway by runway, after the Precision Approach Radar scope.'"></button>
+                                </template>
+                            </div>
+                            <template x-if="$store.atc.mainView === 'map' && $store.atc.storySkyNote">
+                                <div class="cl-sky__note"><b x-text="$store.atc.storySkyNote.callsign"></b><span x-text="$store.atc.storySkyNote.since"></span></div>
                             </template>
-                            <div x-show="$store.atc.filterSummary" class="cl-sky__note" x-text="$store.atc.filterSummary"></div>
-                        </div>
-
-                        <!-- The main screen shows the radar map or the PAR view of one
-                             followed airport; the side panels stay as they are. -->
-                        <div id="par-view" x-show="$store.atc.mainView === 'par'" style="display: none"></div>
-                        <!-- ParFrame (step 8, c-suivre): the followed aircraft's approach, drawn by par-view.js. -->
-                        <div id="par-frame" x-show="$store.atc.storyFrameAirport" x-cloak class="cl-root cl-parframe absolute left-0 right-0 bottom-0 z-20"></div>
-                        <div class="absolute top-4 right-4 z-[10001] flex items-center gap-0.5 px-1 py-1 rounded border border-border bg-panel/85 backdrop-blur-sm text-xs shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-                            <button type="button" @click="$store.atc.setMainView('map')"
-                                    :class="$store.atc.mainView === 'map' ? 'bg-highlight/20 text-highlight' : 'text-text/70 hover:text-text'"
-                                    class="px-2 py-1 rounded uppercase tracking-wide cursor-pointer"
-                                    title="Radar map">Radar</button>
-                            <span class="pl-2 pr-1 text-text/40 uppercase tracking-wide"
-                                  title="Profile view of each runway, after the Precision Approach Radar scope">PAR</span>
-                            <template x-for="apt in $store.atc.followedAirports" :key="apt.code">
-                                <button type="button" @click="$store.atc.setMainView('par', apt.code)"
-                                        :class="$store.atc.mainView === 'par' && $store.atc.parAirport === apt.code ? 'bg-highlight/20 text-highlight' : 'text-text/70 hover:text-text'"
-                                        class="px-2 py-1 rounded cursor-pointer"
-                                        :title="apt.name" x-text="apt.code"></button>
-                            </template>
-                        </div>
-
-                        <!-- The column folded (layout B, b-replie): Right now as a card over
-                             the sky, under the Map/PAR switch, which keeps the top right
-                             corner until its own step. -->
-                        <div x-show="$store.atc.columnFolded && !$store.atc.selectedAircraft" x-cloak
-                             class="cl-root hidden md:block absolute top-16 right-4 z-[10001]">
-                            <div class="cl-sky__end">
+                            <div x-show="$store.atc.mainView === 'map' && $store.atc.filterSummary" x-cloak class="cl-sky__note" x-text="$store.atc.filterSummary"></div>
+<div x-show="$store.atc.columnFolded && !$store.atc.selectedAircraft" x-cloak class="cl-sky__end pointer-events-auto hidden md:flex">
                                 <div class="cl-row">
                                     <button class="cl-btn" @click="$store.atc.setColumnFolded(false, 'traffic')"
                                             data-help-title="Traffic" data-help="Bring the column back on the list of aircraft.">Traffic <span class="cl-tabs__count" x-text="$store.atc.activeAircraftCount"></span></button>
@@ -1050,178 +877,94 @@
                             </div>
                         </div>
 
-                        <div x-data="{ open: false }" x-show="$store.atc.mainView === 'map'" class="absolute bottom-4 right-4 z-[10001]"
-                             :style="$store.atc.storyFrameAirport && $store.atc.parFrameHeight ? 'bottom: ' + ($store.atc.parFrameHeight + 8) + 'px' : ''">
-                            <button @click="open = !open"
-                                    @keydown.escape.window="open = false"
-                                    type="button"
-                                    title="Map controls"
-                                    class="filter-input text-xs px-3 py-1.5 rounded border border-border bg-panel/85 text-text min-w-[180px] flex items-center justify-between backdrop-blur-sm hover:border-highlight/60 transition-colors shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-                                <span class="uppercase tracking-wide text-text/80">Map Controls</span>
-                                <i class="fas" :class="open ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
-                            </button>
+                        <!-- The main screen shows the radar map or the PAR view of one
+                             followed airport; the side panels stay as they are. -->
+                        <div id="par-view" x-show="$store.atc.mainView === 'par'" style="display: none"></div>
+                        <!-- ParFrame (step 8, c-suivre): the followed aircraft's approach, drawn by par-view.js. -->
+                        <div id="par-frame" x-show="$store.atc.storyFrameAirport" x-cloak class="cl-root cl-parframe absolute left-0 right-0 bottom-0 z-20"></div>
 
-                            <div x-show="open"
-                                 @click.outside="open = false"
-                                 x-transition.origin.bottom.right
-                                                                     class="absolute bottom-full right-0 mb-2 w-[340px] max-w-[calc(100vw-1rem)] max-h-[65vh] overflow-y-auto overflow-x-hidden bg-panel/95 border border-border rounded-md shadow-[0_8px_20px_rgba(0,0,0,0.45)] p-3 space-y-3">
-                                <div>
-                                    <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Map Style</div>
-                                    <div class="grid grid-cols-2 gap-1.5">
-                                        <button type="button" @click="$store.atc.settings.mapStyle='ign-dark'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='ign-dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IGN dark</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='ign'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='ign' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">IGN</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='osm-dark'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='osm-dark' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">OSM dark</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='osm'; $store.atc.setMapStyle()" class="px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='osm' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">OpenStreetMap</button>
-                                        <button type="button" @click="$store.atc.settings.mapStyle='none'; $store.atc.setMapStyle()" class="col-span-2 px-2 py-1.5 text-xs rounded border transition-colors"
-                                                :class="$store.atc.settings.mapStyle==='none' ? 'border-highlight/60 bg-highlight/20 text-highlight' : 'border-border bg-background text-text hover:bg-highlight/15'">None (black)</button>
+
+                        <!-- ErrorBanner (step 10, etats.html): the connection lost says so at the
+                             top of the sky, which stays usable underneath (it replaced a
+                             full-screen "Connection Lost"). -->
+                        <div x-show="$store.atc.connected === false && $store.atc.initialDataLoaded" x-cloak role="alert"
+                             class="cl-root cl-banner absolute left-3 right-3 top-14" style="z-index: 10001;"
+                             x-text="$store.atc.connectionBannerText"></div>
+
+                        <!-- MapControls (step 9, a-calques): the base map and the layers, behind the
+                             layers button in the corner; saved in this browser as before. Above
+                             the PAR frame while it shows; hidden with the PAR view. -->
+                        <div x-show="$store.atc.mainView === 'map'" class="cl-root cl-sky__corner"
+                             :style="$store.atc.storyFrameAirport && $store.atc.parFrameHeight ? 'z-index: 10001; background: transparent; bottom: ' + ($store.atc.parFrameHeight + 8) + 'px' : 'z-index: 10001; background: transparent'"
+                             @keydown.escape.window="$store.atc.layersOpen = false">
+                            <div class="relative" @click.outside="$store.atc.layersOpen = false">
+                                <button class="cl-btn cl-btn--icon" aria-label="Layers and base map" :aria-expanded="$store.atc.layersOpen"
+                                        :class="$store.atc.layersOpen ? 'is-on' : ''" @click="$store.atc.layersOpen = !$store.atc.layersOpen"
+                                        data-help-title="Layers and base map" data-help="The base map under the aircraft, and what is drawn on it: labels, tracks, rings, airspace, airports, beacons.">
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5 14 5.5 8 8.5 2 5.5Z"/><path d="M2 8.2 8 11.2 14 8.2"/><path d="M2 10.9 8 13.9 14 10.9"/></svg>
+                                </button>
+                                <div x-show="$store.atc.layersOpen" x-cloak class="cl-menu cl-menu--map absolute right-0 bottom-full mb-2 max-h-[75vh] overflow-y-auto" role="dialog" aria-label="Layers and base map">
+                                    <div class="cl-menu__head"><span class="cl-menu__title">Base map</span></div>
+                                    <div class="cl-seg">
+                                        <template x-for="b in $store.atc.mapBaseStyles" :key="b.id">
+                                            <button class="cl-seg__item" :aria-pressed="$store.atc.settings.mapStyle === b.id" @click="$store.atc.setMapBase(b.id)" x-text="b.label"></button>
+                                        </template>
                                     </div>
-                                </div>
-
-                                <div>
-                                    <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Aircraft</div>
-                                    <div class="space-y-1.5">
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showLabels" @change="$store.atc.toggleLabels()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Labels</span>
+                                    <div class="cl-menu__sep"></div>
+                                    <div class="cl-menu__group">
+                                        <span class="cl-label">Aircraft</span>
+                                        <div class="cl-menu__row">
+                                            <button class="cl-switch" role="switch" :class="$store.atc.settings.showLabels ? 'is-on' : ''" :aria-checked="!!$store.atc.settings.showLabels"
+                                                    aria-label="Labels" @click="$store.atc.flipSetting('showLabels', 'toggleLabels')"></button>
+                                            <span class="cl-menu__label cursor-help" data-help-title="Labels" data-help="Each aircraft's callsign, type, altitude and speed beside it, and the last thing heard from it.">Labels</span>
                                         </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showPaths" @change="$store.atc.togglePaths()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Tracks</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showPaths">
-                                                <input type="range"
-                                                       x-model.number="$store.atc.settings.trailLength"
-                                                       min="1"
-                                                       max="10"
-                                                       step="1"
-                                                       @input="$store.atc.applyFilters()"
-                                                       class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs whitespace-nowrap" x-text="$store.atc.settings.trailLength + 'min'"></span>
+                                        <div class="cl-menu__row">
+                                            <button class="cl-switch" role="switch" :class="$store.atc.settings.showPaths ? 'is-on' : ''" :aria-checked="!!$store.atc.settings.showPaths"
+                                                    aria-label="Tracks" @click="$store.atc.flipSetting('showPaths', 'togglePaths')"></button>
+                                            <span class="cl-menu__label cursor-help" x-text="'Tracks, last ' + $store.atc.settings.trailLength + ' min'"
+                                                  data-help-title="Tracks" data-help="The line behind each aircraft: where it flew in the last minutes. The slider sets how many."></span>
+                                            <div class="cl-slider cl-slider--short">
+                                                <span class="cl-slider__rail"></span>
+                                                <span class="cl-slider__fill" :style="'left:0;width:' + Math.round(($store.atc.settings.trailLength - 1) / 9 * 100) + '%'"></span>
+                                                <span class="cl-slider__thumb" :style="'left:' + Math.round(($store.atc.settings.trailLength - 1) / 9 * 100) + '%'"></span>
+                                                <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="1" max="10" step="1" aria-label="Track length, minutes"
+                                                       :value="$store.atc.settings.trailLength" @input="$store.atc.settings.trailLength = Number($event.target.value); $store.atc.applyFilters()">
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div>
-                                    <div class="text-[10px] uppercase tracking-wide text-text/70 mb-2">Layers</div>
-                                    <div class="space-y-1.5">
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showRings" @change="$store.atc.toggleRings()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Distance Rings</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showRings">
-                                                <input type="range" x-model.number="$store.atc.settings.ringsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setRingsOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.ringsOpacity * 100) + '%'" ></span>
+                                    <div class="cl-menu__sep"></div>
+                                    <div class="cl-menu__group">
+                                        <span class="cl-label">Layers <span class="cl-age">switch · opacity</span></span>
+                                        <template x-for="row in $store.atc.mapLayerRows" :key="row.key">
+                                            <div class="cl-menu__row">
+                                                <button class="cl-switch" role="switch" :class="$store.atc.settings[row.show] ? 'is-on' : ''" :aria-checked="!!$store.atc.settings[row.show]"
+                                                        :aria-label="row.label" @click="$store.atc.flipSetting(row.show, row.toggle)"></button>
+                                                <span class="cl-menu__label cursor-help" x-text="row.label" :data-help-title="row.label" :data-help="row.help"></span>
+                                                <template x-if="row.op">
+                                                    <div class="cl-slider cl-slider--short">
+                                                <span class="cl-slider__rail"></span>
+                                                <span class="cl-slider__fill" :style="'left:0;width:' + Math.round(($store.atc.settings[row.op] - 0.1) / 0.9 * 100) + '%'"></span>
+                                                <span class="cl-slider__thumb" :style="'left:' + Math.round(($store.atc.settings[row.op] - 0.1) / 0.9 * 100) + '%'"></span>
+                                                <input type="range" class="absolute inset-0 w-full opacity-0 cursor-pointer" min="0.1" max="1" step="0.1" :aria-label="row.label + ' opacity'"
+                                                           :value="$store.atc.settings[row.op]" @input="$store.atc.setLayerOpacity(row, $event.target.value)">
                                             </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showAirspaceBoundaries" @change="$store.atc.toggleAirspaceBoundaries()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Airspace</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAirspaceBoundaries">
-                                                <input type="range" x-model.number="$store.atc.settings.airspaceOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAirspaceOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.airspaceOpacity * 100) + '%'" ></span>
+                                                </template>
                                             </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showAirports" @change="$store.atc.toggleAirports()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Airports</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAirports">
-                                                <input type="range" x-model.number="$store.atc.settings.airportsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAirportsOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.airportsOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showHeliports" @change="$store.atc.toggleHeliports()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Heliports</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showHeliports">
-                                                <input type="range" x-model.number="$store.atc.settings.heliportsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setHeliportsOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.heliportsOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showNavaids" @change="$store.atc.toggleNavaids()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Navaids</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showNavaids">
-                                                <input type="range" x-model.number="$store.atc.settings.navaidsOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setNavaidsOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.navaidsOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showAllRunways" @change="$store.atc.toggleAllRunways()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Other Runways</span>
-                                            <div class="flex items-center gap-2 shrink-0 w-[126px]" x-show="$store.atc.settings.showAllRunways">
-                                                <input type="range" x-model.number="$store.atc.settings.allRunwaysOpacity" min="0.1" max="1" step="0.1" @input="$store.atc.setAllRunwaysOpacity()" class="flex-1 h-1 bg-background rounded">
-                                                <span class="w-10 text-right text-xs" x-text="Math.round($store.atc.settings.allRunwaysOpacity * 100) + '%'" ></span>
-                                            </div>
-                                        </div>
-
-                                        <!-- Runways, taxiways, aprons from OpenStreetMap: tools/airport-layout/fetch.py -->
-                                        <div class="flex items-center gap-2.5 min-h-[30px]">
-                                            <label class="switch shrink-0">
-                                                <input type="checkbox" x-model="$store.atc.settings.showAirportLayout" @change="$store.atc.toggleAirportLayout()">
-                                                <span class="slider"></span>
-                                            </label>
-                                            <span class="text-sm min-w-[96px]">Airport layout</span>
-                                        </div>
+                                        </template>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Connection Lost Overlay - Only show after initialization and when connection is lost -->
-                    <div class="fixed inset-0 bg-black/50 flex justify-center items-center z-[9000] transition-all duration-500"
-                         :class="{ 'opacity-100 visible': $store.atc.connected === false && $store.atc.initialDataLoaded, 'opacity-0 invisible pointer-events-none': $store.atc.connected !== false || !$store.atc.initialDataLoaded }">
-                        <div class="text-center text-danger text-4xl font-bold uppercase tracking-wider animate-pulse bg-black/50 p-8 rounded-lg shadow-2xl">
-                            <i class="fas fa-wifi-slash text-6xl mb-4 block"></i>
-                            Connection Lost
-                            <div class="mt-3 text-base text-text/80 normal-case tracking-normal" x-show="$store.atc.wsReconnectAttempt > 0">
-                                Reconnect attempt #<span x-text="$store.atc.wsReconnectAttempt"></span>
-                                <span x-show="$store.atc.wsNextRetryDelayMs !== null"> · next in <span x-text="Math.ceil($store.atc.wsNextRetryDelayMs / 1000)"></span>s</span>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <!-- Resume listening. Browsers let a page play sound only after a click
                          on it; upstream asked for that click with a welcome screen over the
                          whole map, at every load. Now the first click or key anywhere resumes
                          the frequencies listened to last time, and this line says so while
                          something is waiting for it (10/10, audit 1.5). -->
                     <div x-show="$store.atc.resumeListeningPending" x-transition.opacity
-                         class="absolute left-1/2 -translate-x-1/2 bottom-4 z-40 px-3 py-1.5 rounded-full bg-panel/90 border border-highlight/40 text-xs text-text shadow pointer-events-none">
-                        <i class="fas fa-volume-high mr-1.5 text-highlight"></i>Click anywhere to resume listening
+                         class="cl-root cl-resume absolute left-1/2 -translate-x-1/2 bottom-6 pointer-events-none" style="z-index: 10001; background: var(--color-surface-raised);">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6v4h2.5l3.5 3V3L5 6Z"/><path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.8a6 6 0 0 1 0 8.4"/></svg>Click anywhere to resume listening
                     </div>
                 </main>
                 
@@ -2275,6 +2018,7 @@
     <script defer src="store/now.js"></script>
     <script defer src="store/thread.js"></script>
     <script defer src="store/story.js"></script>
+    <script defer src="store/sky.js"></script>
     <script defer src="server-settings.js"></script>
     <script defer src="app.js"></script>
     <!-- Alpine starts after every script above has registered its stores and

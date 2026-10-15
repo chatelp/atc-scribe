@@ -533,10 +533,13 @@
 .cl-signin__console { position: absolute; right: var(--space-8); top: var(--space-8); width: 420px; padding: var(--space-4); background: color-mix(in srgb, var(--color-surface-page) 88%, transparent); border: var(--border-width-default) solid var(--color-border-default); border-radius: var(--radius-lg); }
 .cl-signin__foot { position: absolute; left: 0; right: 0; bottom: var(--space-6); text-align: center; font: var(--font-weight-regular) var(--font-size-caption) / var(--font-line-height-caption) var(--font-family-mono); color: var(--color-text-tertiary); }
 @media (max-width: 767px) {
-    .cl-signin__brand { left: var(--space-4); top: var(--space-4); font-size: 32px; gap: var(--space-2); }
+    /* One column in the flow: the brand, the card, then the console (the sky stays behind). */
+    .cl-signin--sky { display: flex; flex-direction: column; gap: var(--space-4); height: auto; min-height: 100%; padding: var(--space-4) 0 var(--space-6); }
+    .cl-signin__brand { position: relative; left: auto; top: auto; margin: 0 var(--space-4); font-size: 32px; gap: var(--space-2); }
     .cl-signin__brand svg { width: 36px; height: 36px; }
-    .cl-signin--sky .cl-signin__card { width: calc(100% - 2 * var(--space-4)); padding: var(--space-6) var(--space-4); }
-    .cl-signin__console { position: static; width: auto; margin: 0 var(--space-4); }
+    .cl-signin--sky .cl-signin__card { position: relative; left: auto; top: auto; transform: none; width: auto; margin: 0 var(--space-4); padding: var(--space-6) var(--space-4); }
+    .cl-signin__console { position: relative; right: auto; top: auto; order: 3; width: auto; margin: 0 var(--space-4); }
+    .cl-signin__foot { position: relative; bottom: auto; order: 4; padding: 0 var(--space-4); }
 }
 
 /* ------------------------------------------------------------ StationVitals: the station's console, aggregated figures only */

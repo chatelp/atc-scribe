@@ -109,12 +109,13 @@ test('"since at least" is said for the first airport only', () => {
     assert.match(text(s.html), /^Paris-Orly has been using runway 25 since at least 15:05\. Charles de Gaulle uses runway 27R\./);
 });
 
-test('runways of the same direction are named together, others are "perhaps"', () => {
+test('runways of the same direction are named together, one of the other direction is not written', () => {
     const cdg = (second) => R.summary({ airports: [{ code: 'LFPG', name: 'Charles de Gaulle International Airport', principal: true,
         runway_in_use: [{ runway_end: '08R-26L/26L', probability: 0.57 }, { runway_end: second, probability: 0.43 }] }], clock });
     assert.match(text(cdg('09L-27R/27R').html), /^Charles de Gaulle uses runways 26L and 27R\./);
     assert.match(text(cdg('08L-26R/26R').html), /^Charles de Gaulle uses runways 26L and 26R\./);
-    assert.match(text(cdg('08R-26L/08R').html), /^Charles de Gaulle uses runway 26L, perhaps 08R too\./);
+    assert.match(text(cdg('08R-26L/08R').html), /^Charles de Gaulle uses runway 26L\./);
+    assert.match(text(cdg('09L-27R/09L').html), /^Charles de Gaulle uses runway 26L\./);
     assert.equal(R.sameDirection('18-36/36', '01-19/01'), true);
     assert.equal(R.sameDirection('07-25/25', '02-20/20'), false);
 });

@@ -402,6 +402,39 @@ type MatchProof struct {
 	Reason string
 }
 
+// SetSecondReading stores a second reading that came after the first one was
+// stored (the sidecar's "later" mode, 14/10). A transmission already processed
+// without an aircraft goes back to the queue: its second reading may name one
+// (the matcher tries both). One already matched keeps its match -- the primary
+// wins a disagreement anyway -- and only gains the text. Returns whether it
+// went back to the queue.
+//
+// A processing pass running at that very moment may still write the
+// transmission as processed without seeing this text: then the second reading
+// is shown but not tried, as when it came too late before.
+func (s *TranscriptionStorage) SetSecondReading(id int64, second string) (bool, error) {
+	lockSQLiteWrite()
+	defer unlockSQLiteWrite()
+
+	res, err := s.db.Exec(
+		`UPDATE transcriptions
+		SET content_second = ?,
+			is_processed = CASE WHEN is_processed = 1 AND COALESCE(callsign, '') = '' THEN 0 ELSE is_processed END
+		WHERE id = ?`,
+		second, id)
+	if err != nil {
+		return false, fmt.Errorf("store second reading: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return false, nil
+	}
+	var processed bool
+	if err := s.db.QueryRow(`SELECT is_processed FROM transcriptions WHERE id = ?`, id).Scan(&processed); err != nil {
+		return false, nil
+	}
+	return !processed, nil
+}
+
 // UpdateMatchedTranscription is UpdateProcessedTranscription with the words that
 // named the aircraft and the proof of the match, written in the same statement: a
 // callsign stored without its evidence, or the reverse, would highlight words that

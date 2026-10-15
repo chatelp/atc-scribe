@@ -29,6 +29,7 @@ class WebSocketClient {
         this.listeners = {
             transcription: [],
             transcription_update: [],
+            transcription_second: [],
             aircraft: [],
             aircraft_added: [],
             aircraft_update: [],
@@ -173,6 +174,8 @@ class WebSocketClient {
                     this._notifyListeners('transcription', message.data);
                 } else if (message.type === 'transcription_update') {
                     this._notifyListeners('transcription_update', message.data);
+                } else if (message.type === 'transcription_second') {
+                    this._notifyListeners('transcription_second', message.data);
                 } else if (message.type === 'aircraft') {
                     this._notifyListeners('aircraft', message.data);
                 } else if (message.type === 'status_update') {
