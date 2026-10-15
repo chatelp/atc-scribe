@@ -1,7 +1,9 @@
 // Clairance menu bar launcher.
 //
 // An icon in the menu bar that says whether production runs, starts and stops
-// it, and opens the page. It does not run production itself: it runs the same
+// it, and opens the page. Below, every co-atc instance running on this Mac,
+// production and test alike, each with what it serves, its transcription, its
+// station link, its log; and what was left running without an instance. It does not run production itself: it runs the same
 // script a double-click runs (production_command, runs/production.command on the
 // owner's station), so the sign-in, the station link and the clean stop stay in
 // one place. Stopping sends that script SIGTERM, which its trap turns into a
@@ -31,7 +33,6 @@ struct LauncherConfig: Decodable {
 let builtRepo = "@REPO@"
 
 let coAtcPattern = "bin/co-atc -config configs/config.toml"
-let testPattern = "runs/son-test/co-atc -config"
 let planningMarker = "(menu bar launcher)"
 
 @discardableResult
@@ -53,6 +54,217 @@ func pids(matching pattern: String) -> [Int32] {
         .split(separator: "\n").compactMap { Int32($0.trimmingCharacters(in: .whitespaces)) }
 }
 
+// MARK: - Every instance on this Mac
+
+/// A co-atc process, production or test, and what goes with it.
+struct Instance: Identifiable, Sendable {
+    var id: Int32 { pid }
+    let pid: Int32
+    let production: Bool
+    let name: String            // "Production", or the config's name ("migration-fake")
+    let elapsed: String
+    let config: String          // as given on its command line
+    let cwd: String
+    let port: Int?
+    let extraPorts: [Int]
+    let staticDir: String
+    let www: String             // "migration @ cad595f", or "copy" when not a checkout
+    let database: String
+    let log: String
+    let sidecarURL: String
+    let sidecarPid: Int32?
+    let sidecarKind: String     // "real model", "fake", or the command's name
+    let stationLinks: [Helper]
+    // Read from the server and the sidecar after the scan.
+    var version = ""
+    var summary = ""            // vitalsLine, empty when the server did not answer
+    var sidecarHealth = ""
+
+    var url: String? { port.map { "http://127.0.0.1:\($0)/" } }
+
+    var title: String {
+        var t = name
+        if let p = port { t += " · :\(p)" }
+        if !elapsed.isEmpty { t += " · \(elapsed)" }
+        return t
+    }
+}
+
+/// A helper process: a sidecar or a station link.
+struct Helper: Identifiable, Sendable {
+    var id: Int32 { pid }
+    let pid: Int32
+    let what: String
+    let elapsed: String
+    let command: String
+}
+
+/// "05:46:58" or "1-02:03:04" (ps etime) as "5 h 47", "1 d 2 h", "3 min".
+func shortElapsed(_ etime: String) -> String {
+    let dayParts = etime.split(separator: "-")
+    let days = dayParts.count == 2 ? Int(dayParts[0]) ?? 0 : 0
+    let hms = (dayParts.last ?? "").split(separator: ":").compactMap { Int($0) }
+    guard !hms.isEmpty else { return etime }
+    let h = hms.count == 3 ? hms[0] : 0
+    let m = hms.count >= 2 ? hms[hms.count - 2] : 0
+    if days > 0 { return "\(days) d \(h) h" }
+    if h > 0 { return "\(h) h \(String(format: "%02d", m))" }
+    return "\(m) min"
+}
+
+/// The few keys of a co-atc TOML config the launcher reads: section -> key -> raw value.
+func readConfig(_ path: String) -> [String: [String: String]] {
+    guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return [:] }
+    var out: [String: [String: String]] = [:]
+    var section = ""
+    for raw in text.components(separatedBy: "\n") {
+        // Drop a comment, unless the # is inside quotes.
+        var line = ""
+        var quoted = false
+        for ch in raw {
+            if ch == "\"" { quoted.toggle() }
+            if ch == "#" && !quoted { break }
+            line.append(ch)
+        }
+        line = line.trimmingCharacters(in: .whitespaces)
+        if line.hasPrefix("[") && line.hasSuffix("]") && !line.contains("=") {
+            section = String(line.dropFirst().dropLast())
+            continue
+        }
+        guard let eq = line.firstIndex(of: "=") else { continue }
+        let key = line[..<eq].trimmingCharacters(in: .whitespaces)
+        var value = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+        if value.hasPrefix("\""), value.hasSuffix("\""), value.count >= 2 { value = String(value.dropFirst().dropLast()) }
+        out[section, default: [:]][key] = value
+    }
+    return out
+}
+
+func resolve(_ path: String, from dir: String) -> String {
+    guard !path.isEmpty else { return "" }
+    let full = path.hasPrefix("/") ? path : (dir as NSString).appendingPathComponent(path)
+    return (full as NSString).standardizingPath
+}
+
+func processCommand(_ pid: Int32) -> (etime: String, command: String) {
+    let out = run("/bin/ps", ["-o", "etime=,command=", "-p", String(pid)]).out
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let space = out.firstIndex(of: " ") else { return (out, "") }
+    return (String(out[..<space]), out[space...].trimmingCharacters(in: .whitespaces))
+}
+
+/// lsof's name for one of the process's descriptors ("cwd", "1").
+func openPath(_ pid: Int32, fd: String) -> String {
+    run("/usr/sbin/lsof", ["-a", "-p", String(pid), "-d", fd, "-Fn"]).out
+        .split(separator: "\n").first(where: { $0.hasPrefix("n") }).map { String($0.dropFirst()) } ?? ""
+}
+
+func listener(onPort port: Int) -> Int32? {
+    run("/usr/sbin/lsof", ["-nP", "-t", "-iTCP:\(port)", "-sTCP:LISTEN"]).out
+        .split(separator: "\n").compactMap { Int32($0) }.first
+}
+
+/// The branch and commit of a www folder, when it is a checkout's own.
+func wwwOrigin(_ staticDir: String) -> String {
+    let top = run("/usr/bin/git", ["-C", staticDir, "rev-parse", "--show-toplevel"]).out
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !top.isEmpty, resolve("www", from: top) == staticDir else { return "copy" }
+    let branch = run("/usr/bin/git", ["-C", top, "rev-parse", "--abbrev-ref", "HEAD"]).out
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    let commit = run("/usr/bin/git", ["-C", top, "rev-parse", "--short", "HEAD"]).out
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return "\(branch) @ \(commit)"
+}
+
+func sidecarKind(_ command: String) -> String {
+    if command.contains("whisper_server.py") { return "real model" }
+    if command.contains("fake-sidecar") { return "fake" }
+    return command.split(separator: " ").first.map { ($0 as NSString).lastPathComponent } ?? "?"
+}
+
+/// Every co-atc process, and the sidecars and station links left without one.
+/// Runs off the main thread: ps, lsof and git, a few tens of milliseconds each.
+func scanInstances() -> (instances: [Instance], orphans: [Helper]) {
+    let coAtc = run("/usr/bin/pgrep", ["-x", "co-atc"]).out
+        .split(separator: "\n").compactMap { Int32($0) }
+    let links = run("/usr/bin/pgrep", ["-f", "radio-ctl-sync"]).out
+        .split(separator: "\n").compactMap { Int32($0) }
+        .map { pid -> Helper in
+            let c = processCommand(pid)
+            return Helper(pid: pid, what: c.command.contains(" -once") ? "station link, once (should run continuously)" : "station link",
+                          elapsed: shortElapsed(c.etime), command: c.command)
+        }
+    let sidecars = (run("/usr/bin/pgrep", ["-f", "whisper_server.py|fake-sidecar"]).out
+        .split(separator: "\n").compactMap { Int32($0) })
+        .map { pid -> Helper in
+            let c = processCommand(pid)
+            return Helper(pid: pid, what: "sidecar, \(sidecarKind(c.command))", elapsed: shortElapsed(c.etime), command: c.command)
+        }
+    var claimed = Set<Int32>()
+    var instances: [Instance] = []
+    for pid in coAtc {
+        let c = processCommand(pid)
+        let args = c.command.split(separator: " ").map(String.init)
+        let cfgArg = args.firstIndex(of: "-config").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } ?? ""
+        let cwd = openPath(pid, fd: "cwd")
+        let cfgPath = resolve(cfgArg, from: cwd)
+        let cfg = readConfig(cfgPath)
+        let server = cfg["server"] ?? [:]
+        let port = server["port"].flatMap { Int($0) }
+        let extra = (server["additional_ports"] ?? "").split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+        let staticDir = resolve(server["static_dir"] ?? "www", from: cwd)
+        let local = cfg["transcription.local"] ?? [:]
+        let sidecarURL = local["server_url"] ?? ""
+        let sidecarPort = URL(string: sidecarURL)?.port
+        let sidecarPid = sidecarPort.flatMap { listener(onPort: $0) }
+        if let s = sidecarPid { claimed.insert(s) }
+        let mine = links.filter { h in
+            port.map { p in h.command.contains("127.0.0.1:\(p)") || h.command.contains("localhost:\(p)") } ?? false
+        }
+        mine.forEach { claimed.insert($0.pid) }
+        let production = c.command.contains(coAtcPattern)
+        var name = "Production"
+        if !production {
+            name = ((cfgPath as NSString).lastPathComponent as NSString).deletingPathExtension
+            if name.hasPrefix("config-") { name = String(name.dropFirst("config-".count)) }
+            name = "Test · " + name
+        }
+        instances.append(Instance(
+            pid: pid, production: production, name: name, elapsed: shortElapsed(c.etime),
+            config: cfgArg, cwd: cwd, port: port, extraPorts: extra,
+            staticDir: staticDir, www: wwwOrigin(staticDir),
+            database: resolve(cfg["storage"]?["sqlite_base_path"] ?? "", from: cwd),
+            log: openPath(pid, fd: "1"),
+            sidecarURL: sidecarURL, sidecarPid: sidecarPid,
+            sidecarKind: sidecarPid.map { sidecarKind(processCommand($0).command) } ?? "",
+            stationLinks: mine))
+    }
+    instances.sort { ($0.production ? 0 : 1, $0.port ?? 0) < ($1.production ? 0 : 1, $1.port ?? 0) }
+    let orphans = (sidecars + links).filter { !claimed.contains($0.pid) }
+    return (instances, orphans)
+}
+
+func getJSON(_ s: String, timeout: Double = 3) async -> [String: Any]? {
+    guard let url = URL(string: s) else { return nil }
+    var req = URLRequest(url: url)
+    req.timeoutInterval = timeout
+    guard let (data, _) = try? await URLSession.shared.data(for: req) else { return nil }
+    return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+}
+
+/// "103 aircraft · 5 437 transmissions today · 44 % matched"
+func vitalsLine(_ v: [String: Any]) -> String {
+    func n(_ k: String) -> Int? { (v[k] as? NSNumber)?.intValue }
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.locale = Locale(identifier: "fr_FR")
+    var parts: [String] = []
+    if let a = n("aircraft") { parts.append("\(a) aircraft") }
+    if let t = n("transmissions_today") { parts.append("\(f.string(from: NSNumber(value: t)) ?? String(t)) transmissions today") }
+    if let m = n("matched_share") { parts.append("\(m) % matched") }
+    return parts.joined(separator: " · ")
+}
+
 @MainActor
 final class Production: ObservableObject {
     @Published var running = false
@@ -64,7 +276,8 @@ final class Production: ObservableObject {
     // antenna is on the air.
     var listening: Bool { running && stationMode == "chaine" }
     @Published var sidecar = "—"
-    @Published var testInstance = false
+    @Published var instances: [Instance] = []
+    @Published var orphans: [Helper] = []
     @Published var busy = false
     @Published var note = ""
 
@@ -92,7 +305,27 @@ final class Production: ObservableObject {
     func refresh() async {
         let co = pids(matching: coAtcPattern)
         running = !co.isEmpty
-        testInstance = !pids(matching: testPattern).isEmpty
+        let scan = await Task.detached { scanInstances() }.value
+        var found = scan.instances
+        for i in found.indices {
+            if let u = found[i].url, let v = await getJSON(u + "api/v1/vitals") {
+                found[i].version = v["version"] as? String ?? ""
+                found[i].summary = vitalsLine(v)
+            }
+            if !found[i].sidecarURL.isEmpty {
+                if let h = await getJSON(found[i].sidecarURL + "/health") {
+                    let status = h["status"] as? String ?? "?"
+                    let degraded = (h["degraded"] as? [String]) ?? []
+                    let q = h["queue"] as? [String: Any]
+                    let queue = q.map { " · queue \(($0["first"] as? NSNumber)?.intValue ?? 0)/\(($0["second"] as? NSNumber)?.intValue ?? 0)" } ?? ""
+                    found[i].sidecarHealth = (degraded.isEmpty ? status : "\(status): \(degraded.joined(separator: ", "))") + queue
+                } else {
+                    found[i].sidecarHealth = "not answering"
+                }
+            }
+        }
+        instances = found
+        orphans = scan.orphans
         if let pid = co.first {
             elapsed = run("/bin/ps", ["-o", "etime=", "-p", String(pid)]).out
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -155,6 +388,52 @@ final class Production: ObservableObject {
 
     func open(_ url: String) {
         if let u = URL(string: url) { NSWorkspace.shared.open(u) }
+    }
+
+    // A test instance stops by its own PIDs, never by a pattern (on 14/10 a
+    // pattern also stopped the night's measurement): co-atc, the station
+    // link that feeds it, and its sidecar when co-atc did not start it.
+    func stopInstance(_ i: Instance) {
+        var targets: [(Int32, String)] = [(i.pid, "co-atc")]
+        targets += i.stationLinks.map { ($0.pid, "station link") }
+        if let s = i.sidecarPid {
+            let parent = Int32(run("/bin/ps", ["-o", "ppid=", "-p", String(s)]).out
+                .trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            if parent != i.pid { targets.append((s, "sidecar")) }
+        }
+        let alert = NSAlert()
+        alert.messageText = "Stop \(i.name)?"
+        alert.informativeText = targets.map { "\($0.1) (\($0.0))" }.joined(separator: ", ")
+        alert.addButton(withTitle: "Stop")
+        alert.addButton(withTitle: "Cancel")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        for (pid, _) in targets { kill(pid, SIGTERM) }
+        note = "Stopped \(i.name)"
+        Task { await refresh() }
+    }
+
+    func stopHelper(_ h: Helper) {
+        let alert = NSAlert()
+        alert.messageText = "Stop the \(h.what) (\(h.pid))?"
+        alert.informativeText = h.command
+        alert.addButton(withTitle: "Stop")
+        alert.addButton(withTitle: "Cancel")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        kill(h.pid, SIGTERM)
+        Task { await refresh() }
+    }
+
+    func openFile(_ path: String) {
+        guard !path.isEmpty else { return }
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    }
+
+    func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        note = "Copied \(text)"
     }
 
     func openLog() {
@@ -226,6 +505,16 @@ enum Entry {
             print(p.running ? "production running" + (p.elapsed.isEmpty ? "" : " for \(p.elapsed)") : "production stopped")
             if p.running { print("sidecar: \(p.sidecar)") }
             print("on air: \(p.onAir)")
+            for i in p.instances {
+                print("")
+                print("\(i.title)  (pid \(i.pid))")
+                for line in instanceLines(i) { print("  \(line)") }
+            }
+            if !p.orphans.isEmpty {
+                print("")
+                print("left without an instance:")
+                for h in p.orphans { print("  \(h.what) (pid \(h.pid), \(h.elapsed)): \(h.command)") }
+            }
             if !p.note.isEmpty { print("note: \(p.note)") }
         }
         settle(2)
@@ -240,10 +529,32 @@ enum Entry {
             break
         }
         Task { await p.refresh() }
-        settle(3)
+        settle(6)
         report()
         exit(p.note.hasPrefix("Not found") || p.note.hasPrefix("Could not") ? 1 : 0)
     }
+}
+
+// What an instance's menu says, and the command line's --status.
+func instanceLines(_ i: Instance) -> [String] {
+    var lines: [String] = []
+    lines.append("Page: \(i.www)")
+    if !i.version.isEmpty { lines.append("Server: \(i.version)") }
+    lines.append(i.summary.isEmpty ? "Server not answering" : i.summary)
+    if !i.sidecarURL.isEmpty {
+        let kind = i.sidecarKind.isEmpty ? "" : "\(i.sidecarKind), "
+        lines.append("Transcription: \(kind)\(i.sidecarHealth)" + (i.sidecarKind == "real model" ? " · uses the GPU" : ""))
+    }
+    if i.stationLinks.isEmpty {
+        lines.append("Station link: none")
+    } else {
+        for h in i.stationLinks { lines.append("Station link: \(h.what == "station link" ? "running" : h.what), \(h.elapsed)") }
+    }
+    let ports = ([i.port].compactMap { $0 } + i.extraPorts).map(String.init).joined(separator: ", ")
+    if !ports.isEmpty { lines.append("Ports: \(ports)") }
+    lines.append("Config: \(i.config)")
+    if !i.database.isEmpty { lines.append("Databases: \(i.database)") }
+    return lines
 }
 
 // menuBarIcon loads the sign's three states from the bundle's Resources
@@ -271,7 +582,6 @@ struct ClairanceLauncher: App {
             Text(p.running ? "Production running" + (p.elapsed.isEmpty ? "" : " for \(p.elapsed)") : "Production stopped")
             if p.running { Text("Sidecar: \(p.sidecar)") }
             Text("On air: \(p.onAir)")
-            if p.testInstance { Text("Test instance running") }
             if !p.note.isEmpty { Text(p.note) }
             Divider()
             Button("Start production") { p.start() }.disabled(p.running || p.busy)
@@ -280,6 +590,31 @@ struct ClairanceLauncher: App {
             Button("Open Clairance") { p.open("http://127.0.0.1:8000/") }.disabled(!p.running)
             if p.cfg.tailscale_url != nil { Button("Copy remote address") { p.copyRemoteAddress() } }
             Button("Production log") { p.openLog() }
+            Divider()
+            Text(p.instances.isEmpty ? "No instance running" : "Instances running: \(p.instances.count)")
+            ForEach(p.instances) { i in
+                Menu(i.title) {
+                    ForEach(instanceLines(i), id: \.self) { Text($0) }
+                    Divider()
+                    if let u = i.url {
+                        Button("Open \(u)") { p.open(u) }
+                        Button("Copy address") { p.copy(u) }
+                    }
+                    Button("Open log") { p.openFile(i.log) }.disabled(i.log.isEmpty || !i.log.hasPrefix("/"))
+                    Button("Show config") { p.openFile(resolve(i.config, from: i.cwd)) }
+                    if !i.production {
+                        Divider()
+                        Button("Stop this instance…") { p.stopInstance(i) }
+                    }
+                }
+            }
+            if !p.orphans.isEmpty {
+                Menu("Left without an instance: \(p.orphans.count)") {
+                    ForEach(p.orphans) { h in
+                        Button("Stop \(h.what) · \(h.pid) · \(h.elapsed)…") { p.stopHelper(h) }
+                    }
+                }
+            }
             Divider()
             Button("Quit launcher (production keeps running)") { NSApplication.shared.terminate(nil) }
         } label: {
