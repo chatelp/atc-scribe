@@ -384,6 +384,7 @@
 .cl-threadhead__row--channels { flex-wrap: nowrap; }
 .cl-threadhead__row--channels .cl-channel { flex: 0 1 auto; min-width: 0; }
 .cl-channel__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cl-threadhead__pace { font-family: var(--font-family-mono); font-size: var(--font-size-caption); line-height: var(--font-line-height-caption); color: var(--color-text-tertiary); }
 .cl-threadhead__title { margin: 0; font-size: var(--font-size-title); line-height: var(--font-line-height-title); font-weight: var(--font-weight-strong); }
 .cl-threadhead__end { margin-left: auto; display: flex; gap: var(--space-1-5); align-items: center; }
 
