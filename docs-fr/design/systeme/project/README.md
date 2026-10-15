@@ -43,7 +43,7 @@ Clairance lets a listener hear the airband their station receives, read it in En
 ## States and motion
 
 - Hover `color-surface-hover` in `motion-duration-fast`; focus a solid 2 px `color-border-focus` ring, offset 2 px, on `:focus-visible` only; disabled `color-text-disabled`.
-- What moves is information: aircraft, a frequency's level meter. A change of state takes `motion-duration-fast` with `motion-easing-standard`; a popover opens in `motion-duration-base`. An emergency pulses three times and stops. Nothing loops. Under `prefers-reduced-motion` durations drop to 0.
+- What moves is information: aircraft, a frequency's level meter. A change of state takes `motion-duration-fast` with `motion-easing-standard`; a popover opens in `motion-duration-base`. An emergency pulses three times and stops. Nothing loops. Under `prefers-reduced-motion` durations drop to 0, the emergency pulse included; the aircraft keep gliding between positions, since their motion is information and jumps every two seconds would be busier (owner, 15/10).
 - A new line in the thread or the list appears; it does not slide or blink.
 
 ## Iconography
