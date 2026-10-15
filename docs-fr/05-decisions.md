@@ -5215,7 +5215,14 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
-### Q55 — Les noms officiels de l'AIP dans l'appariement *(15/10 — ouverte, proposée par le labo, choix du propriétaire attendu)*
+### Q55 — Les noms officiels de l'AIP dans l'appariement *(15/10 — **lancée par le propriétaire le 15/10 au soir pour l'outil et la grammaire** ; l'indice de direction et l'affichage restent ouverts)*
+
+> **Décision du propriétaire, 15/10 au soir** : « lance Q55 : l'outil AIP et la grammaire ». Ce
+> qui part : (1) un outil générique dans le dépôt, qui fabrique la liste des noms sur place pour un
+> centre et un rayon, hors du dépôt, source et date dans le fichier ; (2) la règle de grammaire,
+> mesurée par paires avant d'être activée. Pourquoi elle compte ici : la lecture des lettres
+> (« seven uniform echo » → 7UE, `letters`, active en production depuis le 26/09) lit aussi
+> « ELCOB 7 Golf » comme un morceau d'indicatif, 7G.
 
 Le labo a tiré de l'eAIP France du SIA (cycle AIRAC du 01/10/2026, cinq pages : ENR 4.4, ENR 2.1,
 AD 2 LFPG, LFPO, LFPB), avec l'accord du propriétaire, une liste de noms réels autour de LFPG :
