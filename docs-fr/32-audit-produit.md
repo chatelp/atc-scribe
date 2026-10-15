@@ -492,6 +492,19 @@ sur la carte.
 
 ## État
 
+- 15/10 (matin) : **nuit de mesure du 14 au 15/10** (instance d'essai, vrai modèle, D81 et modèles
+  gardés en mémoire, 20 h 56 → 9 h). Première lecture, 3 850 transmissions : **1,0 s en médiane,
+  2,4 s au 90ᵉ centile**, stable d'heure en heure, pic du matin compris (7 h : 464 transmissions,
+  1,0 s, 1,8 s au 90ᵉ). Lecture française, 2 136 : 1,7 s après l'anglaise en médiane, 4,0 s au
+  90ᵉ ; 2 030 d'entre elles ont servi à la reconnaissance. Part reconnue 21 h – 9 h : **34,5 %**,
+  contre 27,4 et 25,1 % les nuits du 2-3 et du 3-4/10 sur les mêmes fréquences ; écart non
+  attribuable à une cause unique (règles, détecteur, D81 et trafic ont changé entre-temps), et la
+  précision n'est pas mesurée. ADS-B : 14 coupures d'une à deux minutes (« i/o timeout » vers la
+  station), rétablies seules. Disque : +1,5 Go d'archive audio, +0,3 Go de base, 82 Go libres.
+  Mémoire du sidecar : 14 → 17 Go en douze heures (trois modèles), à surveiller. **Le relevé toutes
+  les 5 minutes, lui, n'a tourné que dix minutes** : le redémarrage de 20 h 56 l'a arrêté (motif
+  `pgrep` trop large) ; corrigé dans l'outil (ce59219) ; files d'attente et mémoire heure par
+  heure ne sont donc pas connues pour cette nuit.
 - 14/10 (soir) : **étape 10 versée dans `local`** après relecture design et coup d'œil du
   propriétaire. L'écran plein « Connection Lost » devient un `cl-banner` en haut du ciel, vérifié
   en coupant le serveur sous une page ouverte (« Connection to the server lost since 18:31Z:
