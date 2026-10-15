@@ -492,6 +492,19 @@ sur la carte.
 
 ## État
 
+- 15/10 (soir) : **Q55, l'outil des noms officiels de l'AIP, piloté depuis les réglages** (le
+  propriétaire : « il faut que ce script soit pilotable depuis les settings web »). Le script du
+  labo devient le paquet Go `internal/aip` : cycle AIRAC calculé (tous les 28 jours depuis le
+  01/10/2026), cinq pages de l'eAIP du SIA (ENR 4.4, ENR 2.1, AD 2 de chaque aérodrome suivi)
+  téléchargées une fois par cycle dans un cache à côté des bases, liste écrite à côté des bases avec
+  sa source et sa date, une page AD 2 manquante sautée et nommée. Routes `GET /api/v1/aip-names` et
+  `POST /api/v1/aip-names/refresh`, derrière la session ; réglage « Update at each new AIRAC
+  cycle », éteint par défaut (requête vers un site extérieur). Section dans « Callsign matching »
+  selon la fiche SettingsPage de la session design. Vérifié : sur les pages du labo, les mêmes
+  points (un au bord du rayon près) et procédures que son script, et 41 positions de contrôle de plus
+  qu'il manquait (PARIS Contrôle, REIMS Contrôle…) ; sur l'instance d'essai, de « Not made yet »
+  à « Up to date · AIRAC 2026-10-01 » en un clic, sans rien télécharger (pages du labo en cache,
+  instance sans flux audio). Reste de Q55 : la grammaire, mesurée par paires avant activation.
 - 15/10 (soir) : **migration du design versée dans `local` et prête pour la production**
   (efaaa7a) : étapes 12 et 13 et tout ce qui a suivi le même jour, relu conforme par la session
   design. Le propriétaire a choisi de la regarder en production plutôt que sur l'instance d'essai

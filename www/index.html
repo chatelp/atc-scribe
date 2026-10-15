@@ -522,6 +522,40 @@
                                     </div>
                                 </div>
                             </template>
+                            <!-- Names from the AIP (Q55; SettingsPage, 15/10): a source of the matcher,
+                                 made from the French eAIP on this page's button. -->
+                            <template x-if="aip">
+                                <div class="contents">
+                                    <div class="cl-field max-md:grid-cols-1">
+                                        <span class="cl-field__label cursor-help" data-help-title="Names from the AIP"
+                                              data-help="The official names around the station, from the French eAIP: reporting points, control positions, procedures. The matcher reads them so that &quot;ELCOB 7 Golf&quot; is a procedure, not a callsign.">Names from the AIP</span>
+                                        <span class="cl-light whitespace-normal" :class="'cl-light--' + aipLight().level" x-text="aipLight().text"></span>
+                                    </div>
+                                    <dl class="cl-kv">
+                                        <template x-if="aip.present">
+                                            <div class="contents">
+                                                <dt>Reporting points</dt><dd x-text="aip.points"></dd>
+                                                <dt>Control positions</dt><dd x-text="aip.callsigns"></dd>
+                                                <dt>Procedures</dt><dd x-text="aip.procedures"></dd>
+                                            </div>
+                                        </template>
+                                        <dt>Area</dt><dd x-text="aip.radius_nm + ' NM around the station'"></dd>
+                                        <dt>Aerodromes</dt><dd x-text="(aip.airports || []).join(' · ') + ' (the ones followed)'"></dd>
+                                    </dl>
+                                    <div class="cl-row">
+                                        <button class="cl-btn" :class="aipStale ? 'cl-btn--primary' : ''" :disabled="aip.refreshing || aipBusy" @click="refreshAIP()">Update from the SIA</button>
+                                        <span class="cl-plain">Five public pages of the eAIP, about 9 MB, a few seconds.</span>
+                                    </div>
+                                    <span x-show="aip.present" class="cl-plain"
+                                          x-text="'Source: ' + aip.source + '. Made on ' + aipMadeText() + '. Next cycle: ' + aip.next_airac + '.' + ((aip.skipped || []).length ? ' Not read: ' + aip.skipped.join('; ') + '.' : '')"></span>
+                                    <div class="cl-field">
+                                        <span class="cl-field__label">Update at each new AIRAC cycle</span>
+                                        <button class="cl-switch" role="switch" aria-label="Update at each new AIRAC cycle" :disabled="busy"
+                                                :class="aip.auto_update ? 'is-on' : ''" :aria-checked="String(!!aip.auto_update)" @click="setAIPAuto(!aip.auto_update)"></button>
+                                        <span class="cl-field__help">Every 28 days, when a new cycle comes into force, the server downloads the pages again.</span>
+                                    </div>
+                                </div>
+                            </template>
                         </section>
 
                         <section id="set-display" class="cl-page__section max-md:px-4">
@@ -532,7 +566,7 @@
                                 <button class="cl-switch" role="switch" aria-label="Last transmission on aircraft labels"
                                         :class="$store.atc.settings.voiceBubbles ? 'is-on' : ''" :aria-checked="String(!!$store.atc.settings.voiceBubbles)"
                                         @click="$store.atc.flipSetting('voiceBubbles', 'toggleVoiceBubbles')"></button>
-                                <span class="cl-field__help">A third line under the label, in quotes, for ten minutes after it was heard.</span>
+                                <span class="cl-field__help">A tag under the label, in quotes, for ten minutes after it was heard: full for two minutes, then paler.</span>
                             </div>
                             <div class="cl-field">
                                 <span class="cl-field__label cursor-help" data-help-title="Smooth movement"

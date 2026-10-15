@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yegors/co-atc/internal/aip"
 	"github.com/yegors/co-atc/internal/audioarchive"
 	"net/http"
 	"os"
@@ -48,6 +49,11 @@ type Handler struct {
 	commit        string
 	dbSampleAt    time.Time
 	dbSampleBytes int64
+
+	// The list of official names around the station, made from the panel
+	// (aip_handlers.go, Q55); nil without one.
+	aip     *aip.Maker
+	aipMade func(*aip.Names)
 }
 
 // NewHandler creates a new API handler
