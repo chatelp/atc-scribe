@@ -492,6 +492,14 @@ sur la carte.
 
 ## État
 
+- 15/10 : **« Show only » depuis un avion** (le propriétaire pensait au Shift+clic ; écarté :
+  invisible, sans équivalent au doigt, et il n'y a pas de sélection multiple). Sous la grille du
+  récit, une rangée « Show only » et deux bascules : « FL 290 ± 500 ft » (±500 ft, choix du
+  propriétaire) règle la réglette d'altitude, « CRZ » ne garde que ce code de phase exact ; elles
+  se cumulent, et un second clic remet le filtre d'avant (vérifié : « up to FL 100 » revient). La
+  note du ciel les nomme (« Showing 1 of 87 · FL 290 ± 500 ft · CRZ only ») et finit par un ✕ qui
+  efface tout ce qu'elle liste. L'avion suivi reste dans la liste quels que soient les filtres,
+  comme il restait déjà sur la carte. Forme de la session design (5530c9e).
 - 15/10 : **échelle des altitudes aux couleurs des avions** (demande du propriétaire, forme A
   choisie sur une planche de la session design, 7e63e14 ; fiche AltitudeLegend, Slider mise à
   jour). En bas à gauche du ciel, une légende des cinq bandes de couleur, chacune avec

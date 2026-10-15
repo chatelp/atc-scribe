@@ -39,6 +39,19 @@ function altitudeFilter() {
             this.hi = Math.max(this.lo + 1, S.indexOf(this.list, st.maxAltitude));
             this.refresh();
             this._timer = setInterval(() => this.refresh(), REFRESH_MS);
+            // The band set elsewhere (a story's "Show only", the sky note's ✕):
+            // the handles follow, on the nearest stops.
+            const follow = () => {
+                const s = this.$store.atc.settings;
+                if (s.minAltitude === this.min && s.maxAltitude === this.max) return;
+                this.lo = S.indexOf(this.list, s.minAltitude);
+                this.hi = Math.max(this.lo + 1, S.indexOf(this.list, s.maxAltitude));
+                if (this.$refs.lo) this.$refs.lo.value = this.lo;
+                if (this.$refs.hi) this.$refs.hi.value = this.hi;
+                this.refresh();
+            };
+            this.$watch('$store.atc.settings.minAltitude', follow);
+            this.$watch('$store.atc.settings.maxAltitude', follow);
         },
 
         destroy() {
@@ -114,7 +127,8 @@ function altitudeFilter() {
             const alts = this.altitudes();
             this.counts = S.histogram(this.list, alts, BINS);
             this.airborne = alts.length;
-            this.inBand = alts.filter((ft) => ft >= this.min && ft <= this.max).length;
+            const s = this.$store.atc.settings;
+            this.inBand = alts.filter((ft) => ft >= s.minAltitude && ft <= s.maxAltitude).length;
         },
 
         // While a handle moves: the two handles never cross, and the list

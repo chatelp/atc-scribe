@@ -11,6 +11,18 @@
 // matched to the aircraft (aircraftRadio), the track is the one the panel
 // already refreshes every 5 s (aircraftDetailsHistoryData).
 (function () {
+    // "Show only" this level: the aircraft's ± this, as Pierre chose (15/10).
+    const ONLY_LEVEL_FT = 500;
+
+    // "FL 340 ± 500 ft", "2 400 ft ± 500 ft": the slider's words (feet on
+    // the QNH under the transition altitude).
+    function onlyLevelText(ft) {
+        const S = window.AltitudeScale;
+        const geo = window.ParGeometry;
+        const ta = (geo && geo.DEFAULTS && geo.DEFAULTS.transitionAltitudeFt) || S.DEFAULT_TA;
+        return `${S.label(ft, ta)} ± ${ONLY_LEVEL_FT} ft`;
+    }
+
     // A narrow no-break space between thousands, as the design system writes
     // numbers ("4 000 ft").
     const THIN = ' ';
@@ -166,6 +178,102 @@
         },
 
         // The head of the story: who, and four numbers.
+        // "Show only" this aircraft's level or its phase (AircraftStory, owner
+        // 15/10): each toggle sets the Traffic filter it names -- the altitude
+        // slider to the level ± 500 ft, the phase filters to that code alone --
+        // and, pressed again, puts back what that filter was before. On while
+        // the filter is still the one it set.
+        _onlyLevel: null,   // { min, max, label, before: { min, max } }
+        _onlyPhase: null,   // { code, before: phaseFilters }
+
+        get onlyLevelOn() {
+            const o = this._onlyLevel;
+            return !!o && this.settings.minAltitude === o.min && this.settings.maxAltitude === o.max;
+        },
+
+        get onlyPhaseOn() {
+            const o = this._onlyPhase;
+            const f = this.settings.phaseFilters || {};
+            return !!o && Object.entries(f).every(([k, v]) => (k === o.code) === (v !== false));
+        },
+
+        // The row's two toggles: the level's text (the one set while on, the
+        // aircraft's now otherwise) and the phase code its label shows.
+        get storyOnly() {
+            const a = this.selectedAircraft;
+            if (!a) return null;
+            let level = null;
+            if (this.onlyLevelOn) level = this._onlyLevel.label;
+            else if (!a.on_ground) {
+                const ft = this.altitudeFt(a);
+                if (Number.isFinite(ft)) level = onlyLevelText(Math.round(ft / 100) * 100);
+            }
+            const phase = this.onlyPhaseOn ? this._onlyPhase.code : this.getCurrentPhase(a);
+            return { level, phase };
+        },
+
+        toggleOnlyLevel() {
+            const s = this.settings;
+            if (this.onlyLevelOn) {
+                s.minAltitude = this._onlyLevel.before.min;
+                s.maxAltitude = this._onlyLevel.before.max;
+                this._onlyLevel = null;
+            } else {
+                const a = this.selectedAircraft;
+                const ft = a && !a.on_ground ? this.altitudeFt(a) : NaN;
+                if (!Number.isFinite(ft)) return;
+                const centre = Math.round(ft / 100) * 100;
+                this._onlyLevel = {
+                    min: Math.max(0, centre - ONLY_LEVEL_FT), max: centre + ONLY_LEVEL_FT,
+                    label: onlyLevelText(centre), before: { min: s.minAltitude, max: s.maxAltitude },
+                };
+                s.minAltitude = this._onlyLevel.min;
+                s.maxAltitude = this._onlyLevel.max;
+            }
+            this.refreshFilters();
+        },
+
+        toggleOnlyPhase() {
+            const s = this.settings;
+            if (this.onlyPhaseOn) {
+                s.phaseFilters = { ...this._onlyPhase.before };
+                this._onlyPhase = null;
+            } else {
+                const a = this.selectedAircraft;
+                if (!a) return;
+                const code = this.getCurrentPhase(a);
+                const before = { ...(s.phaseFilters || {}) };
+                const next = {};
+                for (const k of new Set([...Object.keys(before), code])) next[k] = k === code;
+                this._onlyPhase = { code, before };
+                s.phaseFilters = next;
+            }
+            this.refreshFilters();
+        },
+
+        // The ✕ of the sky's note: everything the note lists, back to all.
+        clearFilters() {
+            const s = this.settings;
+            s.minAltitude = window.AltitudeScale.FLOOR;
+            s.maxAltitude = window.AltitudeScale.NO_CEILING;
+            const f = {};
+            for (const k of Object.keys(s.phaseFilters || {})) f[k] = true;
+            s.phaseFilters = f;
+            s.showAirAircraft = true;
+            s.showGroundAircraft = true;
+            s.voiceOnly = false;
+            this.searchTerm = '';
+            this._onlyLevel = null;
+            this._onlyPhase = null;
+            this.refreshFilters();
+        },
+
+        refreshFilters() {
+            this.applyFilters();
+            if (this.mapManager) this.mapManager.applyFiltersAndRefreshView();
+            this.saveSettings();
+        },
+
         get storyHead() {
             const a = this.selectedAircraft;
             if (!a) return null;
