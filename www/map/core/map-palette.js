@@ -18,13 +18,15 @@
  */
 (function () {
     const FALLBACK = {
-        airport: '#60a5fa', heliport: '#a78bfa',
+        airport: '#60a5fa', 'airport-small': '#a78bfa', heliport: '#a78bfa',
         'navaid-vor': '#60a5fa', 'navaid-vortac': '#818cf8', 'navaid-ndb': '#f59e0b',
-        airspace: '#f59e0b', runway: '#e4e4e4', taxiway: '#5c5c5c',
+        'navaid-dme': '#a78bfa', runway: '#e4e4e4', centerline: '#555555', taxiway: '#5c5c5c',
         ring: '#3d3d3d', 'ring-label': '#949494',
         selected: '#66c56a', hovered: '#e0e0e0',
         'trail-followed': '#66c56a', estimate: '#66c56a', 'trail-stale': '#949494',
-        'light-ring': '#b5b5b5', 'light-taxiway': '#9a9a9a', 'light-selected': '#2e7d32',
+        proximity: '#66c56a',
+        'light-ring': '#b5b5b5', 'light-centerline': '#a8a8a8', 'light-proximity': '#2e7d32',
+        'light-taxiway': '#9a9a9a', 'light-selected': '#2e7d32',
         'light-hovered': '#333333', 'light-trail-stale': '#7a7a7a',
         'text-primary': '#e0e0e0', 'text-secondary': '#b8b8b8', 'text-tertiary': '#949494',
         'text-disabled': '#666666',

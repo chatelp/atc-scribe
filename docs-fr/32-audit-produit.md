@@ -500,10 +500,14 @@ sur la carte.
   rétro-prévision) en accent pointillé fin ; trace ancienne ou perdue en gris ; taxiways et
   anneaux gris ; balises, pistes et grands aéroports sur leurs jetons ; l'onde de décollage ou
   d'atterrissage prend la couleur de la famille de phase. Le jaune #FDE047 de l'avion choisi
-  était dans une fonction morte (`_getAircraftStyle`, retirée) : le vrai halo était blanc. Restent
-  hors jetons et soumis à la session design : prolongements d'axe de piste en vert, aérodromes
-  moyens, petits et hydrobases, héliports en orange (le jeton les dit violets), DME seuls,
-  cercle de proximité, et les espaces aériens, qui sont des tuiles d'image openAIP.
+  était dans une fonction morte (`_getAircraftStyle`, retirée) : le vrai halo était blanc. Les sept
+  restes, tranchés par la session design le même jour (eedecb2, mesurés en ΔE76) : axes de piste
+  en `centerline` gris (le vert était à ΔE 1,2 de l'accent) ; aérodromes moyens en `airport`,
+  petits et hydrobases en `airport-small` ; héliports en `heliport` violet (l'orange était à
+  ΔE 3,3 de la phase départ) ; DME seuls en `navaid-dme` ; cercle de proximité en `proximity`,
+  l'accent du vol suivi ; jeton `airspace` retiré, les espaces aériens étant des tuiles openAIP ;
+  neutres gardés. Dans le code de la carte, il ne reste en dur que ces neutres. Rendu sur fond
+  clair (IGN, OSM) non mesuré : à regarder pendant la soirée du propriétaire.
 - 15/10 : **relecture design de l'étape 13**. Le « 3° » de la PAR passe en texte tertiaire
   (#949494, environ 6,8:1 ; il était à 2,7:1) ; le « 10 NM » de la portée de la connexion reste,
   décoratif et `aria-hidden` (WCAG 1.4.3, noté dans la fiche SignIn). La légende de la mini-carte

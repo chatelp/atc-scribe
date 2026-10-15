@@ -673,7 +673,7 @@
                             ),
                         });
                         lineExt.setStyle(new window.ol.style.Style({
-                            stroke: new window.ol.style.Stroke({ color: '#76C76C', width: 1.5, lineDash: [8, 12] }),
+                            stroke: new window.ol.style.Stroke({ color: window.MapPalette.color('centerline'), width: 1.5, lineDash: [8, 12] }),
                         }));
                         state.source.addFeature(lineExt);
                     });
@@ -692,9 +692,9 @@
             const showLabels = zoom >= 12;
             const typeCfg = {
                 large_airport: { color: window.MapPalette.color('airport'), radius: 6, minZoom: 8 },
-                medium_airport: { color: '#34D399', radius: 5, minZoom: 9 },
-                small_airport: { color: '#A78BFA', radius: 4, minZoom: 10 },
-                seaplane_base: { color: '#2DD4BF', radius: 3, minZoom: 11 },
+                medium_airport: { color: window.MapPalette.color('airport'), radius: 5, minZoom: 9 },
+                small_airport: { color: window.MapPalette.color('airport-small'), radius: 4, minZoom: 10 },
+                seaplane_base: { color: window.MapPalette.color('airport-small'), radius: 3, minZoom: 11 },
             };
 
             this.airportsData.forEach((airport) => {
@@ -738,10 +738,10 @@
                 feature.setStyle(new window.ol.style.Style({
                     image: new window.ol.style.Circle({
                         radius: 4,
-                        fill: new window.ol.style.Fill({ color: '#FB923C' }),
-                        stroke: new window.ol.style.Stroke({ color: '#FB923C', width: 1.5 }),
+                        fill: new window.ol.style.Fill({ color: window.MapPalette.color('heliport') }),
+                        stroke: new window.ol.style.Stroke({ color: window.MapPalette.color('heliport'), width: 1.5 }),
                     }),
-                    text: showLabels ? this._getReferenceLabelStyle(heliport.ident || '', '#FB923C') : undefined,
+                    text: showLabels ? this._getReferenceLabelStyle(heliport.ident || '', window.MapPalette.color('heliport')) : undefined,
                 }));
                 state.source.addFeature(feature);
             });
@@ -753,11 +753,9 @@
                 VOR: 'navaid-vor', 'VOR-DME': 'navaid-vor',
                 VORTAC: 'navaid-vortac', TACAN: 'navaid-vortac',
                 NDB: 'navaid-ndb', 'NDB-DME': 'navaid-ndb',
+                DME: 'navaid-dme',
             }[type];
-            if (role) return P.color(role);
-            // A DME alone keeps its violet, which has no token yet.
-            if (type === 'DME') return '#A78BFA';
-            return P.color('text-tertiary');
+            return P.color(role || 'text-tertiary');
         }
 
         _renderNavaids() {
@@ -1775,11 +1773,11 @@
             const feature = new window.ol.Feature({ geometry: circle });
             feature.setStyle(new window.ol.style.Style({
                 stroke: new window.ol.style.Stroke({
-                    color: '#EB8C00',
+                    color: window.MapPalette.color('proximity'),
                     width: 2,
                     lineDash: [5, 5],
                 }),
-                fill: new window.ol.style.Fill({ color: 'rgba(235, 140, 0, 0.08)' }),
+                fill: new window.ol.style.Fill({ color: window.MapPalette.withAlpha(window.MapPalette.color('proximity'), 0.06) }),
             }));
 
             this._proximityCircleFeature = feature;
