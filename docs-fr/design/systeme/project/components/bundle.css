@@ -576,8 +576,6 @@
 .cl-skip a { position: fixed; left: var(--space-2); top: -48px; z-index: 100000; padding: var(--space-1-5) var(--space-3); background: var(--color-surface-raised); color: var(--color-text-primary); border: var(--border-width-strong) solid var(--color-border-focus); border-radius: var(--radius-md); font-size: var(--font-size-small); text-decoration: none; }
 .cl-skip a:focus { top: var(--space-2); }
 
-<<<<<<< HEAD
-=======
 /* ------------------------------------------------------------ Touch sizes under 768 px (migration step 12) */
 /* Every target 44 px at least: measured on the four phone panes, 18 of 79 were
    smaller (a channel's caret 15 px wide, the column's tabs 30 px high, an
@@ -596,7 +594,6 @@
     .cl-table button { min-height: var(--size-target-touch); min-width: var(--size-target-touch); }
 }
 
->>>>>>> origin/main
 /* ------------------------------------------------------------ Phone: the thread's head and an exchange's head */
 /* The tab bar says "Radio": the head keeps the tools and the channels; "Show" is in each frequency's menu
    ("Only this frequency in the thread"). An exchange's time goes on its own line, so that the play button
