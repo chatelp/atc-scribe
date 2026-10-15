@@ -169,13 +169,18 @@
                 // no sidecar configured; fiche H, 13/10) says status "off" without
                 // "reachable": neutral, not a failure.
                 const off = t.status === 'off';
-                const level = off ? 'off' : !t.reachable ? 'bad' : t.status === 'ok' ? 'ok' : t.status === 'degraded' ? 'warn' : 'unknown';
-                const text = off ? 'Off' : !t.reachable ? 'Down' : t.status === 'ok' ? 'OK' : t.status === 'degraded' ? 'Degraded' : '?';
+                // A test instance's stand-in sidecar answers "ok" too: it must
+                // not wear the same green as a real model (owner, 15/10).
+                const fake = !off && t.reachable && t.backend === 'fake';
+                const level = off ? 'off' : !t.reachable ? 'bad' : fake ? 'warn' : t.status === 'ok' ? 'ok' : t.status === 'degraded' ? 'warn' : 'unknown';
+                const text = off ? 'Off' : !t.reachable ? 'Down' : fake ? 'Simulated' : t.status === 'ok' ? 'OK' : t.status === 'degraded' ? 'Degraded' : '?';
+                const runsOn = [t.model, t.backend].filter(Boolean).join(', ');
                 lights.push({ key: 'stt', label: 'Transcription', level, text,
                     help: off ? 'The server runs without transcription: no source transcribes and no sidecar is configured. Turn "transcribe audio" on for a source once a sidecar answers.'
                         : !t.reachable ? 'The transcription sidecar does not answer: transmissions are not transcribed. co-atc restarts it if it crashed.'
+                        : fake ? 'A stand-in sidecar answers, for testing: no model listens, the texts are made up. Nothing heard here says what the radio said, and the matching figures mean nothing.'
                         : t.status === 'degraded' ? `The sidecar runs without some of its models (${(t.degraded || []).join(', ')}): fewer aircraft are identified.`
-                        : 'The transcription sidecar answers with all its models.' });
+                        : 'The transcription sidecar answers with all its models' + (runsOn ? ` (${runsOn}).` : '.') });
             }
             if (st.adsb) {
                 const age = st.adsb.last_fetch ? (Date.now() - Date.parse(st.adsb.last_fetch)) / 1000 : Infinity;

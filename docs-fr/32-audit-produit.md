@@ -492,6 +492,12 @@ sur la carte.
 
 ## État
 
+- 15/10 : **le voyant de transcription distingue un faux sidecar** (demande du propriétaire :
+  même voyant vert avec le vrai modèle et le faux sidecar de l'instance d'essai). `/api/v1/status`
+  publie ce que le sidecar déclare (`backend` : `mlx`, le nom d'un GPU, ou `fake`) et la famille du
+  modèle ; la page affiche « Simulated » en ambre quand c'est `fake`, avec une bulle qui dit que les
+  textes sont inventés et que les chiffres d'appariement n'ont pas de sens ; avec le vrai modèle,
+  la bulle nomme le modèle et ce qui le fait tourner. Vérifié sur l'instance d'essai redémarrée.
 - 15/10 : **étiquettes de la carte allégées** (demande du propriétaire du 13/10, choisie le 15/10
   sur deux planches de la session design ; fiche MapLabel, 597c142). Mesure de la session sur
   environ 110 avions : au zoom par défaut, 62 % des étiquettes complètes en chevauchaient une
