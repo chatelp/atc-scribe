@@ -476,7 +476,7 @@
         if (!aircraft) {
             return {
                 phaseText: '',
-                phaseColor: '#9CA3AF',
+                phaseColor: labelTextColor('tertiary'),
                 callsignText: '',
                 typeText: '',
                 detailsText: '',
@@ -603,7 +603,7 @@
             const rotationRad = Number.isFinite(properties.rotationRad) ? properties.rotationRad : 0;
             const iconSrc = properties.iconSrc || 'assets/a0.svg';
             const iconSize = Number.isFinite(properties.iconSize) ? properties.iconSize : 24;
-            const labelColor = properties.labelColor || '#9CA3AF';
+            const labelColor = properties.labelColor || labelTextColor('tertiary');
             const deemphasized = properties.deemphasized ? 1 : 0;
             const fade = Number.isFinite(properties.fade) ? properties.fade : 1; // relocation (aircraft-animation.js)
             return `${selected}_${hovered}_${deemphasized}_${color}_${labelColor}_${iconSrc}_${iconSize}_${rotationRad.toFixed(3)}_${fade}`;
@@ -661,7 +661,7 @@
             const estimatedLabelWidthPx = Math.max(72, Math.round(longestLabelLineLength * 6.4) + 12);
             const labelBorderColor = brightMap
                 ? hexToRgba('#111827', (deemphasized ? 0.7 : 0.85) * labelAgeFade)
-                : hexToRgba('#9CA3AF', 0.45 * labelAgeFade);
+                : hexToRgba(labelTextColor('tertiary'), 0.45 * labelAgeFade);
             const labelBackgroundColor = brightMap
                 ? hexToRgba('#111827', (deemphasized ? 0.72 : 0.82) * labelAgeFade)
                 : hexToRgba('#000000', 0.45 * labelAgeFade);
@@ -674,9 +674,12 @@
                 ? getOutlinedAircraftIconSrc(properties.iconSrc || 'assets/a0.svg', iconColor)
                 : getColorizedAircraftIconSrc(properties.iconSrc || 'assets/a0.svg', iconColor);
             const showHalo = isSelected || isHovered;
-            const haloColor = isSelected ? '#FFFFFF' : '#9CA3AF';
-            const haloFillAlpha = deemphasized ? 0.12 : 0.2;
-            const haloStrokeAlpha = deemphasized ? 0.4 : 0.85;
+            // The chosen aircraft's ring in the accent, 2 px; the hovered one
+            // in the primary text colour, 1.2 px (palette C, 15/10).
+            const P = window.MapPalette;
+            const haloColor = P ? P.color(isSelected ? 'selected' : 'hovered') : labelTextColor('primary');
+            const haloFillAlpha = isSelected ? 0.12 : 0;
+            const haloStrokeAlpha = deemphasized ? 0.4 : 1;
             const haloRadius = Math.max(12, Math.round(iconSize * (isSelected ? 1.08 : 0.96)));
 
             let symbolStyles = styleCache.get(key);
@@ -702,8 +705,8 @@
                             fill: new window.ol.style.Fill({ color: hexToRgba(haloColor, haloFillAlpha) }),
                             stroke: new window.ol.style.Stroke({
                                 color: hexToRgba(haloColor, haloStrokeAlpha),
-                                width: isSelected ? 2.2 : 1.8,
-                                lineDash: isSelected ? null : [5, 5],
+                                width: isSelected ? 2 : 1.2,
+                                lineDash: null,
                             }),
                         }),
                     })
@@ -742,7 +745,7 @@
                         // Drawn over the first line, which a third line moves up by one.
                         offsetY: -(iconSize / 2 + 14 + (labelParts.voiceText ? LABEL_LINE_PX : 0)),
                         textAlign: 'left',
-                        fill: new window.ol.style.Fill({ color: hexToRgba(labelParts.phaseColor || '#9CA3AF', textOpacity) }),
+                        fill: new window.ol.style.Fill({ color: hexToRgba(labelParts.phaseColor || labelTextColor('tertiary'), textOpacity) }),
                     }),
                 })
                 : null;
@@ -758,7 +761,7 @@
                         offsetY: ageTextOffsetY,
                         offsetX: ageTextOffsetX,
                         textAlign: 'right',
-                        fill: new window.ol.style.Fill({ color: hexToRgba('#9CA3AF', (deemphasized ? 0.68 : 0.9) * labelAgeFade) }),
+                        fill: new window.ol.style.Fill({ color: hexToRgba(labelTextColor('tertiary'), (deemphasized ? 0.68 : 0.9) * labelAgeFade) }),
                     }),
                 })
                 : null;
@@ -1140,5 +1143,7 @@
 
     window.MapAircraftWebGLRenderer = {
         createAircraftWebGLRenderer,
+        // An aircraft's altitude colour, for its trail (openlayers-map-manager.js).
+        altitudeColor: getAltitudeBandColor,
     };
 })();

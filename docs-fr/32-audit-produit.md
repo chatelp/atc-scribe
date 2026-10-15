@@ -492,6 +492,18 @@ sur la carte.
 
 ## État
 
+- 15/10 : **palette de la carte, choix C du propriétaire** (seulement les conflits ; jetons
+  `color-map-*` et `color-map-light-*` de la session design, 34ecf70). Un module commun
+  `www/map/core/map-palette.js` les lit, avec la variante des fonds clairs (IGN, OSM). Anneau de
+  l'avion choisi en accent (2 px), survol en texte primaire (1,2 px) ; traces à la couleur
+  d'altitude de l'avion à 50 %, au sol aussi ; vol suivi en accent pointillé ; estimations (futur,
+  rétro-prévision) en accent pointillé fin ; trace ancienne ou perdue en gris ; taxiways et
+  anneaux gris ; balises, pistes et grands aéroports sur leurs jetons ; l'onde de décollage ou
+  d'atterrissage prend la couleur de la famille de phase. Le jaune #FDE047 de l'avion choisi
+  était dans une fonction morte (`_getAircraftStyle`, retirée) : le vrai halo était blanc. Restent
+  hors jetons et soumis à la session design : prolongements d'axe de piste en vert, aérodromes
+  moyens, petits et hydrobases, héliports en orange (le jeton les dit violets), DME seuls,
+  cercle de proximité, et les espaces aériens, qui sont des tuiles d'image openAIP.
 - 15/10 : **relecture design de l'étape 13**. Le « 3° » de la PAR passe en texte tertiaire
   (#949494, environ 6,8:1 ; il était à 2,7:1) ; le « 10 NM » de la portée de la connexion reste,
   décoratif et `aria-hidden` (WCAG 1.4.3, noté dans la fiche SignIn). La légende de la mini-carte
