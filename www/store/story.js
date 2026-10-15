@@ -71,8 +71,12 @@
     // types in capitals; a word with a digit is a model and stays.
     function typeCase(text) {
         const t = String(text || '').trim();
-        if (/[a-z]/.test(t)) return t;
-        return t.split(' ').map((w) => (/\d/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase())).join(' ');
+        const title = (w) => w.charAt(0) + w.slice(1).toLowerCase();
+        // All in capitals: every word without a digit ("DE HAVILLAND").
+        if (!/[a-z]/.test(t)) return t.split(' ').map((w) => (/\d/.test(w) ? w : title(w))).join(' ');
+        // Mixed, as "CESSNA 560 Citation Ultra": the words wholly in capitals,
+        // short initialisms (VOR, DME) apart (design review, 15/10).
+        return t.split(' ').map((w) => (/^[A-Z]{4,}$/.test(w) ? title(w) : w)).join(' ');
     }
     // Out of the store, so that reading them in a getter does not make Alpine
     // render again: the last instructions table and the runway frames.

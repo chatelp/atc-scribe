@@ -868,9 +868,9 @@
                             <template x-if="$store.atc.mainView === 'map' && $store.atc.storySkyNote">
                                 <div class="cl-sky__note"><b x-text="$store.atc.storySkyNote.callsign"></b><span x-text="$store.atc.storySkyNote.since"></span></div>
                             </template>
-                            <div x-show="$store.atc.mainView === 'map' && $store.atc.filterSummary" x-cloak class="cl-sky__note flex items-center gap-1 py-0 pr-0.5"
-                                 ><span class="min-w-0 truncate" x-text="$store.atc.filterSummary"></span
-                                 ><button class="cl-btn cl-btn--icon shrink-0" aria-label="Clear filters" @click="$store.atc.clearFilters()"
+                            <div x-show="$store.atc.mainView === 'map' && $store.atc.filterSummary" x-cloak class="cl-sky__note cl-sky__note--action"
+                                 ><span class="cl-sky__note-text" x-text="$store.atc.filterSummary"></span
+                                 ><button class="cl-btn cl-btn--icon" aria-label="Clear filters" @click="$store.atc.clearFilters()"
                                           data-help-title="Clear filters" data-help="Every filter the note lists back to all: altitude, phases, air, ground, heard, search."><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button></div>
 <div x-show="$store.atc.columnFolded && !$store.atc.selectedAircraft" x-cloak class="cl-sky__end pointer-events-auto hidden md:flex">
                                 <div class="cl-row">
