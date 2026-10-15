@@ -994,7 +994,8 @@ document.addEventListener('alpine:init', () => {
                     target = column && [...column.querySelectorAll('.cl-tabs--column button')].find(shown);
                 } else {
                     target = (shown(origin) && origin)
-                        || (left && column && column.querySelector(`[data-aircraft-hex="${left}"]`))
+                        // Its strip or its arrival row, drawn again since.
+                        || (left && column && [...column.querySelectorAll(`[data-aircraft-hex="${left}"]`)].find(shown))
                         || (column && [...column.querySelectorAll('[role="tab"][aria-selected="true"]')].find(shown))
                         || column;
                     origin = null;
@@ -1004,6 +1005,23 @@ document.addEventListener('alpine:init', () => {
                 return true;
             };
             // The new column is drawn in a frame or two: tried a few times.
+            for (const ms of [30, 150, 500]) setTimeout(place, ms);
+        });
+
+        // Folding the column takes its fold button away: the focus goes to
+        // the unfold button of the folded card, and back (design review of
+        // step 11). Only after a key, too.
+        let folded = store.columnFolded;
+        Alpine.effect(() => {
+            const now = store.columnFolded;
+            if (now === folded) return;
+            folded = now;
+            const place = () => {
+                const a = document.activeElement;
+                if (!keyboard || (a && a !== document.body && shown(a))) return;
+                const target = [...document.querySelectorAll(now ? '[aria-label="Unfold the column"]' : '[aria-label="Fold the column"]')].find(shown);
+                if (target) target.focus();
+            };
             for (const ms of [30, 150, 500]) setTimeout(place, ms);
         });
     }

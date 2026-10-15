@@ -1035,7 +1035,7 @@
                                     </tr></thead>
                                     <tbody>
                                         <template x-for="r in t.rows" :key="r.hex">
-                                            <tr class="cursor-pointer" @click="$store.atc.selectAircraftByHex(r.hex)" :title="'Show ' + r.callsign" role="button" tabindex="0">
+                                            <tr class="cursor-pointer" :data-aircraft-hex="r.hex" @click="$store.atc.selectAircraftByHex(r.hex)" :title="'Show ' + r.callsign" role="button" tabindex="0">
                                                 <td class="is-dim" x-text="r.rank"></td>
                                                 <td><b x-text="r.callsign"></b> <span class="is-dim" x-text="r.type"></span></td>
                                                 <td class="is-num" x-text="r.toThreshold"></td>
@@ -1735,7 +1735,7 @@
                                             <tr><td colspan="5" class="p-4 text-center">No aircraft found within the specified distance</td></tr>
                                         </template>
                                         <template x-for="aircraft in $store.atc.proximityAircraft" :key="aircraft.hex">
-                                            <tr @click="$store.atc.selectedAircraft = aircraft; $store.atc.showProximityView = false; $store.atc.clearProximityView()"
+                                            <tr :data-aircraft-hex="aircraft.hex" @click="$store.atc.selectedAircraft = aircraft; $store.atc.showProximityView = false; $store.atc.clearProximityView()"
                                                 class="hover:bg-hover/50 transition-colors cursor-pointer" role="button" tabindex="0">
                                                 <td class="p-1.5 text-left border-b border-border" x-text="aircraft.flight || aircraft.hex"></td>
                                                 <td class="p-1.5 text-right border-b border-border">
