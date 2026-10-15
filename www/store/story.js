@@ -69,11 +69,17 @@
 
     // "BOEING 737-800" -> "Boeing 737-800": the aircraft base writes some
     // types in capitals; a word with a digit is a model and stays.
+    const NAME_PARTICLES = new Set(['DE', 'DU', 'DA', 'LA', 'LE', 'VAN', 'VON', 'DOS']);
+
     function typeCase(text) {
         const t = String(text || '').trim();
         const title = (w) => w.charAt(0) + w.slice(1).toLowerCase();
-        // All in capitals: every word without a digit ("DE HAVILLAND").
-        if (!/[a-z]/.test(t)) return t.split(' ').map((w) => (/\d/.test(w) ? w : title(w))).join(' ');
+        // All in capitals: every word without a digit, but initialisms of
+        // three letters or fewer (ATR, BAE) stay, name particles apart
+        // ("DE HAVILLAND"; design review, 15/10).
+        if (!/[a-z]/.test(t)) {
+            return t.split(' ').map((w) => (/\d/.test(w) || (w.length <= 3 && !NAME_PARTICLES.has(w)) ? w : title(w))).join(' ');
+        }
         // Mixed, as "CESSNA 560 Citation Ultra": the words wholly in capitals,
         // short initialisms (VOR, DME) apart (design review, 15/10).
         return t.split(' ').map((w) => (/^[A-Z]{4,}$/.test(w) ? title(w) : w)).join(' ');
