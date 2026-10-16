@@ -5264,6 +5264,27 @@ sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien co
 >   (ATREX, ELCOB, AGOPA) : LFPB publie ces points en 7C, 7F, 7J, 7M, 7P, 7Q ; LFPG en 2x, 6G à
 >   6L, 7A, 7B, 7D, 7E. Non élucidé ; le point nommé reste juste.
 >
+> **La procédure déduite de l'ADS-B seul, mesurée le 16/10** (question du propriétaire : « comme
+> l'attribution d'une piste, à partir du trajet ») : le doublet de pistes d'après le sens et le côté
+> du décollage (au nord 09/27, au sud 08/26), puis le point de sortie vers lequel l'avion pointe une
+> fois sorti de la zone terminale (au-delà de 15 NM, au-dessus de 6 000 ft, médiane de l'écart
+> entre sa route et le relèvement de chaque sortie). 415 départs de LFPG les 15 et 16/10 :
+> - **le doublet se déduit sans faute** : la lettre entendue sur les six vols vérifiables tombe
+>   dans la paire de lettres que les tables donnent pour ce doublet (K → 09, L → 08, B → 26) ;
+> - **le point de sortie : 172 départs sur 415 (41 %) pointent nettement vers une sortie** (≤ 5°, la
+>   suivante à plus de 5° de plus), 51 hésitent entre deux voisines, 185 ne pointent vers aucune
+>   (guidés au cap, ou trajectoire enregistrée trop courte) ;
+> - **contre les procédures entendues, 4 sur 6 concordent** (OKASI à 0,1°, OPALE à 2,9°, ATREX à
+>   0,3°, OPALE à 4,3°) ; AFR358P (ELCOB entendu) ne pointe vers rien, guidé ; BAW309 (ATREX
+>   entendu) pointe vers OPALE à 0,5° : soit un raccourci du contrôle, soit une transmission
+>   attribuée au mauvais avion. Six cas, c'est peu : la mesure se refait quand les cas entendus
+>   s'accumulent.
+> - Les deux variantes d'une même sortie (7B/7E, 6G/6K…) ont le même début et ne se distinguent pas
+>   à la trajectoire : la désignation reste « OKASI 7B ou 7E ». Le chiffre entendu (« 7K », « 7L »)
+>   diffère du chiffre des tables pour la configuration face à l'est (6G/6K, 6H/6L) : non élucidé.
+> - Une première faute de ma part, corrigée avant la mesure : j'avais inversé les doublets nord et
+>   sud ; les lettres entendues l'ont révélé, et la position des pistes l'a confirmé.
+>
 > Reste à trancher : la forme (session design), la façon de connaître la configuration en service
 > (sens des décollages vus en ADS-B, ou choix de l'auditeur), et l'ordre (tracé au clic d'abord).
 > Hors de l'eAIP français, rien n'est dessiné et les réglages le disent.
