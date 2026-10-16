@@ -5245,6 +5245,19 @@ sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien co
 > code de la règle est retiré (D71), gardé en patch avec la mesure (`runs/mesures/q55/`, hors
 > dépôt) ; l'outil des noms reste, pour l'indice de direction (usage 2), l'affichage (usage 3) et
 > la relecture du labo, qui restent ouverts.
+>
+> **Usage 2, l'indice de direction, mesuré le 16/10 : pas adopté non plus.** Lancé par le
+> propriétaire le 16/10 au matin ; mesuré avant d'écrire une ligne dans l'apparieur, sur les cas
+> du labo (`runs/mesures/q55/direction.py`, hors dépôt). Sur les 23 annonces de vraies procédures
+> (RANUX, ELCOB, ATREX, OPALE, OKIPA, MOPAR, NURMO), l'avion confirmé par l'ADS-B se rapproche du
+> point de 3 NM ou plus dans les cinq minutes 18 fois ; mais 39 % des autres avions du ciel aussi,
+> soit en médiane 35 avions sur 92 à chaque annonce. Sa route ne vise le point que 6 fois sur 23,
+> contre 24 % par hasard (les départs tournent avant de s'y diriger). Un indice qui ne fait que
+> diviser les candidats par deux corrobore un mauvais avion presque aussi souvent que le bon :
+> c'est le défaut qui a fait écarter « un chiffre d'écart » (Q46). **Usage 3, l'affichage du nom
+> réel, lancé le 16/10** : forme décidée par la session design (fiche Chips, `cl-chip--place`,
+> jamais de réécriture du texte lu), à n'afficher que si la proposition est juste au moins 95 fois
+> sur 100, seuil à mesurer.
 
 Le labo a tiré de l'eAIP France du SIA (cycle AIRAC du 01/10/2026, cinq pages : ENR 4.4, ENR 2.1,
 AD 2 LFPG, LFPO, LFPB), avec l'accord du propriétaire, une liste de noms réels autour de LFPG :
