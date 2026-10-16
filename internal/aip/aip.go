@@ -134,10 +134,13 @@ var (
 	reCell    = regexp.MustCompile(`(?s)<td[^>]*>(.*?)</td>`)
 	reTag     = regexp.MustCompile(`<[^>]+>`)
 	reScripts = regexp.MustCompile(`(?s)<script.*?</script>|<style.*?</style>`)
-	reSpace   = regexp.MustCompile(`\s+`)
-	reName5   = regexp.MustCompile(`^[A-Z]{5}$`)
-	reDMS     = regexp.MustCompile(`^(\d+)°(\d+)'([\d.]+)"([NSEW])`)
-	reCall    = regexp.MustCompile(`\b((?:[A-Z][A-Z'\-]+ ){0,2}[A-Z][A-Z'\-]+) (Approche|Départ|Tour|Sol|Prévol|Contrôle|Info|Information|Approach|Departure|Tower|Ground|Delivery|Control|Radar|Trafic|Prevol)\b`)
+	// A value amended this cycle is printed twice: the old one struck out
+	// (<del>), the new one inserted (<ins>). Only the new one holds.
+	reDel   = regexp.MustCompile(`(?s)<del\b[^>]*>.*?</del>`)
+	reSpace = regexp.MustCompile(`\s+`)
+	reName5 = regexp.MustCompile(`^[A-Z]{5}$`)
+	reDMS   = regexp.MustCompile(`^(\d+)°(\d+)'([\d.]+)"([NSEW])`)
+	reCall  = regexp.MustCompile(`\b((?:[A-Z][A-Z'\-]+ ){0,2}[A-Z][A-Z'\-]+) (Approche|Départ|Tour|Sol|Prévol|Contrôle|Info|Information|Approach|Departure|Tower|Ground|Delivery|Control|Radar|Trafic|Prevol)\b`)
 	// Table words and abbreviations caught before a role (NIL Départ, UAC ACS
 	// PARIS Contrôle...) are not call signs.
 	reNotAName = regexp.MustCompile(`\b(FREQ|HOR|MHZ|ATS|APP|TWR|FIS|ACC|SID|STAR|RWY|AD|FIR|UIR|TMA|CTR|NIL|PENTE|VPE|DEP|ATC|UAC|ACS|ASFC|FIC|INFO|CONTROLE)\b`)
@@ -149,7 +152,8 @@ func plain(s string) string {
 }
 
 func pageText(raw string) string {
-	return reSpace.ReplaceAllString(html.UnescapeString(reTag.ReplaceAllString(reScripts.ReplaceAllString(raw, ""), " ")), " ")
+	raw = reDel.ReplaceAllString(reScripts.ReplaceAllString(raw, ""), "")
+	return reSpace.ReplaceAllString(html.UnescapeString(reTag.ReplaceAllString(raw, " ")), " ")
 }
 
 func dms(s string) (float64, bool) {
@@ -177,6 +181,7 @@ func distanceNM(lat1, lon1, lat2, lon2 float64) float64 {
 // longitude in degrees, minutes and seconds.
 func points(raw string) []Point {
 	var out []Point
+	raw = reDel.ReplaceAllString(raw, "")
 	for _, row := range reRow.FindAllStringSubmatch(raw, -1) {
 		cells := reCell.FindAllStringSubmatch(row[1], -1)
 		if len(cells) < 2 {

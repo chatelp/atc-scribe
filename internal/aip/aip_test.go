@@ -2,6 +2,7 @@ package aip
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -64,6 +65,24 @@ func TestPointsWithinTheRadiusCallSignsAndProcedures(t *testing.T) {
 	}
 	if strings.Join(n.Procedures, "|") != "MOPAR 1E|OKIPA 1W" {
 		t.Errorf("procedures %q: a script is not text", n.Procedures)
+	}
+}
+
+// A point moved this cycle: ENR 4.4 prints the old coordinates struck out
+// beside the new ones, as on 01 OCT 2026 for DOPAP.
+func TestAPointMovedThisCycleTakesItsNewCoordinates(t *testing.T) {
+	page := `<table><tr id="SP-DOPAP"><td><span>DOPAP</span></td><td><p class="line"><span>
+<del class="cellChanged AmdtDeletedAIRAC" title="x">48°42'07.8"N</del>
+<ins class="cellChanged AmdtInsertedAIRAC" title="x">48°42'18.0"N</ins></span></p><p class="line"><span>
+<del class="cellChanged AmdtDeletedAIRAC">001°58'00.0"E</del>
+<ins class="cellChanged AmdtInsertedAIRAC">001°59'00.0"E</ins></span></p></td></tr></table>`
+	n := Parse(map[string]string{pagePoints: page}, 49.0, 2.5, 120)
+	if len(n.Points) != 1 {
+		t.Fatalf("points %+v, want DOPAP", n.Points)
+	}
+	p := n.Points[0]
+	if math.Abs(p.Lat-(48+42.0/60+18.0/3600)) > 1e-4 || math.Abs(p.Lon-(1+59.0/60)) > 1e-4 {
+		t.Errorf("DOPAP at %v %v, want the inserted coordinates", p.Lat, p.Lon)
 	}
 }
 
