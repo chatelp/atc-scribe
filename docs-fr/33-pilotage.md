@@ -143,11 +143,12 @@ l'interface, elle, reste sur le Mac.
    et quand. Recommandation : l'outil et la grammaire après la migration, mesurés par paires.
 8. ~~**Les procédures dessinées sur la carte**~~ (Q56, 16/10) — **feu vert le 16/10, construit sur
    `migration` le même jour** (726b10c, ef10b99) d'après la fiche `ProcedureRoute` : la route au clic
-   sur la puce, la couche « Procedures (SID, STAR) » éteinte par défaut. Relecture design en cours,
-   puis coup d'œil du propriétaire et versement en production (relance, puis « Update from the SIA » :
-   les fiches DATA et l'ENR 4.1 s'ajoutent au cache).
+   sur la puce, la couche « Procedures (SID, STAR) » éteinte par défaut. Relu et clos par la session
+   design ; **versé en production le 16/10 à 16 h 02** (ab4d319) sur la demande du propriétaire, le
+   cache complété depuis le disque (fiches DATA, ENR 4.1, AD 2 de Beauvais). Reste son clic sur
+   « Update from the SIA » pour écrire les routes dans la liste.
 9. **Les avions fantômes** (16/10) — deux causes trouvées et corrigées sur `migration` (04dc5e3,
-   d0b54d5), mesurées sur le trafic réel ; à verser avec Q56. Une troisième famille, plus petite
+   d0b54d5), mesurées sur le trafic réel ; **en production depuis le 16/10 à 16 h 02**. Une troisième famille, plus petite
    (un recul d'environ 4 s de vol, seulement quand l'instance porte les flux audio), reste à
    expliquer.
 
