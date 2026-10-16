@@ -528,9 +528,9 @@
                                 <div class="contents">
                                     <div class="cl-field max-md:grid-cols-1">
                                         <span class="cl-field__label cursor-help" data-help-title="Names from the AIP"
-                                              data-help="The official names around the station, from the French eAIP: reporting points, control positions, procedures. The matcher reads them so that &quot;ELCOB 7 Golf&quot; is a procedure, not a callsign.">Names from the AIP</span>
+                                              data-help="The official names around the station, from the French eAIP: reporting points, control positions, procedures. Kept for reading: the matcher does not use them, measured (Q55).">Names from the AIP</span>
                                         <span class="cl-light whitespace-normal" :class="'cl-light--' + aipLight().level" x-text="aipLight().text"></span>
-                                        <span class="cl-field__help">The official names around the station, from the French eAIP: reporting points, control positions, procedures. The matcher reads them so that "ELCOB 7 Golf" is a procedure, not a callsign.</span>
+                                        <span class="cl-field__help">The official names around the station, from the French eAIP: reporting points, control positions, procedures. Kept for reading: the matcher does not use them, measured (Q55): a callsign heard with its airline mangled has the very shape of a procedure.</span>
                                     </div>
                                     <dl class="cl-kv">
                                         <template x-if="aip.present">
