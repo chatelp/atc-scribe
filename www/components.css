@@ -192,6 +192,11 @@
 .cl-chip--clearance { font-weight: var(--font-weight-strong); }
 .cl-chip--clearance::before { content: "✓"; color: var(--color-text-secondary); }
 .cl-chip--atc { height: 18px; padding: 0 var(--space-1); background: transparent; border-color: var(--color-border-control); color: var(--color-text-secondary); font-size: var(--font-size-caption); letter-spacing: var(--font-tracking-label); }
+/* an official AIP name proposed from the sound of the words (Q55): a reading, not a fact; dashed as a proposal */
+.cl-chip--place { font-family: var(--font-family-mono); border-style: dashed; border-color: var(--color-border-control); background: transparent; color: var(--color-text-primary); }
+button.cl-chip--place { cursor: pointer; }
+button.cl-chip--place:hover { background: var(--color-surface-hover); }
+.cl-exchange__text .is-place { text-decoration: underline dotted var(--color-text-tertiary); text-underline-offset: 3px; }
 .cl-value { font-family: var(--font-family-mono); font-size: var(--font-size-small); color: var(--color-text-primary); white-space: nowrap; }
 
 /* ------------------------------------------------------------ MatchStrength */
@@ -493,6 +498,8 @@
 .cl-field { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-4); align-items: center; }
 .cl-field__label { font-size: var(--font-size-body); line-height: var(--font-line-height-body); color: var(--color-text-primary); }
 .cl-field__help { grid-column: 1 / -1; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-secondary); }
+/* where a value comes from: a source cited, or where it was measured */
+.cl-field__source { grid-column: 1 / -1; font-size: var(--font-size-small); line-height: var(--font-line-height-small); color: var(--color-text-tertiary); }
 /* a field whose value is a sentence (On air) goes under its label on the phone, never the label cut in two */
 @media (max-width: 767px) { .cl-field--text { grid-template-columns: 1fr; } }
 .cl-select { height: var(--size-control-large); padding: 0 var(--space-2); background: var(--color-surface-page); border: var(--border-width-default) solid var(--color-border-control); border-radius: var(--radius-md); color: var(--color-text-primary); font-size: var(--font-size-small); }

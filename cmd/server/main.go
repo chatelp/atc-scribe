@@ -5,6 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"github.com/yegors/co-atc/internal/aip"
+	"github.com/yegors/co-atc/internal/config"
+	"github.com/yegors/co-atc/internal/transcription"
+	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -121,7 +124,14 @@ func main() {
 	// from the settings page, kept beside the databases with the pages it was
 	// made from.
 	aipMaker := &aip.Maker{OutPath: filepath.Join(store.dir, "aip-names.json"), CacheDir: filepath.Join(store.dir, "aip-cache")}
-	router.Handler().AttachAIP(aipMaker, nil)
+	// The procedures heard are named against the list's procedure points
+	// (Q55, usage 3), at the sound likeness the panel asks for.
+	placeNamer := startPlaceNamer(cfg, aipMaker.OutPath, runtimeSettings, log)
+	router.Handler().AttachAIP(aipMaker, func(n *aip.Names) {
+		if placeNamer != nil {
+			placeNamer.Set(procedurePoints(n))
+		}
+	})
 	router.Handler().KeepAIPNamesUpToDate(ctx)
 
 	servers := serve(cfg, router, log)
@@ -131,4 +141,29 @@ func main() {
 	<-signalCtx.Done()
 
 	shutdown(log, weatherService, frequenciesService, sttSidecar, adsbService, cancel, servers)
+}
+
+// startPlaceNamer builds the namer of the procedures heard, from the list
+// made earlier when there is one.
+func startPlaceNamer(cfg *config.Config, listPath string, rt *config.Runtime, log *logger.Logger) *phraseology.PlaceNamer {
+	m, err := phraseology.NewMatcher(cfg.Reference.AirlinesDATPath)
+	if err != nil {
+		log.Warn("Procedures heard will not be named: the airlines file could not be read", logger.Error(err))
+		return nil
+	}
+	n := phraseology.NewPlaceNamer(m)
+	if list, err := aip.Load(listPath); err == nil {
+		n.Set(procedurePoints(list))
+		log.Info("Procedures heard are named", logger.Int("procedure_points", n.Count()), logger.String("airac", list.AIRAC))
+	}
+	transcription.SetPlaces(n, rt.PlaceNaming)
+	return n
+}
+
+func procedurePoints(n *aip.Names) []phraseology.PlacePoint {
+	out := make([]phraseology.PlacePoint, 0, len(n.ProcedurePoints))
+	for _, p := range n.ProcedurePoints {
+		out = append(out, phraseology.PlacePoint{Name: p.Name, Lat: p.Lat, Lon: p.Lon, Kinds: p.Kinds})
+	}
+	return out
 }

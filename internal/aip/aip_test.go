@@ -162,3 +162,33 @@ func TestAnAirportWithoutAnAD2PageIsSkippedAndNamed(t *testing.T) {
 		t.Errorf("skipped %q, source %q", n.Skipped, n.Source)
 	}
 }
+
+func TestOnlyFrenchAirportsAreRead(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, pagePoints) {
+			w.Write([]byte(enr44))
+			return
+		}
+		w.Write([]byte(ad2))
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	m := &Maker{OutPath: filepath.Join(dir, "aip-names.json"), CacheDir: filepath.Join(dir, "cache"),
+		Client: &http.Client{Transport: rewrite{srv.URL}}}
+	if _, err := m.Make(context.Background(), Request{Lat: 43.7, Lon: -79.6, RadiusNM: 120, Airports: []string{"CYYZ"}}); err == nil ||
+		!strings.Contains(err.Error(), "CYYZ") {
+		t.Errorf("a station following CYYZ alone: %v", err)
+	}
+	n, err := m.Make(context.Background(), Request{Lat: 49, Lon: 2.5, RadiusNM: 120, Airports: []string{"LFPG", "EGLL"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(n.Outside, ",") != "EGLL" || strings.Join(n.Airports, ",") != "LFPG" {
+		t.Errorf("outside %v, airports %v", n.Outside, n.Airports)
+	}
+	// The text names OKIPA 1W and MOPAR 1E; their points are not in the test
+	// table of points, so they have no place to show.
+	for _, p := range n.ProcedurePoints {
+		t.Errorf("a procedure point without coordinates: %+v", p)
+	}
+}

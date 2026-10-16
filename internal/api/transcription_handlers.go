@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"github.com/yegors/co-atc/internal/transcription"
 	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"net/http"
 	"strconv"
@@ -253,6 +254,7 @@ func explainTranscriptions(list []*sqlite.TranscriptionRecord) {
 			continue
 		}
 		t.Plain = plainOf(t.Content)
+		t.Places = transcription.PlacesOf(t.Content)
 	}
 }
 

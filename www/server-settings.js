@@ -48,7 +48,11 @@ function serverSettings() {
         // to it. Read from the scroll rather than an IntersectionObserver: the
         // last sections are short and never reach the top, so "in view" is
         // also "scrolled to the bottom".
-        sections: [['listening', 'Listening'], ['matching', 'Callsign matching'], ['display', 'Display'], ['account', 'Account'], ['system', 'System']],
+        sections: [['listening', 'Listening'], ['matching', 'Callsign matching'], ['regional', 'Regional data'], ['display', 'Display'], ['account', 'Account'], ['system', 'System']],
+
+        // How sure a procedure's name must be (Q55): only measured settings,
+        // with what each gave on the owner's listening of 77 cases.
+        namingChoices: [['surer', 'Surer', '9 names, all right'], ['measured', 'Measured', '18 names, all right'], ['more', 'More', '19 names, 18 right']],
         current: 'listening',
         rulesOpen: false,
         reportsOpen: false,
@@ -257,6 +261,9 @@ function serverSettings() {
         aipLight() {
             const a = this.aip;
             if (!a) return { level: 'unknown', text: '' };
+            if (a.coverage === 'none') {
+                return { level: 'off', text: `Not for this station: the French eAIP covers aerodromes in France (LF…); this station follows ${(a.airports || []).join(', ')}.` };
+            }
             if (a.refreshing || this.aipBusy) return { level: 'switching', text: 'Updating from the SIA…' };
             const failedSince = a.last_error && (!a.made || (a.last_tried && a.last_tried > a.made));
             if (failedSince) {
@@ -299,11 +306,25 @@ function serverSettings() {
             }
         },
 
-        async setAIPAuto(on) {
+        // The line the SIA asks to cite, and the aerodromes it does not cover.
+        aipSourceLine() {
+            const a = this.aip;
+            if (!a) return '';
+            let line = `Source: ${a.source}. Made on ${this.aipMadeText()}. Next cycle: ${a.next_airac}.`;
+            if ((a.outside || []).length) line += ` Not read: ${a.outside.join(', ')}, outside the French eAIP.`;
+            if ((a.skipped || []).length) line += ` Not read: ${a.skipped.join('; ')}.`;
+            return line;
+        },
+
+        // The list's three settings travel together: one sent alone would
+        // reset the others.
+        async setAIP(change) {
+            const a = this.aip || {};
+            const next = Object.assign({ auto_update: !!a.auto_update, name_procedures: a.name_procedures !== false, naming: a.naming || 'measured' }, change);
             try {
                 const r = await fetch('/api/v1/server/settings', {
                     method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ aip_names: { auto_update: !!on } }),
+                    body: JSON.stringify({ aip_names: next }),
                 });
                 if (r.status === 401) { this.flash('Sign in to change server settings.', true); return; }
                 if (!r.ok) { this.flash((await r.text()).trim() || ('Refused (' + r.status + ')'), true); return; }

@@ -215,7 +215,10 @@
         // the text comes from a speech model and must never reach x-html raw.
         // The term underlined is the windows' search, or the one given (the
         // thread's, step 6).
-        transcriptHtml(text, spans, searchTerm) {
+        // spans: the words that named the aircraft, in bold; places: the
+        // words of a procedure heard, underlined dotted (is-place, Q55), the
+        // text itself never rewritten.
+        transcriptHtml(text, spans, searchTerm, places) {
             if (!text) return '';
             const esc = str => str.replace(/[&<>"']/g, c =>
                 ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -228,17 +231,41 @@
                 : esc(str);
             // Offsets that do not fit this text name words in another one: shown
             // without highlight rather than with a wrong one.
-            const fits = Array.isArray(spans) && spans.length > 0 && spans.every(sp =>
+            const fit = (list) => (Array.isArray(list) ? list : []).filter(sp =>
                 Array.isArray(sp) && sp[0] >= 0 && sp[0] < sp[1] && sp[1] <= text.length);
-            if (!fits) return plain(text);
+            const bold = Array.isArray(spans) && spans.length > 0 && fit(spans).length === spans.length ? fit(spans) : [];
+            const marks = bold.map(([a, b]) => ({ a, b, open: '<b>', close: '</b>' }))
+                .concat(fit(places).map(([a, b]) => ({ a, b, open: '<span class="is-place">', close: '</span>' })));
+            if (!marks.length) return plain(text);
             let out = '', at = 0;
-            for (const [a, b] of [...spans].sort((x, y) => x[0] - y[0])) {
-                if (a < at) continue;
-                out += plain(text.slice(at, a)) +
-                    '<b>' + plain(text.slice(a, b)) + '</b>';
-                at = b;
+            for (const m of marks.sort((x, y) => x.a - y.a)) {
+                if (m.a < at) continue;
+                out += plain(text.slice(at, m.a)) + m.open + plain(text.slice(m.a, m.b)) + m.close;
+                at = m.b;
             }
             return out + plain(text.slice(at));
+        },
+
+        // Where a transmission's procedures heard are in the text shown:
+        // the processed text once processed, the text received before.
+        placeSpans(t, processed) {
+            const list = Array.isArray(t && t.places) ? t.places : [];
+            return list.map((p) => (processed ? p.normalized : p.raw)).filter(Boolean);
+        },
+
+        placeHelp(p) {
+            const what = p.kind === 'SID' ? 'a departure (SID)' : p.kind === 'STAR' ? 'an arrival (STAR)' : 'a procedure';
+            return `Official AIP name, proposed from the sound of the words: ${p.designator}, ${what} named after ${p.point}. ` +
+                `The transcript is left as heard. Click to see ${p.point} on the map.`;
+        },
+
+        // A procedure's point on the map for ten seconds (Chips, Q55).
+        showPlace(p) {
+            if (!p || !Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return;
+            if (this.mainView !== 'map' && typeof this.setMainView === 'function') this.setMainView('map');
+            if (this.mapManager && typeof this.mapManager.showPlace === 'function') {
+                this.mapManager.showPlace(p.lat, p.lon, p.point);
+            }
         },
 
         // Before a transmission's plain words: who gives them.

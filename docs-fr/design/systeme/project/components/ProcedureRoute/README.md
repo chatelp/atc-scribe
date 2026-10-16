@@ -1,0 +1,15 @@
+# ProcedureRoute
+
+A procedure route draws on the map a published departure (SID) or arrival (STAR): from the runway to its last point, or from its first point to the runway (Q56, 16/10).
+
+**Drawn on demand.** Pressing a place chip of a procedure ("ELCOB 7G") draws its whole route, in place of the ring the chip showed alone; it stays until it is closed or another one is asked for (a route takes longer than ten seconds to read). The sky's note says what it is and closes it: "ELCOB 7G · departure from 26R · published route" and its ✕ (`cl-sky__note--action`).
+
+**The line.** `color-map-procedure` (`#e0e0e0`, `color-map-light-procedure` on IGN and OSM), 1.6 px, solid; chevrons every 46 px in the direction flown (outward for a SID, toward the runway for a STAR); the runway's designator at its start or end. It is a reference, not a path: neither the aircraft's altitude colour nor the accent, which stays the followed aircraft's own track. When the aircraft is identified and followed, both show: the route in neutral, its track in the accent, dashed; the gap between them is the controller's direct.
+
+**The points.** Named reporting points and navaids as small hollow triangles (5 px), their name beside in mono 10 px `color-map-procedure`; the technical terminal points (PG271…) are not drawn, the line passes through them. Under a named point, its constraints when the table gives them, in mono 9.5 px `color-text-tertiary`, in the brand's numbers: "≥ FL 060", "≤ 4 000 ft", "≤ 250 kt", "FL 070" when it is exact.
+
+**The layer** (MapControls › Layers): "Procedures (SID, STAR)", off by default; when on, a `SegmentedControl` "Arrivals · Departures" (arrivals by default: the approach is what is heard), and the configuration it draws, said and not chosen: "LFPG west (26L, 27R), from the runways in use". It follows the runways in use already judged from the ADS-B tracks (the direction rule): no selector to keep in sync; while they are not known, nothing is drawn and the row says "Shown once the runway in use is known." The layer's routes take `color-map-procedure` at 38 %, 1.1 px, chevrons every 70 px, their named points at 60 %; the route asked for from a chip draws above them at full strength. Point names follow the labels' tiers: named up to 67 NM across the sky, triangles alone beyond; aircraft and their labels draw above the routes.
+
+**Words.** The help of the chip, the note and the layer says what a route is: "The published route of ELCOB 7G, a departure from 26R. The controller often clears an aircraft direct to a later point: the route is what was published, not the path flown." Outside the French eAIP nothing is drawn: the chip of a procedure shows its point alone when it is known, the layer's row has no switch and says "Not for this station: published routes come from the French eAIP (aerodromes LF…).", as the source lines of Regional data.
+
+**Data.** The coding tables of the eAIP (SID and STAR), per procedure: its points in order with their position, its runways, its kind, and per segment the altitude and speed constraints.

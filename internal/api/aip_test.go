@@ -1,6 +1,8 @@
 package api
 
 import (
+	"github.com/yegors/co-atc/internal/transcription"
+	"github.com/yegors/co-atc/internal/transcription/phraseology"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -71,5 +73,52 @@ func TestTheOfficialNamesAreMadeFromThePanel(t *testing.T) {
 	s.get("/api/v1/aip-names", &st)
 	if !st.AutoUpdate {
 		t.Error("the switch did not hold")
+	}
+}
+
+// A transmission is served with the procedure heard named, where its words
+// are; off from the panel, not at all.
+func TestTheProcedureHeardIsServedNamed(t *testing.T) {
+	s := newStack(t, stackOptions{})
+	s.signIn()
+	m, err := phraseology.NewMatcher("../../assets/airlines.dat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := phraseology.NewPlaceNamer(m)
+	n.Set([]phraseology.PlacePoint{{Name: "ELCOB", Lat: 49.03, Lon: 1.22}})
+	transcription.SetPlaces(n, s.runtime.PlaceNaming)
+	t.Cleanup(func() { transcription.SetPlaces(nil, nil) })
+
+	text := "Air France five two, elcope seven golf, climb flight level one two zero"
+	s.transcribe("124350", text, "", time.Now())
+	var out struct {
+		Transcriptions []struct {
+			Places []struct {
+				Designator string  `json:"designator"`
+				Lat        float64 `json:"lat"`
+				Raw        []int   `json:"raw"`
+			} `json:"places"`
+		} `json:"transcriptions"`
+	}
+	s.get("/api/v1/transcriptions", &out)
+	if len(out.Transcriptions) != 1 || len(out.Transcriptions[0].Places) != 1 {
+		t.Fatalf("%+v", out)
+	}
+	p := out.Transcriptions[0].Places[0]
+	if p.Designator != "ELCOB 7G" || p.Lat != 49.03 || len(p.Raw) != 2 || text[p.Raw[0]:p.Raw[1]] != "elcope seven golf" {
+		t.Errorf("%+v", p)
+	}
+
+	if rec := s.do("PUT", "/api/v1/server/settings", `{"aip_names":{"name_procedures":false}}`); rec.Code != http.StatusOK {
+		t.Fatalf("switch off: %d %s", rec.Code, rec.Body.String())
+	}
+	out.Transcriptions = nil // a field absent from the answer would keep its old value
+	s.get("/api/v1/transcriptions", &out)
+	if len(out.Transcriptions[0].Places) != 0 {
+		t.Errorf("named while off: %+v", out.Transcriptions[0].Places)
+	}
+	if rec := s.do("PUT", "/api/v1/server/settings", `{"aip_names":{"naming":"loose"}}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("an unmeasured level was accepted: %d", rec.Code)
 	}
 }

@@ -84,11 +84,13 @@
       "trail-followed": { "$value": "#66c56a", "$description": "Track of the followed aircraft, dashed. Other aircraft's trails take their altitude colour at 50 %." },
       "estimate": { "$value": "#66c56a", "$description": "Estimated positions, dotted: the future and the hindcast (were #FFC107 and #00BCD4)." },
       "trail-stale": { "$value": "#949494", "$description": "Trail of an aircraft whose position is getting old or lost: tertiary, as the lost glyph." },
+      "procedure": { "$value": "#e0e0e0", "$description": "A published route (SID, STAR) and its named points: a reference, neutral, not the aircraft's track (its altitude colour, or the accent when followed). Full for the route asked for, at 38 % in the Procedures layer." },
       "proximity": { "$value": "#66c56a", "$description": "The Nearby tab's circle around the followed aircraft, dashed, fill at 6 %: it belongs to the followed flight; was #EB8C00, dE76 0.9 from the departure phase." },
       "light": {
         "ring": { "$value": "#b5b5b5", "$description": "Range rings on a light base map (IGN, OSM)." },
         "centerline": { "$value": "#a8a8a8", "$description": "Extended centrelines on a light base map." },
         "proximity": { "$value": "#2e7d32", "$description": "The Nearby circle on a light base map." },
+        "procedure": { "$value": "#3a3a3a", "$description": "A published route on a light base map." },
         "taxiway": { "$value": "#9a9a9a", "$description": "Taxiway on a light base map." },
         "selected": { "$value": "#2e7d32", "$description": "Selection ring on a light base map (4.5:1 on the OSM ground)." },
         "hovered": { "$value": "#333333", "$description": "Hover ring on a light base map." },

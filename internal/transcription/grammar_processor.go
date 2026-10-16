@@ -646,6 +646,7 @@ func (p *GrammarProcessor) broadcast(record *sqlite.TranscriptionRecord, process
 			"callsign_evidence": evidence,
 			"content_second":    record.ContentSecond,
 			"plain":             plain,
+			"places":            PlacesOf(record.Content),
 		},
 	})
 }

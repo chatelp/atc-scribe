@@ -1,12 +1,16 @@
 package aip
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 // With AIP_PAGES set to a folder of saved eAIP pages (ENR 4.4, ENR 2.1, AD 2
@@ -68,4 +72,69 @@ func TestRealPagesAgreeWithAReferenceList(t *testing.T) {
 	if len(missing) > 1 {
 		t.Errorf("points missing: %v", missing)
 	}
+}
+
+// With AIP_PAGES and AIP_CHARTS (a folder of the SID and STAR coding tables,
+// as Cartes/LFPG/... beside the pages), the procedure points of Paris come out
+// without a request: OPALE, ELCOB, ATREX, RANUX, NURMO, and MOPAR, OKIPA from
+// the text. Needs pdftotext.
+func TestRealChartsGiveTheProcedurePoints(t *testing.T) {
+	pagesDir, charts := os.Getenv("AIP_PAGES"), os.Getenv("AIP_CHARTS")
+	if pagesDir == "" || charts == "" || pdfToText() == "" {
+		t.Skip("AIP_PAGES, AIP_CHARTS or pdftotext missing")
+	}
+	cache := t.TempDir()
+	folder := filepath.Join(cache, "2026-10-01")
+	if err := os.MkdirAll(filepath.Join(folder, "Cartes", "LFPG"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.MkdirAll(filepath.Join(folder, "Cartes", "LFPO"), 0o755)
+	for _, name := range PageNames([]string{"LFPG", "LFPO"}) {
+		b, err := os.ReadFile(filepath.Join(pagesDir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		os.WriteFile(filepath.Join(folder, name), b, 0o644)
+	}
+	pdfs, _ := filepath.Glob(filepath.Join(charts, "AD_2_*.pdf"))
+	for _, p := range pdfs {
+		b, _ := os.ReadFile(p)
+		ad := filepath.Base(p)[5:9]
+		os.WriteFile(filepath.Join(folder, "Cartes", ad, filepath.Base(p)), b, 0o644)
+	}
+	m := &Maker{OutPath: filepath.Join(cache, "aip-names.json"), CacheDir: cache,
+		Client: &http.Client{Transport: refuse{}}, Now: func() time.Time { return time.Date(2026, 10, 16, 0, 0, 0, 0, time.UTC) }}
+	n, err := m.Make(context.Background(), Request{Lat: 49.0097, Lon: 2.5479, RadiusNM: 120, Airports: []string{"LFPG", "LFPO"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, p := range n.ProcedurePoints {
+		names[p.Name] = true
+	}
+	t.Logf("%d charts read, %d procedure points: %v", n.ChartsRead, len(n.ProcedurePoints), n.ProcedurePoints)
+	for _, want := range []string{"OPALE", "ELCOB", "ATREX", "RANUX", "NURMO", "MOPAR", "OKIPA"} {
+		if !names[want] {
+			t.Errorf("%s missing", want)
+		}
+	}
+	for _, p := range n.ProcedurePoints {
+		if p.Name == "ELCOB" {
+			for d, k := range p.Kinds {
+				if k != "SID" {
+					t.Errorf("%s is a %s; ELCOB is a departure point", d, k)
+				}
+			}
+			if len(p.Kinds) == 0 {
+				t.Error("ELCOB's procedures have no kind")
+			}
+		}
+	}
+}
+
+// refuse answers every request with an error: nothing may be downloaded.
+type refuse struct{}
+
+func (refuse) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("no network in this test")
 }

@@ -22,6 +22,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -96,6 +97,36 @@ type Names struct {
 	// Airports whose AD 2 page could not be had (a small aerodrome may have
 	// none): the list is made without them, and says so.
 	Skipped []string `json:"skipped,omitempty"`
+
+	// The points the followed airports' departures and arrivals are named
+	// after (OPALE for OPALE 7A), from the SID and STAR coding tables of the
+	// eAIP and the procedures the text names: the page names the procedures
+	// heard against these alone (Q55, usage 3).
+	ProcedurePoints []ProcedurePoint `json:"procedure_points,omitempty"`
+	ChartsRead      int              `json:"charts_read"`
+	ChartsNote      string           `json:"charts_note,omitempty"`
+
+	// Airports followed outside the French eAIP: nothing is read for them.
+	Outside []string `json:"outside,omitempty"`
+
+	allPoints map[string]Point // every point of ENR 4.4, for the procedures' coordinates
+}
+
+// ProcedurePoint is a point procedures are named after.
+type ProcedurePoint struct {
+	Name        string   `json:"name"`
+	Lat         float64  `json:"lat"`
+	Lon         float64  `json:"lon"`
+	Designators []string `json:"designators"`
+	// SID or STAR for each designator a coding table names; the ones only the
+	// AIP text names have no kind.
+	Kinds map[string]string `json:"kinds,omitempty"`
+}
+
+// Covered says whether the French eAIP holds an airport: LF, metropolitan
+// France. The overseas AIPs are other publications.
+func Covered(icao string) bool {
+	return len(icao) == 4 && strings.HasPrefix(strings.ToUpper(icao), "LF")
 }
 
 var (
@@ -171,7 +202,12 @@ func points(raw string) []Point {
 // Parse makes the list from the pages, keyed by their file names.
 func Parse(pages map[string]string, lat, lon, radiusNM float64) Names {
 	var n Names
-	for _, p := range points(pages[pagePoints]) {
+	all := points(pages[pagePoints])
+	n.allPoints = map[string]Point{}
+	for _, p := range all {
+		n.allPoints[p.Name] = p
+	}
+	for _, p := range all {
 		d := distanceNM(lat, lon, p.Lat, p.Lon)
 		if d <= radiusNM {
 			p.Lat = math.Round(p.Lat*1e5) / 1e5
@@ -300,6 +336,19 @@ func (m *Maker) now() time.Time {
 }
 
 func (m *Maker) make(ctx context.Context, req Request) (*Names, error) {
+	var outside []string
+	var covered []string
+	for _, a := range req.Airports {
+		if Covered(a) {
+			covered = append(covered, strings.ToUpper(a))
+		} else {
+			outside = append(outside, strings.ToUpper(a))
+		}
+	}
+	if len(req.Airports) > 0 && len(covered) == 0 {
+		return nil, fmt.Errorf("the French eAIP covers aerodromes in France (LF…); this station follows %s", strings.Join(outside, ", "))
+	}
+	req.Airports = covered
 	airac := req.AIRAC
 	if airac.IsZero() {
 		airac = InForce(m.now())
@@ -329,6 +378,8 @@ func (m *Maker) make(ctx context.Context, req Request) (*Names, error) {
 	}
 	n := Parse(pages, req.Lat, req.Lon, req.RadiusNM)
 	n.Skipped = skipped
+	n.Outside = outside
+	m.procedurePoints(ctx, &n, base, folder, req.Airports, pages)
 	if len(n.Points) == 0 {
 		return nil, fmt.Errorf("no point found in %s: the page's layout may have changed", pagePoints)
 	}
@@ -337,9 +388,7 @@ func (m *Maker) make(ctx context.Context, req Request) (*Names, error) {
 	n.AIRAC = airac.Format("2006-01-02")
 	n.NextAIRAC = airac.AddDate(0, 0, airacDays).Format("2006-01-02")
 	n.Made = m.now().Format(time.RFC3339)
-	for _, a := range req.Airports {
-		n.Airports = append(n.Airports, strings.ToUpper(a))
-	}
+	n.Airports = req.Airports
 
 	raw, err := json.MarshalIndent(n, "", " ")
 	if err != nil {
@@ -392,4 +441,99 @@ func (m *Maker) fetch(ctx context.Context, url, path string) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+var reChart = regexp.MustCompile(`href="(Cartes/(LF[A-Z]{2})/AD_2_LF[A-Z]{2}_DATA_(?:SID|STAR)[^"]*\.pdf)"`)
+var reDesignator = regexp.MustCompile(`^\s*([A-Z]{5}) (\d[A-Z])\s*$`)
+
+// procedurePoints reads the SID and STAR coding tables of the followed
+// airports (linked from their AD 2 pages) and the procedures the text names,
+// and keeps the points they are named after, with their coordinates.
+func (m *Maker) procedurePoints(ctx context.Context, n *Names, base, folder string, airports []string, pages map[string]string) {
+	designators := map[string]map[string]bool{}
+	kinds := map[string]string{}
+	add := func(point, designator string) {
+		if designators[point] == nil {
+			designators[point] = map[string]bool{}
+		}
+		designators[point][designator] = true
+	}
+	for _, p := range n.Procedures {
+		if f := strings.Fields(p); len(f) == 2 {
+			add(f[0], p)
+		} else if len(p) == 7 {
+			add(p[:5], p[:5]+" "+p[5:])
+		}
+	}
+	tool := pdfToText()
+	if tool == "" {
+		n.ChartsNote = "pdftotext (poppler) is not installed: only the procedures the AIP text names are known"
+	}
+	for _, a := range airports {
+		page := pages[fmt.Sprintf(pageAirport, a)]
+		seen := map[string]bool{}
+		for _, mm := range reChart.FindAllStringSubmatch(page, -1) {
+			rel := mm[1]
+			if seen[rel] || tool == "" {
+				continue
+			}
+			seen[rel] = true
+			path := filepath.Join(folder, filepath.FromSlash(rel))
+			if _, err := os.Stat(path); err != nil {
+				if err := m.fetch(ctx, base+"/"+rel, path); err != nil {
+					n.ChartsNote = fmt.Sprintf("some coding tables could not be had (%v)", err)
+					continue
+				}
+			}
+			out, err := exec.CommandContext(ctx, tool, "-layout", path, "-").Output()
+			if err != nil {
+				n.ChartsNote = fmt.Sprintf("a coding table could not be read (%v)", err)
+				continue
+			}
+			n.ChartsRead++
+			kind := "STAR"
+			if strings.Contains(rel, "_DATA_SID_") {
+				kind = "SID"
+			}
+			for _, line := range strings.Split(string(out), "\n") {
+				if d := reDesignator.FindStringSubmatch(line); d != nil {
+					add(d[1], d[1]+" "+d[2])
+					kinds[d[1]+" "+d[2]] = kind
+				}
+			}
+		}
+	}
+	for name, ds := range designators {
+		p, ok := n.allPoints[name]
+		if !ok {
+			continue // a name the points table does not hold: no place to show
+		}
+		pp := ProcedurePoint{Name: name, Lat: math.Round(p.Lat*1e5) / 1e5, Lon: math.Round(p.Lon*1e5) / 1e5}
+		for d := range ds {
+			pp.Designators = append(pp.Designators, d)
+			if k := kinds[d]; k != "" {
+				if pp.Kinds == nil {
+					pp.Kinds = map[string]string{}
+				}
+				pp.Kinds[d] = k
+			}
+		}
+		sort.Strings(pp.Designators)
+		n.ProcedurePoints = append(n.ProcedurePoints, pp)
+	}
+	sort.Slice(n.ProcedurePoints, func(i, j int) bool { return n.ProcedurePoints[i].Name < n.ProcedurePoints[j].Name })
+}
+
+// pdfToText finds poppler's pdftotext: on the PATH, or where Homebrew puts it
+// (a launcher's PATH may not hold it).
+func pdfToText() string {
+	if p, err := exec.LookPath("pdftotext"); err == nil {
+		return p
+	}
+	for _, p := range []string{"/opt/homebrew/bin/pdftotext", "/usr/local/bin/pdftotext", "/usr/bin/pdftotext"} {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
 }

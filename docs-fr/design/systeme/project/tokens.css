@@ -60,10 +60,12 @@
   --color-map-trail-followed: #66c56a;
   --color-map-estimate: #66c56a;
   --color-map-trail-stale: #949494;
+  --color-map-procedure: #e0e0e0;
   --color-map-proximity: #66c56a;
   --color-map-light-ring: #b5b5b5;
   --color-map-light-centerline: #a8a8a8;
   --color-map-light-proximity: #2e7d32;
+  --color-map-light-procedure: #3a3a3a;
   --color-map-light-taxiway: #9a9a9a;
   --color-map-light-selected: #2e7d32;
   --color-map-light-hovered: #333333;
