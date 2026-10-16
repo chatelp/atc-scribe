@@ -154,6 +154,7 @@
                     f.set('point', p);
                     f.set('prev', coords[i - 1] || null);
                     f.set('next', coords[i + 1] || null);
+                    f.set('ends', i === pts.length - 1);
                     f.setStyle(pointStyle(mode));
                     out.push(f);
                 });
@@ -211,12 +212,24 @@
             layered = replace(layered, next);
         }
 
-        // The palette changed (a bright base map): restyle.
+        // The selected departure's candidate exits (Q57): the likeliest route
+        // as a route asked for, the others as the layer's; the view does not
+        // move (the aircraft is followed, the list changes as it flies).
+        let candidates = [];
+        function setCandidates(items) {
+            ensure();
+            if (!source) return;
+            const next = [];
+            for (const it of items) next.push(...featuresOf(it.route, it.runways, it.strong ? ASKED : LAYER, true));
+            candidates = replace(candidates, next);
+        }
+
+                // The palette changed (a bright base map): restyle.
         function refresh() {
             if (layer) layer.changed();
         }
 
-        return { show, clear, setLayer, refresh };
+        return { show, clear, setLayer, setCandidates, refresh };
     }
 
     window.MapProcedureFeature = { create };

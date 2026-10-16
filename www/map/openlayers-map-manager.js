@@ -1745,7 +1745,12 @@
         clearProcedureRoute() {
             this._procedures?.clear();
         }
-        // The Procedures layer's routes; an empty list hides it.
+        // The selected departure's candidate exits (Q57): [{ route, runways,
+        // strong }], the likeliest strong; an empty list clears them.
+        showExitRoutes(items) {
+            this._procedureFeature()?.setCandidates(items || []);
+        }
+                // The Procedures layer's routes; an empty list hides it.
         setProcedureLayer(routes, runwaysOf) {
             this._procedureFeature()?.setLayer(routes, runwaysOf);
         }

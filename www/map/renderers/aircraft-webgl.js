@@ -536,7 +536,23 @@
             ageText: (aircraft.status === 'signal_lost' || ageSeconds === null || !Number.isFinite(ageSeconds) || ageSeconds < 5)
                 ? ''
                 : `-${Math.max(0, ageSeconds)}s`,
+            // Where it is probably going (Q57, MapLabel): "→26L/R", "→OKASI"
+            // and the count of the others, read by store/probable.js.
+            probable: aircraft.status === 'signal_lost' || store?.settings?.showProbable === false
+                ? null
+                : (store?.probable?.[aircraft.hex] || null),
         };
+    }
+
+    // The width of a label's text in its own font, for what is drawn over it
+    // in another colour (the probable runway or exit).
+    let labelMeasure = null;
+    function labelTextWidth(text) {
+        if (!labelMeasure) {
+            labelMeasure = document.createElement('canvas').getContext('2d');
+            labelMeasure.font = '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+        }
+        return labelMeasure.measureText(text).width;
     }
 
     // "1 620 ft", "FL 110", "ground": the brand's numbers (thin space).
@@ -771,6 +787,12 @@
             const fade = Number.isFinite(properties.fade) ? properties.fade : 1; // relocation (aircraft-animation.js)
             const textOpacity = baseTextOpacity * labelAgeFade * fade;
             const labelLineOne = `${labelParts.phaseText || ''}${labelParts.callsignText || ''}${labelParts.typeText || ''}`;
+            // The probable runway or exit ends the second line, two spaces after
+            // the speed; the line keeps their room in no-break spaces, and
+            // they are drawn over it in their own colours.
+            const probable = labelMode === 'full' ? labelParts.probable : null;
+            const probableWords = probable ? `  ${probable.main}${probable.rest || ''}` : '';
+            if (probableWords) labelParts.detailsText = `${labelParts.detailsText || ''}${'\u00a0'.repeat(probableWords.length)}`;
             const labelLineTwo = `${labelParts.detailsText || ''}`;
             const longestLabelLineLength = Math.max(labelLineOne.length, labelLineTwo.length);
             const estimatedLabelWidthPx = Math.max(72, Math.round(longestLabelLineLength * 6.4) + 12);
@@ -916,9 +938,28 @@
                 })
                 : null;
 
+            // Over the second line: the runway or exit in the secondary text
+            // colour, the count of the others in the tertiary (MapLabel, Q57).
+            const probableStyles = [];
+            if (probable && labelMainStyle && labelMode === 'full') {
+                const details = labelLineTwo.slice(0, labelLineTwo.length - probableWords.length);
+                const x0 = labelTextWidth(details + '  ');
+                const lineTwoY = -(iconSize / 2 + 1) - lift;
+                const over = (text, x, role) => new window.ol.style.Style({
+                    text: new window.ol.style.Text({
+                        text, offsetX: x, offsetY: lineTwoY, textAlign: 'left',
+                        font: '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                        fill: new window.ol.style.Fill({ color: hexToRgba(labelTextColor(role), textOpacity) }),
+                    }),
+                });
+                probableStyles.push(over(probable.main, x0, 'secondary'));
+                if (probable.rest) probableStyles.push(over(probable.rest, x0 + labelTextWidth(probable.main), 'tertiary'));
+            }
+
             const textStyles = [];
             if (labelMainStyle) textStyles.push(labelMainStyle);
             if (phasePrefixStyle) textStyles.push(phasePrefixStyle);
+            textStyles.push(...probableStyles);
             if (voiceTagStyle) textStyles.push(voiceTagStyle);
 
             return labelAgeStyle
