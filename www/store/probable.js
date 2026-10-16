@@ -111,7 +111,8 @@
                     extra: p.others.length ? ` · or ${p.others.join(', ')}` : '', extraDim: true,
                     help: 'The exit it is probably heading for, read from its ADS-B track, not announced by the controllers; ' +
                         'the others it could still take, the most likely first. Measured on 813 departures from Paris-CDG: ' +
-                        'an exit alone is right 93 times in 100 at 20 NM out.',
+                        'an exit alone is right 93 times in 100 at 20 NM out. ' +
+                        'Its published route is drawn on the map, with those of the exits it could still take, while it is selected.',
                 };
             }
             return null;
