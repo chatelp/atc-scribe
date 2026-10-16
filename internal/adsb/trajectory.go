@@ -59,6 +59,9 @@ type TrajectorySnapshot struct {
 	TAS          float64 // True airspeed (knots)
 	IAS          float64 // Indicated airspeed (knots)
 	Track        float64 // Track angle (degrees, 0-360)
+	// TrackUnknown: the receiver gave no track (a Mode S position without
+	// velocity), so Track's 0 is not north. Nothing is predicted from it.
+	TrackUnknown bool
 	MagHeading   float64 // Magnetic heading (degrees)
 	TrueHeading  float64 // True heading (degrees)
 	BaroRate     float64 // Barometric vertical rate (feet per minute)
@@ -100,6 +103,7 @@ func TrajectorySnapshotFromADSB(adsb *ADSBTarget, onGround bool, ts, dataAt time
 		TAS:          NumberOrZero(adsb.TAS),
 		IAS:          NumberOrZero(adsb.IAS),
 		Track:        NumberOrZero(adsb.Track),
+		TrackUnknown: adsb.Track == nil,
 		MagHeading:   NumberOrZero(adsb.MagHeading),
 		TrueHeading:  NumberOrZero(adsb.TrueHeading),
 		BaroRate:     NumberOrZero(adsb.BaroRate),
