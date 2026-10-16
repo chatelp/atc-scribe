@@ -292,8 +292,8 @@
                                 </div>
                                 <p class="cl-exchange__text" :lang="$store.atc.exchangeIsFrench(t) ? 'fr' : 'en'"
                                    x-html="(t.is_processed && t.content_processed)
-                                       ? $store.atc.transcriptHtml(t.content_processed, t.callsign_source !== 'fr' ? t.callsign_evidence : null, $store.atc.threadSearch)
-                                       : $store.atc.transcriptHtml(t.text, null, $store.atc.threadSearch)"></p>
+                                       ? $store.atc.transcriptHtml(t.content_processed, t.callsign_source !== 'fr' ? t.callsign_evidence : null, $store.atc.threadSearch, $store.atc.placeSpans(t, true))
+                                       : $store.atc.transcriptHtml(t.text, null, $store.atc.threadSearch, $store.atc.placeSpans(t, false))"></p>
                                 <!-- When the French reading named the aircraft, its words are in it. -->
                                 <template x-if="t.callsign_source === 'fr' && t.content_second">
                                     <div class="cl-exchange__explain" lang="fr">
@@ -302,10 +302,15 @@
                                     </div>
                                 </template>
                                 <!-- The instructions in plain words (phraseology grammar). -->
-                                <template x-if="t.plain && t.plain.length">
+                                <template x-if="(t.plain && t.plain.length) || (t.places && t.places.length)">
                                     <div class="cl-exchange__instr" data-help-title="In plain words" :data-help="$store.atc.plainHelp(t)">
-                                        <template x-for="p in t.plain" :key="p.text">
+                                        <template x-for="p in (t.plain || [])" :key="p.text">
                                             <span class="cl-chip cl-chip--instr" :class="p.role === 'clearance' ? 'cl-chip--clearance' : ''" x-text="p.text"></span>
+                                        </template>
+                                        <!-- The procedures heard, named (Chips: Place, Q55): a proposal. -->
+                                        <template x-for="p in (t.places || [])" :key="'place-' + p.designator + (p.raw || []).join('-')">
+                                            <button class="cl-chip cl-chip--place" @click.stop="$store.atc.showPlace(p)" :aria-label="p.designator + ': show ' + p.point + ' on the map'"
+                                                    data-help-title="Official AIP name" :data-help="$store.atc.placeHelp(p)" x-text="p.designator"></button>
                                         </template>
                                     </div>
                                 </template>
@@ -434,6 +439,7 @@
                                             </div>
                                         </span>
                                         <span class="cl-field__help">How a transmission is tied to an aircraft. The eleven rules behind each preset stay below, folded.</span>
+                                        <span class="cl-field__source">Measured on Paris approaches (CDG, ORY, LBG), October 2026.</span>
                                     </div>
                                     <button class="cl-disclosure" :aria-expanded="String(rulesOpen)" @click="rulesOpen = !rulesOpen">The eleven rules</button>
                                     <div x-show="rulesOpen" class="flex flex-col gap-3">
@@ -482,6 +488,7 @@
                                             <button class="cl-switch" role="switch" aria-label="Only aircraft in the frequency's sector" :disabled="busy"
                                                     :class="draft.matching.sectors ? 'is-on' : ''" :aria-checked="String(!!draft.matching.sectors)" @click="flipRule('sectors')"></button>
                                             <span class="cl-field__help">For frequencies that name their airport and kind. Measured on the Roissy approach: chance matches halved, more true ones.</span>
+                                            <span class="cl-field__source">Set for the Paris area: set your own for another station.</span>
                                         </div>
                                         <template x-if="draft.matching.sectors && draft.matching.sector">
                                             <div class="flex flex-col gap-2 pl-4 border-l border-border-subtle">
@@ -522,39 +529,66 @@
                                     </div>
                                 </div>
                             </template>
-                            <!-- Names from the AIP (Q55; SettingsPage, 15/10): a source of the matcher,
-                                 made from the French eAIP on this page's button. -->
+                        </section>
+
+                        <!-- Regional data (SettingsPage, 16/10): the sources that depend on where the
+                             station is; a source that does not cover it says so, without controls. -->
+                        <section id="set-regional" class="cl-page__section max-md:px-4">
+                            <h3>Regional data</h3>
                             <template x-if="aip">
                                 <div class="contents">
                                     <div class="cl-field max-md:grid-cols-1">
                                         <span class="cl-field__label cursor-help" data-help-title="Names from the AIP"
-                                              data-help="The official names around the station, from the French eAIP: reporting points, control positions, procedures. They do not decide which aircraft is speaking: tried, a callsign whose airline is misheard sounds just like a procedure.">Names from the AIP</span>
+                                              data-help="The official names around the station, from the French eAIP: reporting points, control positions, procedures. They name the procedures heard in the thread, from the sound of the words.">Names from the AIP</span>
                                         <span class="cl-light whitespace-normal" :class="'cl-light--' + aipLight().level" x-text="aipLight().text"></span>
-                                        <span class="cl-field__help">The official names around the station, from the French eAIP: reporting points, control positions, procedures. They do not decide which aircraft is speaking: tried, a callsign whose airline is misheard sounds just like a procedure.</span>
+                                        <span class="cl-field__help">The official names around the station, from the French eAIP: reporting points, control positions, procedures. They do not decide which aircraft is speaking: tried, a callsign whose airline is misheard sounds just like a procedure. They name the procedures heard in the thread, from the sound of the words.</span>
                                     </div>
-                                    <dl class="cl-kv">
-                                        <template x-if="aip.present">
-                                            <div class="contents">
-                                                <dt>Reporting points</dt><dd x-text="aip.points"></dd>
-                                                <dt>Control positions</dt><dd x-text="aip.callsigns"></dd>
-                                                <dt>Procedures</dt><dd x-text="aip.procedures"></dd>
+                                    <template x-if="aip.coverage !== 'none'">
+                                        <div class="contents">
+                                            <dl class="cl-kv">
+                                                <template x-if="aip.present">
+                                                    <div class="contents">
+                                                        <dt>Reporting points</dt><dd x-text="aip.points"></dd>
+                                                        <dt>Control positions</dt><dd x-text="aip.callsigns"></dd>
+                                                        <dt>Procedure points</dt><dd x-text="aip.procedure_points + (aip.charts_read ? ' · from ' + aip.charts_read + ' SID and STAR coding tables' : '')"></dd>
+                                                    </div>
+                                                </template>
+                                                <dt>Area</dt><dd x-text="aip.radius_nm + ' NM around the station'"></dd>
+                                                <dt>Aerodromes</dt><dd x-text="(aip.airports || []).filter(a => !(aip.outside || []).includes(a)).join(' · ') + ' (the ones followed)'"></dd>
+                                            </dl>
+                                            <div class="cl-row">
+                                                <button class="cl-btn" :class="aipStale ? 'cl-btn--primary' : ''" :disabled="aip.refreshing || aipBusy" @click="refreshAIP()">Update from the SIA</button>
+                                                <span class="cl-plain">Public pages and coding tables of the eAIP, about 15 MB the first time in a cycle, under a minute.</span>
                                             </div>
-                                        </template>
-                                        <dt>Area</dt><dd x-text="aip.radius_nm + ' NM around the station'"></dd>
-                                        <dt>Aerodromes</dt><dd x-text="(aip.airports || []).join(' · ') + ' (the ones followed)'"></dd>
-                                    </dl>
-                                    <div class="cl-row">
-                                        <button class="cl-btn" :class="aipStale ? 'cl-btn--primary' : ''" :disabled="aip.refreshing || aipBusy" @click="refreshAIP()">Update from the SIA</button>
-                                        <span class="cl-plain">Five public pages of the eAIP, about 9 MB, a few seconds.</span>
-                                    </div>
-                                    <span x-show="aip.present" class="cl-plain"
-                                          x-text="'Source: ' + aip.source + '. Made on ' + aipMadeText() + '. Next cycle: ' + aip.next_airac + '.' + ((aip.skipped || []).length ? ' Not read: ' + aip.skipped.join('; ') + '.' : '')"></span>
-                                    <div class="cl-field">
-                                        <span class="cl-field__label">Update at each new AIRAC cycle</span>
-                                        <button class="cl-switch" role="switch" aria-label="Update at each new AIRAC cycle" :disabled="busy"
-                                                :class="aip.auto_update ? 'is-on' : ''" :aria-checked="String(!!aip.auto_update)" @click="setAIPAuto(!aip.auto_update)"></button>
-                                        <span class="cl-field__help">Every 28 days, when a new cycle comes into force, the server downloads the pages again.</span>
-                                    </div>
+                                            <span x-show="aip.present" class="cl-plain" x-text="aipSourceLine()"></span>
+                                            <span x-show="aip.present && aip.charts_note" class="cl-plain" x-text="'Coding tables: ' + aip.charts_note + '.'"></span>
+                                            <div class="cl-field">
+                                                <span class="cl-field__label">Update at each new AIRAC cycle</span>
+                                                <button class="cl-switch" role="switch" aria-label="Update at each new AIRAC cycle" :disabled="busy"
+                                                        :class="aip.auto_update ? 'is-on' : ''" :aria-checked="String(!!aip.auto_update)" @click="setAIP({ auto_update: !aip.auto_update })"></button>
+                                                <span class="cl-field__help">Every 28 days, when a new cycle comes into force, the server downloads the pages again.</span>
+                                            </div>
+                                            <!-- Naming the procedures in the thread (Q55 usage 3): three measured settings, no free slider. -->
+                                            <div class="cl-field">
+                                                <span class="cl-field__label">Name the procedures heard in the thread</span>
+                                                <button class="cl-switch" role="switch" aria-label="Name the procedures heard in the thread" :disabled="busy"
+                                                        :class="aip.name_procedures ? 'is-on' : ''" :aria-checked="String(!!aip.name_procedures)" @click="setAIP({ name_procedures: !aip.name_procedures })"></button>
+                                                <span class="cl-field__help">A dashed chip beside the words gives the official name they probably were: "ELCOB 7G" for "elcope seven golf". The transcript is left as heard.</span>
+                                            </div>
+                                            <template x-if="aip.name_procedures">
+                                                <div class="cl-field max-md:grid-cols-1">
+                                                    <span class="cl-field__label">How sure</span>
+                                                    <div class="cl-seg justify-self-end max-md:justify-self-start" role="group" aria-label="How sure a name must be">
+                                                        <template x-for="c in namingChoices" :key="c[0]">
+                                                            <button class="cl-seg__item" :aria-pressed="String(aip.naming === c[0])" :disabled="busy" @click="setAIP({ naming: c[0] })" x-text="c[1]"></button>
+                                                        </template>
+                                                    </div>
+                                                    <span class="cl-field__help" x-text="(namingChoices.find(c => c[0] === aip.naming) || namingChoices[1])[2]"></span>
+                                                    <span class="cl-field__source">Measured on the owner's listening of Paris approaches, 77 cases, October 2026.</span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </section>
@@ -1667,17 +1701,21 @@
                                             </button>
                                         </div>
                                         <p class="cl-exchange__text" :lang="$store.atc.exchangeIsFrench(t) ? 'fr' : 'en'"
-                                           x-html="$store.atc.transcriptHtml(t.content_processed || t.content, (t.callsign_source !== 'fr' && t.content_processed) ? t.callsign_evidence : null)"></p>
+                                           x-html="$store.atc.transcriptHtml(t.content_processed || t.content, (t.callsign_source !== 'fr' && t.content_processed) ? t.callsign_evidence : null, '', $store.atc.placeSpans(t, !!t.content_processed))"></p>
                                         <template x-if="t.callsign_source === 'fr' && t.content_second">
                                             <div class="cl-exchange__explain" lang="fr">
                                                 <span class="cursor-help" data-help-title="French reading" data-help="Every transmission is transcribed twice, by an English and a French model. This is the French reading, the one that named the aircraft.">French reading:</span>
                                                 <span x-html="$store.atc.transcriptHtml(t.content_second, t.callsign_evidence)"></span>
                                             </div>
                                         </template>
-                                        <template x-if="t.plain && t.plain.length">
+                                        <template x-if="(t.plain && t.plain.length) || (t.places && t.places.length)">
                                             <div class="cl-exchange__instr" data-help-title="In plain words" :data-help="$store.atc.plainHelp(t)">
-                                                <template x-for="p in t.plain" :key="p.text">
+                                                <template x-for="p in (t.plain || [])" :key="p.text">
                                                     <span class="cl-chip cl-chip--instr" :class="p.role === 'clearance' ? 'cl-chip--clearance' : ''" x-text="p.text"></span>
+                                                </template>
+                                                <template x-for="p in (t.places || [])" :key="'place-' + p.designator + (p.raw || []).join('-')">
+                                                    <button class="cl-chip cl-chip--place" @click.stop="$store.atc.showPlace(p)" :aria-label="p.designator + ': show ' + p.point + ' on the map'"
+                                                            data-help-title="Official AIP name" :data-help="$store.atc.placeHelp(p)" x-text="p.designator"></button>
                                                 </template>
                                             </div>
                                         </template>

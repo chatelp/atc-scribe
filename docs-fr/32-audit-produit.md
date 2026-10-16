@@ -492,6 +492,19 @@ sur la carte.
 
 ## État
 
+- 16/10 : **les procédures entendues, nommées dans le fil** (Q55, usage 3 ; choix du
+  propriétaire : ne comparer qu'aux points de procédure). La mise à jour depuis le SIA lit aussi les
+  tables de codage SID/STAR de l'eAIP des aérodromes suivis (avec `pdftotext` de poppler s'il est
+  installé, sinon les seules procédures nommées dans le texte) : 25 points pour LFPG et LFPO, tirés de
+  100 tables. Une transmission est servie avec la procédure entendue (« ELCOB 7G » pour « elcope seven
+  golf ») quand le mot ressemble au son à l'un de ces points ; la page souligne les mots en pointillé et
+  ajoute une puce en pointillé, un clic montre le point dix secondes sur la carte. Réglage dans une
+  nouvelle section « Regional data » : interrupteur allumé par défaut, trois positions mesurées sur
+  l'écoute du propriétaire (Surer 1,10 : 9 justes sur 9 ; Measured 0,95 : 18 sur 18 ; More 0,90 : 18
+  sur 19). Les valeurs mesurées ou décidées pour Paris disent d'où elles viennent ; une source qui ne
+  couvre pas la station le dit, sans bouton. Vérifié sur l'instance d'essai, sans téléchargement (pages
+  et tables du disque) : la puce, le soulignement, le point sur la carte, et la puce qui disparaît en
+  « Surer ».
 - 15/10 (soir) : **Q55, l'outil des noms officiels de l'AIP, piloté depuis les réglages** (le
   propriétaire : « il faut que ce script soit pilotable depuis les settings web »). Le script du
   labo devient le paquet Go `internal/aip` : cycle AIRAC calculé (tous les 28 jours depuis le

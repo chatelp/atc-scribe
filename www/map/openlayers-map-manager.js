@@ -1727,6 +1727,48 @@
 
             window.requestAnimationFrame(animate);
         }
+        // A procedure's point shown for ten seconds (Chips: Place, Q55): a ring
+        // and its name where it is, the view moved to it when it is outside.
+        showPlace(lat, lon, name) {
+            if (typeof lat !== 'number' || typeof lon !== 'number') return;
+            this._ensureOverlayLayer();
+            if (!this._overlaySource) return;
+            if (this._placeFeature) {
+                this._overlaySource.removeFeature(this._placeFeature);
+                this._placeFeature = null;
+            }
+            clearTimeout(this._placeTimer);
+            const P = window.MapPalette;
+            const at = this._toMapCoordinate(lat, lon);
+            const feature = new window.ol.Feature({ geometry: new window.ol.geom.Point(at) });
+            feature.setStyle(new window.ol.style.Style({
+                image: new window.ol.style.Circle({
+                    radius: 14,
+                    stroke: new window.ol.style.Stroke({ color: P.color('selected'), width: 2 }),
+                }),
+                text: new window.ol.style.Text({
+                    text: name || '',
+                    font: '11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                    offsetY: -24,
+                    fill: new window.ol.style.Fill({ color: P.color('text-primary') }),
+                    backgroundFill: new window.ol.style.Fill({ color: 'rgba(0,0,0,0.6)' }),
+                    padding: [2, 4, 2, 4],
+                }),
+            }));
+            this._overlaySource.addFeature(feature);
+            this._placeFeature = feature;
+            const map = this._olMap;
+            if (map) {
+                const extent = map.getView().calculateExtent(map.getSize());
+                if (!window.ol.extent.containsCoordinate(extent, at)) {
+                    map.getView().animate({ center: at, duration: window.smoothScroll && window.smoothScroll() === 'auto' ? 0 : 400 });
+                }
+            }
+            this._placeTimer = setTimeout(() => {
+                if (this._placeFeature && this._overlaySource) this._overlaySource.removeFeature(this._placeFeature);
+                this._placeFeature = null;
+            }, 10000);
+        }
         showPositionHighlight(lat, lon) {
             if (typeof lat !== 'number' || typeof lon !== 'number') return;
             this._ensureOverlayLayer();
