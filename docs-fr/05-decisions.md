@@ -5233,7 +5233,19 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
-### Q57 — La piste et la sortie probables sur le cartouche de l'avion *(16/10 — ouverte ; mesures lancées le 16/10)*
+### Q57 — La piste et la sortie probables sur le cartouche de l'avion *(16/10 — **décidée par le propriétaire le 16/10, en production à 17 h 06**)*
+
+> **Décision du propriétaire, 16/10** : « oui, construis cette forme directement et on bascule en
+> prod direct », sur la forme de la session design (MapLabel, AircraftStory, MapControls,
+> design-suite a0b8201) ; avec un ajout : les sorties possibles d'un départ montrées sur la carte,
+> leurs routes publiées, « pour suivre l'avion et voir s'il va vraiment vers là », mises à jour en
+> direct. Construit (9fcc281) : le champ en fin de 2ᵉ ligne de l'étiquette, la clé de la fiche, le
+> réglage « Probable runway and exit » (allumé par défaut) ; un départ sélectionné montre les routes
+> de ses sorties encore possibles, la plus probable en plein, les autres comme la couche, recalculées
+> toutes les deux secondes. Les étiquettes étant dessinées sur le canevas, c'est la sélection de
+> l'avion qui montre les routes, pas un clic sur le mot. Vérifié sur le trafic réel : AFR63RM,
+> décollé de la 27L, « →NURMO » à 35 NM, sur la route NURMO 7A tracée. Le chevauchement des étiquettes
+> mesuré avec et sans le champ, à 24 NM de ciel : 24 % dans les deux cas.
 
 > **Demande du propriétaire, 16/10** : afficher sur le cartouche de chaque avion ce que sa
 > trajectoire laisse prévoir, avec son niveau de confiance : la piste d'une arrivée, et le point de

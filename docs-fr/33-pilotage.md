@@ -147,9 +147,11 @@ l'interface, elle, reste sur le Mac.
    design ; **versé en production le 16/10 à 16 h 02** (ab4d319) sur la demande du propriétaire, le
    cache complété depuis le disque (fiches DATA, ENR 4.1, AD 2 de Beauvais). Reste son clic sur
    « Update from the SIA » pour écrire les routes dans la liste.
-10. **La piste et la sortie probables sur le cartouche** (Q57, 16/10) — demande du propriétaire ;
-   deux mesures lancées le 16/10 (piste d'arrivée selon la distance, sortie d'un départ selon le
-   cap), puis forme au design, puis décision.
+10. ~~**La piste et la sortie probables sur le cartouche**~~ (Q57, 16/10) — mesurées (2 338 arrivées,
+   3 111 départs), forme du design, **décidées et en production le 16/10 à 17 h 06** (9fcc281), avec
+   les routes des sorties possibles du départ sélectionné. À surveiller à l'usage : les sorties d'Orly,
+   peu couvertes par la réception ; après chaque relance, les départs déjà en l'air n'ont pas de
+   sortie (la piste de décollage n'est jugée que pour ceux vus décoller).
 9. **Les avions fantômes** (16/10) — deux causes trouvées et corrigées sur `migration` (04dc5e3,
    d0b54d5), mesurées sur le trafic réel ; **en production depuis le 16/10 à 16 h 02**. Une troisième famille, plus petite
    (un recul d'environ 4 s de vol, seulement quand l'instance porte les flux audio), reste à
