@@ -149,7 +149,9 @@ l'interface, elle, reste sur le Mac.
    « Update from the SIA » pour écrire les routes dans la liste.
 10. ~~**La piste et la sortie probables sur le cartouche**~~ (Q57, 16/10) — mesurées (2 338 arrivées,
    3 111 départs), forme du design, **décidées et en production le 16/10 à 17 h 06** (9fcc281), avec
-   les routes des sorties possibles du départ sélectionné. À surveiller à l'usage : les sorties d'Orly,
+   les routes des sorties possibles du départ sélectionné ; quatre corrections de la relecture design
+   (un nom par point, la route d'une puce l'emporte) versées à 17 h 18 (4ba147b). Suite possible : amorcer
+   la page sur la trace du serveur, pour éviter la minute sans sortie à l'ouverture. À surveiller à l'usage : les sorties d'Orly,
    peu couvertes par la réception ; après chaque relance, les départs déjà en l'air n'ont pas de
    sortie (la piste de décollage n'est jugée que pour ceux vus décoller).
 9. **Les avions fantômes** (16/10) — deux causes trouvées et corrigées sur `migration` (04dc5e3,
