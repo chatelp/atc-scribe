@@ -31,7 +31,7 @@ SPK_OFF = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor"
 CARET = '<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="m3 6 5 5 5-5"/></svg>'
 PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M5 3.5v9l7-4.5z"/></svg>'
 BELL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 11V7a4 4 0 0 1 8 0v4l1.5 1.5h-11L4 11ZM6.5 14h3"/></svg>'
-GEAR = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>'
+GEAR = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M6.43 2.83 L6.50 1.16 L9.50 1.16 L9.57 2.83 L10.55 3.24 L11.77 2.10 L13.90 4.23 L12.76 5.45 L13.17 6.43 L14.84 6.50 L14.84 9.50 L13.17 9.57 L12.76 10.55 L13.90 11.77 L11.77 13.90 L10.55 12.76 L9.57 13.17 L9.50 14.84 L6.50 14.84 L6.43 13.17 L5.45 12.76 L4.23 13.90 L2.10 11.77 L3.24 10.55 L2.83 9.57 L1.16 9.50 L1.16 6.50 L2.83 6.43 L3.24 5.45 L2.10 4.23 L4.23 2.10 L5.45 3.24Z"/><circle cx="8" cy="8" r="2.1"/></svg>'
 SEARCH = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>'
 LAYERS = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m8 2 6 3.5L8 9 2 5.5 8 2ZM2 8.5 8 12l6-3.5M2 11.5 8 15l6-3.5"/></svg>'
 CLOSE = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg>'
@@ -253,7 +253,7 @@ def column_now():
 <div class="cl-app__scroll">
 <div class="cl-section"><p class="cl-summary">De Gaulle has been using runway <b>26L</b> since 11:40. Three aircraft on final, next touchdown in about 2 min. Orly uses <b>06</b>.</p><p class="cl-summary__source">Read from the ADS-B tracks, not announced by the controllers.</p></div>
 <div class="cl-section"><span class="cl-label">Arrivals to LFPG 26L</span>{SEQ}</div>
-<div class="cl-section"><span class="cl-label">Worth knowing · last 30 min</span><ul class="cl-events"><li><time>13:09</time><span><span class="is-warn">▲ Go-around</span> EZY14LM on 27R, now climbing back.</span></li><li><time>13:05</time><span>LFPG switched to landing west (26L, was 08R).</span></li></ul></div>
+<div class="cl-section"><span class="cl-label">Worth knowing · last 30 min</span><ul class="cl-events"><li><time>13:09</time><span><span class="is-warn">▲ Go-around</span> EZY14LM on 27R at LFPG, now climbing back.</span></li><li><time>13:05</time><span>LFPG switched to landing west (26L, was 08R).</span></li></ul></div>
 <div class="cl-section"><span class="cl-label">Weather at LFPG</span><span class="cl-metar">LFPG 131300Z 25012KT 9999 FEW030 17/09 Q1018</span><span class="cl-metar__plain">Wind from the west, 12 kt; visibility over 10 km; a few clouds at 3 000 ft; QNH 1018.</span><span class="cl-row"><button class="cl-btn">TAF</button><button class="cl-btn">NOTAM <span class="cl-tabs__count">4</span></button></span></div>
 <div class="cl-section"><span class="cl-label">Traffic</span><div class="cl-stats"><span><b>107</b> airborne</span><span><b>12</b> heard</span><span><b>3</b> on the ground</span></div></div>
 </div>
@@ -393,9 +393,9 @@ def event_log():
   <div class="cl-menu__head"><span class="cl-menu__title">Event log</span><span class="cl-age">5 events</span><span class="cl-row" style="margin-left: auto;"><button class="cl-btn">Sounds</button><button class="cl-btn cl-btn--quiet">Clear</button></span></div>
   <ul class="cl-events">
     <li class="is-clickable"><time>13:12</time><span><span class="is-urgent">■ 7700</span> AFR6TZ, emergency squawk, FL 110, 18 NM north-east.</span></li>
-    <li class="is-clickable"><time>13:09</time><span><span class="cl-warn">▲ Go-around</span> EZY14LM on 27R.</span></li>
-    <li><time>13:05</time><span>LFPG runway in use: 26L (was 08R).</span></li>
-    <li class="is-clickable"><time>12:57</time><span><span class="is-info">● Of interest</span> A388, AFR18GH, 34 NM west.</span></li>
+    <li class="is-clickable"><time>13:09</time><span><span class="cl-warn">▲ Go-around</span> EZY14LM on 27R at LFPG, now climbing back.</span></li>
+    <li><time>13:05</time><span>LFPG switched to landing west (26L, was 08R).</span></li>
+    <li class="is-clickable"><time>12:57</time><span><span class="is-info">●</span> AFR18GH, an A388, is in range, 34 NM west.</span></li>
     <li><time>12:51</time><span>The station switched to Approche De Gaulle + De Gaulle App. (L).</span></li>
   </ul>
   <div class="cl-menu__sep"></div>
