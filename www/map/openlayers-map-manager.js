@@ -1230,7 +1230,9 @@
                         selected: this.store?.selectedAircraft?.hex === hex,
                         hovered: this.store?.hoveredAircraft?.hex === hex,
                         deemphasized: !!this.store?.selectedAircraft?.hex && this.store.selectedAircraft.hex !== hex,
-                    })
+                    }),
+                    // As a single update does: the animated pose kept.
+                    { preservePose: !!this.store?.settings?.aircraftAnimation?.enabled }
                 );
             } else {
                 Object.keys(aircraftByHex).forEach((hex) => {

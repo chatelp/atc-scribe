@@ -1222,7 +1222,13 @@
             stats.removes++;
         }
 
-        function bulkSyncAircraft(aircraftMap, shouldRender, visualResolver) {
+        // options.preservePose: an aircraft already drawn keeps the pose the
+        // animation engine gave it. Set from the raw position, an aircraft
+        // whose position the receiver lost 10 to 40 s ago was drawn back
+        // there at each full sync -- the transcriptions trigger them -- and
+        // forward again the next frame (owner, 16/10: "the third family of
+        // jumps", 580 visible jumps in 5 min with the audio streams on).
+        function bulkSyncAircraft(aircraftMap, shouldRender, visualResolver, options = {}) {
             const activeHexes = new Set();
             const collection = aircraftMap || {};
 
@@ -1240,7 +1246,7 @@
                     ? (visualResolver(aircraft.hex) || { selected: false, hovered: false })
                     : { selected: false, hovered: false };
 
-                upsertAircraftFeature(aircraft, visualState);
+                upsertAircraftFeature(aircraft, visualState, { preservePose: options.preservePose === true });
                 activeHexes.add(aircraft.hex);
             });
 
