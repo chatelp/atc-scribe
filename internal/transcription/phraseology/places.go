@@ -28,7 +28,25 @@ import (
 type PlacePoint struct {
 	Name     string
 	Lat, Lon float64
-	key      string
+	// Kinds: SID or STAR for each designator known ("ELCOB 7G": "SID").
+	Kinds map[string]string
+	key   string
+}
+
+// kindOf is the kind of a designator heard: its own when a coding table
+// names it, else the point's when all its procedures are of one kind.
+func (p *PlacePoint) kindOf(designator string) string {
+	if k := p.Kinds[designator]; k != "" {
+		return k
+	}
+	one := ""
+	for _, k := range p.Kinds {
+		if one != "" && k != one {
+			return ""
+		}
+		one = k
+	}
+	return one
 }
 
 // PlaceIndex is the station's procedure points, ready to be compared by sound.
@@ -61,6 +79,7 @@ type Place struct {
 	Words      [2]int  // token range: the point's word, the digit and the letter
 	Point      string  // ELCOB
 	Designator string  // ELCOB 7G
+	Kind       string  // SID, STAR, or "" when not known
 	Lat, Lon   float64 // the point, for the map
 	Score      float64 // the sound likeness, for the record
 }
@@ -99,8 +118,9 @@ func (m *Matcher) Places(r Result, ix *PlaceIndex, floor float64) []Place {
 		if best == nil || score < floor {
 			continue
 		}
+		designator := best.Name + " " + g.text
 		out = append(out, Place{
-			Words: [2]int{i - 1, g.word[1]}, Point: best.Name, Designator: best.Name + " " + g.text,
+			Words: [2]int{i - 1, g.word[1]}, Point: best.Name, Designator: designator, Kind: best.kindOf(designator),
 			Lat: best.Lat, Lon: best.Lon, Score: score,
 		})
 	}

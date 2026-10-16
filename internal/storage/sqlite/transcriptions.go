@@ -55,8 +55,9 @@ type TranscriptionRecord struct {
 // its words are in the text as received (Raw) and as processed (Normalized,
 // absent when the normalisation rewrote them), and where its point is.
 type PlaceName struct {
-	Designator string  `json:"designator"` // ELCOB 7G
-	Point      string  `json:"point"`      // ELCOB
+	Designator string  `json:"designator"`     // ELCOB 7G
+	Point      string  `json:"point"`          // ELCOB
+	Kind       string  `json:"kind,omitempty"` // SID or STAR
 	Lat        float64 `json:"lat"`
 	Lon        float64 `json:"lon"`
 	Score      float64 `json:"score"`

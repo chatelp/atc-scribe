@@ -70,3 +70,19 @@ func TestNoPointsNoNames(t *testing.T) {
 		t.Errorf("%d points", n.Count())
 	}
 }
+
+func TestAPlaceSaysItsKind(t *testing.T) {
+	n := NewPlaceNamer(newTestMatcher(t))
+	n.Set([]PlacePoint{{Name: "ELCOB", Kinds: map[string]string{"ELCOB 7A": "SID", "ELCOB 7D": "SID"}},
+		{Name: "MOPAR", Kinds: map[string]string{"MOPAR 1E": "SID", "MOPAR 2W": "STAR"}}})
+	for _, c := range []struct{ text, kind string }{
+		{"elcope seven golf", "SID"}, // not in the tables, but every ELCOB procedure is a SID
+		{"mopar one echo", "SID"},    // in the tables
+		{"mopar three whiskey", ""},  // MOPAR has both kinds: not known
+	} {
+		got := n.Name(Parse(c.text), 0.95)
+		if len(got) != 1 || got[0].Kind != c.kind {
+			t.Errorf("%q: %+v, want kind %q", c.text, got, c.kind)
+		}
+	}
+}

@@ -163,7 +163,7 @@ func startPlaceNamer(cfg *config.Config, listPath string, rt *config.Runtime, lo
 func procedurePoints(n *aip.Names) []phraseology.PlacePoint {
 	out := make([]phraseology.PlacePoint, 0, len(n.ProcedurePoints))
 	for _, p := range n.ProcedurePoints {
-		out = append(out, phraseology.PlacePoint{Name: p.Name, Lat: p.Lat, Lon: p.Lon})
+		out = append(out, phraseology.PlacePoint{Name: p.Name, Lat: p.Lat, Lon: p.Lon, Kinds: p.Kinds})
 	}
 	return out
 }

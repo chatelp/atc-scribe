@@ -118,6 +118,9 @@ type ProcedurePoint struct {
 	Lat         float64  `json:"lat"`
 	Lon         float64  `json:"lon"`
 	Designators []string `json:"designators"`
+	// SID or STAR for each designator a coding table names; the ones only the
+	// AIP text names have no kind.
+	Kinds map[string]string `json:"kinds,omitempty"`
 }
 
 // Covered says whether the French eAIP holds an airport: LF, metropolitan
@@ -448,6 +451,7 @@ var reDesignator = regexp.MustCompile(`^\s*([A-Z]{5}) (\d[A-Z])\s*$`)
 // and keeps the points they are named after, with their coordinates.
 func (m *Maker) procedurePoints(ctx context.Context, n *Names, base, folder string, airports []string, pages map[string]string) {
 	designators := map[string]map[string]bool{}
+	kinds := map[string]string{}
 	add := func(point, designator string) {
 		if designators[point] == nil {
 			designators[point] = map[string]bool{}
@@ -487,9 +491,14 @@ func (m *Maker) procedurePoints(ctx context.Context, n *Names, base, folder stri
 				continue
 			}
 			n.ChartsRead++
+			kind := "STAR"
+			if strings.Contains(rel, "_DATA_SID_") {
+				kind = "SID"
+			}
 			for _, line := range strings.Split(string(out), "\n") {
 				if d := reDesignator.FindStringSubmatch(line); d != nil {
 					add(d[1], d[1]+" "+d[2])
+					kinds[d[1]+" "+d[2]] = kind
 				}
 			}
 		}
@@ -502,6 +511,12 @@ func (m *Maker) procedurePoints(ctx context.Context, n *Names, base, folder stri
 		pp := ProcedurePoint{Name: name, Lat: math.Round(p.Lat*1e5) / 1e5, Lon: math.Round(p.Lon*1e5) / 1e5}
 		for d := range ds {
 			pp.Designators = append(pp.Designators, d)
+			if k := kinds[d]; k != "" {
+				if pp.Kinds == nil {
+					pp.Kinds = map[string]string{}
+				}
+				pp.Kinds[d] = k
+			}
 		}
 		sort.Strings(pp.Designators)
 		n.ProcedurePoints = append(n.ProcedurePoints, pp)

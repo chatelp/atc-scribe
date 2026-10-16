@@ -118,6 +118,18 @@ func TestRealChartsGiveTheProcedurePoints(t *testing.T) {
 			t.Errorf("%s missing", want)
 		}
 	}
+	for _, p := range n.ProcedurePoints {
+		if p.Name == "ELCOB" {
+			for d, k := range p.Kinds {
+				if k != "SID" {
+					t.Errorf("%s is a %s; ELCOB is a departure point", d, k)
+				}
+			}
+			if len(p.Kinds) == 0 {
+				t.Error("ELCOB's procedures have no kind")
+			}
+		}
+	}
 }
 
 // refuse answers every request with an error: nothing may be downloaded.

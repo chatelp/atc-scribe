@@ -254,7 +254,8 @@
         },
 
         placeHelp(p) {
-            return `Official AIP name, proposed from the sound of the words: ${p.designator}, a procedure named after ${p.point}. ` +
+            const what = p.kind === 'SID' ? 'a departure (SID)' : p.kind === 'STAR' ? 'an arrival (STAR)' : 'a procedure';
+            return `Official AIP name, proposed from the sound of the words: ${p.designator}, ${what} named after ${p.point}. ` +
                 `The transcript is left as heard. Click to see ${p.point} on the map.`;
         },
 

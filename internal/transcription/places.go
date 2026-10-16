@@ -39,7 +39,7 @@ func PlacesOf(content string) []sqlite.PlaceName {
 	r := phraseology.Parse(content)
 	var out []sqlite.PlaceName
 	for _, p := range pc.namer.Name(r, floor) {
-		pn := sqlite.PlaceName{Designator: p.Designator, Point: p.Point, Lat: p.Lat, Lon: p.Lon, Score: p.Score}
+		pn := sqlite.PlaceName{Designator: p.Designator, Point: p.Point, Kind: p.Kind, Lat: p.Lat, Lon: p.Lon, Score: p.Score}
 		if s := r.RawSpans([][2]int{p.Words}); len(s) == 1 {
 			pn.Raw = []int{s[0][0], s[0][1]}
 		}
