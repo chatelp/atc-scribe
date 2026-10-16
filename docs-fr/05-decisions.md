@@ -4891,6 +4891,24 @@ système de design : la séquence d'arrivée calculée dans le store pour tous l
 (la PAR la relit), les gabarits français des consignes, puis la migration elle-même
 (`04-migration.md`).
 
+### D82 — L'archive audio de production plafonnée à 60 Go, le ciel témoin mis à l'abri *(16/10)*
+
+Le propriétaire voyait son disque se remplir. Mesuré le 16/10 : sur le Mac, Clairance occupe
+environ 13 Go (bases de production 7 Go, plafonnées à 20 Go ; instance d'essai 4,8 Go, mise à la
+Corbeille le même jour, ses extraits audio plafonnés à 2 Go) ; sur le disque externe (931 Go, 136
+Go libres), l'archive audio de production grossit de 2,5 à 3 Go par jour de production pleine, sans
+plafond depuis D64 et D65. **Décision du propriétaire, sur l'avis du labo** : `audio_archive_max_gb
+= 60` en production (environ trois semaines ; les jours les plus anciens partent d'abord, celui du
+jour jamais), et copie par le labo des bases du ciel témoin (`co-atc-2026-09-30.db` à `10-04.db`,
+4,1 Go) dans un corpus protégé du disque externe — **faite le 16/10 à 10 h 22** par le labo
+(`whisper-corpus/bases-reference/`, sauvegarde SQLite, intégrité « ok », 20 272 transmissions,
+sommes SHA256 dans `SHA256SUMS` à côté, copies en lecture seule). Pourquoi les bases d'abord : sous le plafond de
+20 Go de `data/`, ce sont elles qui partiraient en premier, et les mesures du labo (Q55,
+précision par indices, J2) en dépendent. L'atelier et l'affinage n'utilisent que les extraits que
+le tri du labo retient (3 à 7 % des transmissions) : copiés à part, l'archive peut tourner. Restent
+à décider : la copie des extraits retenus et son rythme hebdomadaire, le ménage d'environ 60 Go
+proposé par le labo sur le disque externe, ligne par ligne.
+
 ### D81 — La première lecture d'abord, la seconde ensuite *(14/10)*
 
 **Décidé par le propriétaire le 14/10** (« oui »), sur la proposition du labo. **Le constat** :
@@ -5257,7 +5275,22 @@ sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien co
 > c'est le défaut qui a fait écarter « un chiffre d'écart » (Q46). **Usage 3, l'affichage du nom
 > réel, lancé le 16/10** : forme décidée par la session design (fiche Chips, `cl-chip--place`,
 > jamais de réécriture du texte lu), à n'afficher que si la proposition est juste au moins 95 fois
-> sur 100, seuil à mesurer.
+> sur 100, seuil à mesurer. **Mesuré le 16/10 sur l'écoute du propriétaire** (séance dédiée de
+> l'atelier, 77 cas : 46 noms de points entendus, 21 inaudibles, 5 autre chose, 3 noms hors liste, 2
+> compagnies) : la justesse de la puce selon le seuil de ressemblance au son va de 55 % (0,80) à
+> 88 % (1,00), 92 % (1,05) et 100 % à 1,10 — 9 puces sur 9, mais 9 des 46 noms entendus seulement,
+> ceux que le modèle écrit presque juste (Ranux, Atrex, Oquipa, Elkhob). À 1,10, aucun des 35
+> indicatifs mal transcrits de la mesure de l'usage 1 ne passerait. Échantillon petit : 9 sur 9 n'exclut
+> pas une justesse de 70 % (borne basse à 95 %). **Le propriétaire choisit, le 16/10, de ne comparer
+> qu'aux points de procédure.** Le jeu XML gratuit du SIA (commandé par le propriétaire, cycle
+> 10/26, AIXM 4.5 et XML SIA) ne contient aucune procédure et ne distingue pas leurs points ; les
+> tables de codage SID/STAR de l'eAIP, en PDF et en accès direct, les nomment : 100 tables pour LFPG
+> et LFPO (7,4 Mo, téléchargées avec l'accord du propriétaire), 307 désignations sur 19 points, plus
+> les 6 points des procédures du Bourget nommées dans le texte de l'AIP, soit 25 points. 41 des 45
+> noms entendus y sont. Justesse de la puce : 95 % au seuil 0,90 (18 sur 19), **100 % à 0,95 (18 sur
+> 18)**, deux fois plus de puces qu'avec les 450 points ; aucun des 35 indicatifs mal transcrits ne
+> passe à 0,95 (« dot » → DORDI à 0,90, écarté par une longueur minimale de 4 lettres). Échantillon
+> encore petit : 18 sur 18 n'exclut pas 85 %.
 
 Le labo a tiré de l'eAIP France du SIA (cycle AIRAC du 01/10/2026, cinq pages : ENR 4.4, ENR 2.1,
 AD 2 LFPG, LFPO, LFPB), avec l'accord du propriétaire, une liste de noms réels autour de LFPG :
