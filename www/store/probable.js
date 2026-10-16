@@ -13,6 +13,12 @@
     // Positions kept per departure, outside Alpine's reactivity: a minute of
     // fixes for a hundred aircraft would be proxied for nothing.
     const history = new Map();
+    // Departures whose track is being, or has been, asked of the server:
+    // once each, so that a page just opened has its exits within seconds
+    // instead of after the 45 s of track it would otherwise have to see
+    // itself (design review 16/10).
+    const seeding = new Set();
+    const SEED_POSITIONS = 90;
     let exitsCache = { routes: null, byKey: new Map() };
 
     window.AtcStore = window.AtcStore || [];
@@ -54,6 +60,10 @@
                     if (!dep || !adsb || a.status !== 'active' || !Number.isFinite(adsb.lat)) continue;
                     let h = history.get(a.hex);
                     if (!h) { h = []; history.set(a.hex, h); }
+                    if (!seeding.has(a.hex)) {
+                        seeding.add(a.hex);
+                        this._seedTrack(a.hex);
+                    }
                     const last = h[h.length - 1];
                     if (!last || last.lat !== adsb.lat || last.lon !== adsb.lon) {
                         h.push({ t: now, lat: adsb.lat, lon: adsb.lon, track: Number.isFinite(adsb.track) ? adsb.track : NaN });
@@ -82,9 +92,36 @@
                     }
                 }
             }
-            for (const hex of history.keys()) if (!this.aircraft || !this.aircraft[hex]) history.delete(hex);
+            for (const hex of history.keys()) {
+                if (!this.aircraft || !this.aircraft[hex]) { history.delete(hex); seeding.delete(hex); }
+            }
             this.probable = next;
             this._drawSelectedExits();
+        },
+
+        // A departure's last positions from the server, put before the ones
+        // this page has seen. Dated relative to the newest, so that a clock
+        // that differs from the server's (a phone, a VPN) does not matter.
+        async _seedTrack(hex) {
+            try {
+                const r = await fetch(`${API_BASE_URL}/aircraft/${hex}/tracks?limit=${SEED_POSITIONS}`, { credentials: 'same-origin' });
+                if (!r.ok) return;
+                const data = await r.json();
+                const pts = (Array.isArray(data.history) ? data.history : [])
+                    .filter((q) => Number.isFinite(q.lat) && Number.isFinite(q.lon) && q.timestamp)
+                    .map((q) => ({ at: Date.parse(q.timestamp), lat: q.lat, lon: q.lon, track: Number.isFinite(q.track) ? q.track : NaN }))
+                    .filter((q) => Number.isFinite(q.at))
+                    .sort((x, y) => x.at - y.at);
+                if (!pts.length) return;
+                const now = Date.now();
+                const newest = pts[pts.length - 1].at;
+                const h = history.get(hex) || [];
+                const firstSeen = h.length ? h[0].t : Infinity;
+                const before = pts
+                    .map((q) => ({ t: now - (newest - q.at), lat: q.lat, lon: q.lon, track: q.track }))
+                    .filter((q) => q.t < firstSeen && now - q.t <= KEEP_MS);
+                history.set(hex, before.concat(h));
+            } catch (e) { /* the page's own track fills in within a minute */ }
         },
 
         // The selected departure's candidate exits, their published routes on
