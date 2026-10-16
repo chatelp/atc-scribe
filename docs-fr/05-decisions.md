@@ -5233,6 +5233,28 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
+### Q57 — La piste et la sortie probables sur le cartouche de l'avion *(16/10 — ouverte ; mesures lancées le 16/10)*
+
+> **Demande du propriétaire, 16/10** : afficher sur le cartouche de chaque avion ce que sa
+> trajectoire laisse prévoir, avec son niveau de confiance : la piste d'une arrivée, et le point de
+> sortie d'un départ (ou d'entrée d'une arrivée) en fonction de son cap, pas dès le décollage.
+>
+> Ce qu'on sait déjà : la piste d'une arrivée est calculée par la page pour la séquence d'arrivée
+> et la vue PAR (`www/par/par-arrivals.js`), pas montrée sur le cartouche ; la sortie d'un départ,
+> mesurée le 16/10 sur 415 départs de LFPG (Q56), se lit nettement pour 41 % d'entre eux, et 4
+> des 6 procédures entendues concordent. Une sortie ou une piste probable est une inférence : la
+> règle « jamais de verdict » de la session design s'applique, et l'afficher est une décision du
+> propriétaire.
+>
+> **Mesurer d'abord**, sur les bases des derniers jours, l'ADS-B seul servant de vérité :
+> - la piste : prédiction de la page selon la distance au seuil, contre la piste où l'avion s'est
+>   posé ;
+> - la sortie : prédiction à 15-20 NM de l'aéroport, contre le point vers lequel l'avion pointe
+>   en fin de trajectoire enregistrée.
+>
+> Puis la forme au design (place sur un cartouche déjà chargé, marque du « probable », seuil
+> d'affichage), puis la décision.
+
 ### Q56 — Les procédures dessinées sur la carte *(16/10 — feu vert du propriétaire le 16/10 ; construit sur `migration` le même jour, relecture design en cours)*
 
 > **Feu vert du propriétaire, 16/10** (« Feu vert ») sur la forme de la session design (fiche
