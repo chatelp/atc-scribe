@@ -166,6 +166,8 @@ func (r *Router) Routes() http.Handler {
 			// making it again, which reaches the SIA's site.
 			router.Get("/aip-names", r.handler.GetAIPNames)
 			router.Post("/aip-names/refresh", r.handler.PostAIPNamesRefresh)
+			// The published routes of the followed airports, for the map (Q56).
+			router.Get("/procedure-routes", r.handler.GetProcedureRoutes)
 			router.Get("/adsb/source", r.handler.GetADSBSourceStatus)
 
 			// Station Configuration

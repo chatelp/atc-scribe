@@ -109,6 +109,11 @@ type Names struct {
 	// Airports followed outside the French eAIP: nothing is read for them.
 	Outside []string `json:"outside,omitempty"`
 
+	// The published routes of those departures and arrivals, for the map
+	// (Q56, routes.go), and how their reading went.
+	Routes     []Route     `json:"routes,omitempty"`
+	RoutesNote *RoutesNote `json:"routes_note,omitempty"`
+
 	allPoints map[string]Point // every point of ENR 4.4, for the procedures' coordinates
 }
 
@@ -474,6 +479,8 @@ func (m *Maker) procedurePoints(ctx context.Context, n *Names, base, folder stri
 	if tool == "" {
 		n.ChartsNote = "pdftotext (poppler) is not installed: only the procedures the AIP text names are known"
 	}
+	var note RoutesNote
+	var routes []Route
 	for _, a := range airports {
 		page := pages[fmt.Sprintf(pageAirport, a)]
 		seen := map[string]bool{}
@@ -506,7 +513,12 @@ func (m *Maker) procedurePoints(ctx context.Context, n *Names, base, folder stri
 					kinds[d[1]+" "+d[2]] = kind
 				}
 			}
+			table := strings.TrimSuffix(rel[strings.LastIndex(rel, "/")+1:], ".pdf")
+			routes = append(routes, parseCodingTable(string(out), a, kind, table, &note)...)
 		}
+	}
+	if len(routes) > 0 {
+		m.placeRoutes(ctx, n, routes, &note, base, folder, airports, pages, tool)
 	}
 	for name, ds := range designators {
 		p, ok := n.allPoints[name]
