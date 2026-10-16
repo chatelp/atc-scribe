@@ -5273,6 +5273,33 @@ sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien co
 > optimistes, 15-20 NM indépendants) ; le toucher n'est pas vu (traces arrêtées vers 3,8 NM en
 > médiane). Lecture : le sens et le doublet sont sûrs dès qu'une prédiction existe ; la piste
 > exacte, à partir de 15 NM.
+>
+> **Mesuré le 16/10 : la sortie d'un départ** (`runs/mesures/q57/sortie/`, hors du dépôt). 3 111
+> départs des mêmes jours ; vérité claire pour 813 (26 %) : l'avion passe à 2,5 NM d'une sortie
+> de son doublet (281), ou la vise à 5° près au-delà de 25 NM (532) ; 1 293 écartés parce que
+> guidés ou mis en direct ailleurs, 542 parce que la trace s'arrête avant 30 NM (surtout à
+> LFPO, où la réception s'arrête vers 26 NM). Prédiction : l'angle entre la route et chaque
+> sortie, médiane des 45 dernières secondes. À LFPG, couverture / juste selon la marge sur la
+> deuxième sortie :
+>
+> | Distance | marge ≥ 5° | ≥ 10° | ≥ 15° |
+> |---|---|---|---|
+> | 15 NM | 51 % / 77 % | 42 % / 85 % | 27 % / 94 % |
+> | 20 NM | 54 % / 89 % | 49 % / 93 % | 31 % / 98 % |
+> | 30 NM | 55 % / 98 % | 50 % / 98 % | 44 % / 99 % |
+>
+> Probabilités par sortie (exp(−angle/T), T ajusté par distance en validation croisée) : le milieu
+> de l'échelle est juste à ±8 points, le haut sous-estimé (un « 65 % » est juste 91 fois sur 100 à
+> 15 NM). Liste des candidates à 10 % ou plus : 3 sorties en médiane à 15 NM, 2 de 20 à 30 NM ; la
+> vraie y figure 83 % des fois à 15 NM, 91 % à 20 NM, 97 % à 30 NM ; à 10 NM, 52 % seulement.
+> Les procédures entendues : 5 sur 6 retrouvées dès 15-20 NM (BAW309 vise OPALE, ATREX entendu,
+> comme en Q56). Limites : vérité claire pour un quart des départs seulement (les cas faciles) ;
+> la vérité « visée » partage l'angle du prédicteur ; la configuration ouest est mauvaise avant
+> 20 NM ; LFPO trop peu couvert.
+>
+> Lecture : rien avant 15 NM ; de 15 à 20 NM, une courte liste élaguée (2 à 3 noms) ; une sortie
+> seule quand sa marge dépasse 10° (93 % juste à 20 NM pour la moitié des départs). Un départ sur
+> deux reste sans prédiction : guidé au cap, il n'a pas de sortie à afficher.
 ### Q56 — Les procédures dessinées sur la carte *(16/10 — feu vert du propriétaire le 16/10 ; construit sur `migration` le même jour, relecture design en cours)*
 
 > **Feu vert du propriétaire, 16/10** (« Feu vert ») sur la forme de la session design (fiche
