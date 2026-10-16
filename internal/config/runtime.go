@@ -43,6 +43,17 @@ type RuntimeSettings struct {
 	// served without a session by /api/v1/vitals. Absent from a file saved
 	// before it existed, which then means on.
 	Vitals *VitalsSettings `json:"vitals,omitempty"`
+
+	// AIPNames is how the list of official names (internal/aip, Q55) is kept.
+	// Absent from a file saved before it existed, which then means off.
+	AIPNames *AIPNamesSettings `json:"aip_names,omitempty"`
+}
+
+// AIPNamesSettings say whether the server makes the list again by itself when
+// a new AIRAC cycle comes into force. Off by default: it is a request to an
+// outside site, and the settings page has a button (design, 15/10).
+type AIPNamesSettings struct {
+	AutoUpdate bool `json:"auto_update"`
 }
 
 // VitalsSettings switch the public figures of the sign-in page. Off, the route
@@ -285,6 +296,10 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 		v := *saved.Vitals
 		r.settings.Vitals = &v
 	}
+	if saved.AIPNames != nil {
+		a := *saved.AIPNames
+		r.settings.AIPNames = &a
+	}
 	r.log.Info("Applied saved runtime settings",
 		logger.String("path", r.path),
 		logger.Float64("db_retention_gb", r.settings.DBRetentionGB),
@@ -334,7 +349,19 @@ func (r *Runtime) Settings() RuntimeSettings {
 		v := *s.Vitals
 		s.Vitals = &v
 	}
+	if s.AIPNames != nil {
+		a := *s.AIPNames
+		s.AIPNames = &a
+	}
 	return s
+}
+
+// AIPAutoUpdate says whether the list of official names is made again by
+// itself at each new AIRAC cycle.
+func (r *Runtime) AIPAutoUpdate() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.settings.AIPNames != nil && r.settings.AIPNames.AutoUpdate
 }
 
 // VitalsEnabled says whether the sign-in page's public figures are served. Read
@@ -429,6 +456,11 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 		vitals = *next.Vitals
 	}
 	next.Vitals = &vitals
+	aipNames := AIPNamesSettings{}
+	if next.AIPNames != nil {
+		aipNames = *next.AIPNames
+	}
+	next.AIPNames = &aipNames
 	r.mu.Lock()
 	r.settings = next
 	r.mu.Unlock()

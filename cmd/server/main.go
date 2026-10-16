@@ -4,8 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/yegors/co-atc/internal/aip"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/yegors/co-atc/internal/adsb"
@@ -114,6 +116,13 @@ func main() {
 	frequenciesService := startFrequencies(ctx, cfg, adsbService, refService, runtimeSettings, wsServer, store, sttSidecar, log)
 
 	router := buildRouter(cfg, adsbService, frequenciesService, weatherService, refService, wsServer, store, runtimeSettings, sttSidecar, log)
+
+	// The list of official names around the station (internal/aip, Q55), made
+	// from the settings page, kept beside the databases with the pages it was
+	// made from.
+	aipMaker := &aip.Maker{OutPath: filepath.Join(store.dir, "aip-names.json"), CacheDir: filepath.Join(store.dir, "aip-cache")}
+	router.Handler().AttachAIP(aipMaker, nil)
+	router.Handler().KeepAIPNamesUpToDate(ctx)
 
 	servers := serve(cfg, router, log)
 

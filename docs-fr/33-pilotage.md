@@ -137,7 +137,7 @@ l'interface, elle, reste sur le Mac.
    précision de la carte de couverture sur FlightAware (« My ADS-B »).
 5. Le moment du **portage** (cible fixée, calendrier non).
 6. Le **tirage au hasard** de la précision d'appariement (jalon du labo, lié à l'annotation).
-7. **Les noms officiels de l'AIP dans l'appariement** (Q55, proposée par le labo le 15/10) :
+7. ~~**Les noms officiels de l'AIP dans l'appariement**~~ — **lancée le 15/10 au soir** : l'outil est fait et se pilote depuis les réglages ; la grammaire, mesurée sur le ciel témoin, **n'est pas adoptée** (35 justes perdus, 0 gagné). Restent ouverts : l'indice de direction au départ, l'affichage du nom réel. Énoncé d'origine (Q55, proposée par le labo le 15/10) :
    l'outil générique qui fabrique la liste sur place (rien de l'AIP dans le dépôt), puis la
    grammaire des procédures, l'indice de direction au départ et l'affichage du nom réel ; quoi
    et quand. Recommandation : l'outil et la grammaire après la migration, mesurés par paires.

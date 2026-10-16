@@ -146,6 +146,7 @@ function serverSettings() {
                     matching: this.state.settings.matching ? JSON.parse(JSON.stringify(this.state.settings.matching)) : null,
                     vitals: this.vitalsOn(this.state.settings),
                 };
+                this.loadAIP();
             } catch (e) {
                 this.error = 'Server state unreachable: ' + e.message;
             } finally {
@@ -231,6 +232,86 @@ function serverSettings() {
             } finally {
                 this.busy = false;
             }
+        },
+
+        // The list of official names around the station (Q55; SettingsPage):
+        // its state, the button that makes it again from the SIA, and the
+        // switch that does so at each new AIRAC cycle.
+        aip: null,
+        aipBusy: false,
+
+        async loadAIP() {
+            try {
+                const r = await fetch('/api/v1/aip-names', { credentials: 'same-origin' });
+                if (r.ok) this.aip = await r.json();
+            } catch (e) { /* the state stays as it was */ }
+        },
+
+        // "14:20Z" from an ISO time, on the page's clock.
+        aipClock(iso) {
+            const atc = Alpine.store('atc');
+            return iso && atc && atc.clockText ? atc.clockText(new Date(iso)) : '';
+        },
+
+        // The StatusLight's five states.
+        aipLight() {
+            const a = this.aip;
+            if (!a) return { level: 'unknown', text: '' };
+            if (a.refreshing || this.aipBusy) return { level: 'switching', text: 'Updating from the SIA…' };
+            const failedSince = a.last_error && (!a.made || (a.last_tried && a.last_tried > a.made));
+            if (failedSince) {
+                return { level: 'bad', text: `Last update failed at ${this.aipClock(a.last_tried)}: ${a.last_error}` +
+                    (a.present ? ` (the list of ${a.airac} stays in use)` : '') };
+            }
+            if (!a.present) return { level: 'off', text: 'Not made yet: the matcher works without it' };
+            if (a.airac < a.in_force) return { level: 'warn', text: `AIRAC ${a.in_force} in force; this list is of ${a.airac}` };
+            return { level: 'ok', text: `Up to date · AIRAC ${a.airac}` };
+        },
+
+        get aipStale() {
+            return !!this.aip && (!this.aip.present || this.aip.airac < this.aip.in_force);
+        },
+
+        // "15/10 at 14:20Z".
+        aipMadeText() {
+            const a = this.aip;
+            if (!a || !a.made) return '';
+            const d = new Date(a.made);
+            return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')} at ${this.aipClock(a.made)}`;
+        },
+
+        async refreshAIP() {
+            this.aipBusy = true;
+            try {
+                const r = await fetch('/api/v1/aip-names/refresh', { method: 'POST', credentials: 'same-origin' });
+                if (r.status === 401) { this.flash('Sign in to update the names.', true); return; }
+                if (!r.ok && r.status !== 409) { this.flash((await r.text()).trim() || ('Refused (' + r.status + ')'), true); return; }
+                // A few seconds: the five pages, then the list.
+                for (let i = 0; i < 180; i++) {
+                    await new Promise((res) => setTimeout(res, 1000));
+                    await this.loadAIP();
+                    if (this.aip && !this.aip.refreshing) break;
+                }
+            } catch (e) {
+                this.flash('Could not update: ' + e.message, true);
+            } finally {
+                this.aipBusy = false;
+            }
+        },
+
+        async setAIPAuto(on) {
+            try {
+                const r = await fetch('/api/v1/server/settings', {
+                    method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ aip_names: { auto_update: !!on } }),
+                });
+                if (r.status === 401) { this.flash('Sign in to change server settings.', true); return; }
+                if (!r.ok) { this.flash((await r.text()).trim() || ('Refused (' + r.status + ')'), true); return; }
+                this.flash('Saved.', false);
+            } catch (e) {
+                this.flash('Could not save: ' + e.message, true);
+            }
+            await this.loadAIP();
         },
 
         // The sign-in page's station console: absent from a settings file
