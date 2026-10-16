@@ -4900,7 +4900,9 @@ Go libres), l'archive audio de production grossit de 2,5 à 3 Go par jour de pro
 plafond depuis D64 et D65. **Décision du propriétaire, sur l'avis du labo** : `audio_archive_max_gb
 = 60` en production (environ trois semaines ; les jours les plus anciens partent d'abord, celui du
 jour jamais), et copie par le labo des bases du ciel témoin (`co-atc-2026-09-30.db` à `10-04.db`,
-4,1 Go) dans un corpus protégé du disque externe. Pourquoi les bases d'abord : sous le plafond de
+4,1 Go) dans un corpus protégé du disque externe — **faite le 16/10 à 10 h 22** par le labo
+(`whisper-corpus/bases-reference/`, sauvegarde SQLite, intégrité « ok », 20 272 transmissions,
+sommes SHA256 dans `SHA256SUMS` à côté, copies en lecture seule). Pourquoi les bases d'abord : sous le plafond de
 20 Go de `data/`, ce sont elles qui partiraient en premier, et les mesures du labo (Q55,
 précision par indices, J2) en dépendent. L'atelier et l'affinage n'utilisent que les extraits que
 le tri du labo retient (3 à 7 % des transmissions) : copiés à part, l'archive peut tourner. Restent
