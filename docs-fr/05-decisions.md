@@ -4891,6 +4891,22 @@ système de design : la séquence d'arrivée calculée dans le store pour tous l
 (la PAR la relit), les gabarits français des consignes, puis la migration elle-même
 (`04-migration.md`).
 
+### D82 — L'archive audio de production plafonnée à 60 Go, le ciel témoin mis à l'abri *(16/10)*
+
+Le propriétaire voyait son disque se remplir. Mesuré le 16/10 : sur le Mac, Clairance occupe
+environ 13 Go (bases de production 7 Go, plafonnées à 20 Go ; instance d'essai 4,8 Go, mise à la
+Corbeille le même jour, ses extraits audio plafonnés à 2 Go) ; sur le disque externe (931 Go, 136
+Go libres), l'archive audio de production grossit de 2,5 à 3 Go par jour de production pleine, sans
+plafond depuis D64 et D65. **Décision du propriétaire, sur l'avis du labo** : `audio_archive_max_gb
+= 60` en production (environ trois semaines ; les jours les plus anciens partent d'abord, celui du
+jour jamais), et copie par le labo des bases du ciel témoin (`co-atc-2026-09-30.db` à `10-04.db`,
+4,1 Go) dans un corpus protégé du disque externe. Pourquoi les bases d'abord : sous le plafond de
+20 Go de `data/`, ce sont elles qui partiraient en premier, et les mesures du labo (Q55,
+précision par indices, J2) en dépendent. L'atelier et l'affinage n'utilisent que les extraits que
+le tri du labo retient (3 à 7 % des transmissions) : copiés à part, l'archive peut tourner. Restent
+à décider : la copie des extraits retenus et son rythme hebdomadaire, le ménage d'environ 60 Go
+proposé par le labo sur le disque externe, ligne par ligne.
+
 ### D81 — La première lecture d'abord, la seconde ensuite *(14/10)*
 
 **Décidé par le propriétaire le 14/10** (« oui »), sur la proposition du labo. **Le constat** :
