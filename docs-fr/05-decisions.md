@@ -5254,7 +5254,25 @@ sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien co
 >
 > Puis la forme au design (place sur un cartouche déjà chargé, marque du « probable », seuil
 > d'affichage), puis la décision.
-
+>
+> **Mesuré le 16/10 : la piste d'une arrivée** (`runs/mesures/q57/piste/`, hors du dépôt). La
+> fonction de la page (`place()` de `www/par/par-arrivals.js`) rejouée sur 2 338 arrivées des
+> 02, 03, 04, 15 et 16/10 (LFPG 1 965, LFPO 373), contre la piste lue dans l'ADS-B en fin
+> d'approche (dernier segment aligné, à moins de 0,10 NM de l'axe, remises de gaz écartées) :
+>
+> | Distance au seuil | LFPG : prédit / juste | LFPO : prédit / juste |
+> |---|---|---|
+> | 30 NM et plus | rien (le cône s'arrête à 20 NM) | rien |
+> | 20 NM | 64 % / 80 % | 53 % / 100 % |
+> | 15 NM | 97 % / 96,6 % | 95 % / 100 % |
+> | 10 NM | 100 % / 99,6 % | 100 % / 100 % |
+>
+> **Toutes les erreurs sont l'autre piste du même doublet** (08R pour 08L, 09L pour 09R) :
+> aucune en sens opposé. À LFPG, le premier verdict change au moins une fois pour 67 % des
+> arrivées. Limites : la vérité et la page partagent la géométrie d'alignement (10 et 5 NM
+> optimistes, 15-20 NM indépendants) ; le toucher n'est pas vu (traces arrêtées vers 3,8 NM en
+> médiane). Lecture : le sens et le doublet sont sûrs dès qu'une prédiction existe ; la piste
+> exacte, à partir de 15 NM.
 ### Q56 — Les procédures dessinées sur la carte *(16/10 — feu vert du propriétaire le 16/10 ; construit sur `migration` le même jour, relecture design en cours)*
 
 > **Feu vert du propriétaire, 16/10** (« Feu vert ») sur la forme de la session design (fiche
