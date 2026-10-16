@@ -5233,7 +5233,16 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
-### Q56 — Les procédures dessinées sur la carte *(16/10 — essai de faisabilité fait, forme à demander au design, décision du propriétaire attendue)*
+### Q56 — Les procédures dessinées sur la carte *(16/10 — feu vert du propriétaire le 16/10 ; construit sur `migration` le même jour, relecture design en cours)*
+
+> **Feu vert du propriétaire, 16/10** (« Feu vert ») sur la forme de la session design (fiche
+> `ProcedureRoute`, design-suite 1d04003) : la route au clic sur la puce, jusqu'à fermeture ; la
+> couche éteinte par défaut, arrivées ou départs, pour la configuration dite par les pistes en
+> service, sans sélecteur. Construit le même jour (726b10c, ef10b99) : contraintes lues sur 3 781
+> segments sur 3 781, en accord avec la lecture mot à mot sur les 2 907 lignes où elle est sûre ;
+> 428 routes entières sur 445, les autres non servies. Restent ouverts : la piste au bout d'une STAR
+> (les tables s'arrêtent au point d'approche initiale), la trace de l'avion suivi en pointillé, la
+> sortie déduite de l'ADS-B (une inférence : décision du propriétaire).
 
 > **Demande du propriétaire, 16/10** : « ça aurait du sens d'avoir ces points/procédures
 > représentés de manière graphique sur la carte ? en overlay activable ou non ? » Proposition :

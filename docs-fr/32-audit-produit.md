@@ -492,6 +492,30 @@ sur la carte.
 
 ## État
 
+- 16/10 (après-midi) : **les avions fantômes, mesurés et corrigés** (le propriétaire : « des avions
+  fantômes qui se déplacent à toute vitesse en diagonale »). La station et la base sont saines (aucun
+  saut de plus de 15 NM dans la journée) ; une sonde dans Chrome sans fenêtre, sur l'instance d'essai
+  et le trafic réel, note tout avion dessiné à plus de 1 000 kt avec l'état du moteur d'animation.
+  Deux causes : (1) deux positions sans cap datées à quelques millisecondes d'écart donnaient au
+  moteur une vitesse de l'écart sur 1 ms, jusqu'à 1,6 million de kt, lissée à 35 % par relevé, donc
+  une vingtaine de secondes de vol en ligne droite à travers la carte (04dc5e3 : pas de vitesse tirée
+  de deux positions à moins d'une seconde, aucune au-delà de 1 000 kt) ; (2) le serveur prédisait
+  plein nord un avion sans cap connu, son 0 n'étant pas le nord (d0b54d5 : plus de prédiction sans
+  cap). Mesuré sur 10 min de trafic réel : avant, 172 sauts visibles en moins de 1,5 s, 21 avions,
+  jusqu'à 4 388 NM ; après le correctif de la page, 10 sauts, 8 avions, au plus 7,3 NM. Sur
+  `migration`, à verser.
+- 16/10 (après-midi) : **les routes publiées sur la carte** (Q56, feu vert du propriétaire ; forme de la
+  session design, fiche `ProcedureRoute`). Le serveur lit, dans les tables de codage, chaque SID et
+  STAR de LFPG et LFPO avec ses points dans l'ordre et ses contraintes par colonne : contraintes lues
+  sur les 3 781 segments, en accord avec la lecture mot à mot sur les 2 907 lignes où elle est sûre ;
+  428 routes entières sur 445. Points placés par l'ENR 4.4 entière, l'ENR 4.1, les balises d'un
+  aérodrome cité (BOV, AD 2 LFOB), les fiches DATA, les seuils de l'AD 2.12 ; `GET
+  /api/v1/procedure-routes`. La page : la puce d'une procédure trace sa route jusqu'à fermeture,
+  note du ciel et ✕ ; une couche « Procedures (SID, STAR) », éteinte par défaut, pour les pistes en
+  service. Vérifié sur l'instance d'essai, sans téléchargement (pages et tables du disque, la page AD 2
+  de Beauvais ajoutée). Défaut trouvé au passage et corrigé (8659af3) : un point déplacé ce cycle prenait
+  sa nouvelle latitude pour longitude (DEROL, DOPAP, LOUPY hors de la liste). Relecture design en cours.
+
 - 16/10 : **les procédures entendues, nommées dans le fil** (Q55, usage 3 ; choix du
   propriétaire : ne comparer qu'aux points de procédure). La mise à jour depuis le SIA lit aussi les
   tables de codage SID/STAR de l'eAIP des aérodromes suivis (avec `pdftotext` de poppler s'il est

@@ -141,10 +141,13 @@ l'interface, elle, reste sur le Mac.
    l'outil générique qui fabrique la liste sur place (rien de l'AIP dans le dépôt), puis la
    grammaire des procédures, l'indice de direction au départ et l'affichage du nom réel ; quoi
    et quand. Recommandation : l'outil et la grammaire après la migration, mesurés par paires.
-8. **Les procédures dessinées sur la carte** (Q56, 16/10) — essai fait : les tables se lisent
-   (98,8 % des segments placés) et les départs réels collent aux tracés (0,42 NM en médiane), mais
-   tout afficher est illisible. À décider : le tracé au clic sur l'étiquette d'abord, puis une
-   couche éteinte par défaut limitée à la configuration en service ; forme par la session design.
+8. ~~**Les procédures dessinées sur la carte**~~ (Q56, 16/10) — **feu vert le 16/10, construit sur
+   `migration` le même jour** (726b10c, ef10b99) d'après la fiche `ProcedureRoute` : la route au clic
+   sur la puce, la couche « Procedures (SID, STAR) » éteinte par défaut. Relecture design en cours,
+   puis coup d'œil du propriétaire et versement en production (relance, puis « Update from the SIA » :
+   les fiches DATA et l'ENR 4.1 s'ajoutent au cache).
+9. **Les avions fantômes** (16/10) — deux causes trouvées et corrigées sur `migration` (04dc5e3,
+   d0b54d5), mesurées sur le trafic réel ; à verser avec Q56.
 
 ## Les risques suivis
 
