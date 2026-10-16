@@ -34,6 +34,7 @@
         let source = null;
         let asked = [];
         let layered = [];
+        let askedNames = new Set();
 
         function ensure() {
             if (layer || !manager._olMap) return;
@@ -100,10 +101,20 @@
                         }),
                     }));
                 }
-                if (mode === LAYER && skyWidthNM(resolution) > NAMES_UP_TO_NM) return styles;
+                // The layer: every named point under 67 NM of sky; beyond, the
+                // points a route ends at alone (an arrival ends 30 to 40 NM
+                // out: its names never showed). Not those the route asked for
+                // names at full strength.
+                if (mode === LAYER) {
+                    if (skyWidthNM(resolution) > NAMES_UP_TO_NM && !feature.get('ends')) return styles;
+                    if (askedNames.has(p.name)) return styles;
+                }
                 const at = feature.getGeometry().getCoordinates();
                 const px = (c) => c && [c[0] / resolution, -c[1] / resolution];
-                const side = window.ProcedureRoutes.labelSide(px(feature.get('prev')), px(at), px(feature.get('next')));
+                const neighbours = feature.get('neighbours');
+                const side = neighbours
+                    ? window.ProcedureRoutes.widestGap(px(at), neighbours.map(px))
+                    : window.ProcedureRoutes.labelSide(px(feature.get('prev')), px(at), px(feature.get('next')));
                 const dx = side[0] * 9, dy = side[1] * 9;
                 const align = side[0] > 0.3 ? 'left' : side[0] < -0.3 ? 'right' : 'center';
                 const lines = [p.name].concat(mode.constraints ? p.constraints : []);
@@ -126,7 +137,7 @@
             };
         }
 
-        function featuresOf(route, runways, mode) {
+        function featuresOf(route, runways, mode, withPoints = true) {
             const out = [];
             const lines = window.ProcedureRoutes.lines(route, runways);
             lines.forEach((pts, li) => {
@@ -134,6 +145,7 @@
                 const line = new ol.Feature({ geometry: new ol.geom.LineString(coords) });
                 line.setStyle(lineStyle(mode));
                 out.push(line);
+                if (!withPoints) return;
                 pts.forEach((p, i) => {
                     // The shared points are drawn once, with the first line.
                     if (li > 0 && !p.runway) return;
@@ -161,6 +173,8 @@
             ensure();
             if (!source) return;
             asked = replace(asked, featuresOf(route, runways, ASKED));
+            askedNames = new Set((route.legs || []).filter((l) => l.named).map((l) => l.point));
+            if (layer) layer.changed();
             const map = manager._olMap;
             const extent = ol.extent.createEmpty();
             for (const f of asked) ol.extent.extend(extent, f.getGeometry().getExtent());
@@ -173,14 +187,27 @@
 
         function clear() {
             if (source) asked = replace(asked, []);
+            askedNames = new Set();
+            if (layer) layer.changed();
         }
 
         // The layer's routes, or none.
+        // The layer's routes, or none: their lines, and each named point once
+        // (a point twenty routes pass was named twenty times, on as many
+        // sides, design review 16/10).
         function setLayer(routes, runwaysOf) {
             ensure();
             if (!source) return;
             const next = [];
-            for (const r of routes || []) next.push(...featuresOf(r, runwaysOf(r), LAYER));
+            for (const r of routes || []) next.push(...featuresOf(r, runwaysOf(r), LAYER, false));
+            for (const p of window.ProcedureRoutes.layerPoints(routes, runwaysOf)) {
+                const f = new ol.Feature({ geometry: new ol.geom.Point(manager._toMapCoordinate(p.lat, p.lon)) });
+                f.set('point', { name: p.name, named: true, constraints: [] });
+                f.set('neighbours', p.neighbours.map(([la, lo]) => manager._toMapCoordinate(la, lo)));
+                f.set('ends', p.ends);
+                f.setStyle(pointStyle(LAYER));
+                next.push(f);
+            }
             layered = replace(layered, next);
         }
 

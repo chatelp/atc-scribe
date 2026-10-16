@@ -70,16 +70,23 @@
         return xs.slice(0, -1).join(', ') + ' or ' + xs[xs.length - 1];
     }
 
-    // "ELCOB 7G · departure from 26R · published route".
+    // "OKASI 7B · published departure from 26L": the words that count
+    // first; cut by the note's width, the runway goes, and the help has it.
     function note(route, runways) {
-        const way = route.kind === 'SID' ? 'departure from ' : 'arrival to ';
-        return `${route.name} · ${way}${orList(runways)} · published route`;
+        const way = route.kind === 'SID' ? 'published departure from ' : 'published arrival to ';
+        return `${route.name} · ${way}${orList(runways)}`;
     }
 
-    // What the route is, for the note's and the layer's help.
+    // What the route is, for the note's and the layer's help. An arrival's
+    // table stops where the approach begins: the help says so, the line
+    // does not reach the runway.
     function help(route, runways) {
         const what = route.kind === 'SID' ? `a departure from ${orList(runways)}` : `an arrival to ${orList(runways)}`;
-        return `The published route of ${route.name}, ${what}. The controller often clears an aircraft direct to a later point: ` +
+        const legs = route.legs || [];
+        const end = route.kind === 'STAR' && legs.length
+            ? ` It ends at ${legs[legs.length - 1].point}, where the approach begins: from there the controller guides the aircraft to the runway.`
+            : '';
+        return `The published route of ${route.name}, ${what}.${end} The controller often clears an aircraft direct to a later point: ` +
             'the route is what was published, not the path flown.';
     }
 
@@ -184,8 +191,48 @@
         return unit(-d[1], d[0]);
     }
 
+    // The direction a point's one name goes when several routes pass it: the
+    // middle of the widest gap between the lines leaving it, as a unit
+    // vector in screen pixels (y down). neighbours: the screen positions of
+    // the points next to it on every line.
+    function widestGap(at, neighbours) {
+        const angles = (neighbours || [])
+            .map((n) => Math.atan2(n[1] - at[1], n[0] - at[0]))
+            .sort((a, b) => a - b);
+        if (!angles.length) return [1, 0];
+        if (angles.length === 1) return labelSide(null, at, neighbours[0]);
+        let best = -1, mid = 0;
+        for (let i = 0; i < angles.length; i++) {
+            const a = angles[i];
+            const b = i + 1 < angles.length ? angles[i + 1] : angles[0] + 2 * Math.PI;
+            if (b - a > best) { best = b - a; mid = (a + b) / 2; }
+        }
+        return [Math.cos(mid), Math.sin(mid)];
+    }
+
+    // The layer's named points, each once: where it is, the points next to it
+    // on every route through it, and whether a route ends there (a
+    // departure's exit, an arrival's initial approach point: named at every
+    // width of sky).
+    function layerPoints(routes, runwaysOf) {
+        const at = new Map();
+        for (const r of routes || []) {
+            for (const pts of lines(r, runwaysOf(r))) {
+                pts.forEach((p, i) => {
+                    if (!p.named) return;
+                    let e = at.get(p.name);
+                    if (!e) { e = { name: p.name, lat: p.lat, lon: p.lon, neighbours: [], ends: false }; at.set(p.name, e); }
+                    if (pts[i - 1]) e.neighbours.push([pts[i - 1].lat, pts[i - 1].lon]);
+                    if (pts[i + 1]) e.neighbours.push([pts[i + 1].lat, pts[i + 1].lon]);
+                    if (i === pts.length - 1) e.ends = true;
+                });
+            }
+        }
+        return [...at.values()];
+    }
+
     return {
-        inUse, direction, servesConfiguration, runwaysFor, note, help, find, constraints, lines, layer, labelSide, covered,
+        inUse, widestGap, layerPoints, direction, servesConfiguration, runwaysFor, note, help, find, constraints, lines, layer, labelSide, covered,
         LAYER_HELP, OUTSIDE, UNKNOWN_RUNWAY,
     };
 });

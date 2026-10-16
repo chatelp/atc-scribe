@@ -15,7 +15,7 @@ const okasi = {
     complete: true,
 };
 const okasiEast = Object.assign({}, okasi, { name: 'OKASI 6G', runways: ['09L', '09R'], thresholds: [] });
-const enori = { airport: 'LFPG', name: 'ENORI 9E', kind: 'STAR', runways: ['26L', '26R', '27L', '27R'], legs: [], complete: true };
+const enori = { airport: 'LFPG', name: 'ENORI 9E', kind: 'STAR', runways: ['26L', '26R', '27L', '27R'], legs: [{ point: 'ENORI' }, { point: 'LORNI', named: true }], complete: true };
 const lfpg = (end, p = 1) => ({ code: 'LFPG', runway_in_use: [{ runway_end: '08R-26L/' + end, probability: p }] });
 
 test('the runways in use, from /station', () => {
@@ -26,8 +26,8 @@ test('the runways in use, from /station', () => {
 test('a departure from the doublet: the runway in use when it says which, both otherwise', () => {
     assert.deepEqual(R.runwaysFor(okasi, ['26L']), ['26L']);
     assert.deepEqual(R.runwaysFor(okasi, ['27R']), ['26L', '26R']);
-    assert.equal(R.note(okasi, ['26L']), 'OKASI 7B · departure from 26L · published route');
-    assert.equal(R.note(okasi, ['26L', '26R']), 'OKASI 7B · departure from 26L or 26R · published route');
+    assert.equal(R.note(okasi, ['26L']), 'OKASI 7B · published departure from 26L');
+    assert.equal(R.note(okasi, ['26L', '26R']), 'OKASI 7B · published departure from 26L or 26R');
     assert.match(R.help(okasi, ['26R']), /^The published route of OKASI 7B, a departure from 26R\. The controller often clears/);
 });
 
@@ -73,4 +73,20 @@ test('a name goes away from the route', () => {
     assert.ok(s[0] > 0 && s[1] < 0, `north-east: ${s}`);
     const straight = R.labelSide([-10, 0], [0, 0], [10, 0]);
     assert.ok(Math.abs(straight[0]) < 1e-9 && Math.abs(Math.abs(straight[1]) - 1) < 1e-9, 'a straight line: across it');
+});
+
+test('an arrival: its note, and its help says where the approach begins', () => {
+    assert.equal(R.note(enori, ['26L', '26R']), 'ENORI 9E · published arrival to 26L or 26R');
+    assert.match(R.help(enori, ['26L']), /It ends at LORNI, where the approach begins: from there the controller guides the aircraft to the runway\./);
+});
+
+test('a point several routes pass is named once, in the widest gap between them', () => {
+    // Lines leave east, north and west (screen y down): the widest gap is south.
+    const s = R.widestGap([0, 0], [[10, 0], [0, -10], [-10, 0]]);
+    assert.ok(Math.abs(s[0]) < 1e-9 && Math.abs(s[1] - 1) < 1e-9, `south: ${s}`);
+    const pts = R.layerPoints([okasi, Object.assign({}, okasi, { name: 'OKASI 7E' })], () => ['26L']);
+    assert.deepEqual(pts.map((p) => p.name), ['DOPAP', 'OKASI']);
+    assert.equal(pts[0].ends, false);
+    assert.equal(pts[1].ends, true, 'a departure ends at its exit');
+    assert.equal(pts[0].neighbours.length, 4, 'two routes, a point before and after on each');
 });
