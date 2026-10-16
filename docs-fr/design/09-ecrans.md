@@ -117,6 +117,7 @@ qu'eux, et un réglage pour couper la console.
 | Date | Demande | Suite |
 |---|---|---|
 | 13/10 | Le propriétaire : des étiquettes d'avion allégées à faible zoom, par exemple l'indicatif seul sous un seuil (relayé par la session atc-scribe) | **décidé le 15/10** sur le ciel réel de l'instance, mesures et planches à l'appui : trois paliers selon la largeur du ciel (étiquette complète jusqu'à 24 NM, indicatif seul de 24 à 67 NM sauf les avions qui comptent, au-delà seulement eux), et le dernier message dans une bulle sous l'étiquette au lieu d'une troisième ligne ; règles dans la fiche `MapLabel` |
+| 16/10 | Q56, les procédures publiées sur la carte : la route d'une puce de procédure, et une couche (relayé par la session atc-scribe, direction validée par le propriétaire) | **dessiné et livré le 16/10**, fiche `ProcedureRoute`, jeton `color-map-procedure` ; relu sur l'instance avec mesures. La première livraison écrivait un même nom jusqu'à 21 fois (une fois par route) et ne nommait aucun point d'arrivée à aucune largeur (les STAR finissent à 30-40 NM, au-delà du palier de 67 NM pris aux étiquettes). Après correction : un nom par point à toutes les largeurs, 4 noms d'arrivée à 67 NM et 5 à 102 NM (12 de départ), la note tient à 1 440 px. Une STAR finit au point d'approche initiale, sans indicatif de piste |
 
 ## Ce qui n'est pas dessiné
 
