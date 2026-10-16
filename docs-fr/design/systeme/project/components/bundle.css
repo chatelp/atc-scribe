@@ -191,6 +191,11 @@
 .cl-chip--clearance { font-weight: var(--font-weight-strong); }
 .cl-chip--clearance::before { content: "✓"; color: var(--color-text-secondary); }
 .cl-chip--atc { height: 18px; padding: 0 var(--space-1); background: transparent; border-color: var(--color-border-control); color: var(--color-text-secondary); font-size: var(--font-size-caption); letter-spacing: var(--font-tracking-label); }
+/* an official AIP name proposed from the sound of the words (Q55): a reading, not a fact; dashed as a proposal */
+.cl-chip--place { font-family: var(--font-family-mono); border-style: dashed; border-color: var(--color-border-control); background: transparent; color: var(--color-text-primary); }
+button.cl-chip--place { cursor: pointer; }
+button.cl-chip--place:hover { background: var(--color-surface-hover); }
+.cl-exchange__text .is-place { text-decoration: underline dotted var(--color-text-tertiary); text-underline-offset: 3px; }
 .cl-value { font-family: var(--font-family-mono); font-size: var(--font-size-small); color: var(--color-text-primary); white-space: nowrap; }
 
 /* ------------------------------------------------------------ MatchStrength */
