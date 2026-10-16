@@ -5223,6 +5223,28 @@ sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien co
 > mesurée par paires avant d'être activée. Pourquoi elle compte ici : la lecture des lettres
 > (« seven uniform echo » → 7UE, `letters`, active en production depuis le 26/09) lit aussi
 > « ELCOB 7 Golf » comme un morceau d'indicatif, 7G.
+>
+> **Mesuré le 15/10 au soir : la grammaire n'est pas adoptée.** Ciel témoin du labo (bases de
+> production des 02, 03 et 04/10, 18 224 transmissions, préréglage « Mesuré » : `-strict -every
+> -second -context 120 -min-digits 3 -partial 0.6 -alnum -fuzzy-operators -context-letters
+> -context-digits -sectors`), règle du labo (mot hors phraséologie, nombre, lettre OTAN et nom de
+> compagnie, puis un chiffre et une lettre) dans ses deux variantes, transmission par transmission
+> contre la règle éteinte :
+>
+> | Variante | Perdus | dont une valeur confirmée par l'ADS-B | Gagnés | Cas connus changés (72) |
+> |---|---|---|---|---|
+> | forme seule | 35 | 6 | 0 | 1 |
+> | forme + nom de point au son (≥ 0,6) | 34 | 6 | 0 | 0 |
+>
+> Les appariements perdus sont presque tous justes : des indicatifs dont le nom de compagnie est
+> mal transcrit, que rien ne distingue d'un nom de point (« Eziad Three Foxtrot Four » pour ETD3F4,
+> « Finair Nine Charlie » pour FIN9CE, « affair two golf » pour ETD2G7, le seul cas connu touché).
+> Le gain attendu est nul : dans les 72 transmissions des cas connus, le 7G d'une procédure ne
+> produisait presque jamais d'appariement. Aucun seuil de ressemblance ne sépare les deux : à 0,95,
+> 2 justes encore perdus pour un tiers des procédures reconnues. Test du signe : 0 contre 35. Le
+> code de la règle est retiré (D71), gardé en patch avec la mesure (`runs/mesures/q55/`, hors
+> dépôt) ; l'outil des noms reste, pour l'indice de direction (usage 2), l'affichage (usage 3) et
+> la relecture du labo, qui restent ouverts.
 
 Le labo a tiré de l'eAIP France du SIA (cycle AIRAC du 01/10/2026, cinq pages : ENR 4.4, ENR 2.1,
 AD 2 LFPG, LFPO, LFPB), avec l'accord du propriétaire, une liste de noms réels autour de LFPG :

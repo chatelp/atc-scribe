@@ -3,6 +3,7 @@ DELETE /* *api.StaticFileHandler open
 DELETE /api/v1/sources/{id} (*Handler).DeleteSource locked
 GET /* *api.StaticFileHandler open
 GET /api/v1/adsb/source (*Handler).GetADSBSourceStatus locked
+GET /api/v1/aip-names (*Handler).GetAIPNames locked
 GET /api/v1/aircraft (*Handler).GetAllAircraft locked
 GET /api/v1/aircraft/{id} (*Handler).GetAircraftByHex locked
 GET /api/v1/aircraft/{id}/tracks (*Handler).GetAircraftTracks locked
@@ -36,6 +37,7 @@ HEAD /api/v1/stream/{id} (*Handler).StreamAudio locked
 OPTIONS /* *api.StaticFileHandler open
 PATCH /* *api.StaticFileHandler open
 POST /* *api.StaticFileHandler open
+POST /api/v1/aip-names/refresh (*Handler).PostAIPNamesRefresh locked
 POST /api/v1/auth/login (*Handler).PostLogin open
 POST /api/v1/auth/logout (*Handler).PostLogout open
 POST /api/v1/setup (*Handler).PostSetup open

@@ -162,6 +162,10 @@ func (r *Router) Routes() http.Handler {
 			// Local-only or sign-in, switched from the same panel. In this group so
 			// that turning sign-in off takes a session whenever it is on.
 			router.Put("/access", r.handler.PutAccess)
+			// The list of official names around the station (Q55): its state, and
+			// making it again, which reaches the SIA's site.
+			router.Get("/aip-names", r.handler.GetAIPNames)
+			router.Post("/aip-names/refresh", r.handler.PostAIPNamesRefresh)
 			router.Get("/adsb/source", r.handler.GetADSBSourceStatus)
 
 			// Station Configuration
