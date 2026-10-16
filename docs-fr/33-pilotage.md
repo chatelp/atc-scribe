@@ -156,11 +156,16 @@ l'interface, elle, reste sur le Mac.
    peu couvertes par la réception ; après chaque relance, les départs déjà en l'air n'ont pas de
    sortie (la piste de décollage n'est jugée que pour ceux vus décoller).
 9. **Les avions fantômes** (16/10) — deux causes trouvées et corrigées sur `migration` (04dc5e3,
-   d0b54d5), mesurées sur le trafic réel ; **en production depuis le 16/10 à 16 h 02**. Une troisième famille, plus petite
-   (un recul de 5 à 33 s de vol), diagnostiquée le 16/10 au soir : la règle de l'avion silencieux
-   (D80) ramène à sa dernière position un avion que le serveur prédit juste ; décision du
-   propriétaire attendue (suivre la prédiction tant que le serveur la donne ?). Et un volume à réduire :
-   ~300 Ko/s de mises à jour d'avions.
+   d0b54d5), mesurées sur le trafic réel ; **en production depuis le 16/10 à 16 h 02**. La troisième famille (un recul de
+   5 à 40 s de vol) venait du rafraîchissement complet de la carte, déclenché par les transcriptions,
+   qui replaçait chaque avion à sa position brute : corrigé, **en production le 16/10 à 22 h 47**
+   (a09abf1) ; avec flux, 76 sauts en 5 min au lieu de 580 (67 sans flux). La règle de l'avion
+   silencieux (D80) n'était pas en cause : laissée telle quelle. Même versement : les mises à jour
+   d'avions ne portent plus l'avion entier (91 Mo en 5 min → 5,4 Mo).
+   **Nuit du 16 au 17/10** (`runs/mesures/nuit-2026-10-16/`) : relevé de la production toutes les
+   5 min (mémoire de co-atc et du sidecar, transcriptions, disque) ; instance d'essai avec flux par
+   tranches de 55 min (sauts par tranche de 5 min, volume, pistes et sorties probables affichées
+   toutes les 10 s, à confronter aux trajectoires) ; fin à 7 h 30.
 
 ## Les risques suivis
 
