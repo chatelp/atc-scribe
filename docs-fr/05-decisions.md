@@ -5233,6 +5233,41 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
+### Q56 — Les procédures dessinées sur la carte *(16/10 — essai de faisabilité fait, forme à demander au design, décision du propriétaire attendue)*
+
+> **Demande du propriétaire, 16/10** : « ça aurait du sens d'avoir ces points/procédures
+> représentés de manière graphique sur la carte ? en overlay activable ou non ? » Proposition :
+> d'abord le tracé de la procédure entendue, au clic sur son étiquette (Q55, usage 3) ; ensuite
+> une couche « Procédures » éteinte par défaut, limitée à la configuration en service. Accord
+> pour l'essai le même jour.
+>
+> **Essai du 16/10** (hors du dépôt, `runs/mesures/procedures-carte/`) :
+> - **Les données se lisent.** Les tables de codage SID/STAR de LFPG et LFPO (100 PDF, AIRAC
+>   2026-10-01, `pdftotext -layout`) donnent la suite des points de chaque procédure, avec le type
+>   de segment et les contraintes. Coordonnées : ENR 4.4 entière pour les points nommés, ENR 4.1
+>   pour les balises, les fiches `AD_2_LFxx_DATA_01…05` pour les points terminaux (PG271…).
+>   **3 736 segments sur 3 781 placés (98,8 %)** ; 691 procédures sur 736 entières. Manquent BOV
+>   (fiche AD 2 de Beauvais), PB et PB096 (Le Bourget), FF et PO772 : cinq points, autres pages.
+> - **Le trafic réel colle aux tracés.** 187 départs de LFPG du 15/10 (16 h 32 – 22 h UTC), sous
+>   le FL150 : la trajectoire passe en médiane à **0,42 NM** de la SID la plus proche (75 % à moins
+>   de 1,16 NM ; 18 au-delà de 2 NM). ITY317, « OKASI 7B » entendu le 16/10 : à 0,35 NM de cette
+>   SID en médiane, qu'il suit jusqu'au bout. AFR59NM, « OPALE 7B » : il suit le début, puis coupe
+>   droit vers OPALE (un « direct » du contrôle), à 5 NM en parallèle du tracé. **Le tracé est
+>   l'itinéraire publié, pas le chemin volé** : l'aide devra le dire.
+> - **Toutes les SID ensemble sont illisibles** (156 tracés pour LFPG seul, capture de l'essai
+>   hors du dépôt) : il faut la configuration en service, ou le tracé seul de la procédure
+>   entendue.
+> - **Défaut trouvé au passage**, corrigé (8659af3) : un point déplacé ce cycle est imprimé deux
+>   fois dans l'ENR 4.4, ancienne valeur barrée et nouvelle insérée ; l'outil prenait la nouvelle
+>   latitude pour la longitude. DEROL, DOPAP et LOUPY sortaient du rayon (450 points → 453).
+> - **Les tables du Bourget** (23 PDF, 16/10) n'expliquent pas les « 7K » et « 7L » entendus
+>   (ATREX, ELCOB, AGOPA) : LFPB publie ces points en 7C, 7F, 7J, 7M, 7P, 7Q ; LFPG en 2x, 6G à
+>   6L, 7A, 7B, 7D, 7E. Non élucidé ; le point nommé reste juste.
+>
+> Reste à trancher : la forme (session design), la façon de connaître la configuration en service
+> (sens des décollages vus en ADS-B, ou choix de l'auditeur), et l'ordre (tracé au clic d'abord).
+> Hors de l'eAIP français, rien n'est dessiné et les réglages le disent.
+
 ### Q55 — Les noms officiels de l'AIP dans l'appariement *(15/10 — **lancée par le propriétaire le 15/10 au soir pour l'outil et la grammaire** ; l'indice de direction et l'affichage restent ouverts)*
 
 > **Décision du propriétaire, 15/10 au soir** : « lance Q55 : l'outil AIP et la grammaire ». Ce
