@@ -5233,6 +5233,138 @@ rien jusqu'au rechargement. **Vérifié** dans un navigateur sur une instance d'
 ports annexes en 200, son ouvert sur la tuile cliquée, source ajoutée en cours de route branchée
 sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien comportement.
 
+### Q57 — La piste et la sortie probables sur le cartouche de l'avion *(16/10 — ouverte ; mesures lancées le 16/10)*
+
+> **Demande du propriétaire, 16/10** : afficher sur le cartouche de chaque avion ce que sa
+> trajectoire laisse prévoir, avec son niveau de confiance : la piste d'une arrivée, et le point de
+> sortie d'un départ (ou d'entrée d'une arrivée) en fonction de son cap, pas dès le décollage.
+>
+> Ce qu'on sait déjà : la piste d'une arrivée est calculée par la page pour la séquence d'arrivée
+> et la vue PAR (`www/par/par-arrivals.js`), pas montrée sur le cartouche ; la sortie d'un départ,
+> mesurée le 16/10 sur 415 départs de LFPG (Q56), se lit nettement pour 41 % d'entre eux, et 4
+> des 6 procédures entendues concordent. Une sortie ou une piste probable est une inférence : la
+> règle « jamais de verdict » de la session design s'applique, et l'afficher est une décision du
+> propriétaire.
+>
+> **Mesurer d'abord**, sur les bases des derniers jours, l'ADS-B seul servant de vérité :
+> - la piste : prédiction de la page selon la distance au seuil, contre la piste où l'avion s'est
+>   posé ;
+> - la sortie : prédiction à 15-20 NM de l'aéroport, contre le point vers lequel l'avion pointe
+>   en fin de trajectoire enregistrée.
+>
+> Puis la forme au design (place sur un cartouche déjà chargé, marque du « probable », seuil
+> d'affichage), puis la décision.
+>
+> **Mesuré le 16/10 : la piste d'une arrivée** (`runs/mesures/q57/piste/`, hors du dépôt). La
+> fonction de la page (`place()` de `www/par/par-arrivals.js`) rejouée sur 2 338 arrivées des
+> 02, 03, 04, 15 et 16/10 (LFPG 1 965, LFPO 373), contre la piste lue dans l'ADS-B en fin
+> d'approche (dernier segment aligné, à moins de 0,10 NM de l'axe, remises de gaz écartées) :
+>
+> | Distance au seuil | LFPG : prédit / juste | LFPO : prédit / juste |
+> |---|---|---|
+> | 30 NM et plus | rien (le cône s'arrête à 20 NM) | rien |
+> | 20 NM | 64 % / 80 % | 53 % / 100 % |
+> | 15 NM | 97 % / 96,6 % | 95 % / 100 % |
+> | 10 NM | 100 % / 99,6 % | 100 % / 100 % |
+>
+> **Toutes les erreurs sont l'autre piste du même doublet** (08R pour 08L, 09L pour 09R) :
+> aucune en sens opposé. À LFPG, le premier verdict change au moins une fois pour 67 % des
+> arrivées. Limites : la vérité et la page partagent la géométrie d'alignement (10 et 5 NM
+> optimistes, 15-20 NM indépendants) ; le toucher n'est pas vu (traces arrêtées vers 3,8 NM en
+> médiane). Lecture : le sens et le doublet sont sûrs dès qu'une prédiction existe ; la piste
+> exacte, à partir de 15 NM.
+>
+> **Mesuré le 16/10 : la sortie d'un départ** (`runs/mesures/q57/sortie/`, hors du dépôt). 3 111
+> départs des mêmes jours ; vérité claire pour 813 (26 %) : l'avion passe à 2,5 NM d'une sortie
+> de son doublet (281), ou la vise à 5° près au-delà de 25 NM (532) ; 1 293 écartés parce que
+> guidés ou mis en direct ailleurs, 542 parce que la trace s'arrête avant 30 NM (surtout à
+> LFPO, où la réception s'arrête vers 26 NM). Prédiction : l'angle entre la route et chaque
+> sortie, médiane des 45 dernières secondes. À LFPG, couverture / juste selon la marge sur la
+> deuxième sortie :
+>
+> | Distance | marge ≥ 5° | ≥ 10° | ≥ 15° |
+> |---|---|---|---|
+> | 15 NM | 51 % / 77 % | 42 % / 85 % | 27 % / 94 % |
+> | 20 NM | 54 % / 89 % | 49 % / 93 % | 31 % / 98 % |
+> | 30 NM | 55 % / 98 % | 50 % / 98 % | 44 % / 99 % |
+>
+> Probabilités par sortie (exp(−angle/T), T ajusté par distance en validation croisée) : le milieu
+> de l'échelle est juste à ±8 points, le haut sous-estimé (un « 65 % » est juste 91 fois sur 100 à
+> 15 NM). Liste des candidates à 10 % ou plus : 3 sorties en médiane à 15 NM, 2 de 20 à 30 NM ; la
+> vraie y figure 83 % des fois à 15 NM, 91 % à 20 NM, 97 % à 30 NM ; à 10 NM, 52 % seulement.
+> Les procédures entendues : 5 sur 6 retrouvées dès 15-20 NM (BAW309 vise OPALE, ATREX entendu,
+> comme en Q56). Limites : vérité claire pour un quart des départs seulement (les cas faciles) ;
+> la vérité « visée » partage l'angle du prédicteur ; la configuration ouest est mauvaise avant
+> 20 NM ; LFPO trop peu couvert.
+>
+> Lecture : rien avant 15 NM ; de 15 à 20 NM, une courte liste élaguée (2 à 3 noms) ; une sortie
+> seule quand sa marge dépasse 10° (93 % juste à 20 NM pour la moitié des départs). Un départ sur
+> deux reste sans prédiction : guidé au cap, il n'a pas de sortie à afficher.
+### Q56 — Les procédures dessinées sur la carte *(16/10 — feu vert du propriétaire le 16/10 ; construit sur `migration` le même jour, relecture design en cours)*
+
+> **Feu vert du propriétaire, 16/10** (« Feu vert ») sur la forme de la session design (fiche
+> `ProcedureRoute`, design-suite 1d04003) : la route au clic sur la puce, jusqu'à fermeture ; la
+> couche éteinte par défaut, arrivées ou départs, pour la configuration dite par les pistes en
+> service, sans sélecteur. Construit le même jour (726b10c, ef10b99) : contraintes lues sur 3 781
+> segments sur 3 781, en accord avec la lecture mot à mot sur les 2 907 lignes où elle est sûre ;
+> 428 routes entières sur 445, les autres non servies. Restent ouverts : la piste au bout d'une STAR
+> (les tables s'arrêtent au point d'approche initiale), la trace de l'avion suivi en pointillé, la
+> sortie déduite de l'ADS-B (une inférence : décision du propriétaire).
+
+> **Demande du propriétaire, 16/10** : « ça aurait du sens d'avoir ces points/procédures
+> représentés de manière graphique sur la carte ? en overlay activable ou non ? » Proposition :
+> d'abord le tracé de la procédure entendue, au clic sur son étiquette (Q55, usage 3) ; ensuite
+> une couche « Procédures » éteinte par défaut, limitée à la configuration en service. Accord
+> pour l'essai le même jour.
+>
+> **Essai du 16/10** (hors du dépôt, `runs/mesures/procedures-carte/`) :
+> - **Les données se lisent.** Les tables de codage SID/STAR de LFPG et LFPO (100 PDF, AIRAC
+>   2026-10-01, `pdftotext -layout`) donnent la suite des points de chaque procédure, avec le type
+>   de segment et les contraintes. Coordonnées : ENR 4.4 entière pour les points nommés, ENR 4.1
+>   pour les balises, les fiches `AD_2_LFxx_DATA_01…05` pour les points terminaux (PG271…).
+>   **3 736 segments sur 3 781 placés (98,8 %)** ; 691 procédures sur 736 entières. Manquent BOV
+>   (fiche AD 2 de Beauvais), PB et PB096 (Le Bourget), FF et PO772 : cinq points, autres pages.
+> - **Le trafic réel colle aux tracés.** 187 départs de LFPG du 15/10 (16 h 32 – 22 h UTC), sous
+>   le FL150 : la trajectoire passe en médiane à **0,42 NM** de la SID la plus proche (75 % à moins
+>   de 1,16 NM ; 18 au-delà de 2 NM). ITY317, « OKASI 7B » entendu le 16/10 : à 0,35 NM de cette
+>   SID en médiane, qu'il suit jusqu'au bout. AFR59NM, « OPALE 7B » : il suit le début, puis coupe
+>   droit vers OPALE (un « direct » du contrôle), à 5 NM en parallèle du tracé. **Le tracé est
+>   l'itinéraire publié, pas le chemin volé** : l'aide devra le dire.
+> - **Toutes les SID ensemble sont illisibles** (156 tracés pour LFPG seul, capture de l'essai
+>   hors du dépôt) : il faut la configuration en service, ou le tracé seul de la procédure
+>   entendue.
+> - **Défaut trouvé au passage**, corrigé (8659af3) : un point déplacé ce cycle est imprimé deux
+>   fois dans l'ENR 4.4, ancienne valeur barrée et nouvelle insérée ; l'outil prenait la nouvelle
+>   latitude pour la longitude. DEROL, DOPAP et LOUPY sortaient du rayon (450 points → 453).
+> - **Les tables du Bourget** (23 PDF, 16/10) n'expliquent pas les « 7K » et « 7L » entendus
+>   (ATREX, ELCOB, AGOPA) : LFPB publie ces points en 7C, 7F, 7J, 7M, 7P, 7Q ; LFPG en 2x, 6G à
+>   6L, 7A, 7B, 7D, 7E. Non élucidé ; le point nommé reste juste.
+>
+> **La procédure déduite de l'ADS-B seul, mesurée le 16/10** (question du propriétaire : « comme
+> l'attribution d'une piste, à partir du trajet ») : le doublet de pistes d'après le sens et le côté
+> du décollage (au nord 09/27, au sud 08/26), puis le point de sortie vers lequel l'avion pointe une
+> fois sorti de la zone terminale (au-delà de 15 NM, au-dessus de 6 000 ft, médiane de l'écart
+> entre sa route et le relèvement de chaque sortie). 415 départs de LFPG les 15 et 16/10 :
+> - **le doublet se déduit sans faute** : la lettre entendue sur les six vols vérifiables tombe
+>   dans la paire de lettres que les tables donnent pour ce doublet (K → 09, L → 08, B → 26) ;
+> - **le point de sortie : 172 départs sur 415 (41 %) pointent nettement vers une sortie** (≤ 5°, la
+>   suivante à plus de 5° de plus), 51 hésitent entre deux voisines, 185 ne pointent vers aucune
+>   (guidés au cap, ou trajectoire enregistrée trop courte) ;
+> - **contre les procédures entendues, 4 sur 6 concordent** (OKASI à 0,1°, OPALE à 2,9°, ATREX à
+>   0,3°, OPALE à 4,3°) ; AFR358P (ELCOB entendu) ne pointe vers rien, guidé ; BAW309 (ATREX
+>   entendu) pointe vers OPALE à 0,5° : soit un raccourci du contrôle, soit une transmission
+>   attribuée au mauvais avion. Six cas, c'est peu : la mesure se refait quand les cas entendus
+>   s'accumulent.
+> - Les deux variantes d'une même sortie (7B/7E, 6G/6K…) ont le même début et ne se distinguent pas
+>   à la trajectoire : la désignation reste « OKASI 7B ou 7E ». Le chiffre entendu (« 7K », « 7L »)
+>   diffère du chiffre des tables pour la configuration face à l'est (6G/6K, 6H/6L) : non élucidé.
+> - Une première faute de ma part, corrigée avant la mesure : j'avais inversé les doublets nord et
+>   sud ; les lettres entendues l'ont révélé, et la position des pistes l'a confirmé.
+>
+> Reste à trancher : la forme (session design), la façon de connaître la configuration en service
+> (sens des décollages vus en ADS-B, ou choix de l'auditeur), et l'ordre (tracé au clic d'abord).
+> Hors de l'eAIP français, rien n'est dessiné et les réglages le disent.
+
 ### Q55 — Les noms officiels de l'AIP dans l'appariement *(15/10 — **lancée par le propriétaire le 15/10 au soir pour l'outil et la grammaire** ; l'indice de direction et l'affichage restent ouverts)*
 
 > **Décision du propriétaire, 15/10 au soir** : « lance Q55 : l'outil AIP et la grammaire ». Ce

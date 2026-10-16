@@ -346,3 +346,24 @@ func TestPredictedStateMessage(t *testing.T) {
 		t.Errorf("%s %#v\nwant %#v", m.Type, m.Data, want)
 	}
 }
+
+// A position without a track (Mode S, no velocity message): its Track is 0,
+// which is not north. Nothing is predicted from it (owner, 16/10).
+func TestNoLivePredictionWithoutATrack(t *testing.T) {
+	tt := newTestTracker(t, PhaseReference{Lat: receiverLat, Lon: receiverLon, Runways: testRunways()})
+	const hex = "abc124"
+	base := time.Now().UTC().Add(-5 * time.Second)
+	for i := 0; i < 5; i++ {
+		ts := base.Add(time.Duration(i) * time.Second)
+		tt.Ingest(hex, TrajectorySnapshot{
+			Timestamp: ts, PosTimestamp: ts, Lat: 48.5, Lon: 2.0 + float64(i)*0.003,
+			AltBaro: 30000, GS: 400, TrackUnknown: true, Valid: true,
+		})
+	}
+	tt.EnsureDerived(hex)
+	for _, p := range tt.GetLivePredictionsAt(base.Add(5500 * time.Millisecond)) {
+		if p.Hex == hex {
+			t.Fatalf("predicted heading %.0f from a fix without a track", p.Heading)
+		}
+	}
+}

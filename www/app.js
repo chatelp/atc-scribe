@@ -162,6 +162,9 @@ document.addEventListener('alpine:init', () => {
             showAllRunways: JSON.parse(localStorage.getItem('showAllRunways')) ?? true,
             showAirportLayout: JSON.parse(localStorage.getItem('showAirportLayout')) ?? true,
             showAltitudeLegend: JSON.parse(localStorage.getItem('showAltitudeLegend')) ?? true,
+            // The published routes layer (Q56): off by default; arrivals first.
+            showProcedures: JSON.parse(localStorage.getItem('showProcedures')) ?? false,
+            proceduresKind: localStorage.getItem('proceduresKind') === 'SID' ? 'SID' : 'STAR',
             showAirspaceBoundaries: JSON.parse(localStorage.getItem('showAirspaceBoundaries')) ?? false,
             airspaceOpacity: (() => {
                 const value = parseFloat(localStorage.getItem('airspaceOpacity'));
@@ -252,6 +255,8 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem('showAllRunways', this.settings.showAllRunways);
             localStorage.setItem('showAirportLayout', this.settings.showAirportLayout);
             localStorage.setItem('showAltitudeLegend', this.settings.showAltitudeLegend);
+            localStorage.setItem('showProcedures', this.settings.showProcedures);
+            localStorage.setItem('proceduresKind', this.settings.proceduresKind);
             localStorage.setItem('showAirspaceBoundaries', this.settings.showAirspaceBoundaries);
             localStorage.setItem('airspaceOpacity', this.settings.airspaceOpacity);
             localStorage.setItem('ringsOpacity', this.settings.ringsOpacity);
@@ -373,6 +378,7 @@ document.addEventListener('alpine:init', () => {
 
                 // Fetch reference data (airports, navaids, runways) after map init
                 this.fetchReferenceData();
+                this.loadProcedureRoutes();
 
                 // CRITICAL FIX: Check server config to determine if WebSocket streaming is enabled
                 await this.initAircraftDataSource();

@@ -50,6 +50,10 @@ type aipState struct {
 	NameProcedures  bool    `json:"name_procedures"`
 	Naming          string  `json:"naming"`
 	NamingFloor     float64 `json:"naming_floor"`
+
+	// The published routes for the map (Q56): how many, how many whole.
+	Routes         int `json:"routes"`
+	RoutesComplete int `json:"routes_complete"`
 }
 
 // AttachAIP gives the handler the list's maker; onMade is told of each new
@@ -109,6 +113,9 @@ func (h *Handler) aipState() aipState {
 		st.Points, st.Callsigns, st.Procedures = len(n.Points), len(n.Callsigns), len(n.Procedures)
 		st.RadiusNM = n.RadiusNM
 		st.ProcedurePoints, st.ChartsRead, st.ChartsNote = len(n.ProcedurePoints), n.ChartsRead, n.ChartsNote
+		if n.RoutesNote != nil {
+			st.Routes, st.RoutesComplete = n.RoutesNote.Routes, n.RoutesNote.Complete
+		}
 	}
 	ms := h.aip.State()
 	st.Refreshing, st.LastError = ms.Refreshing, ms.LastError
@@ -116,6 +123,32 @@ func (h *Handler) aipState() aipState {
 		st.LastTried = ms.LastTried.UTC().Format(time.RFC3339)
 	}
 	return st
+}
+
+// procedureRoutes is what the map draws from: the whole routes alone (a
+// route is drawn whole or not at all), with the cycle they come from.
+type procedureRoutes struct {
+	AIRAC  string      `json:"airac,omitempty"`
+	Source string      `json:"source,omitempty"`
+	Routes []aip.Route `json:"routes"`
+}
+
+// GetProcedureRoutes serves the published routes of the followed airports
+// (Q56); none until a list is made, and none outside the French eAIP.
+func (h *Handler) GetProcedureRoutes(w http.ResponseWriter, r *http.Request) {
+	out := procedureRoutes{Routes: []aip.Route{}}
+	if h.aip != nil {
+		if n, err := aip.Load(h.aip.OutPath); err == nil {
+			out.AIRAC, out.Source = n.AIRAC, n.Source
+			for _, rt := range n.Routes {
+				if rt.Complete {
+					out.Routes = append(out.Routes, rt)
+				}
+			}
+		}
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+	WriteJSON(w, http.StatusOK, out)
 }
 
 // GetAIPNames says how the list stands.
@@ -165,6 +198,7 @@ func (h *Handler) makeAIP(why string) {
 		logger.Int("points", len(n.Points)),
 		logger.Int("callsigns", len(n.Callsigns)),
 		logger.Int("procedures", len(n.Procedures)),
+		logger.Int("routes", len(n.Routes)),
 		logger.String("took", time.Since(started).Round(time.Millisecond).String()))
 	if h.aipMade != nil {
 		h.aipMade(n)

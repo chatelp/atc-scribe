@@ -299,6 +299,8 @@ function serverSettings() {
                     await this.loadAIP();
                     if (this.aip && !this.aip.refreshing) break;
                 }
+                // The map's published routes come from the same list (Q56).
+                window.Alpine?.store('atc')?.loadProcedureRoutes?.();
             } catch (e) {
                 this.flash('Could not update: ' + e.message, true);
             } finally {

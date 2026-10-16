@@ -1199,6 +1199,7 @@
             // bright base (color-map-light-*): drawn again.
             this._renderRangeRings();
             this._referenceLayerState?.airportLayout?.layer?.changed();
+            this._procedures?.refresh();
             // Aircraft icon colors depend on map style (dark vs light), so force a full re-render
             if (this._aircraftRenderer) {
                 this.applyFiltersAndRefreshView();
@@ -1726,6 +1727,27 @@
             };
 
             window.requestAnimationFrame(animate);
+        }
+        // A procedure's published route (ProcedureRoute, Q56), drawn until it
+        // is closed; it replaces the ring of its point. runways: the ones it is
+        // drawn from or to (map/procedure-routes.js).
+        _procedureFeature() {
+            if (!this._procedures && window.MapProcedureFeature) this._procedures = window.MapProcedureFeature.create(this);
+            return this._procedures;
+        }
+        showProcedureRoute(route, runways) {
+            if (this._placeFeature && this._overlaySource) {
+                this._overlaySource.removeFeature(this._placeFeature);
+                this._placeFeature = null;
+            }
+            this._procedureFeature()?.show(route, runways);
+        }
+        clearProcedureRoute() {
+            this._procedures?.clear();
+        }
+        // The Procedures layer's routes; an empty list hides it.
+        setProcedureLayer(routes, runwaysOf) {
+            this._procedureFeature()?.setLayer(routes, runwaysOf);
         }
         // A procedure's point shown for ten seconds (Chips: Place, Q55): a ring
         // and its name where it is, the view moved to it when it is outside.

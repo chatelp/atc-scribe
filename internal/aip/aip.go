@@ -109,6 +109,11 @@ type Names struct {
 	// Airports followed outside the French eAIP: nothing is read for them.
 	Outside []string `json:"outside,omitempty"`
 
+	// The published routes of those departures and arrivals, for the map
+	// (Q56, routes.go), and how their reading went.
+	Routes     []Route     `json:"routes,omitempty"`
+	RoutesNote *RoutesNote `json:"routes_note,omitempty"`
+
 	allPoints map[string]Point // every point of ENR 4.4, for the procedures' coordinates
 }
 
@@ -134,10 +139,13 @@ var (
 	reCell    = regexp.MustCompile(`(?s)<td[^>]*>(.*?)</td>`)
 	reTag     = regexp.MustCompile(`<[^>]+>`)
 	reScripts = regexp.MustCompile(`(?s)<script.*?</script>|<style.*?</style>`)
-	reSpace   = regexp.MustCompile(`\s+`)
-	reName5   = regexp.MustCompile(`^[A-Z]{5}$`)
-	reDMS     = regexp.MustCompile(`^(\d+)°(\d+)'([\d.]+)"([NSEW])`)
-	reCall    = regexp.MustCompile(`\b((?:[A-Z][A-Z'\-]+ ){0,2}[A-Z][A-Z'\-]+) (Approche|Départ|Tour|Sol|Prévol|Contrôle|Info|Information|Approach|Departure|Tower|Ground|Delivery|Control|Radar|Trafic|Prevol)\b`)
+	// A value amended this cycle is printed twice: the old one struck out
+	// (<del>), the new one inserted (<ins>). Only the new one holds.
+	reDel   = regexp.MustCompile(`(?s)<del\b[^>]*>.*?</del>`)
+	reSpace = regexp.MustCompile(`\s+`)
+	reName5 = regexp.MustCompile(`^[A-Z]{5}$`)
+	reDMS   = regexp.MustCompile(`^(\d+)°(\d+)'([\d.]+)"([NSEW])`)
+	reCall  = regexp.MustCompile(`\b((?:[A-Z][A-Z'\-]+ ){0,2}[A-Z][A-Z'\-]+) (Approche|Départ|Tour|Sol|Prévol|Contrôle|Info|Information|Approach|Departure|Tower|Ground|Delivery|Control|Radar|Trafic|Prevol)\b`)
 	// Table words and abbreviations caught before a role (NIL Départ, UAC ACS
 	// PARIS Contrôle...) are not call signs.
 	reNotAName = regexp.MustCompile(`\b(FREQ|HOR|MHZ|ATS|APP|TWR|FIS|ACC|SID|STAR|RWY|AD|FIR|UIR|TMA|CTR|NIL|PENTE|VPE|DEP|ATC|UAC|ACS|ASFC|FIC|INFO|CONTROLE)\b`)
@@ -149,7 +157,8 @@ func plain(s string) string {
 }
 
 func pageText(raw string) string {
-	return reSpace.ReplaceAllString(html.UnescapeString(reTag.ReplaceAllString(reScripts.ReplaceAllString(raw, ""), " ")), " ")
+	raw = reDel.ReplaceAllString(reScripts.ReplaceAllString(raw, ""), "")
+	return reSpace.ReplaceAllString(html.UnescapeString(reTag.ReplaceAllString(raw, " ")), " ")
 }
 
 func dms(s string) (float64, bool) {
@@ -177,6 +186,7 @@ func distanceNM(lat1, lon1, lat2, lon2 float64) float64 {
 // longitude in degrees, minutes and seconds.
 func points(raw string) []Point {
 	var out []Point
+	raw = reDel.ReplaceAllString(raw, "")
 	for _, row := range reRow.FindAllStringSubmatch(raw, -1) {
 		cells := reCell.FindAllStringSubmatch(row[1], -1)
 		if len(cells) < 2 {
@@ -469,6 +479,8 @@ func (m *Maker) procedurePoints(ctx context.Context, n *Names, base, folder stri
 	if tool == "" {
 		n.ChartsNote = "pdftotext (poppler) is not installed: only the procedures the AIP text names are known"
 	}
+	var note RoutesNote
+	var routes []Route
 	for _, a := range airports {
 		page := pages[fmt.Sprintf(pageAirport, a)]
 		seen := map[string]bool{}
@@ -501,7 +513,12 @@ func (m *Maker) procedurePoints(ctx context.Context, n *Names, base, folder stri
 					kinds[d[1]+" "+d[2]] = kind
 				}
 			}
+			table := strings.TrimSuffix(rel[strings.LastIndex(rel, "/")+1:], ".pdf")
+			routes = append(routes, parseCodingTable(string(out), a, kind, table, &note)...)
 		}
+	}
+	if len(routes) > 0 {
+		m.placeRoutes(ctx, n, routes, &note, base, folder, airports, pages, tool)
 	}
 	for name, ds := range designators {
 		p, ok := n.allPoints[name]

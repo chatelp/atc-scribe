@@ -137,10 +137,23 @@ l'interface, elle, reste sur le Mac.
    précision de la carte de couverture sur FlightAware (« My ADS-B »).
 5. Le moment du **portage** (cible fixée, calendrier non).
 6. Le **tirage au hasard** de la précision d'appariement (jalon du labo, lié à l'annotation).
-7. ~~**Les noms officiels de l'AIP dans l'appariement**~~ — **lancée le 15/10 au soir** : l'outil est fait et se pilote depuis les réglages ; la grammaire, mesurée sur le ciel témoin, **n'est pas adoptée** (35 justes perdus, 0 gagné). L'outil est en production depuis le 16/10 à 10 h 09 (liste faite par le propriétaire). L'indice de direction, mesuré le 16/10, n'est pas adopté (l'avion désigné s'approche du point, mais 39 % des autres aussi) ; l'affichage du nom réel est lancé, forme décidée par la session design, seuil à mesurer pour 95 % de propositions justes. Énoncé d'origine (Q55, proposée par le labo le 15/10) :
+7. ~~**Les noms officiels de l'AIP dans l'appariement**~~ — **lancée le 15/10 au soir** : l'outil est fait et se pilote depuis les réglages ; la grammaire, mesurée sur le ciel témoin, **n'est pas adoptée** (35 justes perdus, 0 gagné). L'outil est en production depuis le 16/10 à 10 h 09 (liste faite par le propriétaire). L'indice de direction, mesuré le 16/10, n'est pas adopté (l'avion désigné s'approche du point, mais 39 % des autres aussi) ; l'affichage du nom réel est **en production depuis le 16/10 à 12 h 21** (seuil 0,95, réglable : 18 sur 18 justes sur la séance d'écoute ; liste refaite par le propriétaire à 12 h 23 avec les 100 tables de codage, 25 points de procédure) ; sur le trafic des 15 et 16/10, environ six procédures nommées par jour, toutes justes à la relecture. Énoncé d'origine (Q55, proposée par le labo le 15/10) :
    l'outil générique qui fabrique la liste sur place (rien de l'AIP dans le dépôt), puis la
    grammaire des procédures, l'indice de direction au départ et l'affichage du nom réel ; quoi
    et quand. Recommandation : l'outil et la grammaire après la migration, mesurés par paires.
+8. ~~**Les procédures dessinées sur la carte**~~ (Q56, 16/10) — **feu vert le 16/10, construit sur
+   `migration` le même jour** (726b10c, ef10b99) d'après la fiche `ProcedureRoute` : la route au clic
+   sur la puce, la couche « Procedures (SID, STAR) » éteinte par défaut. Relu et clos par la session
+   design ; **versé en production le 16/10 à 16 h 02** (ab4d319) sur la demande du propriétaire, le
+   cache complété depuis le disque (fiches DATA, ENR 4.1, AD 2 de Beauvais). Reste son clic sur
+   « Update from the SIA » pour écrire les routes dans la liste.
+10. **La piste et la sortie probables sur le cartouche** (Q57, 16/10) — demande du propriétaire ;
+   deux mesures lancées le 16/10 (piste d'arrivée selon la distance, sortie d'un départ selon le
+   cap), puis forme au design, puis décision.
+9. **Les avions fantômes** (16/10) — deux causes trouvées et corrigées sur `migration` (04dc5e3,
+   d0b54d5), mesurées sur le trafic réel ; **en production depuis le 16/10 à 16 h 02**. Une troisième famille, plus petite
+   (un recul d'environ 4 s de vol, seulement quand l'instance porte les flux audio), reste à
+   expliquer.
 
 ## Les risques suivis
 

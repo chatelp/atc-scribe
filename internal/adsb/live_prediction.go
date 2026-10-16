@@ -14,7 +14,8 @@ package adsb
 //     that repeated it: a receiver giving a position every ~1.7 s, polled
 //     every second, repeats the fix at half the polls (D79, 13/10/2026);
 //   - nothing for an aircraft whose position is older than
-//     maxLivePredictionAge, nor below minPredictionConfidence.
+//     maxLivePredictionAge, nor below minPredictionConfidence, nor whose
+//     track the receiver did not give.
 //
 // The message's form is pinned by TestMotionMessagesKeepTheirForm.
 
@@ -134,6 +135,13 @@ func (tt *TrajectoryTracker) GetLivePredictionsAt(t time.Time) []LivePrediction 
 			continue
 		}
 		if t.Sub(latest.PositionTime()) > maxLivePredictionAge {
+			continue
+		}
+		// No track, no prediction: its 0 is not north. Predicted due north,
+		// an aircraft without a track flew north between its fixes and came
+		// back at each one (owner, 16/10: aircraft dashing across the map;
+		// 78 of the 302 fast moves measured on the page in 10 min).
+		if latest.TrackUnknown {
 			continue
 		}
 

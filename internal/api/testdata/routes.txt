@@ -17,6 +17,7 @@ GET /api/v1/health (*Handler).GetHealth open
 GET /api/v1/heliports (*Handler).GetHeliports locked
 GET /api/v1/navaids (*Handler).GetNavaids locked
 GET /api/v1/navaids/{ident} (*Handler).GetNavaidByIdent locked
+GET /api/v1/procedure-routes (*Handler).GetProcedureRoutes locked
 GET /api/v1/runways (*Handler).GetRunways locked
 GET /api/v1/server (*Handler).GetServerState locked
 GET /api/v1/setup/status (*Handler).GetSetupStatus open
