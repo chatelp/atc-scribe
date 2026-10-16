@@ -507,8 +507,15 @@ sur la carte.
   remesurant : quand l'instance porte aussi les flux audio et leurs transcriptions, l'avion recule
   par moments d'environ 4 s de vol (0,4 à 0,5 NM) puis repart : 380 à 600 sauts par 5 min avec les
   flux, 12 sans (mesure A/B, même serveur, 15 h 52). Ni la correction du cap ni la couche des
-  procédures n'y sont pour rien (essais A/B). Cause à chercher : le retard des messages des avions
-  derrière ceux des transcriptions, piste à mesurer.
+  procédures n'y sont pour rien (essais A/B). **Diagnostic du soir (22 h)** : ni coupure de
+  WebSocket, ni retard de livraison (les prédictions arrivent en 1 ms, avec ou sans flux), ni volume
+  (identique) ; la prédiction du serveur est juste (écart médian 0,01 s de vol sur ~3 500, aucune
+  au-delà de 2 s). Le saut est la règle de l'avion silencieux de la page (D80, 14/10) : un avion dont
+  la station ne reçoit plus la position depuis 5 à 33 s, mais encore prédit par le serveur, est
+  ramené à sa dernière position reçue, puis renvoyé en avant quand une position revient — et elle
+  tombe sur la prédiction (8 cas sur 8). Non expliqué : pourquoi les flux audio multiplient ces cas.
+  Au passage : chaque `aircraft_update` porte l'avion entier en plus du delta, ~5 Ko × 57/s, soit
+  ~300 Ko/s de JSON pour la page.
 - 16/10 (après-midi) : **les routes publiées sur la carte** (Q56, feu vert du propriétaire ; forme de la
   session design, fiche `ProcedureRoute`). Le serveur lit, dans les tables de codage, chaque SID et
   STAR de LFPG et LFPO avec ses points dans l'ordre et ses contraintes par colonne : contraintes lues

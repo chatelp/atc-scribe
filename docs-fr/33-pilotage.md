@@ -157,8 +157,10 @@ l'interface, elle, reste sur le Mac.
    sortie (la piste de décollage n'est jugée que pour ceux vus décoller).
 9. **Les avions fantômes** (16/10) — deux causes trouvées et corrigées sur `migration` (04dc5e3,
    d0b54d5), mesurées sur le trafic réel ; **en production depuis le 16/10 à 16 h 02**. Une troisième famille, plus petite
-   (un recul d'environ 4 s de vol, seulement quand l'instance porte les flux audio), reste à
-   expliquer.
+   (un recul de 5 à 33 s de vol), diagnostiquée le 16/10 au soir : la règle de l'avion silencieux
+   (D80) ramène à sa dernière position un avion que le serveur prédit juste ; décision du
+   propriétaire attendue (suivre la prédiction tant que le serveur la donne ?). Et un volume à réduire :
+   ~300 Ko/s de mises à jour d'avions.
 
 ## Les risques suivis
 
