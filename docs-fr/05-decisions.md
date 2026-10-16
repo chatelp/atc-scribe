@@ -5275,7 +5275,13 @@ sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien co
 > c'est le défaut qui a fait écarter « un chiffre d'écart » (Q46). **Usage 3, l'affichage du nom
 > réel, lancé le 16/10** : forme décidée par la session design (fiche Chips, `cl-chip--place`,
 > jamais de réécriture du texte lu), à n'afficher que si la proposition est juste au moins 95 fois
-> sur 100, seuil à mesurer.
+> sur 100, seuil à mesurer. **Mesuré le 16/10 sur l'écoute du propriétaire** (séance dédiée de
+> l'atelier, 77 cas : 46 noms de points entendus, 21 inaudibles, 5 autre chose, 3 noms hors liste, 2
+> compagnies) : la justesse de la puce selon le seuil de ressemblance au son va de 55 % (0,80) à
+> 88 % (1,00), 92 % (1,05) et 100 % à 1,10 — 9 puces sur 9, mais 9 des 46 noms entendus seulement,
+> ceux que le modèle écrit presque juste (Ranux, Atrex, Oquipa, Elkhob). À 1,10, aucun des 35
+> indicatifs mal transcrits de la mesure de l'usage 1 ne passerait. Échantillon petit : 9 sur 9 n'exclut
+> pas une justesse de 70 % (borne basse à 95 %). Choix du propriétaire attendu.
 
 Le labo a tiré de l'eAIP France du SIA (cycle AIRAC du 01/10/2026, cinq pages : ENR 4.4, ENR 2.1,
 AD 2 LFPG, LFPO, LFPB), avec l'accord du propriétaire, une liste de noms réels autour de LFPG :
