@@ -502,8 +502,13 @@ sur la carte.
   de deux positions à moins d'une seconde, aucune au-delà de 1 000 kt) ; (2) le serveur prédisait
   plein nord un avion sans cap connu, son 0 n'étant pas le nord (d0b54d5 : plus de prédiction sans
   cap). Mesuré sur 10 min de trafic réel : avant, 172 sauts visibles en moins de 1,5 s, 21 avions,
-  jusqu'à 4 388 NM ; après le correctif de la page, 10 sauts, 8 avions, au plus 7,3 NM. Sur
-  `migration`, à verser.
+  jusqu'à 4 388 NM ; après le correctif de la page, 10 sauts, 8 avions, au plus 7,3 NM, plus aucune
+  vitesse au-delà de 1 500 kt. Sur `migration`, à verser. **Reste une autre famille**, vue en
+  remesurant : quand l'instance porte aussi les flux audio et leurs transcriptions, l'avion recule
+  par moments d'environ 4 s de vol (0,4 à 0,5 NM) puis repart : 380 à 600 sauts par 5 min avec les
+  flux, 12 sans (mesure A/B, même serveur, 15 h 52). Ni la correction du cap ni la couche des
+  procédures n'y sont pour rien (essais A/B). Cause à chercher : le retard des messages des avions
+  derrière ceux des transcriptions, piste à mesurer.
 - 16/10 (après-midi) : **les routes publiées sur la carte** (Q56, feu vert du propriétaire ; forme de la
   session design, fiche `ProcedureRoute`). Le serveur lit, dans les tables de codage, chaque SID et
   STAR de LFPG et LFPO avec ses points dans l'ordre et ses contraintes par colonne : contraintes lues

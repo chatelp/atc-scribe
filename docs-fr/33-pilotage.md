@@ -147,7 +147,9 @@ l'interface, elle, reste sur le Mac.
    puis coup d'œil du propriétaire et versement en production (relance, puis « Update from the SIA » :
    les fiches DATA et l'ENR 4.1 s'ajoutent au cache).
 9. **Les avions fantômes** (16/10) — deux causes trouvées et corrigées sur `migration` (04dc5e3,
-   d0b54d5), mesurées sur le trafic réel ; à verser avec Q56.
+   d0b54d5), mesurées sur le trafic réel ; à verser avec Q56. Une troisième famille, plus petite
+   (un recul d'environ 4 s de vol, seulement quand l'instance porte les flux audio), reste à
+   expliquer.
 
 ## Les risques suivis
 
