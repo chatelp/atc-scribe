@@ -5281,7 +5281,16 @@ sans rechargement. Sans cookie, le même flux répond 401 : c'était l'ancien co
 > 88 % (1,00), 92 % (1,05) et 100 % à 1,10 — 9 puces sur 9, mais 9 des 46 noms entendus seulement,
 > ceux que le modèle écrit presque juste (Ranux, Atrex, Oquipa, Elkhob). À 1,10, aucun des 35
 > indicatifs mal transcrits de la mesure de l'usage 1 ne passerait. Échantillon petit : 9 sur 9 n'exclut
-> pas une justesse de 70 % (borne basse à 95 %). Choix du propriétaire attendu.
+> pas une justesse de 70 % (borne basse à 95 %). **Le propriétaire choisit, le 16/10, de ne comparer
+> qu'aux points de procédure.** Le jeu XML gratuit du SIA (commandé par le propriétaire, cycle
+> 10/26, AIXM 4.5 et XML SIA) ne contient aucune procédure et ne distingue pas leurs points ; les
+> tables de codage SID/STAR de l'eAIP, en PDF et en accès direct, les nomment : 100 tables pour LFPG
+> et LFPO (7,4 Mo, téléchargées avec l'accord du propriétaire), 307 désignations sur 19 points, plus
+> les 6 points des procédures du Bourget nommées dans le texte de l'AIP, soit 25 points. 41 des 45
+> noms entendus y sont. Justesse de la puce : 95 % au seuil 0,90 (18 sur 19), **100 % à 0,95 (18 sur
+> 18)**, deux fois plus de puces qu'avec les 450 points ; aucun des 35 indicatifs mal transcrits ne
+> passe à 0,95 (« dot » → DORDI à 0,90, écarté par une longueur minimale de 4 lettres). Échantillon
+> encore petit : 18 sur 18 n'exclut pas 85 %.
 
 Le labo a tiré de l'eAIP France du SIA (cycle AIRAC du 01/10/2026, cinq pages : ENR 4.4, ENR 2.1,
 AD 2 LFPG, LFPO, LFPB), avec l'accord du propriétaire, une liste de noms réels autour de LFPG :
