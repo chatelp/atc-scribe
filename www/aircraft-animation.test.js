@@ -285,3 +285,32 @@ test('high up, a silence is flown ahead until the aircraft is declared lost (14/
     state.status = 'signal_lost';
     assert.ok(e._isSilent(state, at + 1000), 'and as soon as it is declared lost');
 });
+
+// The owner, 16/10: aircraft crossing the map at full speed, diagonally. Two
+// fixes without a track, dated a few milliseconds apart, gave a velocity of
+// hundreds of thousands of knots (the gap over a dt floored at 1 ms); blended
+// at 35 % a sample, it flew the aircraft across the map for twenty seconds,
+// and made every gap look glidable (measured on the real traffic: 18
+// aircraft in 10 min, one drawn 4 388 NM away).
+test('two fixes without a track a few ms apart do not make an aircraft fly at 100 000 kt (16/10)', () => {
+    const { e } = engine();
+    e.updateAircraft(sample(48.5, 2.0));
+    e.updateAircraft(sample(48.5, 2.0028));
+    const state = e.aircraftStates.get('abc123');
+    const kts = () => Math.hypot(state.velocity.eastMps, state.velocity.northMps) / 0.514444;
+    assert.ok(Math.abs(kts() - 400) < 30);
+    // The next fix has no track, lies 2 km off and is dated as the last one.
+    const at = Date.now();
+    e.observe('abc123', { lat: 48.5, lon: 2.03, alt: 30000, gs: null, track: null, heading: null, at, sentAt: at });
+    e.observe('abc123', { lat: 48.518, lon: 2.03, alt: 30000, gs: null, track: null, heading: null, at: at + 3, sentAt: at + 3 });
+    assert.ok(kts() < 1000, `the velocity stays an aircraft's: ${Math.round(kts())} kt`);
+});
+
+test('a velocity no aircraft flies is never taken (16/10)', () => {
+    const { e } = engine();
+    e.updateAircraft(sample(48.5, 2.0));
+    const state = e.aircraftStates.get('abc123');
+    const before = state.velocity;
+    state.velocity = e._blendVelocity(state.velocity, { eastMps: 50000, northMps: 0, verticalMps: 0, headingDeg: 90 });
+    assert.deepEqual(state.velocity, before);
+});

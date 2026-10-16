@@ -91,6 +91,13 @@ class AircraftAnimationEngine {
             // nothing else: the horizon no longer shrinks with it (D79).
             adaptivePerformance: true,
             maxFrameBudgetMs: 14,
+            // A velocity no aircraft here flies, in knots, is never taken; and
+            // a velocity is not read from two fixes less than this apart, in
+            // ms: 50 m of error over a few milliseconds makes thousands of
+            // knots (owner, 16/10: aircraft crossing the map diagonally; two
+            // fixes without a track dated 3 ms apart gave 1.6 million kt).
+            maxSpeedKts: 1000,
+            minDeriveIntervalMs: 1000,
             // How often states unheard of for two minutes are dropped, in ms,
             // and how many states are kept at most (the oldest go first).
             cleanupIntervalMs: 30000,
@@ -911,6 +918,9 @@ class AircraftAnimationEngine {
             northMps = speedMps * Math.cos(trackRad);
             headingDeg = current.track;
         } else {
+            // No track: from the two fixes, when they are far enough apart
+            // in time to say anything.
+            if (dt * 1000 < this.config.minDeriveIntervalMs) return null;
             const avgLatRad = ((previous.lat + current.lat) / 2) * (Math.PI / 180);
             const dNorth = (current.lat - previous.lat) * 111320;
             const dEast = (current.lon - previous.lon) * 111320 * Math.cos(avgLatRad);
@@ -936,6 +946,9 @@ class AircraftAnimationEngine {
     }
 
     _blendVelocity(existing, incoming) {
+        if (!incoming || Math.hypot(incoming.eastMps, incoming.northMps) > this.config.maxSpeedKts * 0.514444) {
+            return existing;
+        }
         if (!existing) return incoming;
         const alpha = 0.35;
         return {
