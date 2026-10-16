@@ -46,6 +46,22 @@ type TranscriptionRecord struct {
 	// What the transmission says in plain words ("Descend to FL100"), from the
 	// phraseology grammar. Not stored: computed when served (internal/api).
 	Plain []PlainInstruction `json:"plain,omitempty"`
+	// Places are the procedures heard, named (Q55): computed when served,
+	// from the station's list of official names, never stored.
+	Places []PlaceName `json:"places,omitempty"`
+}
+
+// PlaceName is a procedure heard and the official name proposed for it: where
+// its words are in the text as received (Raw) and as processed (Normalized,
+// absent when the normalisation rewrote them), and where its point is.
+type PlaceName struct {
+	Designator string  `json:"designator"` // ELCOB 7G
+	Point      string  `json:"point"`      // ELCOB
+	Lat        float64 `json:"lat"`
+	Lon        float64 `json:"lon"`
+	Score      float64 `json:"score"`
+	Raw        []int   `json:"raw,omitempty"`        // [start, end) in the text received
+	Normalized []int   `json:"normalized,omitempty"` // [start, end) in the processed text
 }
 
 // PlainInstruction is one instruction of a transmission in plain words; its

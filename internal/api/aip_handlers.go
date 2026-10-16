@@ -36,6 +36,20 @@ type aipState struct {
 	LastError  string   `json:"last_error,omitempty"`
 	LastTried  string   `json:"last_tried,omitempty"`
 	AutoUpdate bool     `json:"auto_update"`
+
+	// What the French eAIP covers of the airports followed: "france" (all),
+	// "partial" or "none", and those outside it.
+	Coverage string   `json:"coverage"`
+	Outside  []string `json:"outside,omitempty"`
+
+	// The procedures heard, named (Q55, usage 3): the points they are named
+	// after, the coding tables read, the setting in force.
+	ProcedurePoints int     `json:"procedure_points"`
+	ChartsRead      int     `json:"charts_read"`
+	ChartsNote      string  `json:"charts_note,omitempty"`
+	NameProcedures  bool    `json:"name_procedures"`
+	Naming          string  `json:"naming"`
+	NamingFloor     float64 `json:"naming_floor"`
 }
 
 // AttachAIP gives the handler the list's maker; onMade is told of each new
@@ -61,8 +75,29 @@ func (h *Handler) aipRequest() aip.Request {
 func (h *Handler) aipState() aipState {
 	st := aipState{InForce: aip.InForce(time.Now()).Format("2006-01-02"), RadiusNM: AIPRadiusNM}
 	st.Airports = h.aipRequest().Airports
+	covered := 0
+	for _, a := range st.Airports {
+		if aip.Covered(a) {
+			covered++
+		} else {
+			st.Outside = append(st.Outside, a)
+		}
+	}
+	switch {
+	case covered == 0:
+		st.Coverage = "none"
+	case covered < len(st.Airports):
+		st.Coverage = "partial"
+	default:
+		st.Coverage = "france"
+	}
+	st.Naming = "measured"
 	if h.runtime != nil {
 		st.AutoUpdate = h.runtime.AIPAutoUpdate()
+		st.NamingFloor, st.NameProcedures = h.runtime.PlaceNaming()
+		if s := h.runtime.Settings().AIPNames; s != nil && s.Naming != "" {
+			st.Naming = s.Naming
+		}
 	}
 	if h.aip == nil {
 		return st
@@ -73,6 +108,7 @@ func (h *Handler) aipState() aipState {
 		st.Source, st.SourceURL, st.Skipped = n.Source, n.SourceURL, n.Skipped
 		st.Points, st.Callsigns, st.Procedures = len(n.Points), len(n.Callsigns), len(n.Procedures)
 		st.RadiusNM = n.RadiusNM
+		st.ProcedurePoints, st.ChartsRead, st.ChartsNote = len(n.ProcedurePoints), n.ChartsRead, n.ChartsNote
 	}
 	ms := h.aip.State()
 	st.Refreshing, st.LastError = ms.Refreshing, ms.LastError
@@ -147,7 +183,7 @@ func (h *Handler) KeepAIPNamesUpToDate(ctx context.Context) {
 			return
 		}
 		st := h.aipState()
-		if st.Present && st.AIRAC >= st.InForce {
+		if st.Present && st.AIRAC >= st.InForce || st.Coverage == "none" {
 			return
 		}
 		if t := h.aip.State().LastTried; !t.IsZero() && time.Since(t) < 6*time.Hour {

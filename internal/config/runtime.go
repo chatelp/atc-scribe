@@ -54,6 +54,40 @@ type RuntimeSettings struct {
 // outside site, and the settings page has a button (design, 15/10).
 type AIPNamesSettings struct {
 	AutoUpdate bool `json:"auto_update"`
+
+	// NameProcedures shows, beside the words of a transmission, the official
+	// name of the procedure they probably were ("ELCOB 7G" for "elcope seven
+	// golf"). Absent means on: it was measured before it was offered.
+	NameProcedures *bool `json:"name_procedures,omitempty"`
+	// Naming is how alike the words must sound: "surer", "measured" (the
+	// default) or "more" (PlaceFloors).
+	Naming string `json:"naming,omitempty"`
+}
+
+// PlaceFloors are the three sound likenesses offered for naming procedures,
+// each measured on the owner's listening of 77 cases of Paris approaches
+// (16/10): 1.10 named 9, all right; 0.95 named 18, all right; 0.90 named 19,
+// 18 right. A value between two measures would promise what nobody measured.
+var PlaceFloors = map[string]float64{"surer": 1.10, "measured": 0.95, "more": 0.90}
+
+// PlaceNaming says whether procedures heard are named, and how alike they
+// must sound.
+func (r *Runtime) PlaceNaming() (float64, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	a := r.settings.AIPNames
+	if a != nil && a.NameProcedures != nil && !*a.NameProcedures {
+		return 0, false
+	}
+	level := "measured"
+	if a != nil && a.Naming != "" {
+		level = a.Naming
+	}
+	floor, ok := PlaceFloors[level]
+	if !ok {
+		floor = PlaceFloors["measured"]
+	}
+	return floor, true
 }
 
 // VitalsSettings switch the public figures of the sign-in page. Off, the route
@@ -298,6 +332,10 @@ func NewRuntime(cfg *Config, configPath string, log *logger.Logger) *Runtime {
 	}
 	if saved.AIPNames != nil {
 		a := *saved.AIPNames
+		if _, ok := PlaceFloors[a.Naming]; a.Naming != "" && !ok {
+			r.log.Warn("Ignoring an unknown naming level", logger.String("naming", a.Naming))
+			a.Naming = ""
+		}
 		r.settings.AIPNames = &a
 	}
 	r.log.Info("Applied saved runtime settings",
@@ -414,6 +452,11 @@ func (r *Runtime) Apply(next RuntimeSettings) error {
 
 	if next.Matching == nil {
 		return fmt.Errorf("matching rules missing")
+	}
+	if a := next.AIPNames; a != nil && a.Naming != "" {
+		if _, ok := PlaceFloors[a.Naming]; !ok {
+			return fmt.Errorf("aip_names.naming must be surer, measured or more, got %q", a.Naming)
+		}
 	}
 	next.Matching.withSectorDefaults()
 	if err := next.Matching.validate(); err != nil {

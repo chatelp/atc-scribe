@@ -52,6 +52,10 @@ type Match struct {
 type Matcher struct {
 	telephony map[string]string // spoken word -> ICAO operator code
 
+	// operatorWords are the words of the airlines' names and telephony, apart
+	// ("air", "france"): a procedure's point is never one (places.go).
+	operatorWords map[string]bool
+
 	// MinDigits is the shortest spoken number that may stand for a flight number.
 	// Measured against live ADS-B with a shuffled control, two-digit groups match
 	// by arithmetic about as often as by truth; three is where signal starts.
@@ -108,7 +112,7 @@ type Matcher struct {
 // telephony designator are indexed: controllers say "Air France" and "Speedbird",
 // and the file holds AIRFRANS and SPEEDBIRD alongside the names.
 func NewMatcher(airlinesDatPath string) (*Matcher, error) {
-	m := &Matcher{telephony: map[string]string{}, MinDigits: 3}
+	m := &Matcher{telephony: map[string]string{}, operatorWords: map[string]bool{}, MinDigits: 3}
 
 	// Corrections first. They are current where airlines.dat is not, and every
 	// loader below lets the first writer win, so they take precedence.
@@ -141,6 +145,7 @@ func NewMatcher(airlinesDatPath string) (*Matcher, error) {
 			if _, seen := m.telephony[key]; !seen {
 				m.telephony[key] = icao
 			}
+			m.addOperatorWords(form)
 		}
 	}
 	if err := sc.Err(); err != nil {
@@ -188,6 +193,7 @@ func (m *Matcher) loadOverrides(path string) {
 		if _, seen := m.telephony[key]; !seen {
 			m.telephony[key] = icao
 		}
+		m.addOperatorWords(fields[1])
 	}
 }
 
@@ -225,6 +231,7 @@ func (m *Matcher) loadSpokenForms(path string) {
 		if _, seen := m.telephony[key]; !seen {
 			m.telephony[key] = icao
 		}
+		m.addOperatorWords(fields[0])
 	}
 }
 
