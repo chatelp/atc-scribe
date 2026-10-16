@@ -24,7 +24,7 @@
         ring: '#3d3d3d', 'ring-label': '#949494',
         selected: '#66c56a', hovered: '#e0e0e0',
         'trail-followed': '#66c56a', estimate: '#66c56a', 'trail-stale': '#949494',
-        proximity: '#66c56a',
+        proximity: '#66c56a', procedure: '#e0e0e0', 'light-procedure': '#3a3a3a',
         'light-ring': '#b5b5b5', 'light-centerline': '#a8a8a8', 'light-proximity': '#2e7d32',
         'light-taxiway': '#9a9a9a', 'light-selected': '#2e7d32',
         'light-hovered': '#333333', 'light-trail-stale': '#7a7a7a',

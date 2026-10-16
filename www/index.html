@@ -62,6 +62,8 @@
     <script defer src="map/features/interactions-feature.js"></script>
     <script defer src="map/features/proximity-feature.js"></script>
     <script defer src="map/features/minimap-feature.js"></script>
+    <script defer src="map/procedure-routes.js"></script>
+    <script defer src="map/features/procedure-feature.js"></script>
 
     <!-- 6) Map renderers (facades first, concrete aircraft renderer second) -->
     <script defer src="map/renderers/rendering-facades.js"></script>
@@ -309,7 +311,7 @@
                                         </template>
                                         <!-- The procedures heard, named (Chips: Place, Q55): a proposal. -->
                                         <template x-for="p in (t.places || [])" :key="'place-' + p.designator + (p.raw || []).join('-')">
-                                            <button class="cl-chip cl-chip--place" @click.stop="$store.atc.showPlace(p)" :aria-label="p.designator + ': show ' + p.point + ' on the map'"
+                                            <button class="cl-chip cl-chip--place" @click.stop="$store.atc.showRoute(p)" :aria-label="p.designator + ($store.atc.routeForPlace(p) ? ': show its route on the map' : ': show ' + p.point + ' on the map')"
                                                     data-help-title="Official AIP name" :data-help="$store.atc.placeHelp(p)" x-text="p.designator"></button>
                                         </template>
                                     </div>
@@ -941,6 +943,11 @@
                                  ><span class="cl-sky__note-text" x-text="$store.atc.filterSummary"></span
                                  ><button class="cl-btn cl-btn--icon" aria-label="Clear filters" @click="$store.atc.clearFilters()"
                                           data-help-title="Clear filters" data-help="Every filter the note lists back to all: altitude, phases, air, ground, heard, search."><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button></div>
+<!-- The route a procedure chip asked for (ProcedureRoute, Q56): what it is, and its close. -->
+                            <div x-show="$store.atc.mainView === 'map' && $store.atc.askedRoute" x-cloak class="cl-sky__note cl-sky__note--action pointer-events-auto"
+                                 ><span class="cl-sky__note-text cursor-help" x-text="$store.atc.askedRoute?.note" data-help-title="Published route" :data-help="$store.atc.askedRoute?.help"></span
+                                 ><button class="cl-btn cl-btn--icon" aria-label="Close the route" @click="$store.atc.closeRoute()"
+                                          data-help-title="Close the route" data-help="Take the published route off the map."><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button></div>
 <div x-show="$store.atc.columnFolded && !$store.atc.selectedAircraft" x-cloak class="cl-sky__end pointer-events-auto hidden md:flex">
                                 <div class="cl-row">
                                     <button class="cl-btn" @click="$store.atc.setColumnFolded(false, 'traffic')"
@@ -1061,6 +1068,29 @@
                                                            :value="$store.atc.settings[row.op]" @input="$store.atc.setLayerOpacity(row, $event.target.value)">
                                             </div>
                                                 </template>
+                                            </div>
+                                        </template>
+                                        <!-- Published routes (ProcedureRoute, Q56): off by default; arrivals or
+                                             departures; the configuration drawn is said, not chosen. -->
+                                        <div class="cl-menu__row">
+                                            <template x-if="$store.atc.procedureLayer.state !== 'outside'">
+                                                <button class="cl-switch" role="switch" :class="$store.atc.settings.showProcedures ? 'is-on' : ''" :aria-checked="!!$store.atc.settings.showProcedures"
+                                                        aria-label="Procedures (SID, STAR)" @click="$store.atc.flipSetting('showProcedures', 'toggleProcedures')"></button>
+                                            </template>
+                                            <span class="cl-menu__label cursor-help" data-help-title="Procedures (SID, STAR)" :data-help="window.ProcedureRoutes?.LAYER_HELP">Procedures (SID, STAR)</span>
+                                        </div>
+                                        <template x-if="$store.atc.procedureLayer.state === 'outside'">
+                                            <span class="cl-field__source" x-text="$store.atc.procedureLayer.text"></span>
+                                        </template>
+                                        <template x-if="$store.atc.procedureLayer.state !== 'outside' && $store.atc.settings.showProcedures">
+                                            <div class="flex flex-col gap-1">
+                                                <div class="cl-seg" role="group" aria-label="Procedures shown">
+                                                    <button class="cl-seg__item" :aria-pressed="$store.atc.settings.proceduresKind !== 'SID'" @click="$store.atc.setProceduresKind('STAR')"
+                                                            data-help-title="Arrivals" data-help="The published arrivals (STAR) of the runways in use: from the point an aircraft enters by toward the runway.">Arrivals</button>
+                                                    <button class="cl-seg__item" :aria-pressed="$store.atc.settings.proceduresKind === 'SID'" @click="$store.atc.setProceduresKind('SID')"
+                                                            data-help-title="Departures" data-help="The published departures (SID) of the runways in use: from the runway to the point an aircraft leaves by.">Departures</button>
+                                                </div>
+                                                <span class="cl-field__source" x-text="$store.atc.procedureLayer.text"></span>
                                             </div>
                                         </template>
                                     </div>
@@ -1714,7 +1744,7 @@
                                                     <span class="cl-chip cl-chip--instr" :class="p.role === 'clearance' ? 'cl-chip--clearance' : ''" x-text="p.text"></span>
                                                 </template>
                                                 <template x-for="p in (t.places || [])" :key="'place-' + p.designator + (p.raw || []).join('-')">
-                                                    <button class="cl-chip cl-chip--place" @click.stop="$store.atc.showPlace(p)" :aria-label="p.designator + ': show ' + p.point + ' on the map'"
+                                                    <button class="cl-chip cl-chip--place" @click.stop="$store.atc.showRoute(p)" :aria-label="p.designator + ($store.atc.routeForPlace(p) ? ': show its route on the map' : ': show ' + p.point + ' on the map')"
                                                             data-help-title="Official AIP name" :data-help="$store.atc.placeHelp(p)" x-text="p.designator"></button>
                                                 </template>
                                             </div>
@@ -1834,6 +1864,7 @@
     <script defer src="store/thread.js"></script>
     <script defer src="store/story.js"></script>
     <script defer src="store/sky.js"></script>
+    <script defer src="store/procedures.js"></script>
     <script defer src="server-settings.js"></script>
     <script defer src="app.js"></script>
     <!-- Alpine starts after every script above has registered its stores and

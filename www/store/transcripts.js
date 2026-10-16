@@ -255,8 +255,9 @@
 
         placeHelp(p) {
             const what = p.kind === 'SID' ? 'a departure (SID)' : p.kind === 'STAR' ? 'an arrival (STAR)' : 'a procedure';
+            const end = typeof this.placeHelpEnd === 'function' ? this.placeHelpEnd(p) : `Click to see ${p.point} on the map.`;
             return `Official AIP name, proposed from the sound of the words: ${p.designator}, ${what} named after ${p.point}. ` +
-                `The transcript is left as heard. Click to see ${p.point} on the map.`;
+                `The transcript is left as heard. ${end}`;
         },
 
         // A procedure's point on the map for ten seconds (Chips, Q55).

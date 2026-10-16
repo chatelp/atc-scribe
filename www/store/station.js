@@ -269,6 +269,7 @@
                 // Every airport followed; its runways are drawn, not only the
                 // reference airport's.
                 this.followedAirports = Array.isArray(data.airports) ? data.airports : [];
+                if (this.settings.showProcedures) this.drawProcedureLayer();
                 const followedRunways = this.followedAirports.map(a => a.runways).filter(Boolean);
 
                 // Store runway data if available
@@ -476,6 +477,8 @@
                 const data = await response.json();
                 this.runwayInUse = data.runway_in_use || null;
                 if (Array.isArray(data.airports)) this.followedAirports = data.airports;
+                // The Procedures layer follows the runways in use (Q56).
+                if (this.settings.showProcedures) this.drawProcedureLayer();
             } catch (e) { /* silent */ }
         },
 
